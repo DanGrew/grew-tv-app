@@ -136,7 +136,7 @@ function releaseWakeLock() {
 
 async function loadManifest() {
   try {
-    var res = await fetch(FILE_SERVER + '/HomeView/manifest.json', { cache: 'no-store' });
+    var res = await fetch(FILE_SERVER + '/grew-tv/content/manifest.json', { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     var data = await res.json();
     return data.films || [];
@@ -164,7 +164,7 @@ function buildGrid(allFilms) {
     tile.tabIndex = 0;
     tile.setAttribute('data-index', i);
 
-    var posterUrl = FILE_SERVER + '/HomeView/' + film.path + '/poster.jpg';
+    var posterUrl = FILE_SERVER + '/grew-tv/' + film.path + '/poster.jpg';
     tile.innerHTML =
       '<img class="film-poster" src="' + posterUrl + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
       '<div class="film-poster-placeholder" style="display:none">🎬</div>' +
@@ -185,7 +185,7 @@ function playFilm(film) {
   var video = document.getElementById('video');
   if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
 
-  var url = FILE_SERVER + '/HomeView/' + film.path + '/video.mp4';
+  var url = FILE_SERVER + '/grew-tv/' + film.path + '/video.mp4';
   video.src = url;
   document.getElementById('film-title-video').textContent = film.title;
   show('screen-video');
