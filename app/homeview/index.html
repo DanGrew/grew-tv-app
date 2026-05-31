@@ -52,11 +52,14 @@ button:hover { background: #222; }
 #controls {
   position: fixed; bottom: 0; left: 0; right: 0;
   background: linear-gradient(transparent, rgba(0,0,0,0.9));
-  padding: 60px 60px 40px;
-  display: flex; align-items: center; gap: 32px;
+  padding: 40px 60px 40px;
+  display: flex; flex-direction: column; gap: 16px;
   transition: opacity 0.3s;
 }
 #controls.hidden { opacity: 0; pointer-events: none; }
+#skip-row { display: flex; gap: 8px; justify-content: space-between; }
+.btn-skip { font-size: 24px; padding: 8px 12px; min-width: auto; flex: 1; }
+#progress-row { display: flex; align-items: center; gap: 32px; }
 #btn-back-video { font-size: 28px; padding: 16px 32px; min-width: auto; }
 #film-title-video { font-size: 36px; flex: 1; }
 #progress { flex: 2; height: 6px; background: #444; border-radius: 3px; position: relative; }
@@ -110,10 +113,26 @@ button:hover { background: #222; }
 <div id="screen-video">
   <video id="video" preload="metadata"></video>
   <div id="controls">
-    <button id="btn-back-video">← Back</button>
-    <div id="film-title-video"></div>
-    <div id="progress"><div id="progress-fill"></div></div>
-    <div id="time-display">0:00 / 0:00</div>
+    <div id="skip-row">
+      <button class="btn-skip" data-delta="-1800">«30m</button>
+      <button class="btn-skip" data-delta="-900">«15m</button>
+      <button class="btn-skip" data-delta="-300">«5m</button>
+      <button class="btn-skip" data-delta="-120">«2m</button>
+      <button class="btn-skip" data-delta="-30">«30s</button>
+      <button class="btn-skip" data-delta="-10">«10s</button>
+      <button class="btn-skip" data-delta="10">10s»</button>
+      <button class="btn-skip" data-delta="30">30s»</button>
+      <button class="btn-skip" data-delta="120">2m»</button>
+      <button class="btn-skip" data-delta="300">5m»</button>
+      <button class="btn-skip" data-delta="900">15m»</button>
+      <button class="btn-skip" data-delta="1800">30m»</button>
+    </div>
+    <div id="progress-row">
+      <button id="btn-back-video">← Back</button>
+      <div id="film-title-video"></div>
+      <div id="progress"><div id="progress-fill"></div></div>
+      <div id="time-display">0:00 / 0:00</div>
+    </div>
   </div>
 </div>
 
@@ -366,13 +385,22 @@ function togglePlayPause() {
   VIDEO_TOGGLE[video.paused]();
 }
 
+function skipFocusMove(delta) {
+  var btns = Array.from(document.querySelectorAll('.btn-skip'));
+  var idx = btns.indexOf(document.activeElement);
+  [btns[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).forEach(function(b) { b.focus(); });
+}
+
 function handleVideoKey(e) {
+  var onSkip = document.activeElement.classList.contains('btn-skip');
+  var onBack = document.activeElement.id === 'btn-back-video';
   showControls();
-  [stopPlayback].filter(function() { return VIDEO_STOP_KEYS[e.key]; }).forEach(function(f) { f(); });
-  [togglePlayPause].filter(function() { return VIDEO_PLAY_PAUSE_KEYS[e.key]; }).forEach(function(f) {
-    e.preventDefault();
-    f();
-  });
+  [stopPlayback].filter(function() { return VIDEO_STOP_KEYS[e.key]; }).forEach(function(f) { e.preventDefault(); f(); });
+  [1].filter(function() { return e.key === 'ArrowLeft' && onSkip; }).forEach(function() { e.preventDefault(); skipFocusMove(-1); });
+  [1].filter(function() { return e.key === 'ArrowRight' && onSkip; }).forEach(function() { e.preventDefault(); skipFocusMove(1); });
+  [1].filter(function() { return e.key === 'ArrowDown' && onSkip; }).forEach(function() { e.preventDefault(); document.getElementById('btn-back-video').focus(); });
+  [document.querySelector('.btn-skip')].filter(function() { return e.key === 'ArrowUp' && onBack; }).forEach(function(b) { e.preventDefault(); b.focus(); });
+  [togglePlayPause].filter(function() { return VIDEO_PLAY_PAUSE_KEYS[e.key] && !onSkip && !onBack; }).forEach(function(f) { e.preventDefault(); f(); });
 }
 
 function onManifestError() {
@@ -407,6 +435,13 @@ video.addEventListener('timeupdate', function() {
 video.addEventListener('ended', stopPlayback);
 
 document.getElementById('btn-back-video').addEventListener('click', stopPlayback);
+Array.from(document.querySelectorAll('.btn-skip')).forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var delta = parseFloat(btn.getAttribute('data-delta'));
+    video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + delta));
+    showControls();
+  });
+});
 document.getElementById('screen-video').addEventListener('keydown', handleVideoKey);
 document.getElementById('screen-video').addEventListener('click', function() { showControls(); });
 
