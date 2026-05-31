@@ -327,7 +327,8 @@ function playFilm(film, item, from) {
   document.getElementById('film-title-video').textContent = film.title + labelSuffix;
   show('screen-video');
   acquireWakeLock();
-  v.play().catch(function() {});
+  v.muted = true;
+  v.play().then(function() { v.muted = false; }).catch(function() {});
   var savedPos = parseFloat(localStorage.getItem('grew-tv-resume-' + film.id + '-' + playItem.id));
   [savedPos].filter(function(p) { return p > 0; }).forEach(function(p) { v.currentTime = p; });
   showControls();
@@ -444,9 +445,19 @@ show('screen-profile');
 document.getElementById('btn-kids').focus();
 
 (function() {
-  function dispatchKey(key) {
-    var target = [document.activeElement, document.body].filter(Boolean)[0];
-    target.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true, cancelable: true }));
+  var BACK_TARGETS = { 'screen-detail': 'screen-detail', 'screen-video': 'screen-video' };
+
+  function dispatchEscape() {
+    var activeId = Object.keys(BACK_TARGETS).filter(function(id) { return document.getElementById(id).classList.contains('active'); })[0];
+    var target = [document.getElementById(BACK_TARGETS[activeId])].filter(Boolean).concat([document.body])[0];
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  }
+
+  function navItems(selector, delta) {
+    var items = Array.from(document.querySelectorAll(selector));
+    var cur = items.indexOf(document.activeElement);
+    var from = [cur].filter(function(i) { return i > -1; }).concat([-1])[0];
+    [items[Math.max(0, Math.min(items.length - 1, from + delta))]].filter(Boolean).forEach(function(el) { el.focus(); });
   }
 
   var REMOTE_HANDLERS = {
@@ -464,12 +475,12 @@ document.getElementById('btn-kids').focus();
     },
     vol_up:   function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); },
     vol_down: function() { video.volume = Math.max(0, video.volume - 0.1); showControls(); },
-    up:       function() { dispatchKey('ArrowUp'); },
-    down:     function() { dispatchKey('ArrowDown'); },
-    left:     function() { dispatchKey('ArrowLeft'); },
-    right:    function() { dispatchKey('ArrowRight'); },
-    select:   function() { dispatchKey('Enter'); },
-    back:     function() { dispatchKey('Escape'); }
+    up:       function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', -1); },
+    down:     function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', 1); },
+    left:     function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', -1); },
+    right:    function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', 1); },
+    select:   function() { [document.activeElement, document.body].filter(Boolean)[0].click(); },
+    back:     function() { dispatchEscape(); }
   };
 
   function handleCmd(cmd) {
@@ -481,10 +492,10 @@ document.getElementById('btn-kids').focus();
       .then(function(r) { return r.json(); })
       .then(function(data) { [data.cmd].filter(Boolean).forEach(handleCmd); })
       .catch(function() {})
-      .then(function() { setTimeout(poll, 500); });
+      .then(function() { setTimeout(poll, 200); });
   }
 
-  setTimeout(poll, 500);
+  setTimeout(poll, 200);
 }());
 </script>
 </body>
