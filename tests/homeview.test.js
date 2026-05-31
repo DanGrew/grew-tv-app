@@ -4,12 +4,20 @@ const path = require('path');
 const MANIFEST_URL = 'http://localhost:8080/grew-tv/content/manifest.json';
 const FIXTURE = require('./fixtures/manifest.js');
 
-async function interceptManifest(page, data) {
+async function interceptManifest(page, fixture) {
   await page.route(MANIFEST_URL, route => route.fulfill({
     status: 200,
     contentType: 'application/json',
-    body: JSON.stringify(data)
+    body: JSON.stringify(fixture.manifest)
   }));
+  for (const [itemPath, itemData] of Object.entries(fixture.items)) {
+    const itemUrl = 'http://localhost:8080/grew-tv/' + itemPath;
+    await page.route(itemUrl, route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(itemData)
+    }));
+  }
 }
 
 async function interceptManifestError(page) {
