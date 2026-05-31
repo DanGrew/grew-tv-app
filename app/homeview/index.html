@@ -327,8 +327,11 @@ function playFilm(film, item, from) {
   document.getElementById('film-title-video').textContent = film.title + labelSuffix;
   show('screen-video');
   acquireWakeLock();
-  v.muted = true;
-  v.play().then(function() { v.muted = false; }).catch(function() {});
+  v.muted = false;
+  v.play().catch(function() {
+    v.muted = true;
+    v.play().catch(function() {});
+  });
   var savedPos = parseFloat(localStorage.getItem('grew-tv-resume-' + film.id + '-' + playItem.id));
   [savedPos].filter(function(p) { return p > 0; }).forEach(function(p) { v.currentTime = p; });
   showControls();
@@ -380,8 +383,8 @@ function onManifestError() {
 
 function onManifestLoaded(allFilms) {
   films = allFilms;
-  buildGrid(films);
   show('screen-browse');
+  buildGrid(films);
 }
 
 async function selectProfile(p) {
@@ -444,13 +447,18 @@ document.getElementById('btn-retry').addEventListener('click', function() {
 show('screen-profile');
 document.getElementById('btn-kids').focus();
 
-(function() {
-  var BACK_TARGETS = { 'screen-detail': 'screen-detail', 'screen-video': 'screen-video' };
 
-  function dispatchEscape() {
-    var activeId = Object.keys(BACK_TARGETS).filter(function(id) { return document.getElementById(id).classList.contains('active'); })[0];
-    var target = [document.getElementById(BACK_TARGETS[activeId])].filter(Boolean).concat([document.body])[0];
-    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+(function() {
+  var BACK_ACTIONS = {
+    'screen-video':  function() { stopPlayback(); },
+    'screen-detail': function() { show('screen-browse'); [detailSourceTile].filter(Boolean).forEach(function(t) { t.focus(); }); },
+    'screen-browse': function() { show('screen-profile'); document.getElementById('btn-kids').focus(); }
+  };
+
+  function goBack() {
+    Object.keys(BACK_ACTIONS).filter(function(id) {
+      return document.getElementById(id).classList.contains('active');
+    }).forEach(function(id) { BACK_ACTIONS[id](); });
   }
 
   function navItems(selector, delta) {
@@ -480,7 +488,7 @@ document.getElementById('btn-kids').focus();
     left:     function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', -1); },
     right:    function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', 1); },
     select:   function() { [document.activeElement, document.body].filter(Boolean)[0].click(); },
-    back:     function() { dispatchEscape(); }
+    back:     function() { goBack(); }
   };
 
   function handleCmd(cmd) {
