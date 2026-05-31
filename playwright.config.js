@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testMatch: ['tests/**/*.test.js', '!tests/unit/**/*.test.js'],
+  testMatch: 'tests/**/*.test.js',
+  testIgnore: 'tests/unit/**',
   use: {
     baseURL: 'http://localhost:8080'
   },
