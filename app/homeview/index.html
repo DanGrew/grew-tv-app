@@ -239,6 +239,16 @@ async function selectProfile(p) {
   show('screen-browse');
 }
 
+document.getElementById('grid-container').addEventListener('keydown', function(e) {
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  var tiles = Array.from(document.querySelectorAll('.film-tile'));
+  var idx = tiles.indexOf(document.activeElement);
+  if (idx === -1) return;
+  e.preventDefault();
+  var next = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? idx + 1 : idx - 1;
+  if (next >= 0 && next < tiles.length) tiles[next].focus();
+});
+
 document.getElementById('btn-kids').addEventListener('click', function() { selectProfile('kids'); });
 document.getElementById('btn-adults').addEventListener('click', function() { selectProfile('adults'); });
 document.getElementById('btn-retry').addEventListener('click', function() {
