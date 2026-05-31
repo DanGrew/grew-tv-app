@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
-const MANIFEST_URL = 'http://localhost:8080/grew-tv/manifest.json';
+const MANIFEST_URL = 'http://localhost:8765/manifest.json';
 const FIXTURE = require('./fixtures/manifest.js');
 
 async function interceptManifest(page, fixture) {
