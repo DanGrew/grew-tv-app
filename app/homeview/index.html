@@ -114,9 +114,8 @@ var FILM_FILTER = {
   adults: function() { return true; }
 };
 var TILE_ACTION = {
-  'single-film': function(item) { playFilm(item); },
-  'series': function() {},
-  'film-series': function() {}
+  'true': function(item) { playFilm(item); },
+  'false': function() {}
 };
 var PROFILE_LABEL = { kids: 'Kids', adults: 'Adults' };
 var TILE_PLAY_KEYS = { Enter: true, ' ': true };
@@ -173,16 +172,16 @@ function appendFilmTile(grid, film, i) {
   tile.className = 'film-tile';
   tile.tabIndex = 0;
   tile.setAttribute('data-index', i);
-  var posterUrl = FILE_SERVER + '/grew-tv/' + film.path + '/poster.jpg';
+  var posterUrl = FILE_SERVER + '/grew-tv/' + film.path + '/' + film.poster;
   tile.innerHTML =
     '<img class="film-poster" src="' + posterUrl + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
     '<div class="film-poster-placeholder" style="display:none">🎬</div>' +
     '<div class="tile-title">' + film.title + '</div>';
-  tile.addEventListener('click', function() { TILE_ACTION[film.type](film); });
+  tile.addEventListener('click', function() { TILE_ACTION[film.items.length === 1](film); });
   tile.addEventListener('keydown', function(e) {
     [film].filter(function() { return TILE_PLAY_KEYS[e.key]; }).forEach(function(f) {
       e.preventDefault();
-      TILE_ACTION[f.type](f);
+      TILE_ACTION[f.items.length === 1](f);
     });
   });
   grid.appendChild(tile);
@@ -203,7 +202,7 @@ function buildGrid(allFilms) {
 function playFilm(film) {
   var v = document.getElementById('video');
   [currentBlobUrl].filter(Boolean).forEach(revokeBlob);
-  v.src = FILE_SERVER + '/grew-tv/' + film.path + '/video.mp4';
+  v.src = FILE_SERVER + '/grew-tv/' + film.path + '/' + film.items[0].id + '/video.mp4';
   document.getElementById('film-title-video').textContent = film.title;
   show('screen-video');
   acquireWakeLock();

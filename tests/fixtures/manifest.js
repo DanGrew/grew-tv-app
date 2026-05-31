@@ -9,16 +9,16 @@ module.exports = {
   },
   items: {
     'kids/toy-story/content.json': {
-      type: 'single-film', id: 'toy-story', title: 'Toy Story',
-      year: 1995, profile: 'kids', available: true
+      id: 'toy-story', title: 'Toy Story', profile: 'kids', available: true,
+      items: [{ id: 'main', title: 'Toy Story', available: true }]
     },
     'kids/finding-nemo/content.json': {
-      type: 'single-film', id: 'finding-nemo', title: 'Finding Nemo',
-      year: 2003, profile: 'kids', available: true
+      id: 'finding-nemo', title: 'Finding Nemo', profile: 'kids', available: true,
+      items: [{ id: 'main', title: 'Finding Nemo', available: true }]
     },
     'adults/dark-knight/content.json': {
-      type: 'single-film', id: 'dark-knight', title: 'The Dark Knight',
-      year: 2008, profile: 'adults', available: true
+      id: 'dark-knight', title: 'The Dark Knight', profile: 'adults', available: true,
+      items: [{ id: 'main', title: 'The Dark Knight', available: true }]
     }
   }
 };
