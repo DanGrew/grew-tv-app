@@ -1,7 +1,0 @@
-{
-  "films": [
-    { "title": "Toy Story", "path": "toy-story", "profile": "kids" },
-    { "title": "Finding Nemo", "path": "finding-nemo", "profile": "kids" },
-    { "title": "The Dark Knight", "path": "dark-knight", "profile": "adults" }
-  ]
-}
