@@ -99,7 +99,9 @@ button:hover { background: #222; }
   </div>
 </div>
 
-<script>
+<script type="module">
+import { fmt, pad } from '../../core/time.js';
+
 var FILE_SERVER = 'http://localhost:8080';
 var profile = null;
 var films = [];
@@ -113,17 +115,6 @@ function show(id) {
   });
   document.getElementById(id).classList.add('active');
 }
-
-function fmt(secs) {
-  var s = Math.floor(secs);
-  var m = Math.floor(s / 60);
-  var h = Math.floor(m / 60);
-  m = m % 60;
-  s = s % 60;
-  if (h > 0) return h + ':' + pad(m) + ':' + pad(s);
-  return m + ':' + pad(s);
-}
-function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
 function acquireWakeLock() {
   if (!('wakeLock' in navigator)) return;
