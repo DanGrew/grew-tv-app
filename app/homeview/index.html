@@ -449,16 +449,16 @@ document.getElementById('btn-kids').focus();
 
 
 (function() {
+  var BACK_ACTIONS = {
+    'screen-video':  function() { stopPlayback(); },
+    'screen-detail': function() { show('screen-browse'); [detailSourceTile].filter(Boolean).forEach(function(t) { t.focus(); }); },
+    'screen-browse': function() { show('screen-profile'); document.getElementById('btn-kids').focus(); }
+  };
+
   function goBack() {
-    if (document.getElementById('screen-video').classList.contains('active')) {
-      stopPlayback();
-    } else if (document.getElementById('screen-detail').classList.contains('active')) {
-      show('screen-browse');
-      [detailSourceTile].filter(Boolean).forEach(function(t) { t.focus(); });
-    } else if (document.getElementById('screen-browse').classList.contains('active')) {
-      show('screen-profile');
-      document.getElementById('btn-kids').focus();
-    }
+    Object.keys(BACK_ACTIONS).filter(function(id) {
+      return document.getElementById(id).classList.contains('active');
+    }).forEach(function(id) { BACK_ACTIONS[id](); });
   }
 
   function navItems(selector, delta) {
