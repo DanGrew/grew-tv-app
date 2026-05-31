@@ -1,0 +1,15 @@
+{
+  "name": "grew-tv-app",
+  "private": true,
+  "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
+    "test:unit": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test": "playwright test --pass-with-no-tests"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@vitest/coverage-v8": "^4.1.5",
+    "vitest": "^4.1.5"
+  }
+}
