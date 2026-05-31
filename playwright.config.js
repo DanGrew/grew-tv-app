@@ -1,7 +1,8 @@
-import { defineConfig, devices } from '@playwright/test';
+const { defineConfig, devices } = require('@playwright/test');
 
-export default defineConfig({
-  testMatch: ['tests/**/*.test.js', '!tests/unit/**/*.test.js'],
+module.exports = defineConfig({
+  testDir: './tests',
+  testIgnore: ['**/unit/**'],
   use: {
     baseURL: 'http://localhost:8080'
   },

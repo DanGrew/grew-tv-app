@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { pad, fmt } from '../../core/time.js';
 
 describe('pad', () => {
