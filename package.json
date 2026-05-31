@@ -1,7 +1,6 @@
 {
   "name": "grew-tv-app",
   "private": true,
-  "type": "module",
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
     "test:unit": "vitest run",
