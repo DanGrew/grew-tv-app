@@ -12,6 +12,7 @@ body { background: #0a0a0a; color: #fff; font-family: sans-serif; height: 100vh;
 #screen-browse,
 #screen-error { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; }
 #screen-video { display: none; height: 100vh; background: #000; position: relative; }
+#screen-detail { display: none; height: 100vh; flex-direction: column; }
 .active { display: flex !important; }
 #screen-video.active { display: block !important; }
 
@@ -61,6 +62,23 @@ button:hover { background: #222; }
 #progress { flex: 2; height: 6px; background: #444; border-radius: 3px; position: relative; }
 #progress-fill { height: 100%; background: #ff0; border-radius: 3px; width: 0; }
 #time-display { font-size: 28px; color: #aaa; min-width: 120px; text-align: right; }
+
+#detail-title { font-size: 48px; padding: 40px 60px 24px; flex-shrink: 0; }
+#detail-list { flex: 1; overflow-y: auto; padding: 0 60px 60px; }
+.detail-row {
+  display: flex; align-items: center; gap: 24px;
+  padding: 20px; border: 3px solid #333; border-radius: 12px;
+  margin-bottom: 16px; cursor: pointer; background: #1a1a1a;
+}
+.detail-row:focus { outline: none; border-color: #ff0; }
+.detail-row.unavailable { opacity: 0.4; cursor: default; }
+.detail-thumb { width: 80px; height: 120px; object-fit: cover; background: #222; border-radius: 6px; flex-shrink: 0; }
+.detail-thumb-placeholder { width: 80px; height: 120px; background: #1e1e1e; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 32px; flex-shrink: 0; }
+.detail-info { flex: 1; }
+.detail-label { font-size: 36px; line-height: 1.3; }
+.detail-duration { font-size: 28px; color: #aaa; margin-top: 6px; }
+.detail-desc { font-size: 26px; color: #888; margin-top: 6px; }
+.detail-resume { font-size: 24px; color: #ff0; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -99,6 +117,11 @@ button:hover { background: #222; }
   </div>
 </div>
 
+<div id="screen-detail">
+  <div id="detail-title"></div>
+  <div id="detail-list"></div>
+</div>
+
 <script type="module">
 import { fmt, pad } from '../../core/time.js';
 
@@ -108,20 +131,51 @@ var films = [];
 var wakeLock = null;
 var controlsTimer = null;
 var currentBlobUrl = null;
+var currentFilm = null;
+var currentItem = null;
+var currentItemIndex = -1;
+var currentDetailFilm = null;
+var detailSourceTile = null;
+var returnScreen = 'screen-browse';
+var lastSaveTime = 0;
 
 var FILM_FILTER = {
   kids: function(f) { return f.profile === 'kids'; },
   adults: function() { return true; }
 };
 var TILE_ACTION = {
-  'true': function(item) { playFilm(item); },
-  'false': function() {}
+  'true': function(film) { playFilm(film, film.items[0], 'screen-browse'); },
+  'false': function(film) { showDetail(film); }
 };
 var PROFILE_LABEL = { kids: 'Kids', adults: 'Adults' };
 var TILE_PLAY_KEYS = { Enter: true, ' ': true };
 var VIDEO_STOP_KEYS = { Escape: true, Backspace: true };
 var VIDEO_PLAY_PAUSE_KEYS = { ' ': true, Enter: true };
 var ARROW_DELTA = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+var DETAIL_ARROW_DELTA = { ArrowUp: -1, ArrowDown: 1 };
+var DETAIL_BACK_KEYS = { Escape: true, Backspace: true };
+
+var AVAILABLE_ROW = {
+  'true':  { className: 'detail-row',             tabIndex: 0  },
+  'false': { className: 'detail-row unavailable', tabIndex: -1 }
+};
+
+var DETAIL_SOURCE_TILE_UPDATE = {
+  'true':  function() {},
+  'false': function() { detailSourceTile = document.activeElement; }
+};
+
+var STOP_RESTORE = {
+  'screen-detail': function(savedIdx) {
+    showDetail(currentDetailFilm, true);
+    var targetRow = document.querySelector('.detail-row[data-index="' + savedIdx + '"]:not(.unavailable)');
+    [targetRow].filter(Boolean).forEach(function(r) { r.focus(); });
+  },
+  'screen-browse': function() {
+    show('screen-browse');
+    [document.querySelector('.film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
+  }
+};
 
 var video = document.getElementById('video');
 
@@ -131,7 +185,7 @@ var VIDEO_TOGGLE = {
 };
 
 function show(id) {
-  ['screen-profile','screen-browse','screen-error','screen-video'].forEach(function(s) {
+  ['screen-profile','screen-browse','screen-error','screen-video','screen-detail'].forEach(function(s) {
     document.getElementById(s).classList.remove('active');
   });
   document.getElementById(id).classList.add('active');
@@ -199,14 +253,87 @@ function buildGrid(allFilms) {
   [grid.querySelector('.film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
 }
 
-function playFilm(film) {
+function buildDetailRow(film, item, i) {
+  var available = item.available !== false;
+  var avConfig = AVAILABLE_ROW[available + ''];
+  var row = document.createElement('div');
+  row.className = avConfig.className;
+  row.tabIndex = avConfig.tabIndex;
+  row.setAttribute('data-index', i);
+
+  var posterSrc = FILE_SERVER + '/grew-tv/' + film.path + '/' +
+    ([item.poster].filter(Boolean).concat([film.poster].filter(Boolean)))[0];
+
+  var thumbHtml =
+    '<img class="detail-thumb" src="' + posterSrc + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+    '<div class="detail-thumb-placeholder" style="display:none">🎬</div>';
+
+  var resumeKey = 'grew-tv-resume-' + film.path + '-' + item.id;
+  var saved = localStorage.getItem(resumeKey);
+  var resumeHtml = [saved].filter(Boolean).map(function(s) {
+    return '<div class="detail-resume">\u25b6 Resume ' + fmt(parseFloat(s)) + '</div>';
+  }).join('');
+  var durationHtml = [item.duration].filter(Boolean).map(function(d) {
+    return '<div class="detail-duration">' + d + '</div>';
+  }).join('');
+  var descHtml = [item.description].filter(Boolean).map(function(d) {
+    return '<div class="detail-desc">' + d + '</div>';
+  }).join('');
+  var label = [item.label, item.title, 'Item ' + (i + 1)].filter(Boolean)[0];
+
+  row.innerHTML = thumbHtml +
+    '<div class="detail-info">' +
+    '<div class="detail-label">' + label + '</div>' +
+    durationHtml + descHtml + resumeHtml +
+    '</div>';
+
+  [row].filter(function() { return available; }).forEach(function(r) {
+    r.addEventListener('click', function() { playFilm(film, item, 'screen-detail'); });
+    r.addEventListener('keydown', function(e) {
+      [e.key].filter(function(k) { return k === 'Enter'; }).forEach(function() {
+        e.preventDefault();
+        playFilm(film, item, 'screen-detail');
+      });
+    });
+  });
+
+  return row;
+}
+
+function showDetail(film, preserveSourceTile) {
+  currentDetailFilm = film;
+  DETAIL_SOURCE_TILE_UPDATE[!!preserveSourceTile]();
+  document.getElementById('detail-title').textContent = film.title;
+  var list = document.getElementById('detail-list');
+  list.innerHTML = '';
+  film.items.forEach(function(item, i) { list.appendChild(buildDetailRow(film, item, i)); });
+  show('screen-detail');
+  var rows = Array.from(list.querySelectorAll('.detail-row:not(.unavailable)'));
+  var resumeRows = rows.filter(function(r) {
+    return !!localStorage.getItem('grew-tv-resume-' + film.path + '-' + film.items[parseInt(r.getAttribute('data-index'))].id);
+  });
+  [resumeRows.concat(rows)[0]].filter(Boolean).forEach(function(r) { r.focus(); });
+}
+
+function playFilm(film, item, from) {
+  var playItem = [item].filter(Boolean).concat(film.items)[0];
+  var playFrom = [from].filter(Boolean).concat(['screen-browse'])[0];
   var v = document.getElementById('video');
   [currentBlobUrl].filter(Boolean).forEach(revokeBlob);
-  v.src = FILE_SERVER + '/grew-tv/' + film.path + '/' + film.items[0].id + '/video.mp4';
-  document.getElementById('film-title-video').textContent = film.title;
+  currentFilm = film;
+  currentItem = playItem;
+  currentItemIndex = film.items.indexOf(playItem);
+  returnScreen = playFrom;
+  v.src = FILE_SERVER + '/grew-tv/' + film.path + '/' + playItem.id + '/video.mp4';
+  var labelSuffix = [playItem.label, playItem.title].filter(Boolean).map(function(l) {
+    return ' \u2014 ' + l;
+  }).concat([''])[0];
+  document.getElementById('film-title-video').textContent = film.title + labelSuffix;
   show('screen-video');
   acquireWakeLock();
   v.play().catch(function() {});
+  var savedPos = parseFloat(localStorage.getItem('grew-tv-resume-' + film.path + '-' + playItem.id));
+  [savedPos].filter(function(p) { return p > 0; }).forEach(function(p) { v.currentTime = p; });
   showControls();
 }
 
@@ -215,8 +342,12 @@ function stopPlayback() {
   v.pause();
   v.src = '';
   releaseWakeLock();
-  show('screen-browse');
-  [document.querySelector('.film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
+  var rs = returnScreen;
+  var savedIdx = currentItemIndex;
+  currentItem = null;
+  currentFilm = null;
+  currentItemIndex = -1;
+  STOP_RESTORE[rs](savedIdx);
 }
 
 function showControls() {
@@ -265,6 +396,13 @@ async function selectProfile(p) {
 
 video.addEventListener('timeupdate', function() {
   [video.duration].filter(Boolean).forEach(updateProgress);
+  [currentFilm].filter(Boolean).forEach(function(film) {
+    var now = Date.now();
+    [currentItem].filter(Boolean).filter(function() { return now - lastSaveTime > 5000; }).forEach(function() {
+      lastSaveTime = now;
+      localStorage.setItem('grew-tv-resume-' + film.path + '-' + currentItem.id, video.currentTime);
+    });
+  });
 });
 
 video.addEventListener('ended', stopPlayback);
@@ -279,6 +417,20 @@ document.getElementById('grid-container').addEventListener('keydown', function(e
   var idx = tiles.indexOf(document.activeElement);
   [delta].filter(Boolean).forEach(function() { e.preventDefault(); });
   [tiles[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).forEach(function(t) { t.focus(); });
+});
+
+document.getElementById('screen-detail').addEventListener('keydown', function(e) {
+  [DETAIL_BACK_KEYS[e.key]].filter(Boolean).forEach(function() {
+    e.preventDefault();
+    show('screen-browse');
+    [detailSourceTile].filter(Boolean).forEach(function(t) { t.focus(); });
+  });
+  [DETAIL_ARROW_DELTA[e.key]].filter(Boolean).forEach(function(delta) {
+    e.preventDefault();
+    var rows = Array.from(document.querySelectorAll('.detail-row:not(.unavailable)'));
+    var idx = rows.indexOf(document.activeElement);
+    [rows[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).forEach(function(r) { r.focus(); });
+  });
 });
 
 document.getElementById('btn-kids').addEventListener('click', function() { selectProfile('kids'); });
