@@ -327,7 +327,8 @@ function playFilm(film, item, from) {
   document.getElementById('film-title-video').textContent = film.title + labelSuffix;
   show('screen-video');
   acquireWakeLock();
-  v.play().catch(function() {});
+  v.muted = true;
+  v.play().then(function() { v.muted = false; }).catch(function() {});
   var savedPos = parseFloat(localStorage.getItem('grew-tv-resume-' + film.id + '-' + playItem.id));
   [savedPos].filter(function(p) { return p > 0; }).forEach(function(p) { v.currentTime = p; });
   showControls();
@@ -442,6 +443,60 @@ document.getElementById('btn-retry').addEventListener('click', function() {
 
 show('screen-profile');
 document.getElementById('btn-kids').focus();
+
+(function() {
+  var BACK_TARGETS = { 'screen-detail': 'screen-detail', 'screen-video': 'screen-video' };
+
+  function dispatchEscape() {
+    var activeId = Object.keys(BACK_TARGETS).filter(function(id) { return document.getElementById(id).classList.contains('active'); })[0];
+    var target = [document.getElementById(BACK_TARGETS[activeId])].filter(Boolean).concat([document.body])[0];
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  }
+
+  function navItems(selector, delta) {
+    var items = Array.from(document.querySelectorAll(selector));
+    var cur = items.indexOf(document.activeElement);
+    var from = [cur].filter(function(i) { return i > -1; }).concat([-1])[0];
+    [items[Math.max(0, Math.min(items.length - 1, from + delta))]].filter(Boolean).forEach(function(el) { el.focus(); });
+  }
+
+  var REMOTE_HANDLERS = {
+    play:     function() { video.play().catch(function(){}); showControls(); },
+    pause:    function() { video.pause(); showControls(); },
+    next:     function() {
+      [currentFilm].filter(Boolean).forEach(function(f) {
+        [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); });
+      });
+    },
+    prev:     function() {
+      [currentFilm].filter(Boolean).forEach(function(f) {
+        [f.items[currentItemIndex - 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); });
+      });
+    },
+    vol_up:   function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); },
+    vol_down: function() { video.volume = Math.max(0, video.volume - 0.1); showControls(); },
+    up:       function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', -1); },
+    down:     function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', 1); },
+    left:     function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', -1); },
+    right:    function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', 1); },
+    select:   function() { [document.activeElement, document.body].filter(Boolean)[0].click(); },
+    back:     function() { dispatchEscape(); }
+  };
+
+  function handleCmd(cmd) {
+    [REMOTE_HANDLERS[cmd]].filter(Boolean).forEach(function(fn) { fn(); });
+  }
+
+  function poll() {
+    fetch('http://localhost:8765/poll')
+      .then(function(r) { return r.json(); })
+      .then(function(data) { [data.cmd].filter(Boolean).forEach(handleCmd); })
+      .catch(function() {})
+      .then(function() { setTimeout(poll, 200); });
+  }
+
+  setTimeout(poll, 200);
+}());
 </script>
 </body>
 </html>
