@@ -385,6 +385,15 @@ function togglePlayPause() {
   VIDEO_TOGGLE[video.paused]();
 }
 
+var SKIP_NAV = {
+  ArrowLeft:  function() { skipFocusMove(-1); },
+  ArrowRight: function() { skipFocusMove(1); },
+  ArrowDown:  function() { document.getElementById('btn-back-video').focus(); }
+};
+var BACK_NAV = {
+  ArrowUp: function() { [document.querySelector('.btn-skip')].filter(Boolean).forEach(function(b) { b.focus(); }); }
+};
+
 function skipFocusMove(delta) {
   var btns = Array.from(document.querySelectorAll('.btn-skip'));
   var idx = btns.indexOf(document.activeElement);
@@ -396,11 +405,9 @@ function handleVideoKey(e) {
   var onBack = document.activeElement.id === 'btn-back-video';
   showControls();
   [stopPlayback].filter(function() { return VIDEO_STOP_KEYS[e.key]; }).forEach(function(f) { e.preventDefault(); f(); });
-  [1].filter(function() { return e.key === 'ArrowLeft' && onSkip; }).forEach(function() { e.preventDefault(); skipFocusMove(-1); });
-  [1].filter(function() { return e.key === 'ArrowRight' && onSkip; }).forEach(function() { e.preventDefault(); skipFocusMove(1); });
-  [1].filter(function() { return e.key === 'ArrowDown' && onSkip; }).forEach(function() { e.preventDefault(); document.getElementById('btn-back-video').focus(); });
-  [document.querySelector('.btn-skip')].filter(function() { return e.key === 'ArrowUp' && onBack; }).forEach(function(b) { e.preventDefault(); b.focus(); });
-  [togglePlayPause].filter(function() { return VIDEO_PLAY_PAUSE_KEYS[e.key] && !onSkip && !onBack; }).forEach(function(f) { e.preventDefault(); f(); });
+  [SKIP_NAV[e.key]].filter(Boolean).filter(function() { return onSkip; }).forEach(function(fn) { e.preventDefault(); fn(); });
+  [BACK_NAV[e.key]].filter(Boolean).filter(function() { return onBack; }).forEach(function(fn) { e.preventDefault(); fn(); });
+  [togglePlayPause].filter(function() { return VIDEO_PLAY_PAUSE_KEYS[e.key]; }).filter(function() { return !onSkip; }).filter(function() { return !onBack; }).forEach(function(f) { e.preventDefault(); f(); });
 }
 
 function onManifestError() {
@@ -438,7 +445,7 @@ document.getElementById('btn-back-video').addEventListener('click', stopPlayback
 Array.from(document.querySelectorAll('.btn-skip')).forEach(function(btn) {
   btn.addEventListener('click', function() {
     var delta = parseFloat(btn.getAttribute('data-delta'));
-    video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + delta));
+    video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + delta));
     showControls();
   });
 });
