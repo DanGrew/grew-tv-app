@@ -126,6 +126,7 @@ button:hover { background: #222; }
 import { fmt, pad } from '../../core/time.js';
 
 var FILE_SERVER = 'http://localhost:8080';
+var contentBase = '';
 var profile = null;
 var films = [];
 var wakeLock = null;
@@ -206,18 +207,10 @@ function releaseWakeLock() {
   [wakeLock].filter(Boolean).forEach(function(wl) { wl.release(); wakeLock = null; });
 }
 
-function fetchContentItem(ref) {
-  return fetch(FILE_SERVER + '/grew-tv/' + ref.path, { cache: 'no-store' })
-    .then(function(res) { return res.json(); })
-    .then(function(item) { item.path = ref.path.replace('/content.json', ''); return item; })
-    .catch(function(e) { console.warn('skipping ' + ref.path + ':', e); return null; });
-}
-
 async function loadManifest() {
-  return fetch(FILE_SERVER + '/grew-tv/content/manifest.json', { cache: 'no-store' })
+  return fetch(FILE_SERVER + '/grew-tv/manifest.json', { cache: 'no-store' })
     .then(function(res) { return res.json(); })
-    .then(function(manifest) { return Promise.all(manifest.content.map(fetchContentItem)); })
-    .then(function(items) { return items.filter(Boolean); })
+    .then(function(manifest) { contentBase = manifest.contentBase; return manifest.content; })
     .catch(function() { return null; });
 }
 
@@ -226,7 +219,7 @@ function appendFilmTile(grid, film, i) {
   tile.className = 'film-tile';
   tile.tabIndex = 0;
   tile.setAttribute('data-index', i);
-  var posterUrl = FILE_SERVER + '/grew-tv/' + film.path + '/' + film.poster;
+  var posterUrl = contentBase + film.poster;
   tile.innerHTML =
     '<img class="film-poster" src="' + posterUrl + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
     '<div class="film-poster-placeholder" style="display:none">🎬</div>' +
@@ -245,7 +238,7 @@ function buildGrid(allFilms) {
   var grid = document.getElementById('grid');
   grid.innerHTML = '';
   document.getElementById('profile-label').textContent = PROFILE_LABEL[profile];
-  var filtered = allFilms.filter(FILM_FILTER[profile]);
+  var filtered = allFilms.filter(FILM_FILTER[profile]).filter(function(f) { return f.available !== false; });
   [grid].filter(function() { return filtered.length === 0; }).forEach(function(g) {
     g.innerHTML = '<div style="font-size:32px;color:#666;grid-column:1/-1;text-align:center;padding:80px 0">No films available</div>';
   });
@@ -261,14 +254,14 @@ function buildDetailRow(film, item, i) {
   row.tabIndex = avConfig.tabIndex;
   row.setAttribute('data-index', i);
 
-  var posterSrc = FILE_SERVER + '/grew-tv/' + film.path + '/' +
+  var posterSrc = contentBase +
     ([item.poster].filter(Boolean).concat([film.poster].filter(Boolean)))[0];
 
   var thumbHtml =
     '<img class="detail-thumb" src="' + posterSrc + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
     '<div class="detail-thumb-placeholder" style="display:none">🎬</div>';
 
-  var resumeKey = 'grew-tv-resume-' + film.path + '-' + item.id;
+  var resumeKey = 'grew-tv-resume-' + film.id + '-' + item.id;
   var saved = localStorage.getItem(resumeKey);
   var resumeHtml = [saved].filter(Boolean).map(function(s) {
     return '<div class="detail-resume">\u25b6 Resume ' + fmt(parseFloat(s)) + '</div>';
@@ -310,7 +303,7 @@ function showDetail(film, preserveSourceTile) {
   show('screen-detail');
   var rows = Array.from(list.querySelectorAll('.detail-row:not(.unavailable)'));
   var resumeRows = rows.filter(function(r) {
-    return !!localStorage.getItem('grew-tv-resume-' + film.path + '-' + film.items[parseInt(r.getAttribute('data-index'))].id);
+    return !!localStorage.getItem('grew-tv-resume-' + film.id + '-' + film.items[parseInt(r.getAttribute('data-index'))].id);
   });
   [resumeRows.concat(rows)[0]].filter(Boolean).forEach(function(r) { r.focus(); });
 }
@@ -324,7 +317,7 @@ function playFilm(film, item, from) {
   currentItem = playItem;
   currentItemIndex = film.items.indexOf(playItem);
   returnScreen = playFrom;
-  v.src = FILE_SERVER + '/grew-tv/' + film.path + '/' + playItem.id + '/video.mp4';
+  v.src = contentBase + playItem.id + '.mp4';
   var labelSuffix = [playItem.label, playItem.title].filter(Boolean).map(function(l) {
     return ' \u2014 ' + l;
   }).concat([''])[0];
@@ -332,7 +325,7 @@ function playFilm(film, item, from) {
   show('screen-video');
   acquireWakeLock();
   v.play().catch(function() {});
-  var savedPos = parseFloat(localStorage.getItem('grew-tv-resume-' + film.path + '-' + playItem.id));
+  var savedPos = parseFloat(localStorage.getItem('grew-tv-resume-' + film.id + '-' + playItem.id));
   [savedPos].filter(function(p) { return p > 0; }).forEach(function(p) { v.currentTime = p; });
   showControls();
 }
@@ -400,7 +393,7 @@ video.addEventListener('timeupdate', function() {
     var now = Date.now();
     [currentItem].filter(Boolean).filter(function() { return now - lastSaveTime > 5000; }).forEach(function() {
       lastSaveTime = now;
-      localStorage.setItem('grew-tv-resume-' + film.path + '-' + currentItem.id, video.currentTime);
+      localStorage.setItem('grew-tv-resume-' + film.id + '-' + currentItem.id, video.currentTime);
     });
   });
 });
