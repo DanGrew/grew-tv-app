@@ -155,6 +155,28 @@ var ARROW_DELTA = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 var DETAIL_ARROW_DELTA = { ArrowUp: -1, ArrowDown: 1 };
 var DETAIL_BACK_KEYS = { Escape: true, Backspace: true };
 
+var AVAILABLE_ROW = {
+  'true':  { className: 'detail-row',             tabIndex: 0  },
+  'false': { className: 'detail-row unavailable', tabIndex: -1 }
+};
+
+var DETAIL_SOURCE_TILE_UPDATE = {
+  'true':  function() {},
+  'false': function() { detailSourceTile = document.activeElement; }
+};
+
+var STOP_RESTORE = {
+  'screen-detail': function(savedIdx) {
+    showDetail(currentDetailFilm, true);
+    var targetRow = document.querySelector('.detail-row[data-index="' + savedIdx + '"]:not(.unavailable)');
+    [targetRow].filter(Boolean).forEach(function(r) { r.focus(); });
+  },
+  'screen-browse': function() {
+    show('screen-browse');
+    [document.querySelector('.film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
+  }
+};
+
 var video = document.getElementById('video');
 
 var VIDEO_TOGGLE = {
@@ -233,26 +255,31 @@ function buildGrid(allFilms) {
 
 function buildDetailRow(film, item, i) {
   var available = item.available !== false;
+  var avConfig = AVAILABLE_ROW[available + ''];
   var row = document.createElement('div');
-  row.className = 'detail-row' + (available ? '' : ' unavailable');
-  row.tabIndex = available ? 0 : -1;
+  row.className = avConfig.className;
+  row.tabIndex = avConfig.tabIndex;
   row.setAttribute('data-index', i);
 
-  var posterSrc = item.poster
-    ? (FILE_SERVER + '/grew-tv/' + film.path + '/' + item.poster)
-    : (film.poster ? (FILE_SERVER + '/grew-tv/' + film.path + '/' + film.poster) : null);
+  var posterSrc = FILE_SERVER + '/grew-tv/' + film.path + '/' +
+    ([item.poster].filter(Boolean).concat([film.poster].filter(Boolean)))[0];
 
-  var thumbHtml = posterSrc
-    ? ('<img class="detail-thumb" src="' + posterSrc + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
-       '<div class="detail-thumb-placeholder" style="display:none">🎬</div>')
-    : '<div class="detail-thumb-placeholder">🎬</div>';
+  var thumbHtml =
+    '<img class="detail-thumb" src="' + posterSrc + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+    '<div class="detail-thumb-placeholder" style="display:none">🎬</div>';
 
   var resumeKey = 'grew-tv-resume-' + film.path + '-' + item.id;
-  var saved = available ? localStorage.getItem(resumeKey) : null;
-  var resumeHtml = saved ? '<div class="detail-resume">\u25b6 Resume ' + fmt(parseFloat(saved)) + '</div>' : '';
-  var durationHtml = item.duration ? '<div class="detail-duration">' + item.duration + '</div>' : '';
-  var descHtml = item.description ? '<div class="detail-desc">' + item.description + '</div>' : '';
-  var label = item.label || item.title || ('Item ' + (i + 1));
+  var saved = localStorage.getItem(resumeKey);
+  var resumeHtml = [saved].filter(Boolean).map(function(s) {
+    return '<div class="detail-resume">\u25b6 Resume ' + fmt(parseFloat(s)) + '</div>';
+  }).join('');
+  var durationHtml = [item.duration].filter(Boolean).map(function(d) {
+    return '<div class="detail-duration">' + d + '</div>';
+  }).join('');
+  var descHtml = [item.description].filter(Boolean).map(function(d) {
+    return '<div class="detail-desc">' + d + '</div>';
+  }).join('');
+  var label = [item.label, item.title, 'Item ' + (i + 1)].filter(Boolean)[0];
 
   row.innerHTML = thumbHtml +
     '<div class="detail-info">' +
@@ -275,42 +302,37 @@ function buildDetailRow(film, item, i) {
 
 function showDetail(film, preserveSourceTile) {
   currentDetailFilm = film;
-  if (!preserveSourceTile) { detailSourceTile = document.activeElement; }
+  DETAIL_SOURCE_TILE_UPDATE[!!preserveSourceTile]();
   document.getElementById('detail-title').textContent = film.title;
   var list = document.getElementById('detail-list');
   list.innerHTML = '';
-  var firstAvailable = null;
-  var resumeRow = null;
-  film.items.forEach(function(item, i) {
-    var row = buildDetailRow(film, item, i);
-    list.appendChild(row);
-    var available = item.available !== false;
-    if (available) {
-      if (!firstAvailable) { firstAvailable = row; }
-      var saved = localStorage.getItem('grew-tv-resume-' + film.path + '-' + item.id);
-      if (saved && !resumeRow) { resumeRow = row; }
-    }
-  });
+  film.items.forEach(function(item, i) { list.appendChild(buildDetailRow(film, item, i)); });
   show('screen-detail');
-  [(resumeRow || firstAvailable)].filter(Boolean).forEach(function(r) { r.focus(); });
+  var rows = Array.from(list.querySelectorAll('.detail-row:not(.unavailable)'));
+  var resumeRows = rows.filter(function(r) {
+    return !!localStorage.getItem('grew-tv-resume-' + film.path + '-' + film.items[parseInt(r.getAttribute('data-index'))].id);
+  });
+  [resumeRows.concat(rows)[0]].filter(Boolean).forEach(function(r) { r.focus(); });
 }
 
 function playFilm(film, item, from) {
-  item = item || film.items[0];
-  from = from || 'screen-browse';
+  var playItem = [item].filter(Boolean).concat(film.items)[0];
+  var playFrom = [from].filter(Boolean).concat(['screen-browse'])[0];
   var v = document.getElementById('video');
   [currentBlobUrl].filter(Boolean).forEach(revokeBlob);
   currentFilm = film;
-  currentItem = item;
-  currentItemIndex = film.items.indexOf(item);
-  returnScreen = from;
-  v.src = FILE_SERVER + '/grew-tv/' + film.path + '/' + item.id + '/video.mp4';
-  var label = item.label || item.title;
-  document.getElementById('film-title-video').textContent = film.title + (label ? ' \u2014 ' + label : '');
+  currentItem = playItem;
+  currentItemIndex = film.items.indexOf(playItem);
+  returnScreen = playFrom;
+  v.src = FILE_SERVER + '/grew-tv/' + film.path + '/' + playItem.id + '/video.mp4';
+  var labelSuffix = [playItem.label, playItem.title].filter(Boolean).map(function(l) {
+    return ' \u2014 ' + l;
+  }).concat([''])[0];
+  document.getElementById('film-title-video').textContent = film.title + labelSuffix;
   show('screen-video');
   acquireWakeLock();
   v.play().catch(function() {});
-  var savedPos = parseFloat(localStorage.getItem('grew-tv-resume-' + film.path + '-' + item.id));
+  var savedPos = parseFloat(localStorage.getItem('grew-tv-resume-' + film.path + '-' + playItem.id));
   [savedPos].filter(function(p) { return p > 0; }).forEach(function(p) { v.currentTime = p; });
   showControls();
 }
@@ -325,14 +347,7 @@ function stopPlayback() {
   currentItem = null;
   currentFilm = null;
   currentItemIndex = -1;
-  if (rs === 'screen-detail') {
-    showDetail(currentDetailFilm, true);
-    var targetRow = document.querySelector('.detail-row[data-index="' + savedIdx + '"]:not(.unavailable)');
-    [targetRow].filter(Boolean).forEach(function(r) { r.focus(); });
-  } else {
-    show(rs);
-    [document.querySelector('.film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
-  }
+  STOP_RESTORE[rs](savedIdx);
 }
 
 function showControls() {
@@ -383,10 +398,10 @@ video.addEventListener('timeupdate', function() {
   [video.duration].filter(Boolean).forEach(updateProgress);
   [currentFilm].filter(Boolean).forEach(function(film) {
     var now = Date.now();
-    if (currentItem && now - lastSaveTime > 5000) {
+    [currentItem].filter(Boolean).filter(function() { return now - lastSaveTime > 5000; }).forEach(function() {
       lastSaveTime = now;
       localStorage.setItem('grew-tv-resume-' + film.path + '-' + currentItem.id, video.currentTime);
-    }
+    });
   });
 });
 
@@ -410,8 +425,7 @@ document.getElementById('screen-detail').addEventListener('keydown', function(e)
     show('screen-browse');
     [detailSourceTile].filter(Boolean).forEach(function(t) { t.focus(); });
   });
-  var delta = DETAIL_ARROW_DELTA[e.key];
-  [delta].filter(Boolean).forEach(function() {
+  [DETAIL_ARROW_DELTA[e.key]].filter(Boolean).forEach(function(delta) {
     e.preventDefault();
     var rows = Array.from(document.querySelectorAll('.detail-row:not(.unavailable)'));
     var idx = rows.indexOf(document.activeElement);
