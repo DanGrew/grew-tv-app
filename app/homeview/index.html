@@ -442,6 +442,50 @@ document.getElementById('btn-retry').addEventListener('click', function() {
 
 show('screen-profile');
 document.getElementById('btn-kids').focus();
+
+(function() {
+  function dispatchKey(key) {
+    var target = [document.activeElement, document.body].filter(Boolean)[0];
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true, cancelable: true }));
+  }
+
+  var REMOTE_HANDLERS = {
+    play:     function() { video.play().catch(function(){}); showControls(); },
+    pause:    function() { video.pause(); showControls(); },
+    next:     function() {
+      [currentFilm].filter(Boolean).forEach(function(f) {
+        [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); });
+      });
+    },
+    prev:     function() {
+      [currentFilm].filter(Boolean).forEach(function(f) {
+        [f.items[currentItemIndex - 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); });
+      });
+    },
+    vol_up:   function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); },
+    vol_down: function() { video.volume = Math.max(0, video.volume - 0.1); showControls(); },
+    up:       function() { dispatchKey('ArrowUp'); },
+    down:     function() { dispatchKey('ArrowDown'); },
+    left:     function() { dispatchKey('ArrowLeft'); },
+    right:    function() { dispatchKey('ArrowRight'); },
+    select:   function() { dispatchKey('Enter'); },
+    back:     function() { dispatchKey('Escape'); }
+  };
+
+  function handleCmd(cmd) {
+    [REMOTE_HANDLERS[cmd]].filter(Boolean).forEach(function(fn) { fn(); });
+  }
+
+  function poll() {
+    fetch('http://localhost:8765/poll')
+      .then(function(r) { return r.json(); })
+      .then(function(data) { [data.cmd].filter(Boolean).forEach(handleCmd); })
+      .catch(function() {})
+      .then(function() { setTimeout(poll, 500); });
+  }
+
+  setTimeout(poll, 500);
+}());
 </script>
 </body>
 </html>
