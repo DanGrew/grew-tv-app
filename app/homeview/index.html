@@ -109,6 +109,23 @@ var wakeLock = null;
 var controlsTimer = null;
 var currentBlobUrl = null;
 
+var FILM_FILTER = {
+  kids: function(f) { return f.profile === 'kids'; },
+  adults: function() { return true; }
+};
+var PROFILE_LABEL = { kids: 'Kids', adults: 'Adults' };
+var TILE_PLAY_KEYS = { Enter: true, ' ': true };
+var VIDEO_STOP_KEYS = { Escape: true, Backspace: true };
+var VIDEO_PLAY_PAUSE_KEYS = { ' ': true, Enter: true };
+var ARROW_DELTA = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+
+var video = document.getElementById('video');
+
+var VIDEO_TOGGLE = {
+  'true': function() { video.play().catch(function() {}); },
+  'false': function() { video.pause(); }
+};
+
 function show(id) {
   ['screen-profile','screen-browse','screen-error','screen-video'].forEach(function(s) {
     document.getElementById(s).classList.remove('active');
@@ -117,82 +134,77 @@ function show(id) {
 }
 
 function acquireWakeLock() {
-  if (!('wakeLock' in navigator)) return;
-  navigator.wakeLock.request('screen').then(function(wl) { wakeLock = wl; }).catch(function() {});
+  [navigator.wakeLock].filter(Boolean).forEach(function(wl) {
+    wl.request('screen').then(function(l) { wakeLock = l; }).catch(function() {});
+  });
+}
+
+function revokeBlob() {
+  URL.revokeObjectURL(currentBlobUrl);
+  currentBlobUrl = null;
 }
 
 function releaseWakeLock() {
-  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  [wakeLock].filter(Boolean).forEach(function(wl) { wl.release(); wakeLock = null; });
 }
 
 async function loadManifest() {
-  try {
-    var res = await fetch(FILE_SERVER + '/grew-tv/content/manifest.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    var data = await res.json();
-    return data.films || [];
-  } catch(e) {
-    return null;
-  }
+  return fetch(FILE_SERVER + '/grew-tv/content/manifest.json', { cache: 'no-store' })
+    .then(function(res) { return res.json(); })
+    .then(function(d) { return d.films; })
+    .catch(function() { return null; });
+}
+
+function appendFilmTile(grid, film, i) {
+  var tile = document.createElement('div');
+  tile.className = 'film-tile';
+  tile.tabIndex = 0;
+  tile.setAttribute('data-index', i);
+  var posterUrl = FILE_SERVER + '/grew-tv/' + film.path + '/poster.jpg';
+  tile.innerHTML =
+    '<img class="film-poster" src="' + posterUrl + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+    '<div class="film-poster-placeholder" style="display:none">🎬</div>' +
+    '<div class="tile-title">' + film.title + '</div>';
+  tile.addEventListener('click', function() { playFilm(film); });
+  tile.addEventListener('keydown', function(e) {
+    [film].filter(function() { return TILE_PLAY_KEYS[e.key]; }).forEach(function(f) {
+      e.preventDefault();
+      playFilm(f);
+    });
+  });
+  grid.appendChild(tile);
 }
 
 function buildGrid(allFilms) {
-  var filtered = allFilms.filter(function(f) {
-    return profile === 'adults' || f.profile === 'kids';
-  });
   var grid = document.getElementById('grid');
   grid.innerHTML = '';
-  document.getElementById('profile-label').textContent = profile === 'kids' ? 'Kids' : 'Adults';
-
-  if (filtered.length === 0) {
-    grid.innerHTML = '<div style="font-size:32px;color:#666;grid-column:1/-1;text-align:center;padding:80px 0">No films available</div>';
-    return;
-  }
-
-  filtered.forEach(function(film, i) {
-    var tile = document.createElement('div');
-    tile.className = 'film-tile';
-    tile.tabIndex = 0;
-    tile.setAttribute('data-index', i);
-
-    var posterUrl = FILE_SERVER + '/grew-tv/' + film.path + '/poster.jpg';
-    tile.innerHTML =
-      '<img class="film-poster" src="' + posterUrl + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
-      '<div class="film-poster-placeholder" style="display:none">🎬</div>' +
-      '<div class="tile-title">' + film.title + '</div>';
-
-    tile.addEventListener('click', function() { playFilm(film); });
-    tile.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); playFilm(film); }
-    });
-    grid.appendChild(tile);
+  document.getElementById('profile-label').textContent = PROFILE_LABEL[profile];
+  var filtered = allFilms.filter(FILM_FILTER[profile]);
+  [grid].filter(function() { return filtered.length === 0; }).forEach(function(g) {
+    g.innerHTML = '<div style="font-size:32px;color:#666;grid-column:1/-1;text-align:center;padding:80px 0">No films available</div>';
   });
-
-  var first = grid.querySelector('.film-tile');
-  if (first) first.focus();
+  filtered.forEach(appendFilmTile.bind(null, grid));
+  [grid.querySelector('.film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
 }
 
 function playFilm(film) {
-  var video = document.getElementById('video');
-  if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
-
-  var url = FILE_SERVER + '/grew-tv/' + film.path + '/video.mp4';
-  video.src = url;
+  var v = document.getElementById('video');
+  [currentBlobUrl].filter(Boolean).forEach(revokeBlob);
+  v.src = FILE_SERVER + '/grew-tv/' + film.path + '/video.mp4';
   document.getElementById('film-title-video').textContent = film.title;
   show('screen-video');
   acquireWakeLock();
-  video.play().catch(function() {});
+  v.play().catch(function() {});
   showControls();
 }
 
 function stopPlayback() {
-  var video = document.getElementById('video');
-  video.pause();
-  video.src = '';
+  var v = document.getElementById('video');
+  v.pause();
+  v.src = '';
   releaseWakeLock();
   show('screen-browse');
-  var first = document.querySelector('.film-tile');
-  if (first) first.focus();
+  [document.querySelector('.film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
 }
 
 function showControls() {
@@ -202,42 +214,60 @@ function showControls() {
   controlsTimer = setTimeout(function() { c.classList.add('hidden'); }, 3000);
 }
 
-var video = document.getElementById('video');
-
-video.addEventListener('timeupdate', function() {
-  if (!video.duration) return;
+function updateProgress() {
   var pct = (video.currentTime / video.duration) * 100;
   document.getElementById('progress-fill').style.width = pct + '%';
   document.getElementById('time-display').textContent = fmt(video.currentTime) + ' / ' + fmt(video.duration);
+}
+
+function togglePlayPause() {
+  VIDEO_TOGGLE[video.paused]();
+}
+
+function handleVideoKey(e) {
+  showControls();
+  [stopPlayback].filter(function() { return VIDEO_STOP_KEYS[e.key]; }).forEach(function(f) { f(); });
+  [togglePlayPause].filter(function() { return VIDEO_PLAY_PAUSE_KEYS[e.key]; }).forEach(function(f) {
+    e.preventDefault();
+    f();
+  });
+}
+
+function onManifestError() {
+  show('screen-error');
+  document.getElementById('btn-retry').focus();
+}
+
+function onManifestLoaded(allFilms) {
+  films = allFilms;
+  buildGrid(films);
+  show('screen-browse');
+}
+
+async function selectProfile(p) {
+  profile = p;
+  var allFilms = await loadManifest();
+  [onManifestError].filter(function() { return allFilms === null; }).forEach(function(f) { f(); });
+  [onManifestLoaded].filter(function() { return allFilms !== null; }).forEach(function(f) { f(allFilms); });
+}
+
+video.addEventListener('timeupdate', function() {
+  [video.duration].filter(Boolean).forEach(updateProgress);
 });
 
 video.addEventListener('ended', stopPlayback);
 
 document.getElementById('btn-back-video').addEventListener('click', stopPlayback);
-
-document.getElementById('screen-video').addEventListener('keydown', function(e) {
-  showControls();
-  if (e.key === 'Escape' || e.key === 'Backspace') stopPlayback();
-  if (e.key === ' ' || e.key === 'Enter') {
-    e.preventDefault();
-    video.paused ? video.play() : video.pause();
-  }
-});
-
+document.getElementById('screen-video').addEventListener('keydown', handleVideoKey);
 document.getElementById('screen-video').addEventListener('click', function() { showControls(); });
 
-async function selectProfile(p) {
-  profile = p;
-  var allFilms = await loadManifest();
-  if (allFilms === null) {
-    show('screen-error');
-    document.getElementById('btn-retry').focus();
-    return;
-  }
-  films = allFilms;
-  buildGrid(films);
-  show('screen-browse');
-}
+document.getElementById('grid-container').addEventListener('keydown', function(e) {
+  var delta = ARROW_DELTA[e.key];
+  var tiles = Array.from(document.querySelectorAll('.film-tile'));
+  var idx = tiles.indexOf(document.activeElement);
+  [delta].filter(Boolean).forEach(function() { e.preventDefault(); });
+  [tiles[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).forEach(function(t) { t.focus(); });
+});
 
 document.getElementById('btn-kids').addEventListener('click', function() { selectProfile('kids'); });
 document.getElementById('btn-adults').addEventListener('click', function() { selectProfile('adults'); });
