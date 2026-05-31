@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
-const MANIFEST_URL = 'http://localhost:8080/grew-tv/content/manifest.json';
+const MANIFEST_URL = 'http://localhost:8080/grew-tv/manifest.json';
 const FIXTURE = require('./fixtures/manifest.js');
 
 async function interceptManifest(page, fixture) {
@@ -10,14 +10,6 @@ async function interceptManifest(page, fixture) {
     contentType: 'application/json',
     body: JSON.stringify(fixture.manifest)
   }));
-  for (const [itemPath, itemData] of Object.entries(fixture.items)) {
-    const itemUrl = 'http://localhost:8080/grew-tv/' + itemPath;
-    await page.route(itemUrl, route => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(itemData)
-    }));
-  }
 }
 
 async function interceptManifestError(page) {
