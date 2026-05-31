@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+TMPDIR_HOOK=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_HOOK"' EXIT
+
+fail() { echo "[pre-push] FAILED: $1"; exit 1; }
+
+echo "[pre-push] arch checks..."
+node scripts/arch-check.js no-dom-in-core          "$TMPDIR_HOOK/no-dom.txt"          || fail "no-dom-in-core"
+node scripts/arch-check.js no-ui-imports           "$TMPDIR_HOOK/no-ui-imports.txt"   || fail "no-ui-imports"
+node scripts/arch-check.js no-stray-files          "$TMPDIR_HOOK/no-stray.txt"        || fail "no-stray-files"
+node scripts/arch-check.js no-app-exports          "$TMPDIR_HOOK/no-app-exports.txt"  || fail "no-app-exports"
+node scripts/arch-check.js no-guard-chain          "$TMPDIR_HOOK/no-guard.txt"        || fail "no-guard-chain"
+node scripts/arch-check.js no-filter-conditional   "$TMPDIR_HOOK/no-filter.txt"       || fail "no-filter-conditional"
+node scripts/arch-check.js app-index-only          "$TMPDIR_HOOK/app-index.txt"       || fail "app-index-only"
+node scripts/arch-check.js no-media-outside-assets "$TMPDIR_HOOK/no-media.txt"        || fail "no-media-outside-assets"
+node scripts/arch-check.js no-css-outside-styles   "$TMPDIR_HOOK/no-css.txt"          || fail "no-css-outside-styles"
+node scripts/arch-check.js no-md-outside-docs      "$TMPDIR_HOOK/no-md.txt"           || fail "no-md-outside-docs"
+node scripts/arch-check.js no-json-in-repo         "$TMPDIR_HOOK/no-json-in-repo.txt" || fail "no-json-in-repo"
+node scripts/arch-check.js no-pure-fn-outside-core "$TMPDIR_HOOK/no-pure-fn.txt"      || fail "no-pure-fn-outside-core"
+
+echo "[pre-push] TV checks..."
+node scripts/tv-check.js tv-focus-rings   "$TMPDIR_HOOK/tv-focus.txt"   || fail "tv-focus-rings"
+node scripts/tv-check.js tv-min-font-size "$TMPDIR_HOOK/tv-font.txt"    || fail "tv-min-font-size"
+node scripts/tv-check.js tv-no-blank-screen "$TMPDIR_HOOK/tv-blank.txt" || fail "tv-no-blank-screen"
+
+echo "[pre-push] untested check..."
+node scripts/check-untested.js || fail "check-untested"
+
+echo "[pre-push] ui-cyclomatic..."
+node scripts/check-ui-cyclomatic.js "$TMPDIR_HOOK/ui-cyclomatic.txt" || fail "ui-cyclomatic"
+
+echo "[pre-push] unit tests..."
+npm run test:unit || fail "unit tests"
+
+# e2e tests run in CI, not locally
+echo "[pre-push] e2e skipped (runs in CI)"
+
+echo "[pre-push] all checks passed"

@@ -53,7 +53,8 @@ async function run() {
   }
 
   // ui/**/*.js
-  const uiResults = await eslint.lintFiles([path.join(ROOT, 'ui/**/*.js')]);
+  const uiDir = path.join(ROOT, 'ui');
+  const uiResults = fs.existsSync(uiDir) ? await eslint.lintFiles([path.join(ROOT, 'ui/**/*.js')]) : [];
   uiResults.forEach(result => {
     const rel = path.relative(ROOT, result.filePath).replace(/\\/g, '/');
     scanned++;
