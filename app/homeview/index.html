@@ -165,8 +165,9 @@ var screenRegistry = {};
 var activeScreen = null;
 
 function registerScreen(id, config) {
-  if (!config.onEnter) throw new Error('registerScreen: ' + id + ' missing onEnter');
-  if (!config.keys) throw new Error('registerScreen: ' + id + ' missing keys');
+  ['onEnter', 'keys'].filter(function(k) { return !config[k]; }).forEach(function(k) {
+    throw new Error('registerScreen: ' + id + ' missing ' + k);
+  });
   screenRegistry[id] = config;
 }
 
@@ -449,9 +450,14 @@ Array.from(document.querySelectorAll('.btn-skip')).forEach(function(btn) {
 document.getElementById('screen-video').addEventListener('click', function() { showControls(); });
 
 document.addEventListener('keydown', function(e) {
-  var handler = screenRegistry[activeScreen] && screenRegistry[activeScreen].keys[e.key];
-  if (handler) handler(e);
+  [screenRegistry[activeScreen]].filter(Boolean).forEach(function(sc) {
+    [sc.keys[e.key]].filter(Boolean).forEach(function(h) { h(e); });
+  });
 });
+
+function isDetailRowResumable(r) {
+  return Boolean(localStorage.getItem('grew-tv-resume-' + currentDetailFilm.id + '-' + currentDetailFilm.items[parseInt(r.getAttribute('data-index'))].id));
+}
 
 document.getElementById('btn-back-detail').addEventListener('click', function() {
   show('screen-browse');
@@ -506,9 +512,9 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   };
 
   function handleCmd(cmd) {
-    var screen = screenRegistry[activeScreen];
-    var fn = (screen && screen.remote && screen.remote[cmd]) || REMOTE_HANDLERS[cmd];
-    if (fn) fn();
+    var remote = screenRegistry[activeScreen].remote;
+    var fn = [remote[cmd], REMOTE_HANDLERS[cmd]].filter(Boolean)[0];
+    [fn].filter(Boolean).forEach(function(f) { f(); });
   }
 
   var browseArrow = function(e) {
@@ -558,10 +564,7 @@ document.getElementById('btn-retry').addEventListener('click', function() {
     onEnter: function() {
       var list = document.getElementById('detail-list');
       var rows = Array.from(list.querySelectorAll('.detail-row:not(.unavailable)'));
-      var resumeRows = rows.filter(function(r) {
-        return !!localStorage.getItem('grew-tv-resume-' + currentDetailFilm.id + '-' + currentDetailFilm.items[parseInt(r.getAttribute('data-index'))].id);
-      });
-      [resumeRows.concat(rows)[0]].filter(Boolean).forEach(function(r) { r.focus(); });
+      [rows.filter(isDetailRowResumable).concat(rows)[0]].filter(Boolean).forEach(function(r) { r.focus(); });
     },
     keys: { Escape: detailBack, Backspace: detailBack, ArrowUp: detailArrow, ArrowDown: detailArrow },
     remote: {}
