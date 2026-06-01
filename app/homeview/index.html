@@ -408,12 +408,7 @@ function startPlayback(seekTo) {
   show('screen-video');
   acquireWakeLock();
   v.muted = false;
-  [seekTo].filter(function(t) { return t > 0; }).forEach(function(t) {
-    v.addEventListener('playing', function onPlaying() {
-      v.removeEventListener('playing', onPlaying);
-      v.currentTime = t;
-    });
-  });
+  [seekTo].filter(function(t) { return t > 0; }).forEach(function(t) { v.currentTime = t; });
   v.play().catch(function() {
     v.muted = true;
     v.play().catch(function() {});
