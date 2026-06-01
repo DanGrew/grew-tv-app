@@ -395,13 +395,12 @@ function playFilm(film, item, from) {
   document.getElementById('film-title-video').textContent = film.title + labelSuffix;
   var resumeKey = 'grew-tv:position:' + film.id + ':' + playItem.id;
   var saved = localStorage.getItem(resumeKey);
-  var t = saved !== null ? parseFloat(saved) : NaN;
-  if (!isNaN(t) && t > 5) {
-    document.getElementById('resume-time').textContent = fmt(t);
+  var t = [saved].filter(Boolean).map(parseFloat)[0];
+  [t].filter(function(x) { return x > 5; }).forEach(function(x) {
+    document.getElementById('resume-time').textContent = fmt(x);
     show('screen-resume');
-  } else {
-    startPlayback(0);
-  }
+  });
+  [t].filter(function(x) { return !(x > 5); }).forEach(function() { startPlayback(0); });
 }
 
 function startPlayback(seekTo) {
@@ -409,12 +408,12 @@ function startPlayback(seekTo) {
   show('screen-video');
   acquireWakeLock();
   v.muted = false;
-  if (seekTo > 0) {
+  [seekTo].filter(function(t) { return t > 0; }).forEach(function(t) {
     v.addEventListener('playing', function onPlaying() {
       v.removeEventListener('playing', onPlaying);
-      v.currentTime = seekTo;
+      v.currentTime = t;
     });
-  }
+  });
   v.play().catch(function() {
     v.muted = true;
     v.play().catch(function() {});
@@ -424,8 +423,8 @@ function startPlayback(seekTo) {
 
 function doResume() {
   var key = 'grew-tv:position:' + currentFilm.id + ':' + currentItem.id;
-  var t = parseFloat(localStorage.getItem(key));
-  startPlayback(isNaN(t) ? 0 : t);
+  var t = [localStorage.getItem(key)].filter(Boolean).map(parseFloat)[0];
+  startPlayback([t].filter(function(x) { return x > 0; }).concat([0])[0]);
 }
 
 function doRestart() {
@@ -509,14 +508,10 @@ video.addEventListener('timeupdate', function() {
   [video.duration].filter(Boolean).forEach(updateProgress);
   [currentFilm].filter(Boolean).forEach(function(film) {
     var now = Date.now();
-    [currentItem].filter(Boolean).filter(function() { return video.currentTime > 0 && !isNaN(video.duration); }).forEach(function() {
+    [currentItem].filter(Boolean).filter(function() { return video.currentTime > 0; }).filter(function() { return !isNaN(video.duration); }).forEach(function() {
       var key = 'grew-tv:position:' + film.id + ':' + currentItem.id;
-      if (video.duration - video.currentTime < 30) {
-        localStorage.removeItem(key);
-      } else if (now - lastSaveTime > 5000) {
-        lastSaveTime = now;
-        localStorage.setItem(key, video.currentTime);
-      }
+      [key].filter(function() { return video.duration - video.currentTime < 30; }).forEach(function() { localStorage.removeItem(key); });
+      [key].filter(function() { return video.duration - video.currentTime >= 30; }).filter(function() { return now - lastSaveTime > 5000; }).forEach(function() { lastSaveTime = now; localStorage.setItem(key, video.currentTime); });
     });
   });
 });
