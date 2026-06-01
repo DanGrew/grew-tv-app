@@ -229,7 +229,7 @@ function releaseWakeLock() {
 }
 
 async function loadManifest() {
-  return fetch('http://localhost:8765/manifest.json', { cache: 'no-store' })
+  return fetch('/manifest.json', { cache: 'no-store' })
     .then(function(res) { return res.json(); })
     .then(function(manifest) { contentBase = manifest.contentBase; return manifest.content; })
     .catch(function() { return null; });
@@ -537,7 +537,7 @@ document.getElementById('btn-kids').focus();
   }
 
   function poll() {
-    fetch('http://localhost:8765/poll')
+    fetch('/poll')
       .then(function(r) { return r.json(); })
       .then(function(data) { [data.cmd].filter(Boolean).forEach(handleCmd); })
       .catch(function() {})
