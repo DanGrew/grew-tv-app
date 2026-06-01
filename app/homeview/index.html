@@ -146,6 +146,12 @@ button:hover { background: #222; }
 
 <script type="module">
 import { fmt, pad } from '../../core/time.js';
+import { activateScreen, getActiveConfig, dispatchKey } from '../../core/screen-registry.js';
+import '../../ui/screens/screen-profile.js';
+import '../../ui/screens/screen-error.js';
+import { setup as setupBrowse } from '../../ui/screens/screen-browse.js';
+import { setup as setupDetail } from '../../ui/screens/screen-detail.js';
+import { setup as setupVideo } from '../../ui/screens/screen-video.js';
 
 var contentBase = '';
 var profile = null;
@@ -161,16 +167,6 @@ var detailSourceTile = null;
 var returnScreen = 'screen-browse';
 var lastSaveTime = 0;
 
-var screenRegistry = {};
-var activeScreen = null;
-
-function registerScreen(id, config) {
-  ['onEnter', 'keys'].filter(function(k) { return !config[k]; }).forEach(function(k) {
-    throw new Error('registerScreen: ' + id + ' missing ' + k);
-  });
-  screenRegistry[id] = config;
-}
-
 var FILM_FILTER = {
   kids: function(f) { return f.profile === 'kids'; },
   adults: function() { return true; }
@@ -183,9 +179,6 @@ var PROFILE_LABEL = { kids: 'Kids', adults: 'Adults' };
 var TILE_PLAY_KEYS = { Enter: true, ' ': true };
 var VIDEO_STOP_KEYS = { Escape: true, Backspace: true };
 var VIDEO_PLAY_PAUSE_KEYS = { ' ': true, Enter: true };
-var ARROW_DELTA = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
-var DETAIL_ARROW_DELTA = { ArrowUp: -1, ArrowDown: 1 };
-var DETAIL_BACK_KEYS = { Escape: true, Backspace: true };
 
 var AVAILABLE_ROW = {
   'true':  { className: 'detail-row',             tabIndex: 0  },
@@ -214,8 +207,7 @@ function show(id) {
     document.getElementById(s).classList.remove('active');
   });
   document.getElementById(id).classList.add('active');
-  activeScreen = id;
-  screenRegistry[id].onEnter();
+  activateScreen(id);
 }
 
 function acquireWakeLock() {
@@ -450,11 +442,7 @@ Array.from(document.querySelectorAll('.btn-skip')).forEach(function(btn) {
 });
 document.getElementById('screen-video').addEventListener('click', function() { showControls(); });
 
-document.addEventListener('keydown', function(e) {
-  [screenRegistry[activeScreen]].filter(Boolean).forEach(function(sc) {
-    [sc.keys[e.key]].filter(Boolean).forEach(function(h) { h(e); });
-  });
-});
+document.addEventListener('keydown', dispatchKey);
 
 document.getElementById('btn-back-detail').addEventListener('click', function() {
   show('screen-browse');
@@ -509,84 +497,23 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   };
 
   function handleCmd(cmd) {
-    var remote = screenRegistry[activeScreen].remote;
+    var remote = getActiveConfig().remote;
     var fn = [remote[cmd], REMOTE_HANDLERS[cmd]].filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(); });
   }
 
-  var browseArrow = function(e) {
-    var delta = ARROW_DELTA[e.key];
-    var tiles = Array.from(document.querySelectorAll('.film-tile'));
-    var idx = tiles.indexOf(document.activeElement);
-    e.preventDefault();
-    [tiles[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).forEach(function(t) { t.focus(); });
-  };
-
-  var detailBack = function(e) {
-    e.preventDefault();
-    show('screen-browse');
-  };
-
-  var detailArrow = function(e) {
-    e.preventDefault();
-    var delta = DETAIL_ARROW_DELTA[e.key];
-    var rows = Array.from(document.querySelectorAll('.detail-row:not(.unavailable)'));
-    var idx = rows.indexOf(document.activeElement);
-    [rows[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).forEach(function(r) { r.focus(); });
-  };
-
-  registerScreen('screen-profile', {
-    onEnter: function() { document.getElementById('btn-kids').focus(); },
-    keys: {},
-    remote: {}
-  });
-
-  registerScreen('screen-error', {
-    onEnter: function() { document.getElementById('btn-retry').focus(); },
-    keys: {},
-    remote: {}
-  });
-
-  registerScreen('screen-browse', {
-    onEnter: function() {
-      var target = [detailSourceTile, document.querySelector('.film-tile')].filter(Boolean)[0];
-      detailSourceTile = null;
-      [target].filter(Boolean).forEach(function(t) { t.focus(); });
-    },
-    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow },
-    remote: {}
-  });
-
-  registerScreen('screen-detail', {
-    onEnter: function() {
-      var list = document.getElementById('detail-list');
-      var target = [list.querySelector('.detail-row.has-resume'), list.querySelector('.detail-row:not(.unavailable)')].filter(Boolean)[0];
-      [target].filter(Boolean).forEach(function(r) { r.focus(); });
-    },
-    keys: { Escape: detailBack, Backspace: detailBack, ArrowUp: detailArrow, ArrowDown: detailArrow },
-    remote: {}
-  });
-
-  registerScreen('screen-video', {
-    onEnter: function() { document.getElementById('btn-back-video').focus(); },
-    keys: {
-      Escape:     handleVideoKey,
-      Backspace:  handleVideoKey,
-      ' ':        handleVideoKey,
-      Enter:      handleVideoKey,
-      ArrowLeft:  handleVideoKey,
-      ArrowRight: handleVideoKey,
-      ArrowUp:    handleVideoKey,
-      ArrowDown:  handleVideoKey
-    },
-    remote: {
-      play:     function() { video.play().catch(function(){}); showControls(); },
-      pause:    function() { video.pause(); showControls(); },
-      next:     function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
-      prev:     function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex - 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
-      vol_up:   function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); },
-      vol_down: function() { video.volume = Math.max(0, video.volume - 0.1); showControls(); }
-    }
+  setupBrowse(
+    function() { return detailSourceTile; },
+    function() { detailSourceTile = null; }
+  );
+  setupDetail(show);
+  setupVideo(handleVideoKey, {
+    play:     function() { video.play().catch(function(){}); showControls(); },
+    pause:    function() { video.pause(); showControls(); },
+    next:     function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
+    prev:     function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex - 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
+    vol_up:   function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); },
+    vol_down: function() { video.volume = Math.max(0, video.volume - 0.1); showControls(); }
   });
 
   show('screen-profile');

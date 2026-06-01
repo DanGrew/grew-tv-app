@@ -190,20 +190,20 @@ if (rule === 'no-json-in-repo') {
 }
 
 if (rule === 'app-index-only') {
-  const appDir = path.join(ROOT, 'app');
-  function walkApp(dir) {
+  function walkHtmlOnly(dir, label) {
     if (!fs.existsSync(dir)) return;
     fs.readdirSync(dir).forEach(entry => {
       const full = path.join(dir, entry);
-      if (fs.statSync(full).isDirectory()) { walkApp(full); return; }
+      if (fs.statSync(full).isDirectory()) { walkHtmlOnly(full, label); return; }
       const rel = path.relative(ROOT, full).replace(/\\/g, '/');
       scanned.push(rel);
       if (path.extname(full).toLowerCase() !== '.html') {
-        violations.push(`${rel} — app/ must contain only HTML pages (no JS/CSS/media)`);
+        violations.push(`${rel} — ${label}/ must contain only HTML pages (no JS/CSS/media)`);
       }
     });
   }
-  walkApp(appDir);
+  walkHtmlOnly(path.join(ROOT, 'app'), 'app');
+  walkHtmlOnly(path.join(ROOT, 'remote'), 'remote');
 }
 
 if (rule === 'no-media-outside-assets') {
