@@ -1,6 +1,6 @@
 module.exports = {
   manifest: {
-    contentBase: 'http://localhost:8080/media/',
+    contentBase: 'http://localhost:8765/media/',
     content: [
       {
         id: 'toy-story', title: 'Toy Story', profile: 'kids',
