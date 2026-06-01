@@ -226,8 +226,10 @@ function scanDevices() {
   fetch('http://localhost:8765/scan', { cache: 'no-store' })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      var devices = Array.isArray(data.devices) ? data.devices : [];
-      status.textContent = devices.length ? devices.join(', ') : 'No devices found';
+      var devices = [data.devices].filter(Array.isArray).concat([[]])[0];
+      status.textContent = [devices].filter(function(d) { return d.length; })
+        .map(function(d) { return d.join(', '); })
+        .concat(['No devices found'])[0];
     })
     .catch(function() {
       status.textContent = 'Server unavailable';
@@ -548,15 +550,22 @@ document.getElementById('btn-retry').addEventListener('click', function() {
     [fn].filter(Boolean).forEach(function(f) { f(); });
   }
 
+  var PROFILE_BTN_HAS_COG_DOWN = { 'btn-kids': true, 'btn-adults': true };
+
   registerScreen('screen-profile', {
     onEnter: function() { document.getElementById('btn-kids').focus(); },
     keys: {
       ArrowDown: function(e) {
-        var id = document.activeElement.id;
-        if (id === 'btn-kids' || id === 'btn-adults') { e.preventDefault(); document.getElementById('btn-settings').focus(); }
+        [PROFILE_BTN_HAS_COG_DOWN[document.activeElement.id]].filter(Boolean).forEach(function() {
+          e.preventDefault();
+          document.getElementById('btn-settings').focus();
+        });
       },
       ArrowUp: function(e) {
-        if (document.activeElement.id === 'btn-settings') { e.preventDefault(); document.getElementById('btn-kids').focus(); }
+        [document.activeElement].filter(function(el) { return el.id === 'btn-settings'; }).forEach(function() {
+          e.preventDefault();
+          document.getElementById('btn-kids').focus();
+        });
       }
     },
     remote: {}
