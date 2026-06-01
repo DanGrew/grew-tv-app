@@ -13,6 +13,7 @@ body { background: #0a0a0a; color: #fff; font-family: sans-serif; height: 100vh;
 #screen-error { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; }
 #screen-video { display: none; height: 100vh; background: #000; position: relative; }
 #screen-detail { display: none; height: 100vh; flex-direction: column; }
+#screen-settings { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; }
 .active { display: flex !important; }
 #screen-video.active { display: block !important; }
 
@@ -82,6 +83,13 @@ button:hover { background: #222; }
 .detail-duration { font-size: 28px; color: #aaa; margin-top: 6px; }
 .detail-desc { font-size: 26px; color: #888; margin-top: 6px; }
 .detail-resume { font-size: 24px; color: #ff0; margin-top: 6px; }
+
+#btn-settings { font-size: 28px; padding: 16px 40px; min-width: auto; margin-top: 32px; }
+#settings-table { width: 100%; max-width: 960px; padding: 0 60px; }
+.settings-row { display: flex; align-items: center; gap: 32px; padding: 40px 0; }
+.settings-label { font-size: 36px; flex: 0 0 200px; }
+.settings-status { font-size: 30px; color: #aaa; flex: 1; }
+.settings-hr { border: none; border-top: 1px solid #333; margin: 0; }
 </style>
 </head>
 <body>
@@ -92,6 +100,23 @@ button:hover { background: #222; }
   <div class="btn-row">
     <button id="btn-kids" autofocus>Kids</button>
     <button id="btn-adults">Adults</button>
+  </div>
+  <button id="btn-settings" tabindex="0">&#9881;</button>
+</div>
+
+<div id="screen-settings">
+  <div style="display:flex;align-items:center;gap:32px;padding:40px 60px 24px;flex-shrink:0;width:100%;max-width:960px">
+    <button id="btn-back-settings" style="font-size:28px;padding:16px 32px;min-width:auto">&#8592; Back</button>
+    <h1 style="margin:0">Settings</h1>
+  </div>
+  <div id="settings-table">
+    <hr class="settings-hr">
+    <div class="settings-row">
+      <div class="settings-label">Devices</div>
+      <div class="settings-status" id="settings-device-status">&mdash;</div>
+      <button id="btn-refresh">Refresh</button>
+    </div>
+    <hr class="settings-hr">
   </div>
 </div>
 
@@ -146,7 +171,7 @@ button:hover { background: #222; }
 
 <script type="module">
 import { fmt, pad } from '../../core/time.js';
-import { activateScreen, getActiveConfig, dispatchKey } from '../../core/screen-registry.js';
+import { registerScreen, activateScreen, getActiveConfig, dispatchKey } from '../../core/screen-registry.js';
 import '../../ui/screens/screen-profile.js';
 import '../../ui/screens/screen-error.js';
 import { setup as setupBrowse } from '../../ui/screens/screen-browse.js';
@@ -195,6 +220,29 @@ var STOP_RESTORE = {
   'screen-browse': function() { show('screen-browse'); }
 };
 
+function scanDevices() {
+  var status = document.getElementById('settings-device-status');
+  var btn = document.getElementById('btn-refresh');
+  status.textContent = 'Scanning\u2026';
+  btn.disabled = true;
+  btn.textContent = 'Scanning\u2026';
+  fetch('http://localhost:8765/scan', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var devices = [data.devices].filter(Array.isArray).concat([[]])[0];
+      status.textContent = [devices].filter(function(d) { return d.length; })
+        .map(function(d) { return d.join(', '); })
+        .concat(['No devices found'])[0];
+    })
+    .catch(function() {
+      status.textContent = 'Server unavailable';
+    })
+    .then(function() {
+      btn.disabled = false;
+      btn.textContent = 'Refresh';
+    });
+}
+
 var video = document.getElementById('video');
 
 var VIDEO_TOGGLE = {
@@ -203,7 +251,7 @@ var VIDEO_TOGGLE = {
 };
 
 function show(id) {
-  ['screen-profile','screen-browse','screen-error','screen-video','screen-detail'].forEach(function(s) {
+  ['screen-profile','screen-browse','screen-error','screen-video','screen-detail','screen-settings'].forEach(function(s) {
     document.getElementById(s).classList.remove('active');
   });
   document.getElementById(id).classList.add('active');
@@ -449,15 +497,19 @@ document.getElementById('btn-back-detail').addEventListener('click', function() 
 });
 document.getElementById('btn-kids').addEventListener('click', function() { selectProfile('kids'); });
 document.getElementById('btn-adults').addEventListener('click', function() { selectProfile('adults'); });
+document.getElementById('btn-settings').addEventListener('click', function() { show('screen-settings'); });
+document.getElementById('btn-back-settings').addEventListener('click', function() { show('screen-profile'); });
+document.getElementById('btn-refresh').addEventListener('click', function() { scanDevices(); });
 document.getElementById('btn-retry').addEventListener('click', function() {
   show('screen-profile');
 });
 
 (function() {
   var BACK_ACTIONS = {
-    'screen-video':  function() { stopPlayback(); },
-    'screen-detail': function() { show('screen-browse'); },
-    'screen-browse': function() { show('screen-profile'); }
+    'screen-video':    function() { stopPlayback(); },
+    'screen-detail':   function() { show('screen-browse'); },
+    'screen-browse':   function() { show('screen-profile'); },
+    'screen-settings': function() { show('screen-profile'); }
   };
 
   function goBack() {
@@ -501,6 +553,36 @@ document.getElementById('btn-retry').addEventListener('click', function() {
     var fn = [remote[cmd], REMOTE_HANDLERS[cmd]].filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(); });
   }
+
+  var PROFILE_BTN_HAS_COG_DOWN = { 'btn-kids': true, 'btn-adults': true };
+
+  registerScreen('screen-profile', {
+    onEnter: function() { document.getElementById('btn-kids').focus(); },
+    keys: {
+      ArrowDown: function(e) {
+        [PROFILE_BTN_HAS_COG_DOWN[document.activeElement.id]].filter(Boolean).forEach(function() {
+          e.preventDefault();
+          document.getElementById('btn-settings').focus();
+        });
+      },
+      ArrowUp: function(e) {
+        [document.activeElement].filter(function(el) { return el.id === 'btn-settings'; }).forEach(function() {
+          e.preventDefault();
+          document.getElementById('btn-kids').focus();
+        });
+      }
+    },
+    remote: {}
+  });
+
+  registerScreen('screen-settings', {
+    onEnter: function() { scanDevices(); document.getElementById('btn-back-settings').focus(); },
+    keys: {
+      Escape:    function() { show('screen-profile'); },
+      Backspace: function() { show('screen-profile'); }
+    },
+    remote: { back: function() { show('screen-profile'); } }
+  });
 
   setupBrowse(
     function() { return detailSourceTile; },
