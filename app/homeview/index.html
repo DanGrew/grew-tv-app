@@ -197,6 +197,7 @@ var currentFilm = null;
 var currentItem = null;
 var currentItemIndex = -1;
 var currentDetailFilm = null;
+var pendingResumePosition = 0;
 var detailSourceTile = null;
 var returnScreen = 'screen-browse';
 var lastSaveTime = 0;
@@ -397,6 +398,7 @@ function playFilm(film, item, from) {
   var saved = localStorage.getItem(resumeKey);
   var t = [saved].filter(Boolean).map(parseFloat)[0];
   [t].filter(function(x) { return x > 5; }).forEach(function(x) {
+    pendingResumePosition = x;
     document.getElementById('resume-time').textContent = fmt(x);
     show('screen-resume');
   });
@@ -408,21 +410,36 @@ function startPlayback(seekTo) {
   show('screen-video');
   acquireWakeLock();
   v.muted = false;
-  [seekTo].filter(function(t) { return t > 0; }).forEach(function(t) { v.currentTime = t; });
-  v.play().catch(function() {
-    v.muted = true;
-    v.play().catch(function() {});
+
+  var doPlay = function() {
+    v.play().catch(function() {
+      v.muted = true;
+      v.play().catch(function() {});
+    });
+    showControls();
+  };
+
+  [seekTo].filter(function(t) { return t > 0; }).forEach(function(t) {
+    [v].filter(function(el) { return el.readyState >= 1; }).forEach(function() { v.currentTime = t; doPlay(); });
+    [v].filter(function(el) { return el.readyState < 1; }).forEach(function() {
+      v.addEventListener('loadedmetadata', function onMeta() {
+        v.removeEventListener('loadedmetadata', onMeta);
+        v.currentTime = t;
+        doPlay();
+      });
+    });
   });
-  showControls();
+  [seekTo].filter(function(t) { return !(t > 0); }).forEach(function() { doPlay(); });
 }
 
 function doResume() {
-  var key = 'grew-tv:position:' + currentFilm.id + ':' + currentItem.id;
-  var t = [localStorage.getItem(key)].filter(Boolean).map(parseFloat)[0];
-  startPlayback([t].filter(function(x) { return x > 0; }).concat([0])[0]);
+  var t = pendingResumePosition;
+  pendingResumePosition = 0;
+  startPlayback(t);
 }
 
 function doRestart() {
+  pendingResumePosition = 0;
   var key = 'grew-tv:position:' + currentFilm.id + ':' + currentItem.id;
   localStorage.removeItem(key);
   startPlayback(0);
