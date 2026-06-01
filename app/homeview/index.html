@@ -289,6 +289,7 @@ function buildDetailRow(film, item, i) {
 
   var resumeKey = 'grew-tv-resume-' + film.id + '-' + item.id;
   var saved = localStorage.getItem(resumeKey);
+  [saved].filter(Boolean).forEach(function() { row.classList.add('has-resume'); });
   var resumeHtml = [saved].filter(Boolean).map(function(s) {
     return '<div class="detail-resume">\u25b6 Resume ' + fmt(parseFloat(s)) + '</div>';
   }).join('');
@@ -455,10 +456,6 @@ document.addEventListener('keydown', function(e) {
   });
 });
 
-function isDetailRowResumable(r) {
-  return Boolean(localStorage.getItem('grew-tv-resume-' + currentDetailFilm.id + '-' + currentDetailFilm.items[parseInt(r.getAttribute('data-index'))].id));
-}
-
 document.getElementById('btn-back-detail').addEventListener('click', function() {
   show('screen-browse');
 });
@@ -563,8 +560,8 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   registerScreen('screen-detail', {
     onEnter: function() {
       var list = document.getElementById('detail-list');
-      var rows = Array.from(list.querySelectorAll('.detail-row:not(.unavailable)'));
-      [rows.filter(isDetailRowResumable).concat(rows)[0]].filter(Boolean).forEach(function(r) { r.focus(); });
+      var target = list.querySelector('.detail-row.has-resume') || list.querySelector('.detail-row:not(.unavailable)');
+      [target].filter(Boolean).forEach(function(r) { r.focus(); });
     },
     keys: { Escape: detailBack, Backspace: detailBack, ArrowUp: detailArrow, ArrowDown: detailArrow },
     remote: {}
