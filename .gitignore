@@ -2,5 +2,3 @@ node_modules/
 test-results/
 playwright-report/
 .idea/
-manifest.json
-dev-manifest.json
