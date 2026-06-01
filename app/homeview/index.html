@@ -549,7 +549,7 @@ document.getElementById('btn-retry').addEventListener('click', function() {
 
   registerScreen('screen-browse', {
     onEnter: function() {
-      var target = detailSourceTile || document.querySelector('.film-tile');
+      var target = [detailSourceTile, document.querySelector('.film-tile')].filter(Boolean)[0];
       detailSourceTile = null;
       [target].filter(Boolean).forEach(function(t) { t.focus(); });
     },
@@ -560,7 +560,7 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   registerScreen('screen-detail', {
     onEnter: function() {
       var list = document.getElementById('detail-list');
-      var target = list.querySelector('.detail-row.has-resume') || list.querySelector('.detail-row:not(.unavailable)');
+      var target = [list.querySelector('.detail-row.has-resume'), list.querySelector('.detail-row:not(.unavailable)')].filter(Boolean)[0];
       [target].filter(Boolean).forEach(function(r) { r.focus(); });
     },
     keys: { Escape: detailBack, Backspace: detailBack, ArrowUp: detailArrow, ArrowDown: detailArrow },
