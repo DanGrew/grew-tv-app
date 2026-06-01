@@ -146,6 +146,12 @@ button:hover { background: #222; }
 
 <script type="module">
 import { fmt, pad } from '../../core/time.js';
+import { activateScreen, getActiveConfig, dispatchKey } from '../../core/screen-registry.js';
+import '../../ui/screens/screen-profile.js';
+import '../../ui/screens/screen-error.js';
+import { setup as setupBrowse } from '../../ui/screens/screen-browse.js';
+import { setup as setupDetail } from '../../ui/screens/screen-detail.js';
+import { setup as setupVideo } from '../../ui/screens/screen-video.js';
 
 var contentBase = '';
 var profile = null;
@@ -173,9 +179,6 @@ var PROFILE_LABEL = { kids: 'Kids', adults: 'Adults' };
 var TILE_PLAY_KEYS = { Enter: true, ' ': true };
 var VIDEO_STOP_KEYS = { Escape: true, Backspace: true };
 var VIDEO_PLAY_PAUSE_KEYS = { ' ': true, Enter: true };
-var ARROW_DELTA = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
-var DETAIL_ARROW_DELTA = { ArrowUp: -1, ArrowDown: 1 };
-var DETAIL_BACK_KEYS = { Escape: true, Backspace: true };
 
 var AVAILABLE_ROW = {
   'true':  { className: 'detail-row',             tabIndex: 0  },
@@ -188,15 +191,8 @@ var DETAIL_SOURCE_TILE_UPDATE = {
 };
 
 var STOP_RESTORE = {
-  'screen-detail': function(savedIdx) {
-    showDetail(currentDetailFilm, true);
-    var targetRow = document.querySelector('.detail-row[data-index="' + savedIdx + '"]:not(.unavailable)');
-    [targetRow].filter(Boolean).forEach(function(r) { r.focus(); });
-  },
-  'screen-browse': function() {
-    show('screen-browse');
-    [document.querySelector('.film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
-  }
+  'screen-detail': function() { showDetail(currentDetailFilm, true); },
+  'screen-browse': function() { show('screen-browse'); }
 };
 
 var video = document.getElementById('video');
@@ -211,6 +207,7 @@ function show(id) {
     document.getElementById(s).classList.remove('active');
   });
   document.getElementById(id).classList.add('active');
+  activateScreen(id);
 }
 
 function acquireWakeLock() {
@@ -284,6 +281,7 @@ function buildDetailRow(film, item, i) {
 
   var resumeKey = 'grew-tv-resume-' + film.id + '-' + item.id;
   var saved = localStorage.getItem(resumeKey);
+  [saved].filter(Boolean).forEach(function() { row.classList.add('has-resume'); });
   var resumeHtml = [saved].filter(Boolean).map(function(s) {
     return '<div class="detail-resume">\u25b6 Resume ' + fmt(parseFloat(s)) + '</div>';
   }).join('');
@@ -322,11 +320,6 @@ function showDetail(film, preserveSourceTile) {
   list.innerHTML = '';
   film.items.forEach(function(item, i) { list.appendChild(buildDetailRow(film, item, i)); });
   show('screen-detail');
-  var rows = Array.from(list.querySelectorAll('.detail-row:not(.unavailable)'));
-  var resumeRows = rows.filter(function(r) {
-    return !!localStorage.getItem('grew-tv-resume-' + film.id + '-' + film.items[parseInt(r.getAttribute('data-index'))].id);
-  });
-  [resumeRows.concat(rows)[0]].filter(Boolean).forEach(function(r) { r.focus(); });
 }
 
 function playFilm(film, item, from) {
@@ -361,11 +354,10 @@ function stopPlayback() {
   v.src = '';
   releaseWakeLock();
   var rs = returnScreen;
-  var savedIdx = currentItemIndex;
   currentItem = null;
   currentFilm = null;
   currentItemIndex = -1;
-  STOP_RESTORE[rs](savedIdx);
+  STOP_RESTORE[rs]();
 }
 
 function showControls() {
@@ -412,7 +404,6 @@ function handleVideoKey(e) {
 
 function onManifestError() {
   show('screen-error');
-  document.getElementById('btn-retry').focus();
 }
 
 function onManifestLoaded(allFilms) {
@@ -449,51 +440,24 @@ Array.from(document.querySelectorAll('.btn-skip')).forEach(function(btn) {
     showControls();
   });
 });
-document.getElementById('screen-video').addEventListener('keydown', handleVideoKey);
 document.getElementById('screen-video').addEventListener('click', function() { showControls(); });
 
-document.getElementById('grid-container').addEventListener('keydown', function(e) {
-  var delta = ARROW_DELTA[e.key];
-  var tiles = Array.from(document.querySelectorAll('.film-tile'));
-  var idx = tiles.indexOf(document.activeElement);
-  [delta].filter(Boolean).forEach(function() { e.preventDefault(); });
-  [tiles[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).forEach(function(t) { t.focus(); });
-});
-
-document.getElementById('screen-detail').addEventListener('keydown', function(e) {
-  [DETAIL_BACK_KEYS[e.key]].filter(Boolean).forEach(function() {
-    e.preventDefault();
-    show('screen-browse');
-    [detailSourceTile].filter(Boolean).forEach(function(t) { t.focus(); });
-  });
-  [DETAIL_ARROW_DELTA[e.key]].filter(Boolean).forEach(function(delta) {
-    e.preventDefault();
-    var rows = Array.from(document.querySelectorAll('.detail-row:not(.unavailable)'));
-    var idx = rows.indexOf(document.activeElement);
-    [rows[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).forEach(function(r) { r.focus(); });
-  });
-});
+document.addEventListener('keydown', dispatchKey);
 
 document.getElementById('btn-back-detail').addEventListener('click', function() {
   show('screen-browse');
-  [detailSourceTile].filter(Boolean).forEach(function(t) { t.focus(); });
 });
 document.getElementById('btn-kids').addEventListener('click', function() { selectProfile('kids'); });
 document.getElementById('btn-adults').addEventListener('click', function() { selectProfile('adults'); });
 document.getElementById('btn-retry').addEventListener('click', function() {
   show('screen-profile');
-  document.getElementById('btn-kids').focus();
 });
-
-show('screen-profile');
-document.getElementById('btn-kids').focus();
-
 
 (function() {
   var BACK_ACTIONS = {
     'screen-video':  function() { stopPlayback(); },
-    'screen-detail': function() { show('screen-browse'); [detailSourceTile].filter(Boolean).forEach(function(t) { t.focus(); }); },
-    'screen-browse': function() { show('screen-profile'); document.getElementById('btn-kids').focus(); }
+    'screen-detail': function() { show('screen-browse'); },
+    'screen-browse': function() { show('screen-profile'); }
   };
 
   function goBack() {
@@ -533,8 +497,26 @@ document.getElementById('btn-kids').focus();
   };
 
   function handleCmd(cmd) {
-    [REMOTE_HANDLERS[cmd]].filter(Boolean).forEach(function(fn) { fn(); });
+    var remote = getActiveConfig().remote;
+    var fn = [remote[cmd], REMOTE_HANDLERS[cmd]].filter(Boolean)[0];
+    [fn].filter(Boolean).forEach(function(f) { f(); });
   }
+
+  setupBrowse(
+    function() { return detailSourceTile; },
+    function() { detailSourceTile = null; }
+  );
+  setupDetail(show);
+  setupVideo(handleVideoKey, {
+    play:     function() { video.play().catch(function(){}); showControls(); },
+    pause:    function() { video.pause(); showControls(); },
+    next:     function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
+    prev:     function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex - 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
+    vol_up:   function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); },
+    vol_down: function() { video.volume = Math.max(0, video.volume - 0.1); showControls(); }
+  });
+
+  show('screen-profile');
 
   function poll() {
     fetch('http://localhost:8765/poll')
