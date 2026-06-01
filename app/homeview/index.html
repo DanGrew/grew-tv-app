@@ -30,7 +30,8 @@ button:focus { outline: none; border-color: #ff0; background: #1a1a00; color: #f
 button:hover { background: #222; }
 
 #grid-container { width: 100vw; height: 100vh; overflow-y: auto; padding: 60px; }
-#profile-label { font-size: 24px; color: #666; position: fixed; top: 24px; right: 40px; }
+#profile-label { font-size: 24px; color: #666; position: fixed; top: 32px; right: 220px; }
+#btn-refresh { position: fixed; top: 16px; right: 40px; font-size: 28px; padding: 12px 28px; min-width: auto; z-index: 10; }
 #grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -104,6 +105,7 @@ button:hover { background: #222; }
 </div>
 
 <div id="screen-browse">
+  <button id="btn-refresh" tabindex="0">Refresh</button>
   <div id="profile-label"></div>
   <div id="grid-container">
     <div id="grid"></div>
@@ -160,6 +162,16 @@ var currentDetailFilm = null;
 var detailSourceTile = null;
 var returnScreen = 'screen-browse';
 var lastSaveTime = 0;
+
+var errorContext = 'profile';
+
+var ERROR_MSG = {
+  'no-usb':        'No media drive found.<br>Connect USB and press Refresh.',
+  'manifest-fail': 'Media drive found but couldn\'t read library.<br>Press Refresh to try again.',
+  'no-server':     'Can\'t reach the media server.<br>Is the Mac Mini on and connected?'
+};
+
+var RETRY_LABEL = { 'browse': 'Refresh', 'profile': 'Try Again' };
 
 var FILM_FILTER = {
   kids: function(f) { return f.profile === 'kids'; },
@@ -228,11 +240,54 @@ function releaseWakeLock() {
   [wakeLock].filter(Boolean).forEach(function(wl) { wl.release(); wakeLock = null; });
 }
 
+var DEVICE_RESULT = {
+  'true':  function(devices) { return devices[0]; },
+  'false': function() { throw { error: 'no-usb' }; }
+};
+
+function throwNoUsb(devices) {
+  return DEVICE_RESULT[!!devices.length + ''](devices);
+}
+
+function fetchScanDevice() {
+  return fetch('http://localhost:8080/scan', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(scan) { return throwNoUsb(scan.devices); })
+    .catch(function(e) { return [e].filter(function(x) { return x.error; }).concat([{ error: 'no-server' }])[0]; });
+}
+
+function fetchManifest(device) {
+  return fetch('http://localhost:8080/' + device + '/manifest.json', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(manifest) { contentBase = manifest.contentBase; return { films: manifest.content }; })
+    .catch(function() { return { error: 'manifest-fail' }; });
+}
+
+var SCAN_OUTCOME = {
+  'true':  function(r) { return Promise.resolve(r); },
+  'false': function(r) { return fetchManifest(r); }
+};
+
+function fetchManifestDirect(url) {
+  return fetch(url, { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(manifest) { contentBase = manifest.contentBase; return { films: manifest.content }; })
+    .catch(function() { return { error: 'manifest-fail' }; });
+}
+
+async function fetchViaScan() {
+  var scanResult = await fetchScanDevice();
+  return SCAN_OUTCOME[!!scanResult.error + ''](scanResult);
+}
+
+var MANIFEST_SOURCE = {
+  'true':  function(url) { return fetchManifestDirect(url); },
+  'false': function() { return fetchViaScan(); }
+};
+
 async function loadManifest() {
-  return fetch('http://localhost:8765/manifest.json', { cache: 'no-store' })
-    .then(function(res) { return res.json(); })
-    .then(function(manifest) { contentBase = manifest.contentBase; return manifest.content; })
-    .catch(function() { return null; });
+  var override = new URL(location.href).searchParams.get('manifest');
+  return MANIFEST_SOURCE[!!override + ''](override);
 }
 
 function appendFilmTile(grid, film, i) {
@@ -410,9 +465,19 @@ function handleVideoKey(e) {
   [togglePlayPause].filter(function() { return VIDEO_PLAY_PAUSE_KEYS[e.key]; }).filter(function() { return !onSkip; }).filter(function() { return !onBack; }).forEach(function(f) { e.preventDefault(); f(); });
 }
 
-function onManifestError() {
+function onManifestError(errorType) {
+  document.getElementById('error-text').innerHTML = [ERROR_MSG[errorType]].filter(Boolean).concat([ERROR_MSG['no-server']])[0];
+  var btn = document.getElementById('btn-retry');
+  btn.textContent = RETRY_LABEL[errorContext];
   show('screen-error');
-  document.getElementById('btn-retry').focus();
+  btn.focus();
+}
+
+async function refreshManifest() {
+  errorContext = 'browse';
+  var result = await loadManifest();
+  [onManifestError].filter(function() { return result.error; }).forEach(function(f) { f(result.error); });
+  [onManifestLoaded].filter(function() { return !result.error; }).forEach(function(f) { f(result.films); });
 }
 
 function onManifestLoaded(allFilms) {
@@ -423,9 +488,10 @@ function onManifestLoaded(allFilms) {
 
 async function selectProfile(p) {
   profile = p;
-  var allFilms = await loadManifest();
-  [onManifestError].filter(function() { return allFilms === null; }).forEach(function(f) { f(); });
-  [onManifestLoaded].filter(function() { return allFilms !== null; }).forEach(function(f) { f(allFilms); });
+  errorContext = 'profile';
+  var result = await loadManifest();
+  [onManifestError].filter(function() { return result.error; }).forEach(function(f) { f(result.error); });
+  [onManifestLoaded].filter(function() { return !result.error; }).forEach(function(f) { f(result.films); });
 }
 
 video.addEventListener('timeupdate', function() {
@@ -456,8 +522,11 @@ document.getElementById('grid-container').addEventListener('keydown', function(e
   var delta = ARROW_DELTA[e.key];
   var tiles = Array.from(document.querySelectorAll('.film-tile'));
   var idx = tiles.indexOf(document.activeElement);
-  [delta].filter(Boolean).forEach(function() { e.preventDefault(); });
-  [tiles[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).forEach(function(t) { t.focus(); });
+  var topOffsetTop = [tiles[0]].filter(Boolean).map(function(t) { return t.offsetTop; }).concat([NaN])[0];
+  var toRefresh = [1].filter(function() { return e.key === 'ArrowUp'; }).filter(function() { return idx > -1; }).filter(function() { return document.activeElement.offsetTop === topOffsetTop; }).length;
+  [document.getElementById('btn-refresh')].filter(function() { return toRefresh; }).forEach(function(b) { e.preventDefault(); b.focus(); });
+  [delta].filter(Boolean).filter(function() { return !toRefresh; }).forEach(function() { e.preventDefault(); });
+  [tiles[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).filter(function() { return !toRefresh; }).forEach(function(t) { t.focus(); });
 });
 
 document.getElementById('screen-detail').addEventListener('keydown', function(e) {
@@ -480,9 +549,14 @@ document.getElementById('btn-back-detail').addEventListener('click', function() 
 });
 document.getElementById('btn-kids').addEventListener('click', function() { selectProfile('kids'); });
 document.getElementById('btn-adults').addEventListener('click', function() { selectProfile('adults'); });
-document.getElementById('btn-retry').addEventListener('click', function() {
-  show('screen-profile');
-  document.getElementById('btn-kids').focus();
+var RETRY_ACTION = {
+  'browse':  function() { refreshManifest(); },
+  'profile': function() { show('screen-profile'); document.getElementById('btn-kids').focus(); }
+};
+document.getElementById('btn-retry').addEventListener('click', function() { RETRY_ACTION[errorContext](); });
+document.getElementById('btn-refresh').addEventListener('click', refreshManifest);
+document.getElementById('btn-refresh').addEventListener('keydown', function(e) {
+  [document.querySelector('.film-tile')].filter(Boolean).filter(function() { return e.key === 'ArrowDown'; }).forEach(function(t) { e.preventDefault(); t.focus(); });
 });
 
 show('screen-profile');
