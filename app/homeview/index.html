@@ -194,6 +194,23 @@ function sendTelemetry(event, source, opts) {
   }).catch(function() {});
 }
 
+function isPositive(n) { return n > 0; }
+
+function onFrameDrop(d) {
+  sendTelemetry(EVENTS.FRAME_DROPPED, SOURCES.TV, { meta: { droppedFrames: d, perf: performance.now() } });
+}
+
+function checkQuality() {
+  var q = video.getVideoPlaybackQuality();
+  var dropped = q.droppedVideoFrames - lastDroppedFrames;
+  lastDroppedFrames = q.droppedVideoFrames;
+  [dropped].filter(isPositive).forEach(onFrameDrop);
+}
+
+function sampleFrameDrops() {
+  [video.getVideoPlaybackQuality].filter(Boolean).forEach(checkQuality);
+}
+
 var contentBase = '';
 var profile = null;
 var films = [];
@@ -645,14 +662,7 @@ video.addEventListener('ended', stopPlayback);
 video.addEventListener('play', function() {
   document.getElementById('btn-play-pause').textContent = '⏸';
   sendTelemetry(EVENTS.VIDEO_PLAY, SOURCES.TV, { meta: { perf: performance.now() } });
-  [video.getVideoPlaybackQuality].filter(Boolean).forEach(function() {
-    var q = video.getVideoPlaybackQuality();
-    var dropped = q.droppedVideoFrames - lastDroppedFrames;
-    lastDroppedFrames = q.droppedVideoFrames;
-    [dropped].filter(function(d) { return d > 0; }).forEach(function(d) {
-      sendTelemetry(EVENTS.FRAME_DROPPED, SOURCES.TV, { meta: { droppedFrames: d, perf: performance.now() } });
-    });
-  });
+  sampleFrameDrops();
 });
 video.addEventListener('pause', function() {
   document.getElementById('btn-play-pause').textContent = '▶';
@@ -666,14 +676,7 @@ video.addEventListener('canplay', function() {
 });
 video.addEventListener('seeked', function() {
   sendTelemetry(EVENTS.SEEK, SOURCES.TV, { meta: { perf: performance.now() } });
-  [video.getVideoPlaybackQuality].filter(Boolean).forEach(function() {
-    var q = video.getVideoPlaybackQuality();
-    var dropped = q.droppedVideoFrames - lastDroppedFrames;
-    lastDroppedFrames = q.droppedVideoFrames;
-    [dropped].filter(function(d) { return d > 0; }).forEach(function(d) {
-      sendTelemetry(EVENTS.FRAME_DROPPED, SOURCES.TV, { meta: { droppedFrames: d, perf: performance.now() } });
-    });
-  });
+  sampleFrameDrops();
 });
 
 document.getElementById('btn-play-pause').addEventListener('click', function() { togglePlayPause(); });
