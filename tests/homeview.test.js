@@ -268,18 +268,18 @@ test('Enter in popup selects focused option and closes', async ({ page }) => {
   expect(time).toBe(630);
 });
 
-test('ArrowRight from skip-back focuses skip-fwd', async ({ page }) => {
+test('ArrowRight from skip-back focuses play-pause', async ({ page }) => {
   await goToVideoScreen(page);
   await page.locator('#btn-skip-back').focus();
   await page.keyboard.press('ArrowRight');
-  await expect(page.locator('#btn-skip-fwd')).toBeFocused();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
 });
 
-test('ArrowLeft from skip-fwd focuses skip-back', async ({ page }) => {
+test('ArrowLeft from skip-fwd focuses play-pause', async ({ page }) => {
   await goToVideoScreen(page);
   await page.locator('#btn-skip-fwd').focus();
   await page.keyboard.press('ArrowLeft');
-  await expect(page.locator('#btn-skip-back')).toBeFocused();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
 });
 
 test('ArrowDown from skip row focuses back button', async ({ page }) => {
@@ -289,9 +289,9 @@ test('ArrowDown from skip row focuses back button', async ({ page }) => {
   await expect(page.locator('#btn-back-video')).toBeFocused();
 });
 
-test('ArrowUp from back button focuses skip-back button', async ({ page }) => {
+test('ArrowUp from back button focuses play-pause button', async ({ page }) => {
   await goToVideoScreen(page);
   await page.locator('#btn-back-video').focus();
   await page.keyboard.press('ArrowUp');
-  await expect(page.locator('#btn-skip-back')).toBeFocused();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
 });

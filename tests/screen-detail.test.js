@@ -112,10 +112,10 @@ test('Escape on browse does not crash or navigate away', async ({ page }) => {
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
 
-test('video onEnter focuses back button', async ({ page }) => {
+test('video onEnter focuses play-pause button', async ({ page }) => {
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
-  await expect(page.locator('#btn-back-video')).toBeFocused();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
 });
 
 test.describe('error screen entry', () => {
