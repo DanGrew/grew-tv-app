@@ -578,6 +578,10 @@ var POPUP_HANDLERS = {
 
 var SKIP_LEFT_TARGET  = { 'btn-skip-fwd': 'btn-play-pause', 'btn-skip-back': 'btn-back-video' };
 var SKIP_RIGHT_TARGET = { 'btn-skip-back': 'btn-play-pause', 'btn-skip-fwd': 'btn-back-video' };
+var VIDEO_REMOTE_LEFT  = { 'btn-skip-fwd': 'btn-play-pause', 'btn-play-pause': 'btn-skip-back', 'btn-skip-back': 'btn-back-video' };
+var VIDEO_REMOTE_RIGHT = { 'btn-skip-back': 'btn-play-pause', 'btn-play-pause': 'btn-skip-fwd', 'btn-skip-fwd': 'btn-back-video' };
+var VIDEO_REMOTE_DOWN  = { 'btn-skip-back': 'btn-back-video', 'btn-play-pause': 'btn-back-video', 'btn-skip-fwd': 'btn-back-video' };
+var VIDEO_REMOTE_UP    = { 'btn-back-video': 'btn-play-pause' };
 var SKIP_NAV = {
   ArrowLeft:  function() { document.getElementById(SKIP_LEFT_TARGET[document.activeElement.id]).focus(); },
   ArrowRight: function() { document.getElementById(SKIP_RIGHT_TARGET[document.activeElement.id]).focus(); },
@@ -764,7 +768,12 @@ document.getElementById('btn-retry').addEventListener('click', function() {
     vol_up:    function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); },
     vol_down:  function() { video.volume = Math.max(0, video.volume - 0.1); showControls(); },
     skip_back: function() { openSkipPopup('back'); },
-    skip_fwd:  function() { openSkipPopup('fwd'); }
+    skip_fwd:  function() { openSkipPopup('fwd'); },
+    left:      function() { [VIDEO_REMOTE_LEFT[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); },
+    right:     function() { [VIDEO_REMOTE_RIGHT[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); },
+    down:      function() { [VIDEO_REMOTE_DOWN[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); },
+    up:        function() { [VIDEO_REMOTE_UP[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); },
+    select:    function() { showControls(); document.activeElement.click(); }
   });
 
   show('screen-profile');
