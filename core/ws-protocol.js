@@ -10,11 +10,19 @@ export const MESSAGE_TYPES = {
 
 export const SESSION_ID = 'grew-tv';
 
+function uuid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 export function createMessage(type, payload, opts) {
   return {
     type,
     session_id: SESSION_ID,
-    message_id: crypto.randomUUID(),
+    message_id: uuid(),
     version: (opts && opts.version != null) ? opts.version : null,
     timestamp: Date.now(),
     payload: payload != null ? payload : {}
@@ -24,7 +32,7 @@ export function createMessage(type, payload, opts) {
 export function createIntent(intent, params) {
   return createMessage(MESSAGE_TYPES.INTENT, {
     intent,
-    intent_id: crypto.randomUUID(),
+    intent_id: uuid(),
     params: params != null ? params : {}
   });
 }
