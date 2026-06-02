@@ -148,23 +148,50 @@ async function mockVideoTime(page, currentTime, duration) {
   }, { ct: currentTime, dur: duration });
 }
 
-test('skip row shows 12 buttons in playback overlay', async ({ page }) => {
+test('skip row shows two skip buttons', async ({ page }) => {
   await goToVideoScreen(page);
-  await expect(page.locator('.btn-skip')).toHaveCount(12);
+  await expect(page.locator('#btn-skip-back')).toBeVisible();
+  await expect(page.locator('#btn-skip-fwd')).toBeVisible();
 });
 
-test('forward skip adds delta to currentTime', async ({ page }) => {
+test('clicking skip-fwd opens popup', async ({ page }) => {
+  await goToVideoScreen(page);
+  await page.locator('#btn-skip-fwd').click();
+  await expect(page.locator('.skip-popup')).toBeVisible();
+});
+
+test('clicking skip-back opens popup', async ({ page }) => {
+  await goToVideoScreen(page);
+  await page.locator('#btn-skip-back').click();
+  await expect(page.locator('.skip-popup')).toBeVisible();
+});
+
+test('popup shows 6 options', async ({ page }) => {
+  await goToVideoScreen(page);
+  await page.locator('#btn-skip-fwd').click();
+  await expect(page.locator('.skip-popup button')).toHaveCount(6);
+});
+
+test('popup default focus is 10s option', async ({ page }) => {
+  await goToVideoScreen(page);
+  await page.locator('#btn-skip-fwd').click();
+  await expect(page.locator('.skip-popup button[data-delta="10"]')).toBeFocused();
+});
+
+test('forward skip via popup adds delta to currentTime', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 600, 3600);
-  await page.locator('.btn-skip[data-delta="10"]').click();
+  await page.locator('#btn-skip-fwd').click();
+  await page.locator('.skip-popup button[data-delta="10"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
   expect(time).toBe(610);
 });
 
-test('back skip subtracts delta from currentTime', async ({ page }) => {
+test('back skip via popup subtracts delta from currentTime', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 600, 3600);
-  await page.locator('.btn-skip[data-delta="-10"]').click();
+  await page.locator('#btn-skip-back').click();
+  await page.locator('.skip-popup button[data-delta="-10"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
   expect(time).toBe(590);
 });
@@ -172,7 +199,8 @@ test('back skip subtracts delta from currentTime', async ({ page }) => {
 test('back skip clamps to 0', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 5, 3600);
-  await page.locator('.btn-skip[data-delta="-30"]').click();
+  await page.locator('#btn-skip-back').click();
+  await page.locator('.skip-popup button[data-delta="-30"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
   expect(time).toBe(0);
 });
@@ -180,35 +208,90 @@ test('back skip clamps to 0', async ({ page }) => {
 test('forward skip clamps to duration', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 3590, 3600);
-  await page.locator('.btn-skip[data-delta="30"]').click();
+  await page.locator('#btn-skip-fwd').click();
+  await page.locator('.skip-popup button[data-delta="30"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
   expect(time).toBe(3600);
 });
 
-test('ArrowRight moves focus to next skip button', async ({ page }) => {
+test('selecting popup option closes popup', async ({ page }) => {
   await goToVideoScreen(page);
-  await page.locator('.btn-skip').first().focus();
-  await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.btn-skip').nth(1)).toBeFocused();
+  await mockVideoTime(page, 600, 3600);
+  await page.locator('#btn-skip-fwd').click();
+  await page.locator('.skip-popup button[data-delta="10"]').click();
+  await expect(page.locator('.skip-popup')).toHaveCount(0);
 });
 
-test('ArrowLeft moves focus to previous skip button', async ({ page }) => {
+test('Escape closes popup without seeking', async ({ page }) => {
   await goToVideoScreen(page);
-  await page.locator('.btn-skip').nth(1).focus();
+  await mockVideoTime(page, 600, 3600);
+  await page.locator('#btn-skip-fwd').click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.skip-popup')).toHaveCount(0);
+  const time = await page.evaluate(() => document.getElementById('video').currentTime);
+  expect(time).toBe(600);
+});
+
+test('Backspace closes popup without seeking', async ({ page }) => {
+  await goToVideoScreen(page);
+  await mockVideoTime(page, 600, 3600);
+  await page.locator('#btn-skip-back').click();
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('.skip-popup')).toHaveCount(0);
+  const time = await page.evaluate(() => document.getElementById('video').currentTime);
+  expect(time).toBe(600);
+});
+
+test('ArrowDown in popup moves focus to next option', async ({ page }) => {
+  await goToVideoScreen(page);
+  await page.locator('#btn-skip-fwd').click();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.skip-popup button[data-delta="30"]')).toBeFocused();
+});
+
+test('ArrowUp in popup moves focus to previous option', async ({ page }) => {
+  await goToVideoScreen(page);
+  await page.locator('#btn-skip-fwd').click();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('.skip-popup button[data-delta="10"]')).toBeFocused();
+});
+
+test('Enter in popup selects focused option and closes', async ({ page }) => {
+  await goToVideoScreen(page);
+  await mockVideoTime(page, 600, 3600);
+  await page.locator('#btn-skip-fwd').click();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.skip-popup')).toHaveCount(0);
+  const time = await page.evaluate(() => document.getElementById('video').currentTime);
+  expect(time).toBe(630);
+});
+
+test('ArrowRight from skip-back focuses skip-fwd', async ({ page }) => {
+  await goToVideoScreen(page);
+  await page.locator('#btn-skip-back').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#btn-skip-fwd')).toBeFocused();
+});
+
+test('ArrowLeft from skip-fwd focuses skip-back', async ({ page }) => {
+  await goToVideoScreen(page);
+  await page.locator('#btn-skip-fwd').focus();
   await page.keyboard.press('ArrowLeft');
-  await expect(page.locator('.btn-skip').first()).toBeFocused();
+  await expect(page.locator('#btn-skip-back')).toBeFocused();
 });
 
 test('ArrowDown from skip row focuses back button', async ({ page }) => {
   await goToVideoScreen(page);
-  await page.locator('.btn-skip').first().focus();
+  await page.locator('#btn-skip-back').focus();
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('#btn-back-video')).toBeFocused();
 });
 
-test('ArrowUp from back button focuses first skip button', async ({ page }) => {
+test('ArrowUp from back button focuses skip-back button', async ({ page }) => {
   await goToVideoScreen(page);
   await page.locator('#btn-back-video').focus();
   await page.keyboard.press('ArrowUp');
-  await expect(page.locator('.btn-skip').first()).toBeFocused();
+  await expect(page.locator('#btn-skip-back')).toBeFocused();
 });
