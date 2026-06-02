@@ -776,11 +776,12 @@ document.getElementById('btn-retry').addEventListener('click', function() {
     vol_down:  function() { video.volume = Math.max(0, video.volume - 0.1); showControls(); },
     skip_back: function() { openSkipPopup('back'); },
     skip_fwd:  function() { openSkipPopup('fwd'); },
-    left:      function() { [VIDEO_REMOTE_LEFT[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); },
-    right:     function() { [VIDEO_REMOTE_RIGHT[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); },
-    down:      function() { [VIDEO_REMOTE_DOWN[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); },
-    up:        function() { [VIDEO_REMOTE_UP[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); },
-    select:    function() { showControls(); document.activeElement.click(); }
+    left:      function() { var p = skipPopup; [p].filter(Boolean).forEach(function() { POPUP_NAV.Escape(); }); [!p].filter(Boolean).forEach(function() { [VIDEO_REMOTE_LEFT[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); }); },
+    right:     function() { var p = skipPopup; [p].filter(Boolean).forEach(function() { POPUP_NAV.Escape(); }); [!p].filter(Boolean).forEach(function() { [VIDEO_REMOTE_RIGHT[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); }); },
+    down:      function() { var p = skipPopup; [p].filter(Boolean).forEach(function() { POPUP_NAV.ArrowDown(); }); [!p].filter(Boolean).forEach(function() { [VIDEO_REMOTE_DOWN[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); }); },
+    up:        function() { var p = skipPopup; [p].filter(Boolean).forEach(function() { POPUP_NAV.ArrowUp(); }); [!p].filter(Boolean).forEach(function() { [VIDEO_REMOTE_UP[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); }); },
+    select:    function() { var p = skipPopup; [p].filter(Boolean).forEach(function() { POPUP_NAV.Enter(); }); [!p].filter(Boolean).forEach(function() { showControls(); document.activeElement.click(); }); },
+    back:      function() { var p = skipPopup; [p].filter(Boolean).forEach(function() { POPUP_NAV.Escape(); }); [!p].filter(Boolean).forEach(function() { stopPlayback(); }); }
   });
 
   show('screen-profile');
