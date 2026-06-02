@@ -833,10 +833,9 @@ document.getElementById('btn-retry').addEventListener('click', function() {
       .then(function(r) { return r.json(); })
       .then(function(data) {
         [data.cmd].filter(Boolean).forEach(function(cmd) {
-          var commandId = data.command_id || null;
-          sendTelemetry(EVENTS.COMMAND_RECEIVED, SOURCES.TV, { commandId: commandId, command: cmd, meta: { perf: performance.now() } });
+          sendTelemetry(EVENTS.COMMAND_RECEIVED, SOURCES.TV, { commandId: data.command_id, command: cmd, meta: { perf: performance.now() } });
           handleCmd(cmd);
-          sendTelemetry(EVENTS.COMMAND_EXECUTED, SOURCES.TV, { commandId: commandId, command: cmd, meta: { perf: performance.now() } });
+          sendTelemetry(EVENTS.COMMAND_EXECUTED, SOURCES.TV, { commandId: data.command_id, command: cmd, meta: { perf: performance.now() } });
         });
       })
       .catch(function() {})
