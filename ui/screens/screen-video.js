@@ -2,7 +2,7 @@ import { registerScreen } from '../../core/screen-registry.js';
 
 export function setup(handleVideoKey, remote) {
   registerScreen('screen-video', {
-    onEnter: function() { document.getElementById('btn-back-video').focus(); },
+    onEnter: function() { document.getElementById('btn-play-pause').focus(); },
     keys: {
       Escape:     handleVideoKey,
       Backspace:  handleVideoKey,
