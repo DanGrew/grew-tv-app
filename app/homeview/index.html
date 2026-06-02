@@ -179,11 +179,20 @@ button:hover { background: #222; }
 <script type="module">
 import { fmt, pad } from '../../core/time.js';
 import { registerScreen, activateScreen, getActiveConfig, dispatchKey } from '../../core/screen-registry.js';
+import { EVENTS, SOURCES, createEvent } from '../../core/telemetry-schema.js';
 import '../../ui/screens/screen-profile.js';
 import '../../ui/screens/screen-error.js';
 import { setup as setupBrowse } from '../../ui/screens/screen-browse.js';
 import { setup as setupDetail } from '../../ui/screens/screen-detail.js';
 import { setup as setupVideo } from '../../ui/screens/screen-video.js';
+
+function sendTelemetry(event, source, opts) {
+  fetch('/telemetry', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(createEvent(event, source, opts))
+  }).catch(function() {});
+}
 
 var contentBase = '';
 var profile = null;
@@ -199,6 +208,7 @@ var pendingResumePosition = 0;
 var detailSourceTile = null;
 var returnScreen = 'screen-browse';
 var lastSaveTime = 0;
+var lastDroppedFrames = 0;
 
 var FILM_FILTER = {
   kids: function(f) { return f.profile === 'kids'; },
@@ -632,8 +642,39 @@ video.addEventListener('timeupdate', function() {
 });
 
 video.addEventListener('ended', stopPlayback);
-video.addEventListener('play', function() { document.getElementById('btn-play-pause').textContent = '⏸'; });
-video.addEventListener('pause', function() { document.getElementById('btn-play-pause').textContent = '▶'; });
+video.addEventListener('play', function() {
+  document.getElementById('btn-play-pause').textContent = '⏸';
+  sendTelemetry(EVENTS.VIDEO_PLAY, SOURCES.TV, { meta: { perf: performance.now() } });
+  [video.getVideoPlaybackQuality].filter(Boolean).forEach(function() {
+    var q = video.getVideoPlaybackQuality();
+    var dropped = q.droppedVideoFrames - lastDroppedFrames;
+    lastDroppedFrames = q.droppedVideoFrames;
+    [dropped].filter(function(d) { return d > 0; }).forEach(function(d) {
+      sendTelemetry(EVENTS.FRAME_DROPPED, SOURCES.TV, { meta: { droppedFrames: d, perf: performance.now() } });
+    });
+  });
+});
+video.addEventListener('pause', function() {
+  document.getElementById('btn-play-pause').textContent = '▶';
+  sendTelemetry(EVENTS.VIDEO_PAUSE, SOURCES.TV, { meta: { perf: performance.now() } });
+});
+video.addEventListener('waiting', function() {
+  sendTelemetry(EVENTS.VIDEO_BUFFER_START, SOURCES.TV, { meta: { perf: performance.now() } });
+});
+video.addEventListener('canplay', function() {
+  sendTelemetry(EVENTS.VIDEO_BUFFER_END, SOURCES.TV, { meta: { perf: performance.now() } });
+});
+video.addEventListener('seeked', function() {
+  sendTelemetry(EVENTS.SEEK, SOURCES.TV, { meta: { perf: performance.now() } });
+  [video.getVideoPlaybackQuality].filter(Boolean).forEach(function() {
+    var q = video.getVideoPlaybackQuality();
+    var dropped = q.droppedVideoFrames - lastDroppedFrames;
+    lastDroppedFrames = q.droppedVideoFrames;
+    [dropped].filter(function(d) { return d > 0; }).forEach(function(d) {
+      sendTelemetry(EVENTS.FRAME_DROPPED, SOURCES.TV, { meta: { droppedFrames: d, perf: performance.now() } });
+    });
+  });
+});
 
 document.getElementById('btn-play-pause').addEventListener('click', function() { togglePlayPause(); });
 document.getElementById('btn-resume').addEventListener('click', doResume);
@@ -789,7 +830,14 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   function poll() {
     fetch('http://localhost:8765/poll')
       .then(function(r) { return r.json(); })
-      .then(function(data) { [data.cmd].filter(Boolean).forEach(handleCmd); })
+      .then(function(data) {
+        [data.cmd].filter(Boolean).forEach(function(cmd) {
+          var commandId = data.command_id || null;
+          sendTelemetry(EVENTS.COMMAND_RECEIVED, SOURCES.TV, { commandId: commandId, command: cmd, meta: { perf: performance.now() } });
+          handleCmd(cmd);
+          sendTelemetry(EVENTS.COMMAND_EXECUTED, SOURCES.TV, { commandId: commandId, command: cmd, meta: { perf: performance.now() } });
+        });
+      })
       .catch(function() {})
       .then(function() { setTimeout(poll, 200); });
   }
