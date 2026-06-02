@@ -576,13 +576,11 @@ var POPUP_HANDLERS = {
   }
 };
 
+var SKIP_LEFT_TARGET  = { 'btn-skip-fwd': 'btn-play-pause', 'btn-skip-back': 'btn-back-video' };
+var SKIP_RIGHT_TARGET = { 'btn-skip-back': 'btn-play-pause', 'btn-skip-fwd': 'btn-back-video' };
 var SKIP_NAV = {
-  ArrowLeft:  function() {
-    [document.activeElement.id === 'btn-skip-fwd' ? 'btn-play-pause' : 'btn-back-video'].forEach(function(id) { document.getElementById(id).focus(); });
-  },
-  ArrowRight: function() {
-    [document.activeElement.id === 'btn-skip-back' ? 'btn-play-pause' : 'btn-back-video'].forEach(function(id) { document.getElementById(id).focus(); });
-  },
+  ArrowLeft:  function() { document.getElementById(SKIP_LEFT_TARGET[document.activeElement.id]).focus(); },
+  ArrowRight: function() { document.getElementById(SKIP_RIGHT_TARGET[document.activeElement.id]).focus(); },
   ArrowDown:  function() { document.getElementById('btn-back-video').focus(); },
   Enter:      function() { openSkipPopup(SKIP_DIRECTION[document.activeElement.id]); }
 };
