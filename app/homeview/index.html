@@ -194,8 +194,6 @@ function sendTelemetry(event, source, opts) {
   }).catch(function() {});
 }
 
-function isPositive(n) { return n > 0; }
-
 function onFrameDrop(d) {
   sendTelemetry(EVENTS.FRAME_DROPPED, SOURCES.TV, { meta: { droppedFrames: d, perf: performance.now() } });
 }
@@ -204,7 +202,7 @@ function checkQuality() {
   var q = video.getVideoPlaybackQuality();
   var dropped = q.droppedVideoFrames - lastDroppedFrames;
   lastDroppedFrames = q.droppedVideoFrames;
-  [dropped].filter(isPositive).forEach(onFrameDrop);
+  [dropped].filter(Boolean).forEach(onFrameDrop);
 }
 
 function sampleFrameDrops() {
