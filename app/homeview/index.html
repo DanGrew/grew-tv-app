@@ -748,7 +748,14 @@ document.getElementById('btn-retry').addEventListener('click', function() {
       Escape:    function() { show('screen-profile'); },
       Backspace: function() { show('screen-profile'); }
     },
-    remote: { back: function() { show('screen-profile'); } }
+    remote: {
+      back:   function() { show('screen-profile'); },
+      up:     function() { document.getElementById('btn-back-settings').focus(); },
+      left:   function() { document.getElementById('btn-back-settings').focus(); },
+      down:   function() { document.getElementById('btn-refresh').focus(); },
+      right:  function() { document.getElementById('btn-refresh').focus(); },
+      select: function() { document.activeElement.click(); }
+    }
   });
 
   setupBrowse(
