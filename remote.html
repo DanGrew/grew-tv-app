@@ -75,7 +75,7 @@ hr { width: 100%; border: none; border-top: 1px solid #222; margin: 2px 0; }
     fetch(BASE + '/command', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cmd: cmd })
+      body: JSON.stringify({ cmd: cmd, command_id: crypto.randomUUID() })
     }).then(function (r) {
       if (!r.ok) flash('error ' + r.status);
     }).catch(function () {
