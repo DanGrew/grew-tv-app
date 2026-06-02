@@ -180,6 +180,7 @@ button:hover { background: #222; }
 import { fmt, pad } from '../../core/time.js';
 import { registerScreen, activateScreen, getActiveConfig, dispatchKey } from '../../core/screen-registry.js';
 import { EVENTS, SOURCES, createEvent } from '../../core/telemetry-schema.js';
+import { MESSAGE_TYPES, createIntent, createSnapshotRequest, isStaleContext } from '../../core/ws-protocol.js';
 import '../../ui/screens/screen-profile.js';
 import '../../ui/screens/screen-error.js';
 import { setup as setupBrowse } from '../../ui/screens/screen-browse.js';
@@ -208,6 +209,11 @@ function checkQuality() {
 function sampleFrameDrops() {
   [video.getVideoPlaybackQuality].filter(Boolean).forEach(checkQuality);
 }
+
+var WS_URL = 'ws://localhost:8766';
+var ws = null;
+var currentVersion = -1;
+var lastPingTime = Date.now();
 
 var contentBase = '';
 var profile = null;
@@ -252,6 +258,58 @@ var STOP_RESTORE = {
   'screen-detail': function() { showDetail(currentDetailFilm, true); },
   'screen-browse': function() { show('screen-browse'); }
 };
+
+var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
+
+function sendIntent(intent, params) {
+  [ws].filter(Boolean).forEach(function(s) {
+    [s.readyState === WebSocket.OPEN].filter(Boolean).forEach(function() {
+      s.send(JSON.stringify(createIntent(intent, params)));
+    });
+  });
+}
+
+function renderContext(context) {
+  [[context.display].filter(Boolean).map(function(d) { return d.title; })[0]].filter(Boolean).forEach(function(t) {
+    document.getElementById('film-title-video').textContent = t;
+  });
+}
+
+function applyContext(payload) {
+  currentVersion = payload.version;
+  renderContext(payload);
+}
+
+function handleMessage(msg) {
+  var HANDLERS = {
+    snapshot: function() {
+      [msg.payload].filter(function(p) { return !isStaleContext(p, { version: currentVersion }); }).forEach(applyContext);
+    },
+    context: function() {
+      [msg.payload].filter(function(p) { return !isStaleContext(p, { version: currentVersion }); }).forEach(applyContext);
+    },
+    ping: function() {
+      lastPingTime = Date.now();
+      ws.send(JSON.stringify({ type: MESSAGE_TYPES.PONG }));
+    }
+  };
+  [HANDLERS[msg.type]].filter(Boolean).forEach(function(fn) { fn(); });
+}
+
+function connect() {
+  ws = new WebSocket(WS_URL);
+  ws.onopen = function() { ws.send(JSON.stringify(createSnapshotRequest())); };
+  ws.onmessage = function(e) { handleMessage(JSON.parse(e.data)); };
+  ws.onclose = function() { setTimeout(connect, 2000); };
+}
+
+function startWsWatchdog() {
+  setInterval(function() {
+    [ws].filter(Boolean).forEach(function(s) {
+      [Date.now() - lastPingTime > 20000].filter(Boolean).forEach(function() { s.close(); });
+    });
+  }, 5000);
+}
 
 function scanDevices() {
   var status = document.getElementById('settings-device-status');
@@ -417,6 +475,7 @@ function playFilm(film, item, from) {
     return ' \u2014 ' + l;
   }).concat([''])[0];
   document.getElementById('film-title-video').textContent = film.title + labelSuffix;
+  sendIntent('play', { title: film.title + labelSuffix });
   var resumeKey = 'grew-tv:position:' + film.id + ':' + playItem.id;
   var saved = localStorage.getItem(resumeKey);
   var t = [saved].filter(Boolean).map(parseFloat)[0];
@@ -472,6 +531,7 @@ function stopPlayback() {
   var v = document.getElementById('video');
   v.pause();
   v.src = '';
+  sendIntent('stop');
   releaseWakeLock();
   var rs = returnScreen;
   currentItem = null;
@@ -496,6 +556,7 @@ function updateProgress() {
 }
 
 function togglePlayPause() {
+  sendIntent(TOGGLE_INTENT[video.paused + '']);
   VIDEO_TOGGLE[video.paused]();
 }
 
@@ -722,8 +783,8 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   }
 
   var REMOTE_HANDLERS = {
-    play:     function() { video.play().catch(function(){}); showControls(); },
-    pause:    function() { video.pause(); showControls(); },
+    play:     function() { sendIntent('play'); video.play().catch(function(){}); showControls(); },
+    pause:    function() { sendIntent('pause'); video.pause(); showControls(); },
     next:     function() {
       [currentFilm].filter(Boolean).forEach(function(f) {
         [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); });
@@ -810,8 +871,8 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   );
   setupDetail(show);
   setupVideo(handleVideoKey, {
-    play:      function() { video.play().catch(function(){}); showControls(); },
-    pause:     function() { video.pause(); showControls(); },
+    play:      function() { sendIntent('play'); video.play().catch(function(){}); showControls(); },
+    pause:     function() { sendIntent('pause'); video.pause(); showControls(); },
     next:      function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
     prev:      function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex - 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
     vol_up:    function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); },
@@ -827,22 +888,8 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   });
 
   show('screen-profile');
-
-  function poll() {
-    fetch('http://localhost:8765/poll')
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        [data.cmd].filter(Boolean).forEach(function(cmd) {
-          sendTelemetry(EVENTS.COMMAND_RECEIVED, SOURCES.TV, { commandId: data.command_id, command: cmd, meta: { perf: performance.now() } });
-          handleCmd(cmd);
-          sendTelemetry(EVENTS.COMMAND_EXECUTED, SOURCES.TV, { commandId: data.command_id, command: cmd, meta: { perf: performance.now() } });
-        });
-      })
-      .catch(function() {})
-      .then(function() { setTimeout(poll, 200); });
-  }
-
-  setTimeout(poll, 200);
+  connect();
+  startWsWatchdog();
 }());
 </script>
 </body>
