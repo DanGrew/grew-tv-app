@@ -464,8 +464,19 @@ function togglePlayPause() {
   VIDEO_TOGGLE[video.paused]();
 }
 
-var SKIP_AMOUNTS = [10, 30, 120, 300, 900, 1800];
-var SKIP_LABELS  = ['10s', '30s', '2m', '5m', '15m', '30m'];
+var SKIP_AMOUNTS   = [10, 30, 120, 300, 900, 1800];
+var SKIP_LABELS    = ['10s', '30s', '2m', '5m', '15m', '30m'];
+var SKIP_BTN_ID    = { back: 'btn-skip-back', fwd: 'btn-skip-fwd' };
+var SKIP_IDS       = { 'btn-skip-back': true, 'btn-skip-fwd': true };
+var SKIP_DIRECTION = { 'btn-skip-back': 'back', 'btn-skip-fwd': 'fwd' };
+var SKIP_TEXT_FN   = {
+  back: function(lbl) { return '\u00ab ' + lbl; },
+  fwd:  function(lbl) { return lbl + ' \u00bb'; }
+};
+var SKIP_DELTA_FN  = {
+  back: function(amt) { return -amt; },
+  fwd:  function(amt) { return amt; }
+};
 var skipPopup = null;
 
 function executeSkip(delta) {
@@ -478,50 +489,50 @@ function updateSkipPopupFocus() {
 }
 
 function closeSkipPopup() {
-  if (!skipPopup) return;
-  document.removeEventListener('click', skipPopup.outsideHandler);
-  document.body.removeChild(skipPopup.el);
-  skipPopup = null;
+  [skipPopup].filter(Boolean).forEach(function(p) {
+    document.removeEventListener('click', p.outsideHandler);
+    document.body.removeChild(p.el);
+    skipPopup = null;
+  });
+}
+
+function positionSkipPopup(popup, btn) {
+  var rect = btn.getBoundingClientRect();
+  var ph = popup.offsetHeight;
+  var pw = popup.offsetWidth;
+  var left = Math.max(8, Math.min(window.innerWidth - pw - 8, rect.left + rect.width / 2 - pw / 2));
+  popup.style.left = left + 'px';
+  popup.style.top = Math.max(8, rect.top - ph - 8) + 'px';
+}
+
+function appendSkipOption(popup, amt, i, direction, btnId) {
+  var opt = document.createElement('button');
+  opt.textContent = SKIP_TEXT_FN[direction](SKIP_LABELS[i]);
+  opt.setAttribute('data-delta', SKIP_DELTA_FN[direction](amt));
+  opt.addEventListener('click', function() {
+    executeSkip(parseFloat(opt.getAttribute('data-delta')));
+    closeSkipPopup();
+    document.getElementById(btnId).focus();
+  });
+  popup.appendChild(opt);
 }
 
 function openSkipPopup(direction) {
   closeSkipPopup();
-  var btnId = direction === 'back' ? 'btn-skip-back' : 'btn-skip-fwd';
+  var btnId = SKIP_BTN_ID[direction];
   var btn = document.getElementById(btnId);
   var popup = document.createElement('div');
   popup.className = 'skip-popup';
   popup.style.top = '-9999px';
   popup.style.left = '0';
-  SKIP_AMOUNTS.forEach(function(amt, i) {
-    var opt = document.createElement('button');
-    opt.textContent = direction === 'back' ? '\u00ab ' + SKIP_LABELS[i] : SKIP_LABELS[i] + ' \u00bb';
-    opt.setAttribute('data-delta', direction === 'back' ? -amt : amt);
-    opt.addEventListener('click', function() {
-      executeSkip(parseFloat(opt.getAttribute('data-delta')));
-      closeSkipPopup();
-      document.getElementById(btnId).focus();
-    });
-    popup.appendChild(opt);
-  });
+  SKIP_AMOUNTS.forEach(function(amt, i) { appendSkipOption(popup, amt, i, direction, btnId); });
   document.body.appendChild(popup);
   function onClickOutside(e) {
-    if (!skipPopup) { document.removeEventListener('click', onClickOutside); return; }
-    if (!popup.contains(e.target)) { closeSkipPopup(); }
+    [e.target].filter(function(t) { return !popup.contains(t); }).forEach(function() { closeSkipPopup(); });
   }
   setTimeout(function() { document.addEventListener('click', onClickOutside); }, 0);
-  setTimeout(function() {
-    var rect = btn.getBoundingClientRect();
-    var ph = popup.offsetHeight;
-    var pw = popup.offsetWidth;
-    var left = rect.left + rect.width / 2 - pw / 2;
-    left = Math.max(8, Math.min(window.innerWidth - pw - 8, left));
-    var top = rect.top - ph - 8;
-    if (top < 8) top = rect.bottom + 8;
-    popup.style.left = left + 'px';
-    popup.style.top = top + 'px';
-  }, 0);
   skipPopup = { el: popup, direction: direction, focusIndex: 0, outsideHandler: onClickOutside };
-  updateSkipPopupFocus();
+  setTimeout(function() { positionSkipPopup(popup, btn); updateSkipPopupFocus(); }, 0);
   showControls();
 }
 
@@ -533,17 +544,31 @@ var POPUP_NAV = {
     var delta = parseFloat(p.el.querySelectorAll('button')[p.focusIndex].getAttribute('data-delta'));
     closeSkipPopup();
     executeSkip(delta);
-    document.getElementById(p.direction === 'back' ? 'btn-skip-back' : 'btn-skip-fwd').focus();
+    document.getElementById(SKIP_BTN_ID[p.direction]).focus();
   },
   Escape:    function() { closeSkipPopup(); },
   Backspace: function() { closeSkipPopup(); }
+};
+
+var POPUP_HANDLERS = {
+  'true': function(e) {
+    [POPUP_NAV[e.key]].filter(Boolean).forEach(function(fn) { e.preventDefault(); fn(); });
+  },
+  'false': function(e) {
+    var onSkip = !!SKIP_IDS[document.activeElement.id];
+    var onBack = document.activeElement.id === 'btn-back-video';
+    [stopPlayback].filter(function() { return VIDEO_STOP_KEYS[e.key]; }).forEach(function(f) { e.preventDefault(); f(); });
+    [SKIP_NAV[e.key]].filter(Boolean).filter(function() { return onSkip; }).forEach(function(fn) { e.preventDefault(); fn(); });
+    [BACK_NAV[e.key]].filter(Boolean).filter(function() { return onBack; }).forEach(function(fn) { e.preventDefault(); fn(); });
+    [togglePlayPause].filter(function() { return VIDEO_PLAY_PAUSE_KEYS[e.key]; }).filter(function() { return !onSkip; }).filter(function() { return !onBack; }).forEach(function(f) { e.preventDefault(); f(); });
+  }
 };
 
 var SKIP_NAV = {
   ArrowLeft:  function() { document.getElementById('btn-skip-back').focus(); },
   ArrowRight: function() { document.getElementById('btn-skip-fwd').focus(); },
   ArrowDown:  function() { document.getElementById('btn-back-video').focus(); },
-  Enter:      function() { openSkipPopup(document.activeElement.id === 'btn-skip-back' ? 'back' : 'fwd'); }
+  Enter:      function() { openSkipPopup(SKIP_DIRECTION[document.activeElement.id]); }
 };
 var BACK_NAV = {
   ArrowUp: function() { document.getElementById('btn-skip-back').focus(); }
@@ -551,16 +576,7 @@ var BACK_NAV = {
 
 function handleVideoKey(e) {
   showControls();
-  if (skipPopup) {
-    [POPUP_NAV[e.key]].filter(Boolean).forEach(function(fn) { e.preventDefault(); fn(); });
-    return;
-  }
-  var onSkip = document.activeElement.id === 'btn-skip-back' || document.activeElement.id === 'btn-skip-fwd';
-  var onBack = document.activeElement.id === 'btn-back-video';
-  [stopPlayback].filter(function() { return VIDEO_STOP_KEYS[e.key]; }).forEach(function(f) { e.preventDefault(); f(); });
-  [SKIP_NAV[e.key]].filter(Boolean).filter(function() { return onSkip; }).forEach(function(fn) { e.preventDefault(); fn(); });
-  [BACK_NAV[e.key]].filter(Boolean).filter(function() { return onBack; }).forEach(function(fn) { e.preventDefault(); fn(); });
-  [togglePlayPause].filter(function() { return VIDEO_PLAY_PAUSE_KEYS[e.key]; }).filter(function() { return !onSkip; }).filter(function() { return !onBack; }).forEach(function(f) { e.preventDefault(); f(); });
+  POPUP_HANDLERS[!!skipPopup + ''](e);
 }
 
 function onManifestError() {
