@@ -82,16 +82,14 @@ function renderActions(actions) {
 
 function renderFallback(payload) {
   actionsEl.style.display = '';
-  actionsEl.style.gridTemplateColumns = '';
-  actionsEl.style.alignItems = '';
+  actionsEl.style.flexDirection = '';
   renderActions(Array.isArray(payload.actions) ? payload.actions : []);
 }
 
 function renderBrowse() {
   actionsEl.innerHTML = '';
-  actionsEl.style.display = 'grid';
-  actionsEl.style.gridTemplateColumns = '1fr 1fr';
-  actionsEl.style.alignItems = 'start';
+  actionsEl.style.display = 'flex';
+  actionsEl.style.flexDirection = 'column';
   var content = manifestCache ? manifestCache.content || [] : null;
   [!content].filter(Boolean).forEach(function() {
     var p = document.createElement('div');
@@ -126,8 +124,7 @@ function renderBrowse() {
 function renderProfile(payload) {
   actionsEl.innerHTML = '';
   actionsEl.style.display = '';
-  actionsEl.style.gridTemplateColumns = '';
-  actionsEl.style.alignItems = '';
+  actionsEl.style.flexDirection = '';
   [['Kids', 'kids'], ['Adults', 'adults']].forEach(function(pair) {
     var btn = document.createElement('button');
     btn.className = 'action-btn';
