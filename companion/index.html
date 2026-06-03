@@ -33,8 +33,9 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
   background: #2a2a2a; color: #fff; font-size: 22px; cursor: pointer; touch-action: manipulation; }
 .ctrl-btn:active { background: #f0c040; color: #111; }
 .ctrl-btn[aria-disabled="true"] { opacity: 0.3; pointer-events: none; }
-.stop-btn { width: 100%; padding: 22px 16px; border-radius: 12px; border: none;
-  background: #1a1a1a; color: #888; font-size: 22px; cursor: pointer; touch-action: manipulation; }
+.stop-btn { width: 100%; padding: 22px 16px; border-radius: 12px; border: 2px solid #444;
+  background: #1a1a1a; color: #ccc; font-size: 22px; cursor: pointer; touch-action: manipulation; }
+.stop-btn:active { background: #333; color: #fff; }
 .video-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; }
 .video-title { font-size: 16px; color: #ccc; text-align: center; padding: 8px 0 4px; }
 </style>
@@ -246,7 +247,7 @@ function renderVideo(payload) {
     actionsEl.appendChild(stopBtn);
 
     var backBtn = document.createElement('button');
-    backBtn.className = 'stop-btn';
+    backBtn.className = 'action-btn';
     backBtn.textContent = '\u2190 Back';
     backBtn.addEventListener('click', function() { sendIntent('back'); });
     actionsEl.appendChild(backBtn);
