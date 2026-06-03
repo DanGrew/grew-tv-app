@@ -506,7 +506,7 @@ function playFilm(film, item, from) {
   currentItem = playItem;
   currentItemIndex = film.items.indexOf(playItem);
   returnScreen = playFrom;
-  _currentDisplay = { id: playItem.id, title: playItem.label || film.title };
+  _currentDisplay = { id: playItem.id, title: [playItem.label, film.title].filter(Boolean)[0] };
   v.src = contentBase + playItem.id + '.mp4';
   var labelSuffix = [playItem.label, playItem.title].filter(Boolean).map(function(l) {
     return ' \u2014 ' + l;
