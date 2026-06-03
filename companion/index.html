@@ -22,7 +22,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .tile-btn {
   display: flex; flex-direction: column;
   background: #1a1a1a; border: none; border-radius: 8px;
-  overflow: hidden; cursor: pointer; padding: 0;
+  overflow: hidden; cursor: pointer; padding: 0; color: #fff;
 }
 .tile-btn img { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
 .tile-btn span { color: #fff; font-size: 14px; padding: 6px 8px; text-align: left; }
@@ -103,12 +103,13 @@ function renderBrowse() {
     p.textContent = 'No content available';
     actionsEl.appendChild(p);
   });
+  var contentBasePath = (manifestCache.contentBase || '').replace(/^https?:\/\/[^\/]+/, '');
   [content || []].filter(function(c) { return c.length > 0; }).forEach(function(c) {
     c.forEach(function(film) {
       var btn = document.createElement('button');
       btn.className = 'tile-btn';
       var img = document.createElement('img');
-      img.src = 'http://' + window.location.hostname + ':8080/' + film.id + '.jpg';
+      img.src = window.location.origin + contentBasePath + (film.poster || film.id + '.jpg');
       img.alt = film.title || film.id;
       btn.appendChild(img);
       var span = document.createElement('span');
