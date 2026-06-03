@@ -822,7 +822,8 @@ document.getElementById('btn-retry').addEventListener('click', function() {
     left:     function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', -1); },
     right:    function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', 1); },
     select:   function(params) {
-      var film = params && params.id ? films.filter(function(f) { return f.id === params.id; })[0] : null;
+      var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
+      var film = [id].filter(Boolean).map(function(i) { return films.filter(function(f) { return f.id === i; })[0]; }).filter(Boolean)[0];
       [film].filter(Boolean).forEach(function(f) { TILE_ACTION[f.items.length === 1](f); });
       [!film].filter(Boolean).forEach(function() { [document.activeElement, document.body].filter(Boolean)[0].click(); });
     },
