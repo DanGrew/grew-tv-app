@@ -1,0 +1,12 @@
+{
+  "intents": ["navigate_up", "navigate_down", "navigate_left", "navigate_right", "select", "back", "error"],
+  "transitions": {
+    "navigate_up": "browse",
+    "navigate_down": "browse",
+    "navigate_left": "browse",
+    "navigate_right": "browse",
+    "select": "detail",
+    "back": "profile",
+    "error": "error"
+  }
+}

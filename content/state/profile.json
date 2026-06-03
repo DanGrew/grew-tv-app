@@ -1,0 +1,7 @@
+{
+  "intents": ["select", "error"],
+  "transitions": {
+    "select": "browse",
+    "error": "error"
+  }
+}

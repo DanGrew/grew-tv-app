@@ -1,0 +1,18 @@
+{
+  "intents": [
+    "pause", "play", "stop", "back", "error",
+    "skip_back_10", "skip_back_30", "skip_back_120", "skip_back_300", "skip_back_900", "skip_back_1800",
+    "skip_fwd_10", "skip_fwd_30", "skip_fwd_120", "skip_fwd_300", "skip_fwd_900", "skip_fwd_1800"
+  ],
+  "transitions": {
+    "pause": "video",
+    "play": "video",
+    "stop": "detail",
+    "back": "detail",
+    "error": "error",
+    "skip_back_10": "video", "skip_back_30": "video", "skip_back_120": "video",
+    "skip_back_300": "video", "skip_back_900": "video", "skip_back_1800": "video",
+    "skip_fwd_10": "video", "skip_fwd_30": "video", "skip_fwd_120": "video",
+    "skip_fwd_300": "video", "skip_fwd_900": "video", "skip_fwd_1800": "video"
+  }
+}

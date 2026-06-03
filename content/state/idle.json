@@ -1,7 +1,0 @@
-{
-  "actions": [],
-  "intents": ["play"],
-  "transitions": {
-    "play": "watching_media"
-  }
-}

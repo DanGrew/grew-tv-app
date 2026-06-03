@@ -1,4 +1,4 @@
 {
-  "initial": "idle",
-  "states": ["idle", "watching_media"]
+  "initial": "profile",
+  "states": ["profile", "browse", "detail", "video", "error"]
 }
