@@ -39,7 +39,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 import { MESSAGE_TYPES, createIntent, createSnapshotRequest, isStaleContext } from '../core/ws-protocol.js';
 
 var WS_URL = 'ws://' + window.location.hostname + ':8766';
-var MANIFEST_URL = 'http://' + window.location.hostname + ':8080/manifest.json';
+var MANIFEST_URL = 'http://' + window.location.hostname + ':8765/manifest.json';
 var ws = null;
 var currentVersion = -1;
 var lastPingTime = Date.now();
@@ -191,12 +191,20 @@ setInterval(function() {
   });
 }, 5000);
 
-fetch(MANIFEST_URL)
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    manifestCache = data;
-    [currentContextId === 'browse'].filter(Boolean).forEach(renderBrowse);
-  });
+function loadManifest() {
+  fetch(MANIFEST_URL)
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function(data) {
+      manifestCache = data;
+      [currentContextId === 'browse'].filter(Boolean).forEach(renderBrowse);
+    })
+    .catch(function() {
+      manifestCache = { content: [] };
+      [currentContextId === 'browse'].filter(Boolean).forEach(renderBrowse);
+    });
+}
+
+loadManifest();
 
 connect();
 </script>
