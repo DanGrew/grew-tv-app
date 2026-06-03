@@ -346,6 +346,100 @@ if (rule === 'no-pure-fn-outside-core') {
   });
 }
 
+function getAppAndCompanionHtml() {
+  return [
+    ...getAllFiles(path.join(ROOT, 'app'), ['.html']),
+    ...getAllFiles(path.join(ROOT, 'companion'), ['.html']),
+  ];
+}
+
+if (rule === 'no-fetch-in-app') {
+  const PATTERN = /fetch\s*\(/;
+  getAppAndCompanionHtml().forEach(file => {
+    const html = read(file);
+    const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+    extractInlineScripts(html).forEach((script, i) => {
+      const label = `${rel} (block ${i + 1})`;
+      scanned.push(label);
+      if (PATTERN.test(script)) {
+        violations.push(`${label} — fetch() in app/companion HTML; move to core/`);
+      }
+    });
+  });
+}
+
+if (rule === 'no-storage-in-app') {
+  const PATTERN = /localStorage/;
+  getAppAndCompanionHtml().forEach(file => {
+    const html = read(file);
+    const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+    extractInlineScripts(html).forEach((script, i) => {
+      const label = `${rel} (block ${i + 1})`;
+      scanned.push(label);
+      if (PATTERN.test(script)) {
+        violations.push(`${label} — localStorage in app/companion HTML; move to core/state.js`);
+      }
+    });
+  });
+}
+
+if (rule === 'no-ws-in-app') {
+  const PATTERN = /new WebSocket\s*\(/;
+  getAppAndCompanionHtml().forEach(file => {
+    const html = read(file);
+    const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+    extractInlineScripts(html).forEach((script, i) => {
+      const label = `${rel} (block ${i + 1})`;
+      scanned.push(label);
+      if (PATTERN.test(script)) {
+        violations.push(`${label} — new WebSocket() in app/companion HTML; move to core/`);
+      }
+    });
+  });
+}
+
+if (rule === 'max-inline-script-lines') {
+  const LIMIT = 30;
+  getAppAndCompanionHtml().forEach(file => {
+    const html = read(file);
+    const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+    extractInlineScripts(html).forEach((script, i) => {
+      const label = `${rel} (block ${i + 1})`;
+      scanned.push(label);
+      const lines = script.split('\n').length;
+      if (lines > LIMIT) {
+        violations.push(`${label} — ${lines} lines exceeds ${LIMIT}-line limit; extract to core/ or ui/`);
+      }
+    });
+  });
+}
+
+if (rule === 'no-multi-screen-html') {
+  const PATTERN = /(?:initPage|registerScreen)\s*\(/g;
+  getAppAndCompanionHtml().forEach(file => {
+    const html = read(file);
+    const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+    scanned.push(rel);
+    const matches = html.match(PATTERN);
+    const count = matches ? matches.length : 0;
+    if (count > 1) {
+      violations.push(`${rel} — ${count} screen registrations (initPage/registerScreen); max 1 per file`);
+    }
+  });
+}
+
+if (rule === 'companion-in-layers') {
+  const archCheckPath = path.join(ROOT, 'scripts', 'arch-check.js');
+  scanned.push('scripts/arch-check.js');
+  const content = read(archCheckPath);
+  const layersMatch = content.match(/const LAYERS\s*=\s*new Set\s*\(\s*\[([^\]]*)\]/);
+  if (!layersMatch) {
+    violations.push(`scripts/arch-check.js — could not find LAYERS definition`);
+  } else if (!layersMatch[1].includes("'companion'")) {
+    violations.push(`scripts/arch-check.js — 'companion' missing from LAYERS set in no-stray-files rule`);
+  }
+}
+
 let output = `## ${rule}\n`;
 
 if (violations.length === 0) {
