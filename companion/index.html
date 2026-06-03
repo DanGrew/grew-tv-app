@@ -55,7 +55,9 @@ var ws = null;
 var currentVersion = -1;
 var lastPingTime = Date.now();
 var manifestCache = null;
+var manifestFailed = false;
 var currentContextId = null;
+var currentPayload = null;
 
 var connStatus = document.getElementById('conn-status');
 var ctxLabel = document.getElementById('ctx-label');
@@ -158,7 +160,58 @@ function renderProfile(payload) {
   });
 }
 
-function renderDetail(payload) { renderFallback(payload); }
+function renderDetail(payload) {
+  actionsEl.innerHTML = '';
+  actionsEl.style.display = 'flex';
+  actionsEl.style.flexDirection = 'column';
+  actionsEl.style.alignItems = 'center';
+  var filmId = payload.film_id;
+  if (manifestFailed) {
+    var p = document.createElement('div');
+    p.className = 'no-actions';
+    p.textContent = 'Unable to load';
+    actionsEl.appendChild(p);
+    return;
+  }
+  if (!filmId || !manifestCache) {
+    var p = document.createElement('div');
+    p.className = 'no-actions';
+    p.textContent = 'No content';
+    actionsEl.appendChild(p);
+    return;
+  }
+  var film = (manifestCache.content || []).filter(function(f) { return f.id === filmId; })[0];
+  if (!film) {
+    var p = document.createElement('div');
+    p.className = 'no-actions';
+    p.textContent = 'No content';
+    actionsEl.appendChild(p);
+    return;
+  }
+  var contentBasePath = (manifestCache.contentBase || '').replace(/^https?:\/\/[^\/]+/, '');
+  var items = film.items || [];
+  if (items.length === 0) {
+    var p = document.createElement('div');
+    p.className = 'no-actions';
+    p.textContent = 'No content';
+    actionsEl.appendChild(p);
+    return;
+  }
+  items.forEach(function(item) {
+    var poster = ([item.poster].filter(Boolean).concat([film.poster].filter(Boolean)))[0];
+    var btn = document.createElement('button');
+    btn.className = 'tile-btn';
+    var img = document.createElement('img');
+    img.src = window.location.origin + contentBasePath + poster;
+    img.alt = item.label || item.title || '';
+    btn.appendChild(img);
+    var span = document.createElement('span');
+    span.textContent = item.label || item.title || titleCase(item.id);
+    btn.appendChild(span);
+    btn.addEventListener('click', function() { sendIntent('play', { id: item.id }); });
+    actionsEl.appendChild(btn);
+  });
+}
 function renderError(payload)  { renderFallback(payload); }
 
 function renderVideo(payload) {
@@ -281,6 +334,7 @@ var SCREEN_RENDERERS = {
 function applyContext(payload) {
   currentVersion = payload.version;
   currentContextId = payload.context_id;
+  currentPayload = payload;
   var display = payload.display || {};
   ctxTitle.textContent = display.title || '';
   ctxLabel.textContent = payload.context_id ? titleCase(payload.context_id) : '';
@@ -330,10 +384,17 @@ function loadManifest() {
     .then(function(data) {
       manifestCache = data;
       [currentContextId === 'browse'].filter(Boolean).forEach(renderBrowse);
+      [currentContextId === 'detail'].filter(Boolean).forEach(function() {
+        [currentPayload].filter(Boolean).forEach(renderDetail);
+      });
     })
     .catch(function() {
+      manifestFailed = true;
       manifestCache = { content: [] };
       [currentContextId === 'browse'].filter(Boolean).forEach(renderBrowse);
+      [currentContextId === 'detail'].filter(Boolean).forEach(function() {
+        [currentPayload].filter(Boolean).forEach(renderDetail);
+      });
     });
 }
 
