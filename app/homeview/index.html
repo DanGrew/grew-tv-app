@@ -288,6 +288,8 @@ function sendContext(screenId) {
   });
 }
 
+var handleCmd;
+
 function applyContext(payload) {
   currentVersion = payload.version;
 }
@@ -299,6 +301,9 @@ function handleMessage(msg) {
     },
     context: function() {
       [msg.payload].filter(function(p) { return !isStaleContext(p, { version: currentVersion }); }).forEach(applyContext);
+    },
+    intent: function() {
+      [handleCmd].filter(Boolean).forEach(function(fn) { fn(msg.payload.intent); });
     },
     ping: function() {
       lastPingTime = Date.now();
@@ -796,6 +801,8 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   }
 
   var REMOTE_HANDLERS = {
+    kids:     function() { selectProfile('kids'); },
+    adults:   function() { selectProfile('adults'); },
     play:     function() { sendIntent('play'); video.play().catch(function(){}); showControls(); },
     pause:    function() { sendIntent('pause'); video.pause(); showControls(); },
     next:     function() {
@@ -818,11 +825,11 @@ document.getElementById('btn-retry').addEventListener('click', function() {
     back:     function() { goBack(); }
   };
 
-  function handleCmd(cmd) {
+  handleCmd = function(cmd) {
     var remote = getActiveConfig().remote;
     var fn = [remote[cmd], REMOTE_HANDLERS[cmd]].filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(); });
-  }
+  };
 
   var PROFILE_BTN_HAS_COG_DOWN = { 'btn-kids': true, 'btn-adults': true };
 

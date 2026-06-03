@@ -75,11 +75,13 @@ function renderFallback(payload) {
 
 function renderProfile(payload) {
   actionsEl.innerHTML = '';
-  var btn = document.createElement('button');
-  btn.className = 'action-btn';
-  btn.textContent = 'Get Started';
-  btn.addEventListener('click', function() { sendIntent('select'); });
-  actionsEl.appendChild(btn);
+  [['Kids', 'kids'], ['Adults', 'adults']].forEach(function(pair) {
+    var btn = document.createElement('button');
+    btn.className = 'action-btn';
+    btn.textContent = pair[0];
+    btn.addEventListener('click', function() { sendIntent(pair[1]); });
+    actionsEl.appendChild(btn);
+  });
 }
 
 function renderBrowse(payload) { renderFallback(payload); }
