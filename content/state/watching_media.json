@@ -1,0 +1,11 @@
+{
+  "actions": ["pause", "play", "next", "prev", "stop"],
+  "intents": ["pause", "play", "next", "prev", "stop"],
+  "transitions": {
+    "pause": "watching_media",
+    "play": "watching_media",
+    "next": "watching_media",
+    "prev": "watching_media",
+    "stop": "idle"
+  }
+}
