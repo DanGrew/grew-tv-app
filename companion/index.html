@@ -19,6 +19,15 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 }
 .action-btn:active { background: #f0c040; color: #111; transform: scale(0.97); }
 .no-actions { color: #333; font-size: 16px; text-align: center; margin-top: 40px; }
+.tile-btn {
+  display: flex; flex-direction: column;
+  background: #1a1a1a; border: none; border-radius: 8px;
+  overflow: hidden; cursor: pointer; padding: 0; color: #fff;
+  width: 100%; max-width: 2in; flex-shrink: 0;
+}
+.tile-btn img { width: 100%; height: 100px; object-fit: cover; flex-shrink: 0; }
+.tile-btn span { color: #fff; font-size: 14px; padding: 6px 8px; text-align: left; flex-shrink: 0; }
+.tile-btn:active { opacity: 0.7; }
 </style>
 </head>
 <body>
@@ -31,9 +40,12 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 import { MESSAGE_TYPES, createIntent, createSnapshotRequest, isStaleContext } from '../core/ws-protocol.js';
 
 var WS_URL = 'ws://' + window.location.hostname + ':8766';
+var MANIFEST_URL = 'http://' + window.location.hostname + ':8765/manifest.json';
 var ws = null;
 var currentVersion = -1;
 var lastPingTime = Date.now();
+var manifestCache = null;
+var currentContextId = null;
 
 var connStatus = document.getElementById('conn-status');
 var ctxLabel = document.getElementById('ctx-label');
@@ -44,10 +56,10 @@ function titleCase(str) {
   return str.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
 }
 
-function sendIntent(intent) {
+function sendIntent(intent, params) {
   [ws].filter(Boolean).forEach(function(s) {
     [s.readyState === WebSocket.OPEN].filter(Boolean).forEach(function() {
-      s.send(JSON.stringify(createIntent(intent)));
+      s.send(JSON.stringify(createIntent(intent, params)));
     });
   });
 }
@@ -70,11 +82,52 @@ function renderActions(actions) {
 }
 
 function renderFallback(payload) {
+  actionsEl.style.display = '';
+  actionsEl.style.flexDirection = '';
+  actionsEl.style.alignItems = '';
   renderActions(Array.isArray(payload.actions) ? payload.actions : []);
+}
+
+function renderBrowse() {
+  actionsEl.innerHTML = '';
+  actionsEl.style.display = 'flex';
+  actionsEl.style.flexDirection = 'column';
+  actionsEl.style.alignItems = 'center';
+  var content = manifestCache ? manifestCache.content || [] : null;
+  [!content].filter(Boolean).forEach(function() {
+    var p = document.createElement('div');
+    p.className = 'no-actions';
+    p.textContent = 'Loading content\u2026';
+    actionsEl.appendChild(p);
+  });
+  [content && content.length === 0].filter(Boolean).forEach(function() {
+    var p = document.createElement('div');
+    p.className = 'no-actions';
+    p.textContent = 'No content available';
+    actionsEl.appendChild(p);
+  });
+  var contentBasePath = (manifestCache.contentBase || '').replace(/^https?:\/\/[^\/]+/, '');
+  [content || []].filter(function(c) { return c.length > 0; }).forEach(function(c) {
+    c.forEach(function(film) {
+      var btn = document.createElement('button');
+      btn.className = 'tile-btn';
+      var img = document.createElement('img');
+      img.src = window.location.origin + contentBasePath + (film.poster || film.id + '.jpg');
+      img.alt = film.title || film.id;
+      btn.appendChild(img);
+      var span = document.createElement('span');
+      span.textContent = film.title || titleCase(film.id);
+      btn.appendChild(span);
+      btn.addEventListener('click', function() { sendIntent('select', { id: film.id }); });
+      actionsEl.appendChild(btn);
+    });
+  });
 }
 
 function renderProfile(payload) {
   actionsEl.innerHTML = '';
+  actionsEl.style.display = '';
+  actionsEl.style.flexDirection = '';
   [['Kids', 'kids'], ['Adults', 'adults']].forEach(function(pair) {
     var btn = document.createElement('button');
     btn.className = 'action-btn';
@@ -84,7 +137,6 @@ function renderProfile(payload) {
   });
 }
 
-function renderBrowse(payload) { renderFallback(payload); }
 function renderDetail(payload) { renderFallback(payload); }
 function renderVideo(payload)  { renderFallback(payload); }
 function renderError(payload)  { renderFallback(payload); }
@@ -99,6 +151,7 @@ var SCREEN_RENDERERS = {
 
 function applyContext(payload) {
   currentVersion = payload.version;
+  currentContextId = payload.context_id;
   var display = payload.display || {};
   ctxTitle.textContent = display.title || '';
   ctxLabel.textContent = payload.context_id ? titleCase(payload.context_id) : '';
@@ -141,6 +194,21 @@ setInterval(function() {
     [Date.now() - lastPingTime > 20000].filter(Boolean).forEach(function() { s.close(); });
   });
 }, 5000);
+
+function loadManifest() {
+  fetch(MANIFEST_URL)
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function(data) {
+      manifestCache = data;
+      [currentContextId === 'browse'].filter(Boolean).forEach(renderBrowse);
+    })
+    .catch(function() {
+      manifestCache = { content: [] };
+      [currentContextId === 'browse'].filter(Boolean).forEach(renderBrowse);
+    });
+}
+
+loadManifest();
 
 connect();
 </script>

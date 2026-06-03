@@ -35,7 +35,7 @@ button:hover { background: #222; }
 #profile-label { font-size: 24px; color: #666; position: fixed; top: 24px; right: 40px; }
 #grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 32px;
   max-width: 1400px;
   margin: 0 auto;
@@ -303,7 +303,7 @@ function handleMessage(msg) {
       [msg.payload].filter(function(p) { return !isStaleContext(p, { version: currentVersion }); }).forEach(applyContext);
     },
     intent: function() {
-      [handleCmd].filter(Boolean).forEach(function(fn) { fn(msg.payload.intent); });
+      [handleCmd].filter(Boolean).forEach(function(fn) { fn(msg.payload.intent, msg.payload.params); });
     },
     ping: function() {
       lastPingTime = Date.now();
@@ -315,7 +315,12 @@ function handleMessage(msg) {
 
 function connect() {
   ws = new WebSocket(WS_URL);
-  ws.onopen = function() { ws.send(JSON.stringify(createSnapshotRequest())); };
+  ws.onopen = function() {
+    ws.send(JSON.stringify(createSnapshotRequest()));
+    Object.keys(SCREEN_CONTEXT).filter(function(id) {
+      return document.getElementById(id).classList.contains('active');
+    }).forEach(sendContext);
+  };
   ws.onmessage = function(e) { handleMessage(JSON.parse(e.data)); };
   ws.onclose = function() { setTimeout(connect, 2000); };
 }
@@ -396,9 +401,9 @@ function appendFilmTile(grid, film, i) {
   tile.setAttribute('data-index', i);
   var posterUrl = contentBase + film.poster;
   tile.innerHTML =
+    '<div class="tile-title">' + film.title + '</div>' +
     '<img class="film-poster" src="' + posterUrl + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
-    '<div class="film-poster-placeholder" style="display:none">🎬</div>' +
-    '<div class="tile-title">' + film.title + '</div>';
+    '<div class="film-poster-placeholder" style="display:none">🎬</div>';
   tile.addEventListener('click', function() { TILE_ACTION[film.items.length === 1](film); });
   tile.addEventListener('keydown', function(e) {
     [film].filter(function() { return TILE_PLAY_KEYS[e.key]; }).forEach(function(f) {
@@ -821,14 +826,19 @@ document.getElementById('btn-retry').addEventListener('click', function() {
     down:     function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', 1); },
     left:     function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', -1); },
     right:    function() { navItems('#screen-profile.active button, #screen-browse.active .film-tile, #screen-detail.active .detail-row:not(.unavailable)', 1); },
-    select:   function() { [document.activeElement, document.body].filter(Boolean)[0].click(); },
+    select:   function(params) {
+      var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
+      var film = [id].filter(Boolean).map(function(i) { return films.filter(function(f) { return f.id === i; })[0]; }).filter(Boolean)[0];
+      [film].filter(Boolean).forEach(function(f) { TILE_ACTION[f.items.length === 1](f); });
+      [!film].filter(Boolean).forEach(function() { [document.activeElement, document.body].filter(Boolean)[0].click(); });
+    },
     back:     function() { goBack(); }
   };
 
-  handleCmd = function(cmd) {
+  handleCmd = function(cmd, params) {
     var remote = getActiveConfig().remote;
     var fn = [remote[cmd], REMOTE_HANDLERS[cmd]].filter(Boolean)[0];
-    [fn].filter(Boolean).forEach(function(f) { f(); });
+    [fn].filter(Boolean).forEach(function(f) { f(params); });
   };
 
   var PROFILE_BTN_HAS_COG_DOWN = { 'btn-kids': true, 'btn-adults': true };
