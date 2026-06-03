@@ -271,6 +271,17 @@ var STOP_RESTORE = {
 
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 
+var PLAY_WITH_ITEM_OR_VIDEO = {
+  'true': function(itemId) {
+    [currentDetailFilm].filter(Boolean).forEach(function(film) {
+      film.items.filter(function(i) { return i.id === itemId; }).slice(0, 1).forEach(function(item) {
+        playFilm(film, item, 'screen-detail');
+      });
+    });
+  },
+  'false': function() { video.play().catch(function() {}); showControls(); }
+};
+
 function sendIntent(intent, params) {
   [ws].filter(Boolean).forEach(function(s) {
     [s.readyState === WebSocket.OPEN].filter(Boolean).forEach(function() {
@@ -831,7 +842,10 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   var REMOTE_HANDLERS = {
     kids:     function() { selectProfile('kids'); },
     adults:   function() { selectProfile('adults'); },
-    play:     function() { video.play().catch(function(){}); showControls(); },
+    play:     function(params) {
+      var itemId = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
+      PLAY_WITH_ITEM_OR_VIDEO[!!itemId + ''](itemId);
+    },
     pause:    function() { video.pause(); showControls(); },
     toggle:   function() { VIDEO_TOGGLE[video.paused](); showControls(); },
     next:     function() {
