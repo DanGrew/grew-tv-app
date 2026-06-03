@@ -225,6 +225,7 @@ var lastPingTime = Date.now();
 
 var contentBase = '';
 var profile = null;
+var _currentDisplay = {};
 var films = [];
 var wakeLock = null;
 var controlsTimer = null;
@@ -277,12 +278,24 @@ function sendIntent(intent, params) {
   });
 }
 
+function currentVideoDisplay() { return _currentDisplay; }
+
 function sendContext(screenId) {
   var ctx = SCREEN_CONTEXT[screenId];
   [ctx].filter(Boolean).forEach(function() {
     [ws].filter(Boolean).forEach(function(s) {
       [s.readyState === WebSocket.OPEN].filter(Boolean).forEach(function() {
-        s.send(JSON.stringify({ type: 'context_push', payload: { context_id: ctx } }));
+        var payload = { context_id: ctx };
+        [ctx === 'video'].filter(Boolean).forEach(function() {
+          payload.actions = [
+            'skip_back_10','skip_back_30','skip_back_120',
+            'skip_back_300','skip_back_900','skip_back_1800',
+            'skip_fwd_10','skip_fwd_30','skip_fwd_120',
+            'skip_fwd_300','skip_fwd_900','skip_fwd_1800'
+          ];
+          payload.display = currentVideoDisplay();
+        });
+        s.send(JSON.stringify({ type: 'context_push', payload: payload }));
       });
     });
   });
@@ -493,6 +506,7 @@ function playFilm(film, item, from) {
   currentItem = playItem;
   currentItemIndex = film.items.indexOf(playItem);
   returnScreen = playFrom;
+  _currentDisplay = { id: playItem.id, title: [playItem.label, film.title].filter(Boolean)[0] };
   v.src = contentBase + playItem.id + '.mp4';
   var labelSuffix = [playItem.label, playItem.title].filter(Boolean).map(function(l) {
     return ' \u2014 ' + l;
@@ -584,6 +598,11 @@ function togglePlayPause() {
 }
 
 var SKIP_AMOUNTS   = [10, 30, 120, 300, 900, 1800];
+var SKIP_REMOTE    = {};
+SKIP_AMOUNTS.forEach(function(amt) {
+  SKIP_REMOTE['skip_back_' + amt] = function() { executeSkip(-amt); };
+  SKIP_REMOTE['skip_fwd_'  + amt] = function() { executeSkip(amt); };
+});
 var SKIP_LABELS    = ['10s', '30s', '2m', '5m', '15m', '30m'];
 var SKIP_BTN_ID    = { back: 'btn-skip-back', fwd: 'btn-skip-fwd' };
 var SKIP_IDS       = { 'btn-skip-back': true, 'btn-skip-fwd': true };
@@ -808,8 +827,9 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   var REMOTE_HANDLERS = {
     kids:     function() { selectProfile('kids'); },
     adults:   function() { selectProfile('adults'); },
-    play:     function() { sendIntent('play'); video.play().catch(function(){}); showControls(); },
-    pause:    function() { sendIntent('pause'); video.pause(); showControls(); },
+    play:     function() { video.play().catch(function(){}); showControls(); },
+    pause:    function() { video.pause(); showControls(); },
+    toggle:   function() { VIDEO_TOGGLE[video.paused](); showControls(); },
     next:     function() {
       [currentFilm].filter(Boolean).forEach(function(f) {
         [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); });
@@ -837,7 +857,7 @@ document.getElementById('btn-retry').addEventListener('click', function() {
 
   handleCmd = function(cmd, params) {
     var remote = getActiveConfig().remote;
-    var fn = [remote[cmd], REMOTE_HANDLERS[cmd]].filter(Boolean)[0];
+    var fn = [remote[cmd], REMOTE_HANDLERS[cmd], SKIP_REMOTE[cmd]].filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   };
 
@@ -901,8 +921,9 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   );
   setupDetail(show);
   setupVideo(handleVideoKey, {
-    play:      function() { sendIntent('play'); video.play().catch(function(){}); showControls(); },
-    pause:     function() { sendIntent('pause'); video.pause(); showControls(); },
+    play:      function() { video.play().catch(function(){}); showControls(); },
+    pause:     function() { video.pause(); showControls(); },
+    toggle:    function() { VIDEO_TOGGLE[video.paused](); showControls(); },
     next:      function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
     prev:      function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex - 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
     vol_up:    function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); },
