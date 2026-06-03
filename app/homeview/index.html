@@ -296,6 +296,9 @@ function sendContext(screenId) {
           ];
           payload.display = currentVideoDisplay();
         });
+        [ctx === 'detail'].filter(Boolean).forEach(function() {
+          [currentDetailFilm].filter(Boolean).forEach(function() { payload.film_id = currentDetailFilm.id; });
+        });
         s.send(JSON.stringify({ type: 'context_push', payload: payload }));
       });
     });
