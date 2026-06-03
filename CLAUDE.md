@@ -82,9 +82,15 @@ E2E tests run in CI only.
 
 ## Local Dev
 
-Open `app/homeview/index.html` directly in a browser. It fetches `http://localhost:8080/manifest.json`.
+**App (`app/homeview/index.html`):** open directly in browser. Fetches `http://localhost:8080/manifest.json`.
 
-Mock the content server:
+**Companion (`companion/`):** must be served over HTTP — ES modules require it. Run from repo root:
+```bash
+python3 -m http.server 3000   # then open http://localhost:3000/companion/
+```
+Do NOT run server from inside `companion/` — module imports (`../ui/screens/`) will 404.
+
+Mock the content server (separate port):
 ```bash
 python3 -m http.server 8080   # run from a directory containing manifest.json
 ```

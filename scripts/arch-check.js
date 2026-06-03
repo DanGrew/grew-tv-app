@@ -72,7 +72,7 @@ if (rule === 'no-ui-imports') {
 
 if (rule === 'no-stray-files') {
   const EXCLUDED = new Set(['scripts', 'tests', '.github', '.githooks', 'node_modules', 'coverage', 'reports', '.claude']);
-  const LAYERS = new Set(['core', 'ui', 'app', 'components', 'styles', 'assets', 'content']);
+  const LAYERS = new Set(['core', 'ui', 'app', 'companion', 'components', 'styles', 'assets', 'content']);
   const allFiles = getAllFiles(ROOT);
   allFiles.forEach(file => {
     const rel = path.relative(ROOT, file).replace(/\\/g, '/');
