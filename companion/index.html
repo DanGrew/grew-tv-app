@@ -44,6 +44,7 @@ var ws = null;
 var currentVersion = -1;
 var lastPingTime = Date.now();
 var manifestCache = null;
+var currentContextId = null;
 
 var connStatus = document.getElementById('conn-status');
 var ctxLabel = document.getElementById('ctx-label');
@@ -146,6 +147,7 @@ var SCREEN_RENDERERS = {
 
 function applyContext(payload) {
   currentVersion = payload.version;
+  currentContextId = payload.context_id;
   var display = payload.display || {};
   ctxTitle.textContent = display.title || '';
   ctxLabel.textContent = payload.context_id ? titleCase(payload.context_id) : '';
@@ -191,7 +193,10 @@ setInterval(function() {
 
 fetch(MANIFEST_URL)
   .then(function(r) { return r.json(); })
-  .then(function(data) { manifestCache = data; });
+  .then(function(data) {
+    manifestCache = data;
+    [currentContextId === 'browse'].filter(Boolean).forEach(renderBrowse);
+  });
 
 connect();
 </script>
