@@ -60,14 +60,14 @@ export function initPage() {
 
   function onContext(payload) {
     var page = screenPage(payload.context_id);
-    { true: function() { window.location.href = page + '.html'; },
+    ({ true: function() { window.location.href = page + '.html'; },
       false: function() {
         state.latestPayload = payload;
         els.ctxTitle.textContent = displayTitle(payload);
         els.ctxLabel.textContent = displayLabel(payload);
         tryRender();
       }
-    }[page !== 'browse']();
+    })[page !== 'browse']();
   }
 
   loadManifest('http://' + host + ':8765')

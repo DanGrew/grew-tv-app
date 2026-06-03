@@ -27,13 +27,13 @@ export function initPage() {
 
   function onContext(payload) {
     var page = screenPage(payload.context_id);
-    { true: function() { window.location.href = page + '.html'; },
+    ({ true: function() { window.location.href = page + '.html'; },
       false: function() {
         els.ctxTitle.textContent = displayTitle(payload);
         els.ctxLabel.textContent = displayLabel(payload);
         render(els.actionsEl, getApi().sendIntent);
       }
-    }[page !== 'profile']();
+    })[page !== 'profile']();
   }
 
   api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; });
