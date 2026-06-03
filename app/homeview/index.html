@@ -210,6 +210,14 @@ function sampleFrameDrops() {
   [video.getVideoPlaybackQuality].filter(Boolean).forEach(checkQuality);
 }
 
+var SCREEN_CONTEXT = {
+  'screen-profile': 'profile',
+  'screen-browse':  'browse',
+  'screen-detail':  'detail',
+  'screen-video':   'video',
+  'screen-error':   'error'
+};
+
 var WS_URL = 'ws://localhost:8766';
 var ws = null;
 var currentVersion = -1;
@@ -269,15 +277,19 @@ function sendIntent(intent, params) {
   });
 }
 
-function renderContext(context) {
-  [[context.display].filter(Boolean).map(function(d) { return d.title; })[0]].filter(Boolean).forEach(function(t) {
-    document.getElementById('film-title-video').textContent = t;
+function sendContext(screenId) {
+  var ctx = SCREEN_CONTEXT[screenId];
+  [ctx].filter(Boolean).forEach(function() {
+    [ws].filter(Boolean).forEach(function(s) {
+      [s.readyState === WebSocket.OPEN].filter(Boolean).forEach(function() {
+        s.send(JSON.stringify({ type: 'context_push', payload: { context_id: ctx } }));
+      });
+    });
   });
 }
 
 function applyContext(payload) {
   currentVersion = payload.version;
-  renderContext(payload);
 }
 
 function handleMessage(msg) {
@@ -347,6 +359,7 @@ function show(id) {
   });
   document.getElementById(id).classList.add('active');
   activateScreen(id);
+  sendContext(id);
 }
 
 function acquireWakeLock() {
