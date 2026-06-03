@@ -248,12 +248,34 @@ function renderVideo(payload) {
   showMain();
 }
 
+function renderResumePrompt(payload) {
+  actionsEl.innerHTML = '';
+  actionsEl.style.display = '';
+  actionsEl.style.flexDirection = '';
+  actionsEl.style.alignItems = '';
+  var row = document.createElement('div');
+  row.className = 'ctrl-row';
+  row.style.marginTop = '40px';
+  var btnResume = document.createElement('button');
+  btnResume.className = 'ctrl-btn';
+  btnResume.textContent = 'Resume';
+  btnResume.addEventListener('click', function() { sendIntent('resume'); });
+  var btnRestart = document.createElement('button');
+  btnRestart.className = 'ctrl-btn';
+  btnRestart.textContent = 'Restart';
+  btnRestart.addEventListener('click', function() { sendIntent('restart'); });
+  row.appendChild(btnResume);
+  row.appendChild(btnRestart);
+  actionsEl.appendChild(row);
+}
+
 var SCREEN_RENDERERS = {
-  profile: renderProfile,
-  browse:  renderBrowse,
-  detail:  renderDetail,
-  video:   renderVideo,
-  error:   renderError
+  profile:       renderProfile,
+  browse:        renderBrowse,
+  detail:        renderDetail,
+  video:         renderVideo,
+  error:         renderError,
+  resume_prompt: renderResumePrompt
 };
 
 function applyContext(payload) {
