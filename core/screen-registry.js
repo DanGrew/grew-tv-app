@@ -22,3 +22,11 @@ export function dispatchKey(e) {
     [sc.keys[e.key]].filter(Boolean).forEach(function(h) { h(e); });
   });
 }
+
+export function initPage(config) {
+  ['onEnter', 'keys'].filter(function(k) { return !config[k]; }).forEach(function(k) {
+    throw new Error('initPage: missing ' + k);
+  });
+  registerScreen('page', config);
+  activateScreen('page');
+}

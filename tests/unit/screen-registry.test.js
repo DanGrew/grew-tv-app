@@ -1,4 +1,4 @@
-import { registerScreen, activateScreen, getActiveConfig, dispatchKey } from '../../core/screen-registry.js';
+import { registerScreen, activateScreen, getActiveConfig, dispatchKey, initPage } from '../../core/screen-registry.js';
 
 describe('registerScreen', () => {
   it('throws if onEnter missing', () => {
@@ -72,5 +72,30 @@ describe('dispatchKey', () => {
     activateScreen('dk-5');
     dispatchKey({ key: 'Enter' });
     expect(old).toBe(false);
+  });
+});
+
+describe('initPage', () => {
+  it('calls onEnter on init', () => {
+    var called = false;
+    initPage({ onEnter: function() { called = true; }, keys: {} });
+    expect(called).toBe(true);
+  });
+  it('throws if onEnter missing', () => {
+    expect(function() { initPage({ keys: {} }); }).toThrow('missing onEnter');
+  });
+  it('throws if keys missing', () => {
+    expect(function() { initPage({ onEnter: function() {} }); }).toThrow('missing keys');
+  });
+  it('dispatches keys after initPage', () => {
+    var called = false;
+    initPage({ onEnter: function() {}, keys: { Enter: function() { called = true; } } });
+    dispatchKey({ key: 'Enter' });
+    expect(called).toBe(true);
+  });
+  it('makes remote accessible via getActiveConfig', () => {
+    var remote = { back: function() {} };
+    initPage({ onEnter: function() {}, keys: {}, remote: remote });
+    expect(getActiveConfig().remote).toBe(remote);
   });
 });
