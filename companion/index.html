@@ -28,7 +28,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 <div id="actions"></div>
 
 <script type="module">
-import { MESSAGE_TYPES, createIntent, createSnapshotRequest, isStaleContext } from './core/ws-protocol.js';
+import { MESSAGE_TYPES, createIntent, createSnapshotRequest, isStaleContext } from '../core/ws-protocol.js';
 
 var WS_URL = 'ws://' + window.location.hostname + ':8766';
 var ws = null;
