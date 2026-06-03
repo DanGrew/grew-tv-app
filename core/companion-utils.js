@@ -14,3 +14,22 @@ export function skipLabel(actionId) {
   var secs = actionId.split('_').pop();
   return SKIP_LABEL_MAP[secs] || secs + 's';
 }
+
+export function displayTitle(payload) {
+  return [payload.display].filter(Boolean)
+    .map(function(d) { return d.title; })
+    .filter(Boolean)
+    .concat([''])[0];
+}
+
+export function displayLabel(payload) {
+  return [payload.context_id].filter(Boolean).map(titleCase).concat([''])[0];
+}
+
+export function getContentBasePath(manifestCache) {
+  return [manifestCache].filter(Boolean)
+    .map(function(m) { return m.contentBase; })
+    .filter(Boolean)
+    .concat([''])[0]
+    .replace(/^https?:\/\/[^/]+/, '');
+}

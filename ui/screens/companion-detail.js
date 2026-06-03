@@ -1,72 +1,91 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadManifest } from '../../core/companion-manifest.js';
-import { screenPage, titleCase } from '../../core/companion-utils.js';
+import { screenPage, titleCase, displayTitle, displayLabel, getContentBasePath } from '../../core/companion-utils.js';
 
-export function initPage() {
-  var host = window.location.hostname;
-  var connStatus = document.getElementById('conn-status');
-  var ctxLabel = document.getElementById('ctx-label');
-  var ctxTitle = document.getElementById('ctx-title');
-  var actionsEl = document.getElementById('actions');
-  var serverUrl = 'http://' + host + ':8765';
-  var manifestCache = null;
-  var manifestFailed = false;
-  var latestPayload = null;
-
-  function tryRender() {
-    [latestPayload].filter(Boolean).forEach(function(p) {
-      render(p, actionsEl, api.sendIntent, manifestCache, manifestFailed);
-    });
-  }
-
-  loadManifest(serverUrl)
-    .then(function(data) { manifestCache = data; tryRender(); })
-    .catch(function() { manifestFailed = true; manifestCache = { content: [] }; tryRender(); });
-
-  var api = connect('ws://' + host + ':8766', function(payload) {
-    if (screenPage(payload.context_id) !== 'detail') {
-      window.location.href = screenPage(payload.context_id) + '.html';
-      return;
-    }
-    ctxTitle.textContent = (payload.display || {}).title || '';
-    ctxLabel.textContent = payload.context_id ? titleCase(payload.context_id) : '';
-    latestPayload = payload;
-    tryRender();
-  }, function(status) { connStatus.textContent = status; });
-}
-
-function noContent(actionsEl, text) {
+function renderNoContent(actionsEl, text) {
   var p = document.createElement('div');
   p.className = 'no-actions';
   p.textContent = text;
   actionsEl.appendChild(p);
 }
 
-function render(payload, actionsEl, sendIntent, manifestCache, manifestFailed) {
+function renderItem(item, film, actionsEl, sendIntent, basePath) {
+  var poster = [item.poster].filter(Boolean).concat([film.poster].filter(Boolean)).concat([''])[0];
+  var btn = document.createElement('button');
+  btn.className = 'tile-btn';
+  var img = document.createElement('img');
+  img.src = window.location.origin + basePath + poster;
+  img.alt = [item.label, item.title].filter(Boolean).concat([''])[0];
+  btn.appendChild(img);
+  var span = document.createElement('span');
+  span.textContent = [item.label, item.title].filter(Boolean).concat([titleCase(item.id)])[0];
+  btn.appendChild(span);
+  btn.addEventListener('click', function() { sendIntent('play', { id: item.id }); });
+  actionsEl.appendChild(btn);
+}
+
+function renderFilmItems(film, actionsEl, sendIntent, manifestCache) {
+  var basePath = getContentBasePath(manifestCache);
+  var items = [film.items].filter(Boolean).concat([[]])[0];
+  [items.length === 0].filter(Boolean).forEach(function() { renderNoContent(actionsEl, 'No content'); });
+  [items].filter(function(i) { return i.length > 0; }).forEach(function(i) {
+    i.forEach(function(item) { renderItem(item, film, actionsEl, sendIntent, basePath); });
+  });
+}
+
+function renderForFilm(filmId, state, actionsEl, sendIntent) {
+  var content = [state.manifestCache].filter(Boolean)
+    .map(function(m) { return m.content; }).filter(Boolean).concat([[]])[0];
+  var film = content.filter(function(f) { return f.id === filmId; })[0];
+  [!film].filter(Boolean).forEach(function() { renderNoContent(actionsEl, 'No content'); });
+  [film].filter(Boolean).forEach(function(f) { renderFilmItems(f, actionsEl, sendIntent, state.manifestCache); });
+}
+
+function render(payload, state, actionsEl, sendIntent) {
   actionsEl.innerHTML = '';
   actionsEl.style.display = 'flex';
   actionsEl.style.flexDirection = 'column';
   actionsEl.style.alignItems = 'center';
-  var filmId = payload.film_id;
-  if (manifestFailed) { noContent(actionsEl, 'Unable to load'); return; }
-  if (!filmId || !manifestCache) { noContent(actionsEl, 'No content'); return; }
-  var film = (manifestCache.content || []).filter(function(f) { return f.id === filmId; })[0];
-  if (!film) { noContent(actionsEl, 'No content'); return; }
-  var contentBasePath = (manifestCache.contentBase || '').replace(/^https?:\/\/[^/]+/, '');
-  var items = film.items || [];
-  if (items.length === 0) { noContent(actionsEl, 'No content'); return; }
-  items.forEach(function(item) {
-    var poster = ([item.poster].filter(Boolean).concat([film.poster].filter(Boolean)))[0];
-    var btn = document.createElement('button');
-    btn.className = 'tile-btn';
-    var img = document.createElement('img');
-    img.src = window.location.origin + contentBasePath + poster;
-    img.alt = item.label || item.title || '';
-    btn.appendChild(img);
-    var span = document.createElement('span');
-    span.textContent = item.label || item.title || titleCase(item.id);
-    btn.appendChild(span);
-    btn.addEventListener('click', function() { sendIntent('play', { id: item.id }); });
-    actionsEl.appendChild(btn);
+  [state.manifestFailed].filter(Boolean).forEach(function() { renderNoContent(actionsEl, 'Unable to load'); });
+  [!state.manifestFailed].filter(Boolean).forEach(function() {
+    [!payload.film_id].filter(Boolean).forEach(function() { renderNoContent(actionsEl, 'No content'); });
+    [payload.film_id].filter(Boolean).forEach(function(fid) { renderForFilm(fid, state, actionsEl, sendIntent); });
   });
+}
+
+export function initPage() {
+  var host = window.location.hostname;
+  var els = {
+    connStatus: document.getElementById('conn-status'),
+    ctxLabel: document.getElementById('ctx-label'),
+    ctxTitle: document.getElementById('ctx-title'),
+    actionsEl: document.getElementById('actions')
+  };
+  var state = { manifestCache: null, manifestFailed: false, latestPayload: null };
+  var api = {};
+  function getApi() { return api; }
+
+  function tryRender() {
+    [state.latestPayload].filter(Boolean).forEach(function(p) {
+      render(p, state, els.actionsEl, getApi().sendIntent);
+    });
+  }
+
+  function onContext(payload) {
+    var page = screenPage(payload.context_id);
+    { true: function() { window.location.href = page + '.html'; },
+      false: function() {
+        state.latestPayload = payload;
+        els.ctxTitle.textContent = displayTitle(payload);
+        els.ctxLabel.textContent = displayLabel(payload);
+        tryRender();
+      }
+    }[page !== 'detail']();
+  }
+
+  loadManifest('http://' + host + ':8765')
+    .then(function(data) { state.manifestCache = data; tryRender(); })
+    .catch(function() { state.manifestFailed = true; state.manifestCache = { content: [] }; tryRender(); });
+
+  api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; });
 }

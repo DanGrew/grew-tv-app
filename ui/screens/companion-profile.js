@@ -1,23 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { screenPage, titleCase } from '../../core/companion-utils.js';
-
-export function initPage() {
-  var host = window.location.hostname;
-  var connStatus = document.getElementById('conn-status');
-  var ctxLabel = document.getElementById('ctx-label');
-  var ctxTitle = document.getElementById('ctx-title');
-  var actionsEl = document.getElementById('actions');
-
-  var api = connect('ws://' + host + ':8766', function(payload) {
-    if (screenPage(payload.context_id) !== 'profile') {
-      window.location.href = screenPage(payload.context_id) + '.html';
-      return;
-    }
-    ctxTitle.textContent = (payload.display || {}).title || '';
-    ctxLabel.textContent = payload.context_id ? titleCase(payload.context_id) : '';
-    render(actionsEl, api.sendIntent);
-  }, function(status) { connStatus.textContent = status; });
-}
+import { screenPage, displayTitle, displayLabel } from '../../core/companion-utils.js';
 
 function render(actionsEl, sendIntent) {
   actionsEl.innerHTML = '';
@@ -30,4 +12,29 @@ function render(actionsEl, sendIntent) {
     btn.addEventListener('click', function() { sendIntent(pair[1]); });
     actionsEl.appendChild(btn);
   });
+}
+
+export function initPage() {
+  var host = window.location.hostname;
+  var els = {
+    connStatus: document.getElementById('conn-status'),
+    ctxLabel: document.getElementById('ctx-label'),
+    ctxTitle: document.getElementById('ctx-title'),
+    actionsEl: document.getElementById('actions')
+  };
+  var api = {};
+  function getApi() { return api; }
+
+  function onContext(payload) {
+    var page = screenPage(payload.context_id);
+    { true: function() { window.location.href = page + '.html'; },
+      false: function() {
+        els.ctxTitle.textContent = displayTitle(payload);
+        els.ctxLabel.textContent = displayLabel(payload);
+        render(els.actionsEl, getApi().sendIntent);
+      }
+    }[page !== 'profile']();
+  }
+
+  api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; });
 }

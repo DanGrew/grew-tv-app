@@ -1,4 +1,4 @@
-import { screenPage, titleCase, skipLabel } from '../../core/companion-utils.js';
+import { screenPage, titleCase, skipLabel, displayTitle, displayLabel, getContentBasePath } from '../../core/companion-utils.js';
 
 describe('screenPage', () => {
   it('returns context_id unchanged for standard screens', () => {
@@ -22,6 +22,39 @@ describe('titleCase', () => {
   });
   it('handles multi-word strings', () => {
     expect(titleCase('hello_world_test')).toBe('Hello World Test');
+  });
+});
+
+describe('displayTitle', () => {
+  it('returns title from display object', () => {
+    expect(displayTitle({ display: { title: 'My Film' } })).toBe('My Film');
+  });
+  it('returns empty string when no display', () => {
+    expect(displayTitle({})).toBe('');
+  });
+  it('returns empty string when title missing', () => {
+    expect(displayTitle({ display: {} })).toBe('');
+  });
+});
+
+describe('displayLabel', () => {
+  it('returns titleCase of context_id', () => {
+    expect(displayLabel({ context_id: 'browse' })).toBe('Browse');
+  });
+  it('returns empty string when no context_id', () => {
+    expect(displayLabel({})).toBe('');
+  });
+});
+
+describe('getContentBasePath', () => {
+  it('strips origin from contentBase', () => {
+    expect(getContentBasePath({ contentBase: 'http://localhost:8080/media' })).toBe('/media');
+  });
+  it('returns empty string when no manifestCache', () => {
+    expect(getContentBasePath(null)).toBe('');
+  });
+  it('returns empty string when no contentBase', () => {
+    expect(getContentBasePath({})).toBe('');
   });
 });
 
