@@ -69,12 +69,39 @@ function renderActions(actions) {
   });
 }
 
+function renderFallback(payload) {
+  renderActions(Array.isArray(payload.actions) ? payload.actions : []);
+}
+
+function renderProfile(payload) {
+  actionsEl.innerHTML = '';
+  var btn = document.createElement('button');
+  btn.className = 'action-btn';
+  btn.textContent = 'Get Started';
+  btn.addEventListener('click', function() { sendIntent('select'); });
+  actionsEl.appendChild(btn);
+}
+
+function renderBrowse(payload) { renderFallback(payload); }
+function renderDetail(payload) { renderFallback(payload); }
+function renderVideo(payload)  { renderFallback(payload); }
+function renderError(payload)  { renderFallback(payload); }
+
+var SCREEN_RENDERERS = {
+  profile: renderProfile,
+  browse:  renderBrowse,
+  detail:  renderDetail,
+  video:   renderVideo,
+  error:   renderError
+};
+
 function applyContext(payload) {
   currentVersion = payload.version;
   var display = payload.display || {};
   ctxTitle.textContent = display.title || '';
   ctxLabel.textContent = payload.context_id ? titleCase(payload.context_id) : '';
-  renderActions(Array.isArray(payload.actions) ? payload.actions : []);
+  var renderer = SCREEN_RENDERERS[payload.context_id] || renderFallback;
+  renderer(payload);
 }
 
 function handleMessage(msg) {
