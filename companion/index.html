@@ -74,46 +74,11 @@ function sendIntent(intent, params) {
 }
 
 var SKIP_LABEL_MAP = { '10': '10s', '30': '30s', '120': '2 min', '300': '5 min', '900': '15 min', '1800': '30 min' };
+var VIDEO_TOGGLE   = { 'true': { send: 'pause', icon: '\u25b6' }, 'false': { send: 'play', icon: '\u23f8' } };
 
 function skipLabel(actionId) {
   var secs = actionId.split('_').pop();
   return SKIP_LABEL_MAP[secs] || secs + 's';
-}
-
-function makeSkipPopup(actions, prefix, closePopup) {
-  var filtered = actions.filter(function(a) { return a.indexOf(prefix) === 0; });
-  var popup = document.createElement('div');
-  popup.style.cssText = 'position:fixed;background:#1a1a1a;border:2px solid #f0c040;border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:100;bottom:120px;left:16px;right:16px;';
-  filtered.forEach(function(actionId) {
-    var btn = document.createElement('button');
-    btn.className = 'action-btn';
-    btn.textContent = skipLabel(actionId);
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      sendIntent(actionId);
-      closePopup();
-    });
-    popup.appendChild(btn);
-  });
-  return popup;
-}
-
-function openSkipPopup(actions, prefix) {
-  var existing = document.getElementById('skip-popup-overlay');
-  [existing].filter(Boolean).forEach(function(el) { el.parentNode.removeChild(el); });
-  var popup = makeSkipPopup(actions, prefix, function() {
-    var el = document.getElementById('skip-popup-overlay');
-    [el].filter(Boolean).forEach(function(e) { e.parentNode.removeChild(e); });
-  });
-  popup.id = 'skip-popup-overlay';
-  document.body.appendChild(popup);
-  setTimeout(function() {
-    document.addEventListener('click', function onOutside() {
-      var el = document.getElementById('skip-popup-overlay');
-      [el].filter(Boolean).forEach(function(e) { e.parentNode.removeChild(e); });
-      document.removeEventListener('click', onOutside);
-    });
-  }, 0);
 }
 
 function renderActions(actions) {
@@ -193,70 +158,101 @@ function renderDetail(payload) { renderFallback(payload); }
 function renderError(payload)  { renderFallback(payload); }
 
 function renderVideo(payload) {
-  actionsEl.innerHTML = '';
-  actionsEl.style.display = 'flex';
-  actionsEl.style.flexDirection = 'column';
-  actionsEl.style.alignItems = '';
-
   var display = payload.display || {};
   var id = display.id;
   var title = display.title || '';
   var actions = Array.isArray(payload.actions) ? payload.actions : [];
+  var playing = true;
 
-  [id].filter(Boolean).forEach(function(itemId) {
-    var img = document.createElement('img');
-    img.className = 'video-thumb';
-    img.src = 'http://' + window.location.hostname + ':8080/' + itemId + '.jpg';
-    img.alt = title;
-    actionsEl.appendChild(img);
-  });
+  function showSkipOptions(prefix) {
+    actionsEl.innerHTML = '';
+    var filtered = actions.filter(function(a) { return a.indexOf(prefix) === 0; });
+    var returnBtn = document.createElement('button');
+    returnBtn.className = 'action-btn';
+    returnBtn.textContent = '\u2190 Back';
+    returnBtn.addEventListener('click', showMain);
+    actionsEl.appendChild(returnBtn);
+    filtered.forEach(function(actionId) {
+      var btn = document.createElement('button');
+      btn.className = 'action-btn';
+      btn.textContent = skipLabel(actionId);
+      btn.addEventListener('click', function() { sendIntent(actionId); showMain(); });
+      actionsEl.appendChild(btn);
+    });
+  }
 
-  [title].filter(Boolean).forEach(function(t) {
-    var div = document.createElement('div');
-    div.className = 'video-title';
-    div.textContent = t;
-    actionsEl.appendChild(div);
-  });
+  function showMain() {
+    actionsEl.innerHTML = '';
+    actionsEl.style.display = 'flex';
+    actionsEl.style.flexDirection = 'column';
+    actionsEl.style.alignItems = '';
 
-  var hasBack = actions.some(function(a) { return a.indexOf('skip_back_') === 0; });
-  var hasFwd  = actions.some(function(a) { return a.indexOf('skip_fwd_')  === 0; });
+    [id].filter(Boolean).forEach(function(itemId) {
+      var img = document.createElement('img');
+      img.className = 'video-thumb';
+      img.src = 'http://' + window.location.hostname + ':8080/' + itemId + '.jpg';
+      img.alt = title;
+      actionsEl.appendChild(img);
+    });
 
-  var ctrlRow = document.createElement('div');
-  ctrlRow.className = 'ctrl-row';
+    [title].filter(Boolean).forEach(function(t) {
+      var div = document.createElement('div');
+      div.className = 'video-title';
+      div.textContent = t;
+      actionsEl.appendChild(div);
+    });
 
-  var btnBack = document.createElement('button');
-  btnBack.className = 'ctrl-btn';
-  btnBack.textContent = '\u00ab';
-  [!hasBack].filter(Boolean).forEach(function() { btnBack.setAttribute('aria-disabled', 'true'); });
-  btnBack.addEventListener('click', function() { [hasBack].filter(Boolean).forEach(function() { openSkipPopup(actions, 'skip_back_'); }); });
+    var hasBack = actions.some(function(a) { return a.indexOf('skip_back_') === 0; });
+    var hasFwd  = actions.some(function(a) { return a.indexOf('skip_fwd_')  === 0; });
 
-  var btnPause = document.createElement('button');
-  btnPause.className = 'ctrl-btn';
-  btnPause.textContent = '\u23f8';
-  btnPause.addEventListener('click', function() { sendIntent('pause'); });
+    var ctrlRow = document.createElement('div');
+    ctrlRow.className = 'ctrl-row';
 
-  var btnPlay = document.createElement('button');
-  btnPlay.className = 'ctrl-btn';
-  btnPlay.textContent = '\u25b6';
-  btnPlay.addEventListener('click', function() { sendIntent('play'); });
+    var btnSkipBack = document.createElement('button');
+    btnSkipBack.className = 'ctrl-btn';
+    btnSkipBack.textContent = '\u00ab';
+    [!hasBack].filter(Boolean).forEach(function() { btnSkipBack.setAttribute('aria-disabled', 'true'); });
+    [hasBack].filter(Boolean).forEach(function() {
+      btnSkipBack.addEventListener('click', function() { showSkipOptions('skip_back_'); });
+    });
 
-  var btnFwd = document.createElement('button');
-  btnFwd.className = 'ctrl-btn';
-  btnFwd.textContent = '\u00bb';
-  [!hasFwd].filter(Boolean).forEach(function() { btnFwd.setAttribute('aria-disabled', 'true'); });
-  btnFwd.addEventListener('click', function() { [hasFwd].filter(Boolean).forEach(function() { openSkipPopup(actions, 'skip_fwd_'); }); });
+    var toggleBtn = document.createElement('button');
+    toggleBtn.className = 'ctrl-btn';
+    toggleBtn.textContent = '\u23f8';
+    toggleBtn.addEventListener('click', function() {
+      var t = VIDEO_TOGGLE[playing + ''];
+      sendIntent(t.send);
+      playing = !playing;
+      toggleBtn.textContent = t.icon;
+    });
 
-  ctrlRow.appendChild(btnBack);
-  ctrlRow.appendChild(btnPause);
-  ctrlRow.appendChild(btnPlay);
-  ctrlRow.appendChild(btnFwd);
-  actionsEl.appendChild(ctrlRow);
+    var btnSkipFwd = document.createElement('button');
+    btnSkipFwd.className = 'ctrl-btn';
+    btnSkipFwd.textContent = '\u00bb';
+    [!hasFwd].filter(Boolean).forEach(function() { btnSkipFwd.setAttribute('aria-disabled', 'true'); });
+    [hasFwd].filter(Boolean).forEach(function() {
+      btnSkipFwd.addEventListener('click', function() { showSkipOptions('skip_fwd_'); });
+    });
 
-  var stopBtn = document.createElement('button');
-  stopBtn.className = 'stop-btn';
-  stopBtn.textContent = '\u25a0 Stop';
-  stopBtn.addEventListener('click', function() { sendIntent('stop'); });
-  actionsEl.appendChild(stopBtn);
+    ctrlRow.appendChild(btnSkipBack);
+    ctrlRow.appendChild(toggleBtn);
+    ctrlRow.appendChild(btnSkipFwd);
+    actionsEl.appendChild(ctrlRow);
+
+    var stopBtn = document.createElement('button');
+    stopBtn.className = 'stop-btn';
+    stopBtn.textContent = '\u25a0 Stop';
+    stopBtn.addEventListener('click', function() { sendIntent('stop'); });
+    actionsEl.appendChild(stopBtn);
+
+    var backBtn = document.createElement('button');
+    backBtn.className = 'stop-btn';
+    backBtn.textContent = '\u2190 Back';
+    backBtn.addEventListener('click', function() { sendIntent('back'); });
+    actionsEl.appendChild(backBtn);
+  }
+
+  showMain();
 }
 
 var SCREEN_RENDERERS = {
