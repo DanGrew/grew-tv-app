@@ -51,8 +51,8 @@ TV (HDMI) ← Mac Mini running Chrome in kiosk mode
 
 Boolean dispatch table — not `if/else`:
 ```js
-// correct
-{ true: () => doThis(), false: () => doThat() }[condition]();
+// correct — parens required when used as a statement (bare { is parsed as a block)
+({ true: () => doThis(), false: () => doThat() })[condition]();
 
 // forbidden — triggers no-filter-conditional arch check
 [condition].filter(Boolean).forEach(() => doThis());
@@ -84,8 +84,18 @@ E2E tests run in CI only.
 
 **App (`app/homeview/index.html`):** open directly in browser. Fetches `http://localhost:8080/manifest.json`.
 
-**Companion (`companion/`):** must be served over HTTP — ES modules require it. Run from repo root:
+**Companion (`companion/`):** must be served over HTTP — ES modules require it.
+
+Preferred — use `media-manager.py` from the `grew-tv` repo (serves app + WebSocket server together):
 ```bash
+python installation/media-manager.py --app-dir <path-to-grew-tv-app> --volumes-dir <path-to-volumes>
+# Companion at http://localhost:8765/companion/
+# WebSocket at ws://localhost:8766
+```
+
+Standalone (no WebSocket — UI only):
+```bash
+# run from grew-tv-app repo root
 python3 -m http.server 3000   # then open http://localhost:3000/companion/
 ```
 Do NOT run server from inside `companion/` — module imports (`../ui/screens/`) will 404.
