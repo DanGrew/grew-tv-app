@@ -76,6 +76,10 @@ function sendIntent(intent, params) {
 
 var SKIP_LABEL_MAP = { '10': '10s', '30': '30s', '120': '2 min', '300': '5 min', '900': '15 min', '1800': '30 min' };
 var VIDEO_TOGGLE   = { 'true': { send: 'pause', icon: '\u25b6' }, 'false': { send: 'play', icon: '\u23f8' } };
+var FALLBACK_VIDEO_ACTIONS = [
+  'skip_back_10','skip_back_30','skip_back_120','skip_back_300','skip_back_900','skip_back_1800',
+  'skip_fwd_10','skip_fwd_30','skip_fwd_120','skip_fwd_300','skip_fwd_900','skip_fwd_1800'
+];
 
 function skipLabel(actionId) {
   var secs = actionId.split('_').pop();
@@ -162,7 +166,8 @@ function renderVideo(payload) {
   var display = payload.display || {};
   var id = display.id;
   var title = display.title || '';
-  var actions = Array.isArray(payload.actions) ? payload.actions : [];
+  var received = [payload.actions].filter(Array.isArray).filter(function(a) { return a.length > 0; })[0];
+  var actions = [received, FALLBACK_VIDEO_ACTIONS].filter(Boolean)[0];
   var playing = true;
 
   function showSkipOptions(prefix) {
@@ -239,12 +244,6 @@ function renderVideo(payload) {
     ctrlRow.appendChild(toggleBtn);
     ctrlRow.appendChild(btnSkipFwd);
     actionsEl.appendChild(ctrlRow);
-
-    var stopBtn = document.createElement('button');
-    stopBtn.className = 'stop-btn';
-    stopBtn.textContent = '\u25a0 Stop';
-    stopBtn.addEventListener('click', function() { sendIntent('stop'); });
-    actionsEl.appendChild(stopBtn);
 
     var backBtn = document.createElement('button');
     backBtn.className = 'action-btn';

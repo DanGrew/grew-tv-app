@@ -829,7 +829,6 @@ document.getElementById('btn-retry').addEventListener('click', function() {
     adults:   function() { selectProfile('adults'); },
     play:     function() { video.play().catch(function(){}); showControls(); },
     pause:    function() { video.pause(); showControls(); },
-    stop:     function() { stopPlayback(); },
     next:     function() {
       [currentFilm].filter(Boolean).forEach(function(f) {
         [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); });
