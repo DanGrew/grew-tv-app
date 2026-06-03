@@ -1,0 +1,4 @@
+{
+  "initial": "idle",
+  "states": ["idle", "watching_media"]
+}
