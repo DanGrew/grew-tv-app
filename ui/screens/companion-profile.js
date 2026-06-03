@@ -1,8 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-
-var SCREEN_TO_PAGE = { resume_prompt: 'video' };
-function screenPage(id) { return SCREEN_TO_PAGE[id] || id; }
-function titleCase(str) { return str.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); }); }
+import { screenPage, titleCase } from '../../core/companion-utils.js';
 
 export function initPage() {
   var host = window.location.hostname;

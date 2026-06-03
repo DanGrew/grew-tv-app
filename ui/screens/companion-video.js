@@ -1,20 +1,11 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadManifest } from '../../core/companion-manifest.js';
+import { screenPage, titleCase, skipLabel } from '../../core/companion-utils.js';
 
-var SCREEN_TO_PAGE = { resume_prompt: 'video' };
-function screenPage(id) { return SCREEN_TO_PAGE[id] || id; }
-function titleCase(str) { return str.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); }); }
-
-var SKIP_LABEL_MAP = { '10': '10s', '30': '30s', '120': '2 min', '300': '5 min', '900': '15 min', '1800': '30 min' };
 var FALLBACK_VIDEO_ACTIONS = [
   'skip_back_10','skip_back_30','skip_back_120','skip_back_300','skip_back_900','skip_back_1800',
   'skip_fwd_10','skip_fwd_30','skip_fwd_120','skip_fwd_300','skip_fwd_900','skip_fwd_1800'
 ];
-
-function skipLabel(actionId) {
-  var secs = actionId.split('_').pop();
-  return SKIP_LABEL_MAP[secs] || secs + 's';
-}
 
 export function initPage() {
   var host = window.location.hostname;
