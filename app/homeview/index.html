@@ -225,6 +225,7 @@ var lastPingTime = Date.now();
 
 var contentBase = '';
 var profile = null;
+var _currentDisplay = {};
 var films = [];
 var wakeLock = null;
 var controlsTimer = null;
@@ -277,12 +278,24 @@ function sendIntent(intent, params) {
   });
 }
 
+function currentVideoDisplay() { return _currentDisplay; }
+
 function sendContext(screenId) {
   var ctx = SCREEN_CONTEXT[screenId];
   [ctx].filter(Boolean).forEach(function() {
     [ws].filter(Boolean).forEach(function(s) {
       [s.readyState === WebSocket.OPEN].filter(Boolean).forEach(function() {
-        s.send(JSON.stringify({ type: 'context_push', payload: { context_id: ctx } }));
+        var payload = { context_id: ctx };
+        [ctx === 'video'].filter(Boolean).forEach(function() {
+          payload.actions = [
+            'skip_back_10','skip_back_30','skip_back_120',
+            'skip_back_300','skip_back_900','skip_back_1800',
+            'skip_fwd_10','skip_fwd_30','skip_fwd_120',
+            'skip_fwd_300','skip_fwd_900','skip_fwd_1800'
+          ];
+          payload.display = currentVideoDisplay();
+        });
+        s.send(JSON.stringify({ type: 'context_push', payload: payload }));
       });
     });
   });
@@ -493,6 +506,7 @@ function playFilm(film, item, from) {
   currentItem = playItem;
   currentItemIndex = film.items.indexOf(playItem);
   returnScreen = playFrom;
+  _currentDisplay = { id: playItem.id, title: playItem.label || film.title };
   v.src = contentBase + playItem.id + '.mp4';
   var labelSuffix = [playItem.label, playItem.title].filter(Boolean).map(function(l) {
     return ' \u2014 ' + l;
