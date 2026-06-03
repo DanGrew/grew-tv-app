@@ -247,7 +247,8 @@ function renderVideo(payload) {
     [id].filter(Boolean).forEach(function(itemId) {
       var img = document.createElement('img');
       img.className = 'video-thumb';
-      img.src = 'http://' + window.location.hostname + ':8080/' + itemId + '.jpg';
+      var contentBasePath = (manifestCache && manifestCache.contentBase || '').replace(/^https?:\/\/[^\/]+/, '');
+      img.src = window.location.origin + contentBasePath + itemId + '.jpg';
       img.alt = title;
       actionsEl.appendChild(img);
     });
