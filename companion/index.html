@@ -75,7 +75,6 @@ function sendIntent(intent, params) {
 }
 
 var SKIP_LABEL_MAP = { '10': '10s', '30': '30s', '120': '2 min', '300': '5 min', '900': '15 min', '1800': '30 min' };
-var VIDEO_TOGGLE   = { 'true': { send: 'pause', icon: '\u25b6' }, 'false': { send: 'play', icon: '\u23f8' } };
 var FALLBACK_VIDEO_ACTIONS = [
   'skip_back_10','skip_back_30','skip_back_120','skip_back_300','skip_back_900','skip_back_1800',
   'skip_fwd_10','skip_fwd_30','skip_fwd_120','skip_fwd_300','skip_fwd_900','skip_fwd_1800'
@@ -168,7 +167,6 @@ function renderVideo(payload) {
   var title = display.title || '';
   var received = [payload.actions].filter(Array.isArray).filter(function(a) { return a.length > 0; })[0];
   var actions = [received, FALLBACK_VIDEO_ACTIONS].filter(Boolean)[0];
-  var playing = true;
 
   function showSkipOptions(prefix) {
     actionsEl.innerHTML = '';
@@ -224,13 +222,8 @@ function renderVideo(payload) {
 
     var toggleBtn = document.createElement('button');
     toggleBtn.className = 'ctrl-btn';
-    toggleBtn.textContent = '\u23f8';
-    toggleBtn.addEventListener('click', function() {
-      var t = VIDEO_TOGGLE[playing + ''];
-      sendIntent(t.send);
-      playing = !playing;
-      toggleBtn.textContent = t.icon;
-    });
+    toggleBtn.textContent = '\u23ef';
+    toggleBtn.addEventListener('click', function() { sendIntent('toggle'); });
 
     var btnSkipFwd = document.createElement('button');
     btnSkipFwd.className = 'ctrl-btn';

@@ -829,6 +829,7 @@ document.getElementById('btn-retry').addEventListener('click', function() {
     adults:   function() { selectProfile('adults'); },
     play:     function() { video.play().catch(function(){}); showControls(); },
     pause:    function() { video.pause(); showControls(); },
+    toggle:   function() { VIDEO_TOGGLE[video.paused](); showControls(); },
     next:     function() {
       [currentFilm].filter(Boolean).forEach(function(f) {
         [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); });
@@ -922,6 +923,7 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   setupVideo(handleVideoKey, {
     play:      function() { video.play().catch(function(){}); showControls(); },
     pause:     function() { video.pause(); showControls(); },
+    toggle:    function() { VIDEO_TOGGLE[video.paused](); showControls(); },
     next:      function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
     prev:      function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex - 1]].filter(Boolean).forEach(function(item) { playFilm(f, item, returnScreen); }); }); },
     vol_up:    function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); },
