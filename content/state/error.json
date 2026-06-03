@@ -1,0 +1,6 @@
+{
+  "intents": ["back"],
+  "transitions": {
+    "back": "profile"
+  }
+}

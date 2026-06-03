@@ -1,0 +1,12 @@
+{
+  "intents": ["navigate_up", "navigate_down", "navigate_left", "navigate_right", "play", "back", "error"],
+  "transitions": {
+    "navigate_up": "detail",
+    "navigate_down": "detail",
+    "navigate_left": "detail",
+    "navigate_right": "detail",
+    "play": "video",
+    "back": "browse",
+    "error": "error"
+  }
+}
