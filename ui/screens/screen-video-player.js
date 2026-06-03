@@ -28,9 +28,9 @@ export function setup(config) {
   var video       = config.video;
   var contentBase = config.contentBase;
   var onStop      = config.onStop;
-  var onNext      = config.onNext  || function() {};
-  var onPrev      = config.onPrev  || function() {};
-  var onIntent    = config.onIntent || function() {};
+  var onNext      = [config.onNext  ].filter(Boolean).concat([function() {}])[0];
+  var onPrev      = [config.onPrev  ].filter(Boolean).concat([function() {}])[0];
+  var onIntent    = [config.onIntent].filter(Boolean).concat([function() {}])[0];
 
   var wakeLock             = null;
   var controlsTimer        = null;
