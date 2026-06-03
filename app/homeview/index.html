@@ -215,7 +215,8 @@ var SCREEN_CONTEXT = {
   'screen-browse':  'browse',
   'screen-detail':  'detail',
   'screen-video':   'video',
-  'screen-error':   'error'
+  'screen-error':   'error',
+  'screen-resume':  'resume_prompt'
 };
 
 var WS_URL = 'ws://localhost:8766';
@@ -852,6 +853,8 @@ document.getElementById('btn-retry').addEventListener('click', function() {
       [film].filter(Boolean).forEach(function(f) { TILE_ACTION[f.items.length === 1](f); });
       [!film].filter(Boolean).forEach(function() { [document.activeElement, document.body].filter(Boolean)[0].click(); });
     },
+    resume:   function() { doResume(); },
+    restart:  function() { doRestart(); },
     back:     function() { goBack(); }
   };
 
