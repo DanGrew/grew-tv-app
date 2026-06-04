@@ -35,7 +35,7 @@ async function mockVideoReady(page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/app/homeview/index.html');
+  await page.goto('/app/homeview/profile.html');
 });
 
 // --- prompt visibility ---

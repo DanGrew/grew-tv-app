@@ -13,7 +13,7 @@ async function interceptManifest(page) {
 
 test.beforeEach(async ({ page }) => {
   await interceptManifest(page);
-  await page.goto('/app/homeview/index.html');
+  await page.goto('/app/homeview/profile.html');
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
@@ -119,7 +119,7 @@ test('video onEnter focuses play-pause button', async ({ page }) => {
 test.describe('error screen entry', () => {
   test('error onEnter focuses retry button', async ({ page }) => {
     await page.route(MANIFEST_URL, route => route.fulfill({ status: 500 }));
-    await page.goto('/app/homeview/index.html');
+    await page.goto('/app/homeview/profile.html');
     await page.locator('#btn-kids').click();
     await expect(page.locator('#screen-error')).toBeVisible();
     await expect(page.locator('#btn-retry')).toBeFocused();

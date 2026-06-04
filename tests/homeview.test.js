@@ -17,7 +17,7 @@ async function interceptManifestError(page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/app/homeview/index.html');
+  await page.goto('/app/homeview/profile.html');
 });
 
 test('profile screen shown on load, Kids button focused', async ({ page }) => {
