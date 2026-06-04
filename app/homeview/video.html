@@ -112,9 +112,12 @@ fetch('http://localhost:8765/manifest.json', { cache: 'no-store' })
           });
         },
         onIntent: function(intent) {
-          var CONTEXT_INTENTS = { play: true };
-          [CONTEXT_INTENTS[intent]].filter(Boolean).forEach(function() {
+          var VIDEO_CTX = { play: true, video: true };
+          [VIDEO_CTX[intent]].filter(Boolean).forEach(function() {
             wsApp.sendContext({ context_id: 'video', actions: SKIP_ACTIONS, display: player.currentVideoDisplay() });
+          });
+          [intent === 'resume_prompt'].filter(Boolean).forEach(function() {
+            wsApp.sendContext({ context_id: 'resume_prompt' });
           });
         }
       });
