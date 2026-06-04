@@ -212,6 +212,7 @@ export function setup(config) {
 
   function startPlayback(seekTo) {
     document.getElementById('screen-resume').style.display = 'none';
+    onIntent('video');
     acquireWakeLock();
     video.muted = false;
     var doPlay = function() {
@@ -278,6 +279,7 @@ export function setup(config) {
       pendingResumePosition = x;
       document.getElementById('resume-time').textContent = fmt(x);
       document.getElementById('screen-resume').style.display = 'flex';
+      onIntent('resume_prompt');
     });
     [t].filter(function(x) { return !(x > 5); }).forEach(function() { startPlayback(0); });
   }

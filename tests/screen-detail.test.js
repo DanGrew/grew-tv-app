@@ -1,7 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
 const MANIFEST_URL = 'http://localhost:8765/manifest.json';
-const POLL_URL = 'http://localhost:8765/poll';
 const FIXTURE = require('./fixtures/manifest-multi.js');
 
 async function interceptManifest(page) {
@@ -10,7 +9,6 @@ async function interceptManifest(page) {
     contentType: 'application/json',
     body: JSON.stringify(FIXTURE.manifest)
   }));
-  await page.route(POLL_URL, route => route.fulfill({ status: 200, body: '{}' }));
 }
 
 test.beforeEach(async ({ page }) => {
