@@ -32,6 +32,7 @@ export function buildDetailList(film, contentBase, onPlayItem) {
     row.className = avConfig.className;
     row.tabIndex = avConfig.tabIndex;
     row.setAttribute('data-index', i);
+    row.setAttribute('data-id', item.id);
     var posterSrc = contentBase + ([item.poster].filter(Boolean).concat([film.poster].filter(Boolean)))[0];
     var thumbHtml =
       '<img class="detail-thumb" src="' + posterSrc + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +

@@ -40,11 +40,15 @@ import { connectApp } from '../../core/app-ws.js';
 
 var filmId = getParam('film');
 
-var wsApp = connectApp('ws://localhost:8766', function(intent) {
+var wsApp = connectApp('ws://localhost:8766', function(intent, params) {
   var INTENTS = {
     navigate_up:   function() { detailArrow({ key: 'ArrowUp',   preventDefault: function() {} }); },
     navigate_down: function() { detailArrow({ key: 'ArrowDown', preventDefault: function() {} }); },
-    play:          function() { document.activeElement.click(); },
+    play:          function() {
+      var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
+      var target = [id].filter(Boolean).map(function(i) { return document.querySelector('.detail-row[data-id="' + i + '"]'); }).filter(Boolean)[0];
+      ([target].filter(Boolean).concat([document.activeElement]))[0].click();
+    },
     back:          function() { goBack(null); }
   };
   [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
