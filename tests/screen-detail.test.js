@@ -119,7 +119,6 @@ test('video onEnter focuses play-pause button', async ({ page }) => {
 test.describe('error screen entry', () => {
   test('error onEnter focuses retry button', async ({ page }) => {
     await page.route(MANIFEST_URL, route => route.fulfill({ status: 500 }));
-    await page.route(POLL_URL, route => route.fulfill({ status: 200, body: '{}' }));
     await page.goto('/app/homeview/index.html');
     await page.locator('#btn-kids').click();
     await expect(page.locator('#screen-error')).toBeVisible();
