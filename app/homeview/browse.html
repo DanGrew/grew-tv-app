@@ -92,13 +92,17 @@ initPage({
   remote: {}
 });
 
-var wsApp = connectApp('ws://localhost:8766', function(intent) {
+var wsApp = connectApp('ws://localhost:8766', function(intent, params) {
   var INTENTS = {
     navigate_up:    function() { browseArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
     navigate_down:  function() { browseArrow({ key: 'ArrowDown',  preventDefault: function() {} }); },
     navigate_left:  function() { browseArrow({ key: 'ArrowLeft',  preventDefault: function() {} }); },
     navigate_right: function() { browseArrow({ key: 'ArrowRight', preventDefault: function() {} }); },
-    select:         function() { document.activeElement.click(); },
+    select:         function() {
+      var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
+      var target = [id].filter(Boolean).map(function(i) { return document.querySelector('.film-tile[data-id="' + i + '"]'); }).filter(Boolean)[0];
+      ([target].filter(Boolean).concat([document.activeElement]))[0].click();
+    },
     back:           function() { navTo('profile.html'); }
   };
   [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });

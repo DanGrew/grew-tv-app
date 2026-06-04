@@ -26,6 +26,7 @@ export function buildGrid(allFilms, contentBase, profile, onSelect) {
     tile.className = 'film-tile';
     tile.tabIndex = 0;
     tile.setAttribute('data-index', i);
+    tile.setAttribute('data-id', film.id);
     tile.innerHTML =
       '<div class="tile-title">' + film.title + '</div>' +
       '<img class="film-poster" src="' + contentBase + film.poster + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
