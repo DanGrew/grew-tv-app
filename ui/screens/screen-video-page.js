@@ -14,12 +14,56 @@ var SKIP_ACTIONS = [
 export function initVideoPage() {
   var filmId = getParam('film');
   var from   = [getParam('from')].filter(Boolean).concat(['browse'])[0];
+  var filmData = null;
+  var wsApp = null;
+  var player;
 
-  var player = null;
-  var wsApp = connectApp('ws://localhost:8766', function(intent, params) {
-    [player].filter(Boolean).forEach(function() {
-      [player.remote[intent]].filter(Boolean).forEach(function(fn) { fn(params); });
-    });
+  player = setupPlayer({
+    video: document.getElementById('video'),
+    contentBase: '',
+    onStop: function(rp) {
+      var STOP_NAV = {
+        detail: function() { navTo('detail.html', { film: filmId }); },
+        browse: function() { navTo('browse.html'); }
+      };
+      [STOP_NAV[rp]].filter(Boolean).forEach(function(fn) { fn(); });
+      [!STOP_NAV[rp]].filter(Boolean).forEach(function() { navTo('browse.html'); });
+    },
+    onNext: function() {
+      var idx = parseInt([getParam('item')].filter(Boolean).concat(['0'])[0]);
+      [filmData].filter(Boolean).forEach(function(f) {
+        [f.items[idx + 1]].filter(Boolean).forEach(function() {
+          navTo('video.html', { film: filmId, item: idx + 1, from: from });
+        });
+      });
+    },
+    onPrev: function() {
+      var idx = parseInt([getParam('item')].filter(Boolean).concat(['0'])[0]);
+      [filmData].filter(Boolean).forEach(function(f) {
+        [f.items[idx - 1]].filter(Boolean).forEach(function() {
+          navTo('video.html', { film: filmId, item: idx - 1, from: from });
+        });
+      });
+    },
+    onIntent: function(intent) {
+      var VIDEO_CTX = { play: true, video: true };
+      [wsApp].filter(Boolean).forEach(function(ws) {
+        [VIDEO_CTX[intent]].filter(Boolean).forEach(function() {
+          ws.sendContext({ context_id: 'video', actions: SKIP_ACTIONS, display: player.currentVideoDisplay() });
+        });
+        [intent === 'resume_prompt'].filter(Boolean).forEach(function() {
+          ws.sendContext({ context_id: 'resume_prompt' });
+        });
+      });
+    }
+  });
+
+  var keys = {};
+  VIDEO_KEYS.forEach(function(k) { keys[k] = player.handleVideoKey; });
+  initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote });
+
+  wsApp = connectApp('ws://localhost:8766', function(intent, params) {
+    [player.remote[intent]].filter(Boolean).forEach(function(fn) { fn(params); });
   });
 
   document.addEventListener('keydown', dispatchKey);
@@ -29,42 +73,8 @@ export function initVideoPage() {
       var film = manifest.content.filter(function(f) { return f.id === filmId; })[0];
       [!film].filter(Boolean).forEach(function() { navTo('error.html'); });
       [film].filter(Boolean).forEach(function(f) {
-        player = setupPlayer({
-          video: document.getElementById('video'),
-          contentBase: manifest.contentBase,
-          onStop: function(rp) {
-            var STOP_NAV = {
-              detail: function() { navTo('detail.html', { film: filmId }); },
-              browse: function() { navTo('browse.html'); }
-            };
-            [STOP_NAV[rp]].filter(Boolean).forEach(function(fn) { fn(); });
-            [!STOP_NAV[rp]].filter(Boolean).forEach(function() { navTo('browse.html'); });
-          },
-          onNext: function() {
-            var idx = parseInt([getParam('item')].filter(Boolean).concat(['0'])[0]);
-            [f.items[idx + 1]].filter(Boolean).forEach(function() {
-              navTo('video.html', { film: filmId, item: idx + 1, from: from });
-            });
-          },
-          onPrev: function() {
-            var idx = parseInt([getParam('item')].filter(Boolean).concat(['0'])[0]);
-            [f.items[idx - 1]].filter(Boolean).forEach(function() {
-              navTo('video.html', { film: filmId, item: idx - 1, from: from });
-            });
-          },
-          onIntent: function(intent) {
-            var VIDEO_CTX = { play: true, video: true };
-            [VIDEO_CTX[intent]].filter(Boolean).forEach(function() {
-              wsApp.sendContext({ context_id: 'video', actions: SKIP_ACTIONS, display: player.currentVideoDisplay() });
-            });
-            [intent === 'resume_prompt'].filter(Boolean).forEach(function() {
-              wsApp.sendContext({ context_id: 'resume_prompt' });
-            });
-          }
-        });
-        var keys = {};
-        VIDEO_KEYS.forEach(function(k) { keys[k] = player.handleVideoKey; });
-        initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote });
+        filmData = f;
+        player.updateContentBase(manifest.contentBase);
         var itemIdx = parseInt([getParam('item')].filter(Boolean).concat(['0'])[0]);
         player.playFilm(f, f.items[itemIdx], from);
       });

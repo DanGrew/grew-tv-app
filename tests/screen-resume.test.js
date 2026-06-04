@@ -144,6 +144,7 @@ test('Escape from resume prompt acts as Restart', async ({ page }) => {
   await goToBrowse(page);
   await setResumePosition(page, 300);
   await page.locator('.film-tile').first().click();
+  await expect(page.locator('#screen-resume')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('#screen-video')).toBeVisible();
   const saved = await page.evaluate(key => localStorage.getItem(key), RESUME_KEY);
@@ -154,6 +155,7 @@ test('Backspace from resume prompt acts as Restart', async ({ page }) => {
   await goToBrowse(page);
   await setResumePosition(page, 300);
   await page.locator('.film-tile').first().click();
+  await expect(page.locator('#screen-resume')).toBeVisible();
   await page.keyboard.press('Backspace');
   await expect(page.locator('#screen-video')).toBeVisible();
 });

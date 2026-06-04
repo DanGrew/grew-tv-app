@@ -21,6 +21,7 @@ test.beforeEach(async ({ page }) => {
 async function openDetail(page) {
   await page.locator('.film-tile').nth(1).click();
   await expect(page.locator('#screen-detail')).toBeVisible();
+  await expect(page.locator('.detail-row').first()).toBeVisible();
 }
 
 test('multi-item tile opens detail screen, not video', async ({ page }) => {

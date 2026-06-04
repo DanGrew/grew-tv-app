@@ -52,6 +52,7 @@ test('Adults profile shows all films', async ({ page }) => {
   await interceptManifest(page, FIXTURE);
   await page.locator('#btn-adults').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
+  await expect(page.locator('.film-tile')).toHaveCount(3);
   const titles = await page.locator('.tile-title').allTextContents();
   expect(titles).toContain('The Dark Knight');
 });
@@ -76,9 +77,7 @@ test('select film shows video screen with src set', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
-  const src = await page.locator('#video').getAttribute('src');
-  expect(src).toBeTruthy();
-  expect(src).toContain('toy-story');
+  await expect(page.locator('#video')).toHaveAttribute('src', /toy-story/);
 });
 
 test('back button returns to browse screen', async ({ page }) => {
