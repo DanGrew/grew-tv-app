@@ -85,6 +85,7 @@ test('browse source tile is re-focused on back from detail', async ({ page }) =>
   await secondTile.focus();
   await secondTile.click();
   await expect(page.locator('#screen-detail')).toBeVisible();
+  await expect(page.locator('.detail-row').first()).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(secondTile).toBeFocused();
 });
@@ -101,6 +102,7 @@ test('Escape from video after detail returns to detail', async ({ page }) => {
   await page.locator('.detail-row').first().focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.locator('#btn-back-video').focus();
   await page.keyboard.press('Escape');
   await expect(page.locator('#screen-detail')).toBeVisible();

@@ -6,7 +6,7 @@ module.exports = defineConfig({
   timeout: 10000,
   reporter: [['list']],
   webServer: {
-    command: 'npx serve . -p 3456',
+    command: 'python3 -m http.server 3456',
     port: 3456,
     reuseExistingServer: !process.env.CI
   },

@@ -5,6 +5,7 @@ import { connectApp } from '../../core/app-ws.js';
 import { loadManifest, scanDevices } from '../../core/app-manifest.js';
 
 var SERVER = 'http://localhost:8765';
+var LAST_TILE_KEY = 'grew-tv:last-tile';
 
 export function initBrowsePage() {
   function showSettings() {
@@ -61,12 +62,14 @@ export function initBrowsePage() {
     .then(function(manifest) {
       var profile = [getProfile()].filter(Boolean).concat(['kids'])[0];
       buildGrid(manifest.content, manifest.contentBase, profile, function(film) {
+        sessionStorage.setItem(LAST_TILE_KEY, film.id);
         var TILE_NAV = {
           'true':  function() { navTo('video.html', { film: film.id, item: 0, from: 'browse' }); },
           'false': function() { navTo('detail.html', { film: film.id }); }
         };
         TILE_NAV[film.items.length === 1]();
       });
+      [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
     })
     .catch(function() { navTo('error.html'); });
 }

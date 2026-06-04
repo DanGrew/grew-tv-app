@@ -21,13 +21,13 @@ export function initVideoPage() {
   player = setupPlayer({
     video: document.getElementById('video'),
     contentBase: '',
-    onStop: function(rp) {
+    onStop: function() {
       var STOP_NAV = {
         detail: function() { navTo('detail.html', { film: filmId }); },
         browse: function() { navTo('browse.html'); }
       };
-      [STOP_NAV[rp]].filter(Boolean).forEach(function(fn) { fn(); });
-      [!STOP_NAV[rp]].filter(Boolean).forEach(function() { navTo('browse.html'); });
+      [STOP_NAV[from]].filter(Boolean).forEach(function(fn) { fn(); });
+      [!STOP_NAV[from]].filter(Boolean).forEach(function() { navTo('browse.html'); });
     },
     onNext: function() {
       var idx = parseInt([getParam('item')].filter(Boolean).concat(['0'])[0]);

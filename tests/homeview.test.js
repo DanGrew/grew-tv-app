@@ -132,6 +132,7 @@ async function goToVideoScreen(page) {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
 }
 
 async function mockVideoTime(page, currentTime, duration) {
