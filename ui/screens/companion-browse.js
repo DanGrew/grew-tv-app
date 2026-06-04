@@ -46,11 +46,14 @@ export function initPage() {
     connStatus: document.getElementById('conn-status'),
     ctxLabel: document.getElementById('ctx-label'),
     ctxTitle: document.getElementById('ctx-title'),
-    actionsEl: document.getElementById('actions')
+    actionsEl: document.getElementById('actions'),
+    backBtn: document.getElementById('btn-back')
   };
   var state = { manifestCache: null, latestPayload: null };
   var api = {};
   function getApi() { return api; }
+
+  els.backBtn.addEventListener('click', function() { getApi().sendIntent('back'); });
 
   function tryRender() {
     [state.latestPayload].filter(Boolean).forEach(function() {
