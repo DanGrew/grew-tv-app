@@ -85,6 +85,7 @@ test('back button returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.locator('#btn-back-video').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
@@ -94,6 +95,7 @@ test('Escape key returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.locator('#btn-back-video').focus();
   await page.keyboard.press('Escape');
   await expect(page.locator('#screen-browse')).toBeVisible();
@@ -103,6 +105,8 @@ test('focus returns to first grid tile after back', async ({ page }) => {
   await interceptManifest(page, FIXTURE);
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.locator('#btn-back-video').click();
   await expect(page.locator('.film-tile').first()).toBeFocused();
 });
