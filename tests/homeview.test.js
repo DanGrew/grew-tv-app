@@ -17,7 +17,7 @@ async function interceptManifestError(page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/app/homeview/index.html');
+  await page.goto('/app/homeview/profile.html');
 });
 
 test('profile screen shown on load, Kids button focused', async ({ page }) => {
@@ -52,6 +52,7 @@ test('Adults profile shows all films', async ({ page }) => {
   await interceptManifest(page, FIXTURE);
   await page.locator('#btn-adults').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
+  await expect(page.locator('.film-tile')).toHaveCount(3);
   const titles = await page.locator('.tile-title').allTextContents();
   expect(titles).toContain('The Dark Knight');
 });
@@ -76,9 +77,7 @@ test('select film shows video screen with src set', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
-  const src = await page.locator('#video').getAttribute('src');
-  expect(src).toBeTruthy();
-  expect(src).toContain('toy-story');
+  await expect(page.locator('#video')).toHaveAttribute('src', /toy-story/);
 });
 
 test('back button returns to browse screen', async ({ page }) => {
@@ -86,6 +85,7 @@ test('back button returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.locator('#btn-back-video').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
@@ -95,6 +95,7 @@ test('Escape key returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.locator('#btn-back-video').focus();
   await page.keyboard.press('Escape');
   await expect(page.locator('#screen-browse')).toBeVisible();
@@ -104,6 +105,8 @@ test('focus returns to first grid tile after back', async ({ page }) => {
   await interceptManifest(page, FIXTURE);
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.locator('#btn-back-video').click();
   await expect(page.locator('.film-tile').first()).toBeFocused();
 });
@@ -133,6 +136,7 @@ async function goToVideoScreen(page) {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
 }
 
 async function mockVideoTime(page, currentTime, duration) {

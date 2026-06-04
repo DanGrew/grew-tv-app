@@ -13,7 +13,7 @@ async function interceptManifest(page) {
 
 test.beforeEach(async ({ page }) => {
   await interceptManifest(page);
-  await page.goto('/app/homeview/index.html');
+  await page.goto('/app/homeview/profile.html');
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
@@ -21,6 +21,7 @@ test.beforeEach(async ({ page }) => {
 async function openDetail(page) {
   await page.locator('.film-tile').nth(1).click();
   await expect(page.locator('#screen-detail')).toBeVisible();
+  await expect(page.locator('.detail-row').first()).toBeVisible();
 }
 
 test('multi-item tile opens detail screen, not video', async ({ page }) => {
@@ -84,6 +85,7 @@ test('browse source tile is re-focused on back from detail', async ({ page }) =>
   await secondTile.focus();
   await secondTile.click();
   await expect(page.locator('#screen-detail')).toBeVisible();
+  await expect(page.locator('.detail-row').first()).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(secondTile).toBeFocused();
 });
@@ -100,6 +102,7 @@ test('Escape from video after detail returns to detail', async ({ page }) => {
   await page.locator('.detail-row').first().focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.locator('#btn-back-video').focus();
   await page.keyboard.press('Escape');
   await expect(page.locator('#screen-detail')).toBeVisible();
@@ -119,8 +122,7 @@ test('video onEnter focuses play-pause button', async ({ page }) => {
 test.describe('error screen entry', () => {
   test('error onEnter focuses retry button', async ({ page }) => {
     await page.route(MANIFEST_URL, route => route.fulfill({ status: 500 }));
-    await page.route(POLL_URL, route => route.fulfill({ status: 200, body: '{}' }));
-    await page.goto('/app/homeview/index.html');
+    await page.goto('/app/homeview/profile.html');
     await page.locator('#btn-kids').click();
     await expect(page.locator('#screen-error')).toBeVisible();
     await expect(page.locator('#btn-retry')).toBeFocused();

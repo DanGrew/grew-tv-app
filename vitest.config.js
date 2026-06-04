@@ -5,6 +5,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     passWithNoTests: true,
+    pool: 'vmThreads',
     include: ['tests/unit/**/*.test.js'],
     coverage: {
       provider: 'v8',

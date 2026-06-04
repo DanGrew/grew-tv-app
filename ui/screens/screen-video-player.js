@@ -189,15 +189,22 @@ export function setup(config) {
     ArrowDown:  function() { document.getElementById('btn-back-video').focus(); }
   };
 
+  var EXIT_FN   = { 'true': doRestart, 'false': stopPlayback };
+  var RESUME_NAV = { 'btn-resume': { ArrowRight: 'btn-restart' }, 'btn-restart': { ArrowLeft: 'btn-resume' } };
+
   var POPUP_HANDLERS = {
     'true':  function(e) {
       [POPUP_NAV[e.key]].filter(Boolean).forEach(function(fn) { e.preventDefault(); fn(); });
     },
     'false': function(e) {
-      var onSkip     = !!SKIP_IDS[document.activeElement.id];
-      var onBack     = document.activeElement.id === 'btn-back-video';
+      var onSkip      = !!SKIP_IDS[document.activeElement.id];
+      var onBack      = document.activeElement.id === 'btn-back-video';
       var onPlayPause = document.activeElement.id === 'btn-play-pause';
-      [stopPlayback].filter(function() { return VIDEO_STOP_KEYS[e.key]; }).forEach(function(f) { e.preventDefault(); f(); });
+      var onResume    = pendingResumePosition > 0;
+      [EXIT_FN[onResume + '']].filter(function() { return VIDEO_STOP_KEYS[e.key]; }).forEach(function(f) { e.preventDefault(); f(); });
+      [RESUME_NAV[document.activeElement.id]].filter(Boolean).filter(function() { return onResume; }).forEach(function(nav) {
+        [nav[e.key]].filter(Boolean).forEach(function(id) { e.preventDefault(); document.getElementById(id).focus(); });
+      });
       [SKIP_NAV[e.key]].filter(Boolean).filter(function() { return onSkip; }).forEach(function(fn) { e.preventDefault(); fn(); });
       [BACK_NAV[e.key]].filter(Boolean).filter(function() { return onBack; }).forEach(function(fn) { e.preventDefault(); fn(); });
       [PLAY_PAUSE_NAV[e.key]].filter(Boolean).filter(function() { return onPlayPause; }).forEach(function(fn) { e.preventDefault(); fn(); });
@@ -212,6 +219,7 @@ export function setup(config) {
 
   function startPlayback(seekTo) {
     document.getElementById('screen-resume').style.display = 'none';
+    document.getElementById('screen-video').style.display = '';
     onIntent('video');
     acquireWakeLock();
     video.muted = false;
@@ -278,7 +286,9 @@ export function setup(config) {
     [t].filter(function(x) { return x > 5; }).forEach(function(x) {
       pendingResumePosition = x;
       document.getElementById('resume-time').textContent = fmt(x);
+      document.getElementById('screen-video').style.display = 'none';
       document.getElementById('screen-resume').style.display = 'flex';
+      document.getElementById('btn-resume').focus();
       onIntent('resume_prompt');
     });
     [t].filter(function(x) { return !(x > 5); }).forEach(function() { startPlayback(0); });
@@ -350,5 +360,7 @@ export function setup(config) {
   document.getElementById('btn-skip-fwd').addEventListener('click', function() { openSkipPopup('fwd'); });
   document.getElementById('screen-video').addEventListener('click', showControls);
 
-  return { playFilm, doResume, doRestart, handleVideoKey, openSkipPopup, showControls, currentVideoDisplay, remote };
+  function updateContentBase(base) { contentBase = base; }
+
+  return { playFilm, doResume, doRestart, handleVideoKey, openSkipPopup, showControls, currentVideoDisplay, updateContentBase, remote };
 }
