@@ -27,9 +27,19 @@ button:hover { background: #222; }
 <script type="module">
 import { setProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { connectApp } from '../../core/app-ws.js';
 
 document.getElementById('btn-kids').addEventListener('click', function() { setProfile('kids'); navTo('browse.html'); });
 document.getElementById('btn-adults').addEventListener('click', function() { setProfile('adults'); navTo('browse.html'); });
+
+var wsApp = connectApp('ws://localhost:8766', function(intent) {
+  var INTENTS = {
+    kids:   function() { setProfile('kids');   navTo('browse.html'); },
+    adults: function() { setProfile('adults'); navTo('browse.html'); }
+  };
+  [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
+});
+wsApp.sendContext({ context_id: 'profile' });
 document.addEventListener('keydown', dispatchKey);
 initPage({
   onEnter: function() { document.getElementById('btn-kids').focus(); },

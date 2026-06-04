@@ -54,6 +54,7 @@ button:hover { background: #222; }
 import { getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, buildGrid } from '../../ui/screens/screen-browse.js';
+import { connectApp } from '../../core/app-ws.js';
 
 var MANIFEST_URL = 'http://localhost:8765/manifest.json';
 
@@ -90,6 +91,19 @@ initPage({
   keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow },
   remote: {}
 });
+
+var wsApp = connectApp('ws://localhost:8766', function(intent) {
+  var INTENTS = {
+    navigate_up:    function() { browseArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
+    navigate_down:  function() { browseArrow({ key: 'ArrowDown',  preventDefault: function() {} }); },
+    navigate_left:  function() { browseArrow({ key: 'ArrowLeft',  preventDefault: function() {} }); },
+    navigate_right: function() { browseArrow({ key: 'ArrowRight', preventDefault: function() {} }); },
+    select:         function() { document.activeElement.click(); },
+    back:           function() { navTo('profile.html'); }
+  };
+  [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
+});
+wsApp.sendContext({ context_id: 'browse' });
 
 fetch(MANIFEST_URL, { cache: 'no-store' })
   .then(function(r) { return r.json(); })
