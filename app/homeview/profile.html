@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grew TV</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0a0a0a; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+h1 { font-size: 64px; margin-bottom: 16px; letter-spacing: -1px; }
+h2 { font-size: 40px; color: #aaa; margin-bottom: 60px; font-weight: normal; }
+.btn-row { display: flex; gap: 32px; }
+button { background: #1a1a1a; color: #fff; border: 3px solid #444; border-radius: 12px; font-size: 40px; padding: 28px 60px; cursor: pointer; min-width: 260px; text-align: center; }
+button:focus { outline: none; border-color: #ff0; background: #1a1a00; color: #ff0; }
+button:hover { background: #222; }
+#error-msg { display: none; }
+</style>
+</head>
+<body>
+<h1>Grew TV</h1>
+<h2>Who's watching?</h2>
+<div class="btn-row">
+  <button id="btn-kids" autofocus>Kids</button>
+  <button id="btn-adults">Adults</button>
+</div>
+<div id="error-msg"></div>
+<script type="module">
+import { setProfile, navTo } from '../../core/state.js';
+import { initPage, dispatchKey } from '../../core/screen-registry.js';
+
+document.getElementById('btn-kids').addEventListener('click', function() { setProfile('kids'); navTo('browse.html'); });
+document.getElementById('btn-adults').addEventListener('click', function() { setProfile('adults'); navTo('browse.html'); });
+document.addEventListener('keydown', dispatchKey);
+initPage({
+  onEnter: function() { document.getElementById('btn-kids').focus(); },
+  keys: {
+    ArrowRight: function(e) { e.preventDefault(); document.getElementById('btn-adults').focus(); },
+    ArrowLeft:  function(e) { e.preventDefault(); document.getElementById('btn-kids').focus(); },
+    Enter:      function(e) { e.preventDefault(); document.activeElement.click(); }
+  },
+  remote: {
+    right:  function() { document.getElementById('btn-adults').focus(); },
+    left:   function() { document.getElementById('btn-kids').focus(); },
+    select: function() { document.activeElement.click(); }
+  }
+});
+</script>
+</body>
+</html>
