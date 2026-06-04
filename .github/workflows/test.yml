@@ -94,6 +94,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-
       - run: npx playwright install chromium --with-deps
       - run: mkdir -p reports
       - name: Run e2e tests
