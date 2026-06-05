@@ -174,13 +174,27 @@ export function setup(config) {
 
   var SKIP_NAV = {
     ArrowLeft:  function() { document.getElementById(SKIP_LEFT_TARGET[document.activeElement.id]).focus(); },
-    ArrowRight: function() { document.getElementById(SKIP_RIGHT_TARGET[document.activeElement.id]).focus(); },
+    ArrowRight: function() {
+      var id = document.activeElement.id;
+      // From btn-skip-fwd, step right onto the CC toggle when it is showing.
+      var target = ([id].filter(function(x) { return x === 'btn-skip-fwd' && ccVisible(); })
+        .map(function() { return 'btn-cc'; }))[0] || SKIP_RIGHT_TARGET[id];
+      document.getElementById(target).focus();
+    },
     ArrowDown:  function() { document.getElementById('btn-back-video').focus(); },
     Enter:      function() { openSkipPopup(SKIP_DIRECTION[document.activeElement.id]); }
   };
 
   var BACK_NAV = {
     ArrowUp: function() { document.getElementById('btn-play-pause').focus(); }
+  };
+
+  // Subtitle toggle (FEAT-013) — only reachable/visible when the current item
+  // carries a subtitles track; absent ⇒ btn-cc stays hidden and nav is unchanged.
+  var CC_NAV = {
+    ArrowLeft: function() { document.getElementById('btn-skip-fwd').focus(); },
+    ArrowUp:   function() { document.getElementById('btn-play-pause').focus(); },
+    ArrowDown: function() { document.getElementById('btn-back-video').focus(); }
   };
 
   var PLAY_PAUSE_NAV = {
@@ -200,6 +214,7 @@ export function setup(config) {
       var onSkip      = !!SKIP_IDS[document.activeElement.id];
       var onBack      = document.activeElement.id === 'btn-back-video';
       var onPlayPause = document.activeElement.id === 'btn-play-pause';
+      var onCc        = document.activeElement.id === 'btn-cc';
       var onResume    = pendingResumePosition > 0;
       [EXIT_FN[onResume + '']].filter(function() { return VIDEO_STOP_KEYS[e.key]; }).forEach(function(f) { e.preventDefault(); f(); });
       [RESUME_NAV[document.activeElement.id]].filter(Boolean).filter(function() { return onResume; }).forEach(function(nav) {
@@ -208,7 +223,9 @@ export function setup(config) {
       [SKIP_NAV[e.key]].filter(Boolean).filter(function() { return onSkip; }).forEach(function(fn) { e.preventDefault(); fn(); });
       [BACK_NAV[e.key]].filter(Boolean).filter(function() { return onBack; }).forEach(function(fn) { e.preventDefault(); fn(); });
       [PLAY_PAUSE_NAV[e.key]].filter(Boolean).filter(function() { return onPlayPause; }).forEach(function(fn) { e.preventDefault(); fn(); });
-      [togglePlayPause].filter(function() { return VIDEO_PLAY_PAUSE_KEYS[e.key]; }).filter(function() { return !onSkip; }).filter(function() { return !onBack; }).forEach(function(f) { e.preventDefault(); f(); });
+      [CC_NAV[e.key]].filter(Boolean).filter(function() { return onCc; }).forEach(function(fn) { e.preventDefault(); fn(); });
+      [toggleSubtitles].filter(function() { return VIDEO_PLAY_PAUSE_KEYS[e.key]; }).filter(function() { return onCc; }).forEach(function(f) { e.preventDefault(); f(); });
+      [togglePlayPause].filter(function() { return VIDEO_PLAY_PAUSE_KEYS[e.key]; }).filter(function() { return !onSkip; }).filter(function() { return !onBack; }).filter(function() { return !onCc; }).forEach(function(f) { e.preventDefault(); f(); });
     }
   };
 
@@ -243,6 +260,7 @@ export function setup(config) {
   function stopPlayback() {
     video.pause();
     video.src = '';
+    document.getElementById('btn-cc').classList.add('hidden');
     [currentBlobUrl].filter(Boolean).forEach(function() { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; });
     onIntent('stop');
     releaseWakeLock();
@@ -267,6 +285,42 @@ export function setup(config) {
     startPlayback(0);
   }
 
+  function ccVisible() {
+    var b = document.getElementById('btn-cc');
+    return !!b && !b.classList.contains('hidden');
+  }
+
+  // Build the native subtitle <track> for the current item (FEAT-013). One
+  // English track per video; absent subtitles ⇒ no track and the CC toggle
+  // stays hidden, leaving playback chrome unchanged.
+  function setSubtitleTrack(playItem) {
+    Array.prototype.slice.call(video.querySelectorAll('track'))
+      .forEach(function(t) { video.removeChild(t); });
+    var cc = document.getElementById('btn-cc');
+    cc.classList.add('hidden');
+    [playItem.subtitles].filter(Boolean).forEach(function(file) {
+      var track = document.createElement('track');
+      track.kind = 'subtitles';
+      track.srclang = 'en';
+      track.label = 'English';
+      track.src = contentBase + file;
+      track['default'] = true;
+      video.appendChild(track);
+      cc.classList.remove('hidden');
+      cc.classList.remove('cc-off');
+    });
+  }
+
+  function toggleSubtitles() {
+    [video.textTracks.length].filter(Boolean).forEach(function() {
+      var tt = video.textTracks[0];
+      var SET = { 'showing': 'hidden', 'hidden': 'showing' };
+      tt.mode = SET[tt.mode] || 'hidden';
+      document.getElementById('btn-cc').classList.toggle('cc-off', tt.mode !== 'showing');
+      showControls();
+    });
+  }
+
   function playFilm(film, item, from) {
     var playItem = [item].filter(Boolean).concat(film.items)[0];
     var playFrom = [from].filter(Boolean).concat(['browse.html'])[0];
@@ -277,6 +331,7 @@ export function setup(config) {
     returnPage        = playFrom;
     _currentDisplay   = { id: playItem.id, title: [playItem.label, film.title].filter(Boolean)[0] };
     video.src         = contentBase + playItem.id + '.mp4';
+    setSubtitleTrack(playItem);
     var labelSuffix   = [playItem.label, playItem.title].filter(Boolean).map(function(l) { return ' \u2014 ' + l; }).concat([''])[0];
     document.getElementById('film-title-video').textContent = film.title + labelSuffix;
     onIntent('play', { title: film.title + labelSuffix });
@@ -318,6 +373,7 @@ export function setup(config) {
   remote.back   = function() { var p = skipPopup; [p].filter(Boolean).forEach(function() { POPUP_NAV.Escape(); }); [!p].filter(Boolean).forEach(function() { stopPlayback(); }); };
   remote.resume  = function() { doResume(); };
   remote.restart = function() { doRestart(); };
+  remote.cc      = function() { [ccVisible()].filter(Boolean).forEach(toggleSubtitles); };
 
   video.addEventListener('timeupdate', function() {
     [video.duration].filter(Boolean).forEach(updateProgress);
@@ -358,6 +414,7 @@ export function setup(config) {
   document.getElementById('btn-back-video').addEventListener('click', stopPlayback);
   document.getElementById('btn-skip-back').addEventListener('click', function() { openSkipPopup('back'); });
   document.getElementById('btn-skip-fwd').addEventListener('click', function() { openSkipPopup('fwd'); });
+  document.getElementById('btn-cc').addEventListener('click', toggleSubtitles);
   document.getElementById('screen-video').addEventListener('click', showControls);
 
   function updateContentBase(base) { contentBase = base; }
