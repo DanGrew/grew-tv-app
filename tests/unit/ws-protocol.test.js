@@ -1,10 +1,21 @@
 import {
   MESSAGE_TYPES,
+  INTENTS,
+  SKIP_DELTAS,
   SESSION_ID,
   createMessage,
   createIntent,
   createSnapshotRequest,
-  isStaleContext
+  isStaleContext,
+  createAppState,
+  createPlayIntent,
+  createSkipIntent,
+  createNextIntent,
+  createPrevIntent,
+  createSetProfileIntent,
+  createToggleCaptionsIntent,
+  interpolatePosition,
+  createHeartbeat
 } from '../../core/ws-protocol.js';
 
 describe('MESSAGE_TYPES', () => {
@@ -114,5 +125,127 @@ describe('isStaleContext', () => {
 
   it('returns false when incoming version greater than current', () => {
     expect(isStaleContext({ version: 3 }, { version: 2 })).toBe(false);
+  });
+});
+
+describe('APP_STATE message type', () => {
+  it('is app_state', () => expect(MESSAGE_TYPES.APP_STATE).toBe('app_state'));
+});
+
+describe('INTENTS', () => {
+  it('has the six FEAT-017 intents', () => {
+    expect(INTENTS).toEqual({
+      PLAY: 'play', SKIP: 'skip', NEXT: 'next', PREV: 'prev',
+      SET_PROFILE: 'setProfile', TOGGLE_CAPTIONS: 'toggleCaptions'
+    });
+  });
+});
+
+describe('SKIP_DELTAS', () => {
+  it('is the graduated ladder 10s..30m', () => {
+    expect(SKIP_DELTAS).toEqual([10, 30, 120, 600, 1800]);
+  });
+});
+
+describe('createAppState', () => {
+  it('builds an app_state message', () => {
+    expect(createAppState({}).type).toBe('app_state');
+  });
+
+  it('passes through all snapshot fields', () => {
+    const p = createAppState({
+      screen: 'player', itemId: 'ollie-car', episodeId: null,
+      positionSec: 42, durationSec: 380, playing: true,
+      profile: 'kids', captionsOn: true
+    }).payload;
+    expect(p).toEqual({
+      screen: 'player', itemId: 'ollie-car', episodeId: null,
+      positionSec: 42, durationSec: 380, playing: true,
+      profile: 'kids', captionsOn: true
+    });
+  });
+
+  it('normalises missing fields (no undefined on the wire)', () => {
+    const p = createAppState().payload;
+    expect(p.screen).toBeNull();
+    expect(p.positionSec).toBe(0);
+    expect(p.durationSec).toBeNull();
+    expect(p.playing).toBe(false);
+    expect(p.captionsOn).toBe(false);
+  });
+});
+
+describe('intent builders', () => {
+  it('createPlayIntent carries id', () => {
+    const m = createPlayIntent('film-1');
+    expect(m.payload.intent).toBe('play');
+    expect(m.payload.params.id).toBe('film-1');
+  });
+  it('createPlayIntent defaults id to null', () => {
+    expect(createPlayIntent().payload.params.id).toBeNull();
+  });
+  it('createSkipIntent carries deltaSec', () => {
+    const m = createSkipIntent(-30);
+    expect(m.payload.intent).toBe('skip');
+    expect(m.payload.params.deltaSec).toBe(-30);
+  });
+  it('createNextIntent / createPrevIntent set intent', () => {
+    expect(createNextIntent().payload.intent).toBe('next');
+    expect(createPrevIntent().payload.intent).toBe('prev');
+  });
+  it('createSetProfileIntent carries profile', () => {
+    expect(createSetProfileIntent('adults').payload.params.profile).toBe('adults');
+  });
+  it('createToggleCaptionsIntent sets intent', () => {
+    expect(createToggleCaptionsIntent().payload.intent).toBe('toggleCaptions');
+  });
+});
+
+describe('interpolatePosition', () => {
+  it('returns 0 for no snapshot', () => {
+    expect(interpolatePosition(null, 5)).toBe(0);
+  });
+  it('returns base position when paused (ignores elapsed)', () => {
+    expect(interpolatePosition({ positionSec: 30, playing: false }, 10)).toBe(30);
+  });
+  it('advances by elapsed when playing', () => {
+    expect(interpolatePosition({ positionSec: 30, playing: true }, 10)).toBe(40);
+  });
+  it('clamps to durationSec', () => {
+    expect(interpolatePosition({ positionSec: 595, durationSec: 600, playing: true }, 30)).toBe(600);
+  });
+  it('never returns negative', () => {
+    expect(interpolatePosition({ positionSec: 0, playing: true }, -5)).toBe(0);
+  });
+});
+
+describe('createHeartbeat', () => {
+  it('start schedules emit at the interval; stop cancels; idempotent', () => {
+    let scheduled = null, cleared = null, nextId = 1;
+    const hb = createHeartbeat(() => {}, {
+      intervalMs: 1000,
+      setInterval: (fn, ms) => { scheduled = { fn, ms }; return nextId++; },
+      clearInterval: (id) => { cleared = id; }
+    });
+    expect(hb.running()).toBe(false);
+    hb.start();
+    expect(hb.running()).toBe(true);
+    expect(scheduled.ms).toBe(1000);
+    const before = nextId;
+    hb.start();                       // idempotent — no second schedule
+    expect(nextId).toBe(before);
+    hb.stop();
+    expect(hb.running()).toBe(false);
+    expect(cleared).toBe(1);
+  });
+
+  it('emit fn is the one passed in', () => {
+    let ticks = 0;
+    const hb = createHeartbeat(() => { ticks++; }, {
+      setInterval: (fn) => { fn(); return 1; },
+      clearInterval: () => {}
+    });
+    hb.start();
+    expect(ticks).toBe(1);
   });
 });

@@ -65,4 +65,22 @@ describe('connectApp', () => {
     vi.advanceTimersByTime(25000);
     expect(closed).toBe(true);
   });
+
+  it('sendAppState sends an app_state full snapshot', () => {
+    var api = connectApp('ws://host:8766', () => {});
+    api.sendAppState({ screen: 'player', itemId: 'ollie-car', positionSec: 12, playing: true });
+    var msg = MockWS.instances[0].sent.find(m => m.type === 'app_state');
+    expect(msg.payload.itemId).toBe('ollie-car');
+    expect(msg.payload.playing).toBe(true);
+  });
+
+  it('resends last app_state on reconnect (snapshot re-sync)', () => {
+    var api = connectApp('ws://host:8766', () => {});
+    api.sendAppState({ screen: 'player', itemId: 'film-7', positionSec: 99 });
+    MockWS.instances[0].close();
+    vi.advanceTimersByTime(2001);
+    MockWS.instances[1].onopen();
+    var msg = MockWS.instances[1].sent.find(m => m.type === 'app_state');
+    expect(msg.payload.itemId).toBe('film-7');
+  });
 });
