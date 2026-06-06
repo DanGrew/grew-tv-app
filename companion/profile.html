@@ -14,6 +14,27 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 #actions { flex: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-top: 4px; }
 .action-btn { width: 100%; padding: 22px 16px; border-radius: 12px; border: none; background: #2a2a2a; color: #fff; font-size: 22px; cursor: pointer; touch-action: manipulation; transition: background 0.1s, transform 0.08s; }
 .action-btn:active { background: #f0c040; color: #111; transform: scale(0.97); }
+.cmp-cards { display: flex; gap: 12px; }
+.cmp-card { position: relative; flex: 1; padding: 0; border: 2px solid #333; border-radius: 12px; background: #1a1a1a; color: #fff; overflow: hidden; cursor: pointer; touch-action: manipulation; }
+.cmp-card:active { border-color: #f0c040; }
+.cmp-lock { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 14px; z-index: 2; }
+.cmp-photo { height: 110px; display: flex; align-items: center; justify-content: center; }
+.cmp-photo.kids { background: linear-gradient(160deg, #3a7bd5, #00d2ff); }
+.cmp-photo.adults { background: linear-gradient(160deg, #834d9b, #d04ed6); }
+.cmp-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cmp-photo-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 44px; }
+.cmp-name { padding: 10px; font-size: 16px; text-align: center; }
+.cmp-keypad-wrap { display: none; flex-direction: column; align-items: center; gap: 14px; margin-top: 16px; }
+.cmp-keypad-wrap.active { display: flex; }
+.cmp-keypad-wrap.shake { animation: shake 0.4s; }
+.cmp-keypad-title { font-size: 14px; color: #aaa; }
+.cmp-dots { display: flex; gap: 14px; }
+.cmp-dots span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #555; }
+.cmp-dots span.on { background: #f0c040; border-color: #f0c040; }
+.cmp-keypad { display: grid; grid-template-columns: repeat(3, 64px); gap: 10px; }
+.cmp-key { width: 64px; height: 64px; border: 2px solid #444; border-radius: 10px; background: #222; color: #fff; font-size: 24px; cursor: pointer; touch-action: manipulation; }
+.cmp-key:active { background: #f0c040; color: #111; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
 </style>
 </head>
 <body>

@@ -8,52 +8,45 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: #0a0a0a; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; }
 h1 { font-size: 64px; margin-bottom: 16px; letter-spacing: -1px; }
-h2 { font-size: 40px; color: #aaa; margin-bottom: 60px; font-weight: normal; }
-.btn-row { display: flex; gap: 32px; }
-button { background: #1a1a1a; color: #fff; border: 3px solid #444; border-radius: 12px; font-size: 40px; padding: 28px 60px; cursor: pointer; min-width: 260px; text-align: center; }
-button:focus { outline: none; border-color: #ff0; background: #1a1a00; color: #ff0; }
-button:hover { background: #222; }
+h2 { font-size: 40px; color: #aaa; margin-bottom: 56px; font-weight: normal; }
+#profile-cards { display: flex; gap: 36px; }
+.profile-card { position: relative; width: 280px; background: #1a1a1a; border: 3px solid #333; border-radius: 16px; overflow: hidden; cursor: pointer; transition: border-color 0.1s, transform 0.1s; }
+.profile-card:focus { outline: none; border-color: #ff0; transform: translateY(-8px); }
+.profile-card:focus .profile-name { color: #ff0; }
+.profile-photo { height: 280px; background: #222; display: flex; align-items: center; justify-content: center; }
+.profile-photo.kids { background: linear-gradient(160deg, #3a7bd5, #00d2ff); }
+.profile-photo.adults { background: linear-gradient(160deg, #834d9b, #d04ed6); }
+.profile-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.profile-photo-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 96px; }
+.profile-name { padding: 22px; font-size: 30px; text-align: center; }
+.lock-badge { position: absolute; top: 16px; right: 16px; width: 48px; height: 48px; border-radius: 50%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 24px; z-index: 2; }
+#pin-panel { display: none; margin-top: 44px; padding: 32px; background: #1a1a1a; border: 3px solid #333; border-radius: 16px; flex-direction: column; align-items: center; gap: 24px; }
+#pin-panel.active { display: flex; }
+#pin-panel.shake { animation: shake 0.4s; }
+.pin-title { font-size: 24px; color: #aaa; }
+.pin-dots { display: flex; gap: 20px; }
+.pin-dots span { width: 20px; height: 20px; border-radius: 50%; border: 3px solid #555; }
+.pin-dots span.on { background: #ff0; border-color: #ff0; }
+.keypad { display: grid; grid-template-columns: repeat(3, 88px); gap: 16px; }
+.key { width: 88px; height: 88px; background: #222; border: 3px solid #444; border-radius: 12px; font-size: 36px; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: border-color 0.1s, color 0.1s; }
+.key:focus { outline: none; border-color: #ff0; color: #ff0; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-12px); } 40%, 80% { transform: translateX(12px); } }
 #error-msg { display: none; }
 </style>
 </head>
 <body id="screen-profile">
 <h1>Grew TV</h1>
 <h2>Who's watching?</h2>
-<div class="btn-row">
-  <button id="btn-kids" autofocus>Kids</button>
-  <button id="btn-adults">Adults</button>
+<div id="profile-cards"></div>
+<div id="pin-panel">
+  <div class="pin-title" id="pin-title">Enter code</div>
+  <div class="pin-dots" id="pin-dots"><span></span><span></span><span></span><span></span></div>
+  <div class="keypad" id="keypad"></div>
 </div>
 <div id="error-msg"></div>
 <script type="module">
-import { setProfile, navTo } from '../../core/state.js';
-import { initPage, dispatchKey } from '../../core/screen-registry.js';
-import { connectApp } from '../../core/app-ws.js';
-
-document.getElementById('btn-kids').addEventListener('click', function() { setProfile('kids'); navTo('browse.html'); });
-document.getElementById('btn-adults').addEventListener('click', function() { setProfile('adults'); navTo('browse.html'); });
-
-var wsApp = connectApp('ws://localhost:8766', function(intent) {
-  var INTENTS = {
-    kids:   function() { setProfile('kids');   navTo('browse.html'); },
-    adults: function() { setProfile('adults'); navTo('browse.html'); }
-  };
-  [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
-});
-wsApp.sendContext({ context_id: 'profile' });
-document.addEventListener('keydown', dispatchKey);
-initPage({
-  onEnter: function() { document.getElementById('btn-kids').focus(); },
-  keys: {
-    ArrowRight: function(e) { e.preventDefault(); document.getElementById('btn-adults').focus(); },
-    ArrowLeft:  function(e) { e.preventDefault(); document.getElementById('btn-kids').focus(); },
-    Enter:      function(e) { e.preventDefault(); document.activeElement.click(); }
-  },
-  remote: {
-    right:  function() { document.getElementById('btn-adults').focus(); },
-    left:   function() { document.getElementById('btn-kids').focus(); },
-    select: function() { document.activeElement.click(); }
-  }
-});
+import { initProfilePage } from '../../ui/screens/screen-profile-page.js';
+initProfilePage();
 </script>
 </body>
 </html>
