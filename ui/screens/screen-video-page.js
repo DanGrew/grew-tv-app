@@ -1,45 +1,74 @@
-import { getParam, navTo } from '../../core/state.js';
+import { getParam, getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadVideo, loadNext, loadProgress } from '../../core/app-api.js';
+import { loadVideo, loadNext, loadSeries, loadProgress } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 
 var SERVER = 'http://localhost:8765';
 
 // Resume start: explicit restart -> 0; otherwise the backend resume position
-// when the video is still mid-watch (finished/unwatched -> 0). Replaces the old
-// localStorage read + resume/restart prompt (TASK-118).
+// when the video is still mid-watch (finished/unwatched -> 0). Backend is the
+// source of truth — no localStorage read.
 var RESUME_BY_RESTART = {
   'true':  function() { return 0; },
   'false': function(prog) { return [prog.position_secs].filter(function(p) { return isMidWatch(p, prog.duration_secs); }).concat([0])[0]; }
 };
 function resumeStart(restart, prog) { return RESUME_BY_RESTART[!!restart + ''](prog); }
 var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
-var SKIP_ACTIONS = [
-  'skip_back_10', 'skip_back_30', 'skip_back_120', 'skip_back_300', 'skip_back_900', 'skip_back_1800',
-  'skip_fwd_10', 'skip_fwd_30', 'skip_fwd_120', 'skip_fwd_300', 'skip_fwd_900', 'skip_fwd_1800'
-];
 
 export function initVideoPage() {
   var videoId  = getParam('video');
   var seriesId = getParam('series');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
+  var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
   var wsApp = null;
   var player;
 
-  // End-of-video / next: within a series, advance to /api/next; otherwise (a
-  // standalone video, or the end of the series) leave playback.
-  function advance() {
+  function goTo(id) { navTo('video.html', { video: id, series: seriesId, from: from }); }
+
+  // Resolve the next episode, then act on it; no next (end of series) -> stop.
+  function loadNextThen(action) {
+    loadNext(SERVER, seriesId, videoId)
+      .then(function(d) {
+        [d.next].filter(Boolean).forEach(function(n) { action(n); });
+        [!d.next].filter(Boolean).forEach(function() { player.stop(); });
+      })
+      .catch(function() { player.stop(); });
+  }
+
+  // Autoplay at true 100% end: within a series, 5s "Up next" countdown then
+  // advance (wraps); a standalone video (or end of series) returns to origin.
+  function advanceAuto() {
+    [seriesId].filter(Boolean).forEach(function() { loadNextThen(function(n) { player.startUpNext(n.video.title, function() { goTo(n.video.id); }); }); });
+    [!seriesId].filter(Boolean).forEach(function() { player.stop(); });
+  }
+
+  // Manual ⏭ — immediate, no countdown. Standalone has no next: no-op.
+  function nextNow() {
+    [seriesId].filter(Boolean).forEach(function() { loadNextThen(function(n) { goTo(n.video.id); }); });
+  }
+
+  // Manual ⏮ — previous episode in series order (wraps). Standalone: no-op.
+  function previous() {
+    [seriesId].filter(Boolean).forEach(function() {
+      loadSeries(SERVER, seriesId)
+        .then(function(s) {
+          var items = [s.items].filter(Array.isArray).concat([[]])[0];
+          var idx = items.map(function(it) { return it.video.id; }).indexOf(videoId);
+          [items[(idx - 1 + items.length) % items.length]].filter(Boolean).filter(function() { return idx >= 0; }).forEach(function(p) { goTo(p.video.id); });
+        })
+        .catch(function() {});
+    });
+  }
+
+  // Prime the overlay's "Up next" line from the next episode's title.
+  function showUpNextLine() {
     [seriesId].filter(Boolean).forEach(function() {
       loadNext(SERVER, seriesId, videoId)
-        .then(function(d) {
-          [d.next].filter(Boolean).forEach(function(n) { navTo('video.html', { video: n.video.id, series: seriesId, from: from }); });
-          [!d.next].filter(Boolean).forEach(function() { player.stop(); });
-        })
-        .catch(function() { player.stop(); });
+        .then(function(d) { [d.next].filter(Boolean).forEach(function(n) { player.setUpNext(n.video.title); }); })
+        .catch(function() {});
     });
-    [!seriesId].filter(Boolean).forEach(function() { player.stop(); });
   }
 
   player = setupPlayer({
@@ -53,13 +82,20 @@ export function initVideoPage() {
       [STOP_NAV[from]].filter(Boolean).forEach(function(fn) { fn(); });
       [!STOP_NAV[from]].filter(Boolean).forEach(function() { navTo('browse.html'); });
     },
-    onEnded: advance,
-    onNext: advance,
+    onEnded: advanceAuto,
+    onNext: nextNow,
+    onPrev: previous,
+    // Full app_state snapshot to the companion (FEAT-017): static context here,
+    // live position/playing/captions added by the player.
+    emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
+    appContext: function() {
+      return { screen: 'player', itemId: [seriesId].filter(Boolean).concat([videoId])[0], episodeId: videoId, profile: profile };
+    },
     onIntent: function(intent) {
       var VIDEO_CTX = { play: true, video: true };
       [wsApp].filter(Boolean).forEach(function(ws) {
         [VIDEO_CTX[intent]].filter(Boolean).forEach(function() {
-          ws.sendContext({ context_id: 'video', actions: SKIP_ACTIONS, display: player.currentVideoDisplay() });
+          ws.sendContext({ context_id: 'video', display: player.currentVideoDisplay() });
         });
       });
     }
@@ -80,6 +116,6 @@ export function initVideoPage() {
     loadVideo(SERVER, videoId),
     loadProgress(SERVER, videoId).catch(function() { return { position_secs: 0, duration_secs: null }; })
   ])
-    .then(function(res) { player.playVideo(res[0], from, resumeStart(restart, res[1])); })
+    .then(function(res) { player.playVideo(res[0], from, resumeStart(restart, res[1])); player.setSeriesMode(!!seriesId); showUpNextLine(); })
     .catch(function() { navTo('error.html'); });
 }

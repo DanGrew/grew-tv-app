@@ -7,51 +7,57 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; }
-button { background: #1a1a1a; color: #fff; border: 3px solid #444; border-radius: 12px; font-size: 40px; padding: 28px 60px; cursor: pointer; min-width: 260px; text-align: center; }
+button { background: #1a1a1a; color: #fff; border: 3px solid transparent; border-radius: 12px; font-size: 40px; padding: 0; cursor: pointer; text-align: center; }
 button:focus { outline: none; border-color: #ff0; background: #1a1a00; color: #ff0; }
-button:hover { background: #222; }
 #screen-video { height: 100vh; background: #000; position: relative; }
 video { width: 100%; height: 100vh; object-fit: contain; background: #000; }
-#controls { position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85) 35%, rgba(0,0,0,0.97)); padding: 40px 60px 40px; display: flex; flex-direction: column; gap: 16px; transition: opacity 0.3s; }
+video::cue { font-size: 34px; background: rgba(0,0,0,0.75); color: #fff; line-height: 1.3; }
+#controls { position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.92) 40%, rgba(0,0,0,0.98)); padding: 48px 60px 44px; display: flex; flex-direction: column; gap: 10px; transition: opacity 0.3s; }
 #controls.hidden { opacity: 0; pointer-events: none; }
-#film-title-video { position: fixed; top: 48px; left: 80px; font-size: 42px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,0.8); transition: opacity 0.3s; pointer-events: none; }
-#film-title-video.hidden { opacity: 0; }
-.skip-popup { position: fixed; background: #1a1a1a; border: 3px solid #ff0; border-radius: 12px; display: flex; flex-direction: column; padding: 8px; gap: 4px; z-index: 100; }
-#progress-bar-row { display: flex; align-items: center; gap: 32px; }
-#btn-back-video { font-size: 28px; padding: 16px 32px; min-width: auto; }
-#progress { flex: 1; height: 12px; background: rgba(255,255,255,0.18); border-radius: 6px; position: relative; }
-#progress-fill { height: 100%; background: #ff0; border-radius: 6px; width: 0; }
-#time-display { font-size: 30px; color: #aaa; min-width: 120px; text-align: right; }
-#video-btn-row { display: flex; align-items: center; justify-content: space-between; }
-#center-btns { display: flex; align-items: center; gap: 24px; }
-#btn-play-pause { border-radius: 50%; width: 96px; height: 96px; font-size: 44px; padding: 0; min-width: unset; }
-#btn-play-pause:focus { box-shadow: 0 0 20px rgba(255,255,0,0.3); }
-#btn-cc { font-size: 28px; padding: 16px 32px; min-width: auto; font-weight: 700; letter-spacing: 2px; }
-#btn-cc.hidden { display: none; }
+#film-title-video { font-size: 42px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,0.8); }
+#video-upnext { font-size: 24px; color: #aaa; min-height: 30px; }
+#video-upnext b { color: #fff; font-weight: 600; }
+#transport { display: flex; align-items: center; gap: 24px; margin-top: 8px; }
+.ctrl-btn { font-size: 44px; line-height: 1; min-width: 76px; height: 76px; }
+.ctrl-btn.pill { font-size: 28px; font-weight: 700; letter-spacing: 2px; border-radius: 999px; min-width: auto; height: auto; padding: 14px 28px; border-color: #444; }
+#btn-cc.hidden, #btn-prev.hidden, #btn-next.hidden { display: none; }
 #btn-cc.cc-off { opacity: 0.45; }
+#progress { flex: 1; height: 12px; background: rgba(255,255,255,0.18); border-radius: 6px; }
+#progress-fill { height: 100%; background: #ff0; border-radius: 6px; width: 0; }
+#time-display { font-size: 30px; color: #aaa; min-width: 200px; text-align: right; font-variant-numeric: tabular-nums; }
+.jump-popup { position: fixed; background: #1a1a1a; border: 3px solid #ff0; border-radius: 16px; padding: 20px; z-index: 100; box-shadow: 0 12px 40px rgba(0,0,0,0.6); }
+.jump-title { font-size: 22px; text-transform: uppercase; letter-spacing: 3px; color: #888; text-align: center; margin-bottom: 16px; }
+.jump-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.jump-grid button { font-size: 28px; padding: 20px 12px; min-width: 110px; border-color: #444; font-variant-numeric: tabular-nums; }
+#upnext-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; z-index: 200; }
+#upnext-overlay.hidden { display: none; }
+#upnext-text { font-size: 48px; font-weight: 700; text-align: center; }
+#upnext-text b { color: #ff0; }
+#upnext-count { font-size: 30px; color: #aaa; }
+#btn-upnext-cancel { font-size: 32px; padding: 20px 48px; border-color: #444; }
 #error-msg { display: none; }
 </style>
 </head>
 <body>
 <div id="screen-video">
   <video id="video" preload="metadata"></video>
-  <div id="film-title-video" class="hidden"></div>
   <div id="controls">
-    <div id="progress-bar-row">
+    <div id="film-title-video"></div>
+    <div id="video-upnext"></div>
+    <div id="transport">
+      <button id="btn-prev" class="ctrl-btn" aria-label="Previous">&#9198;</button>
+      <button id="btn-play-pause" class="ctrl-btn" aria-label="Play/Pause">&#9208;</button>
+      <button id="btn-next" class="ctrl-btn" aria-label="Next">&#9197;</button>
+      <button id="btn-jump" class="ctrl-btn pill">Jump</button>
+      <button id="btn-cc" class="ctrl-btn pill hidden" aria-label="Subtitles">CC</button>
       <div id="progress"><div id="progress-fill"></div></div>
       <div id="time-display">0:00 / 0:00</div>
     </div>
-    <div id="video-btn-row">
-      <button id="btn-back-video">&#8592; Back</button>
-      <div id="center-btns">
-        <button id="btn-skip-back">&#171; Skip</button>
-        <button id="btn-play-pause">&#9208;</button>
-        <button id="btn-skip-fwd">Skip &#187;</button>
-      </div>
-      <div style="min-width:140px;display:flex;justify-content:flex-end">
-        <button id="btn-cc" class="hidden" aria-label="Subtitles">CC</button>
-      </div>
-    </div>
+  </div>
+  <div id="upnext-overlay" class="hidden">
+    <div id="upnext-text"></div>
+    <div id="upnext-count"></div>
+    <button id="btn-upnext-cancel">Cancel</button>
   </div>
 </div>
 <div id="error-msg"></div>

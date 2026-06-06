@@ -75,31 +75,30 @@ test('select standalone video plays directly with src set', async ({ page }) => 
   await expect(page.locator('#video')).toHaveAttribute('src', /\/media\/toy-story-main\.mp4/);
 });
 
-test('back button returns to browse screen', async ({ page }) => {
-  await page.locator('#btn-kids').click();
-  await page.locator('.film-tile[data-id="toy-story-main"]').click();
-  await expect(page.locator('#screen-video')).toBeVisible();
-  await expect(page.locator('#btn-play-pause')).toBeFocused();
-  await page.locator('#btn-back-video').click();
-  await expect(page.locator('#screen-browse')).toBeVisible();
-});
-
 test('Escape key returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile[data-id="toy-story-main"]').click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
-  await page.locator('#btn-back-video').focus();
   await page.keyboard.press('Escape');
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
 
-test('focus returns to source tile after back', async ({ page }) => {
+test('Backspace key returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile[data-id="toy-story-main"]').click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
-  await page.locator('#btn-back-video').click();
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('#screen-browse')).toBeVisible();
+});
+
+test('focus returns to source tile after Escape', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').click();
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
+  await page.keyboard.press('Escape');
   await expect(page.locator('.film-tile[data-id="toy-story-main"]')).toBeFocused();
 });
 
@@ -136,6 +135,12 @@ async function goToVideoScreen(page) {
   await expect(page.locator('#btn-play-pause')).toBeFocused();
 }
 
+async function goToSeriesEpisode(page) {
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-play-pause')).toBeFocused();
+}
+
 async function mockVideoTime(page, currentTime, duration) {
   await page.evaluate(({ ct, dur }) => {
     const v = document.getElementById('video');
@@ -149,150 +154,203 @@ async function mockVideoTime(page, currentTime, duration) {
   }, { ct: currentTime, dur: duration });
 }
 
-test('skip row shows two skip buttons', async ({ page }) => {
-  await goToVideoScreen(page);
-  await expect(page.locator('#btn-skip-back')).toBeVisible();
-  await expect(page.locator('#btn-skip-fwd')).toBeVisible();
+test('series transport shows prev / play-pause / next / jump', async ({ page }) => {
+  await goToSeriesEpisode(page);
+  await expect(page.locator('#btn-prev')).toBeVisible();
+  await expect(page.locator('#btn-next')).toBeVisible();
+  await expect(page.locator('#btn-jump')).toBeVisible();
 });
 
-test('clicking skip-fwd opens popup', async ({ page }) => {
-  await goToVideoScreen(page);
-  await page.locator('#btn-skip-fwd').click();
-  await expect(page.locator('.skip-popup')).toBeVisible();
+test('series Next button advances to the next episode immediately', async ({ page }) => {
+  await goToSeriesEpisode(page);
+  await page.locator('#btn-next').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
 });
 
-test('clicking skip-back opens popup', async ({ page }) => {
-  await goToVideoScreen(page);
-  await page.locator('#btn-skip-back').click();
-  await expect(page.locator('.skip-popup')).toBeVisible();
+test('series Prev button steps back in order (wraps)', async ({ page }) => {
+  await goToSeriesEpisode(page);
+  await page.locator('#btn-prev').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e03/);
 });
 
-test('popup shows 6 options', async ({ page }) => {
+test('standalone film hides prev / next (no episodes)', async ({ page }) => {
   await goToVideoScreen(page);
-  await page.locator('#btn-skip-fwd').click();
-  await expect(page.locator('.skip-popup button')).toHaveCount(6);
+  await expect(page.locator('#btn-prev')).toHaveClass(/hidden/);
+  await expect(page.locator('#btn-next')).toHaveClass(/hidden/);
+  await expect(page.locator('#btn-jump')).toBeVisible();
 });
 
-test('popup default focus is 10s option', async ({ page }) => {
+test('clicking Jump opens the jump popup', async ({ page }) => {
   await goToVideoScreen(page);
-  await page.locator('#btn-skip-fwd').click();
-  await expect(page.locator('.skip-popup button[data-delta="10"]')).toBeFocused();
+  await page.locator('#btn-jump').click();
+  await expect(page.locator('.jump-popup')).toBeVisible();
 });
 
-test('forward skip via popup adds delta to currentTime', async ({ page }) => {
+test('jump popup shows 10 graduated options', async ({ page }) => {
+  await goToVideoScreen(page);
+  await page.locator('#btn-jump').click();
+  await expect(page.locator('.jump-popup .jump-grid button')).toHaveCount(10);
+});
+
+test('jump popup default focus is +10s', async ({ page }) => {
+  await goToVideoScreen(page);
+  await page.locator('#btn-jump').click();
+  await expect(page.locator('.jump-popup button[data-delta="10"]')).toBeFocused();
+});
+
+test('forward jump adds exact delta to currentTime', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 600, 3600);
-  await page.locator('#btn-skip-fwd').click();
-  await page.locator('.skip-popup button[data-delta="10"]').click();
+  await page.locator('#btn-jump').click();
+  await page.locator('.jump-popup button[data-delta="120"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
-  expect(time).toBe(610);
+  expect(time).toBe(720);
 });
 
-test('back skip via popup subtracts delta from currentTime', async ({ page }) => {
+test('back jump subtracts exact delta from currentTime', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 600, 3600);
-  await page.locator('#btn-skip-back').click();
-  await page.locator('.skip-popup button[data-delta="-10"]').click();
+  await page.locator('#btn-jump').click();
+  await page.locator('.jump-popup button[data-delta="-30"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
-  expect(time).toBe(590);
+  expect(time).toBe(570);
 });
 
-test('back skip clamps to 0', async ({ page }) => {
+test('back jump clamps to 0', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 5, 3600);
-  await page.locator('#btn-skip-back').click();
-  await page.locator('.skip-popup button[data-delta="-30"]').click();
+  await page.locator('#btn-jump').click();
+  await page.locator('.jump-popup button[data-delta="-1800"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
   expect(time).toBe(0);
 });
 
-test('forward skip clamps to duration', async ({ page }) => {
+test('forward jump clamps to duration', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 3590, 3600);
-  await page.locator('#btn-skip-fwd').click();
-  await page.locator('.skip-popup button[data-delta="30"]').click();
+  await page.locator('#btn-jump').click();
+  await page.locator('.jump-popup button[data-delta="1800"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
   expect(time).toBe(3600);
 });
 
-test('selecting popup option closes popup', async ({ page }) => {
+test('selecting a jump option closes the popup', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 600, 3600);
-  await page.locator('#btn-skip-fwd').click();
-  await page.locator('.skip-popup button[data-delta="10"]').click();
-  await expect(page.locator('.skip-popup')).toHaveCount(0);
+  await page.locator('#btn-jump').click();
+  await page.locator('.jump-popup button[data-delta="10"]').click();
+  await expect(page.locator('.jump-popup')).toHaveCount(0);
 });
 
-test('Escape closes popup without seeking', async ({ page }) => {
+test('Escape closes jump popup without seeking', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 600, 3600);
-  await page.locator('#btn-skip-fwd').click();
+  await page.locator('#btn-jump').click();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.skip-popup')).toHaveCount(0);
+  await expect(page.locator('.jump-popup')).toHaveCount(0);
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
   expect(time).toBe(600);
 });
 
-test('Backspace closes popup without seeking', async ({ page }) => {
+test('ArrowRight in jump popup moves focus one cell', async ({ page }) => {
   await goToVideoScreen(page);
-  await mockVideoTime(page, 600, 3600);
-  await page.locator('#btn-skip-back').click();
-  await page.keyboard.press('Backspace');
-  await expect(page.locator('.skip-popup')).toHaveCount(0);
-  const time = await page.evaluate(() => document.getElementById('video').currentTime);
-  expect(time).toBe(600);
-});
-
-test('ArrowDown in popup moves focus to next option', async ({ page }) => {
-  await goToVideoScreen(page);
-  await page.locator('#btn-skip-fwd').click();
-  await page.keyboard.press('ArrowDown');
-  await expect(page.locator('.skip-popup button[data-delta="30"]')).toBeFocused();
-});
-
-test('ArrowUp in popup moves focus to previous option', async ({ page }) => {
-  await goToVideoScreen(page);
-  await page.locator('#btn-skip-fwd').click();
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('ArrowUp');
-  await expect(page.locator('.skip-popup button[data-delta="10"]')).toBeFocused();
-});
-
-test('Enter in popup selects focused option and closes', async ({ page }) => {
-  await goToVideoScreen(page);
-  await mockVideoTime(page, 600, 3600);
-  await page.locator('#btn-skip-fwd').click();
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Enter');
-  await expect(page.locator('.skip-popup')).toHaveCount(0);
-  const time = await page.evaluate(() => document.getElementById('video').currentTime);
-  expect(time).toBe(630);
-});
-
-test('ArrowRight from skip-back focuses play-pause', async ({ page }) => {
-  await goToVideoScreen(page);
-  await page.locator('#btn-skip-back').focus();
+  await page.locator('#btn-jump').click();
+  await expect(page.locator('.jump-popup button[data-delta="10"]')).toBeFocused();
   await page.keyboard.press('ArrowRight');
-  await expect(page.locator('#btn-play-pause')).toBeFocused();
+  await expect(page.locator('.jump-popup button[data-delta="30"]')).toBeFocused();
 });
 
-test('ArrowLeft from skip-fwd focuses play-pause', async ({ page }) => {
+test('ArrowUp in jump popup moves focus one row', async ({ page }) => {
   await goToVideoScreen(page);
-  await page.locator('#btn-skip-fwd').focus();
-  await page.keyboard.press('ArrowLeft');
-  await expect(page.locator('#btn-play-pause')).toBeFocused();
-});
-
-test('ArrowDown from skip row focuses back button', async ({ page }) => {
-  await goToVideoScreen(page);
-  await page.locator('#btn-skip-back').focus();
-  await page.keyboard.press('ArrowDown');
-  await expect(page.locator('#btn-back-video')).toBeFocused();
-});
-
-test('ArrowUp from back button focuses play-pause button', async ({ page }) => {
-  await goToVideoScreen(page);
-  await page.locator('#btn-back-video').focus();
+  await page.locator('#btn-jump').click();
+  await expect(page.locator('.jump-popup button[data-delta="10"]')).toBeFocused();
   await page.keyboard.press('ArrowUp');
-  await expect(page.locator('#btn-play-pause')).toBeFocused();
+  await expect(page.locator('.jump-popup button[data-delta="-10"]')).toBeFocused();
+});
+
+test('Enter in jump popup selects focused option and closes', async ({ page }) => {
+  await goToVideoScreen(page);
+  await mockVideoTime(page, 600, 3600);
+  await page.locator('#btn-jump').click();
+  await expect(page.locator('.jump-popup button[data-delta="10"]')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.jump-popup')).toHaveCount(0);
+  const time = await page.evaluate(() => document.getElementById('video').currentTime);
+  expect(time).toBe(610);
+});
+
+test('d-pad Right quick-skips +10s without a popup', async ({ page }) => {
+  await goToVideoScreen(page);
+  await mockVideoTime(page, 600, 3600);
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.jump-popup')).toHaveCount(0);
+  const time = await page.evaluate(() => document.getElementById('video').currentTime);
+  expect(time).toBe(610);
+});
+
+test('d-pad Left quick-skips -10s without a popup', async ({ page }) => {
+  await goToVideoScreen(page);
+  await mockVideoTime(page, 600, 3600);
+  await page.keyboard.press('ArrowLeft');
+  const time = await page.evaluate(() => document.getElementById('video').currentTime);
+  expect(time).toBe(590);
+});
+
+test('ArrowDown cycles transport focus play-pause -> next', async ({ page }) => {
+  await goToSeriesEpisode(page);
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#btn-next')).toBeFocused();
+});
+
+test('ArrowUp cycles transport focus play-pause -> prev', async ({ page }) => {
+  await goToSeriesEpisode(page);
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('#btn-prev')).toBeFocused();
+});
+
+test('CC button shows for a video with subtitles', async ({ page }) => {
+  await goToVideoScreen(page);
+  await expect(page.locator('#btn-cc')).not.toHaveClass(/hidden/);
+});
+
+test('CC button hidden for a video without subtitles', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await page.locator('.film-tile[data-id="finding-nemo-main"]').click();
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-cc')).toHaveClass(/hidden/);
+});
+
+test('CC preference is sticky across videos', async ({ page }) => {
+  await goToVideoScreen(page);
+  await expect(page.locator('#btn-cc')).toHaveClass(/cc-off/);
+  await page.locator('#btn-cc').click();
+  await expect(page.locator('#btn-cc')).not.toHaveClass(/cc-off/);
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv:captions'))).toBe('on');
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-cc')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#btn-cc')).not.toHaveClass(/cc-off/);
+});
+
+test('standalone film at end returns to its origin', async ({ page }) => {
+  await goToVideoScreen(page);
+  await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
+  await expect(page.locator('#screen-browse')).toBeVisible();
+});
+
+test('series at 100% shows an Up next countdown', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
+  await expect(page.locator('#upnext-overlay')).toBeVisible();
+  await expect(page.locator('#upnext-text')).toContainText('The Weekend');
+});
+
+test('Up next countdown is cancellable and returns to detail', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
+  await expect(page.locator('#upnext-overlay')).toBeVisible();
+  await page.locator('#btn-upnext-cancel').click();
+  await expect(page).toHaveURL(/detail\.html/);
 });

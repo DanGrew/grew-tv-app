@@ -7,26 +7,40 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; background: #111; color: #fff; font-family: sans-serif; }
-body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
+body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 #conn-status { font-size: 13px; font-family: monospace; color: #555; text-align: center; height: 16px; flex-shrink: 0; }
-#ctx-label { font-size: 12px; color: #444; text-align: center; text-transform: uppercase; letter-spacing: 1px; flex-shrink: 0; min-height: 16px; }
-#ctx-title { font-size: 20px; color: #ccc; text-align: center; flex-shrink: 0; min-height: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#actions { flex: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-top: 4px; }
-.action-btn { width: 100%; padding: 22px 16px; border-radius: 12px; border: none; background: #2a2a2a; color: #fff; font-size: 22px; cursor: pointer; touch-action: manipulation; transition: background 0.1s, transform 0.08s; }
-.action-btn:active { background: #f0c040; color: #111; transform: scale(0.97); }
-.ctrl-row { display: flex; gap: 10px; }
-.ctrl-btn { flex: 1; padding: 22px 16px; border-radius: 12px; border: none; background: #2a2a2a; color: #fff; font-size: 22px; cursor: pointer; touch-action: manipulation; }
-.ctrl-btn:active { background: #f0c040; color: #111; }
-.ctrl-btn[aria-disabled="true"] { opacity: 0.3; pointer-events: none; }
-.video-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; }
-.video-title { font-size: 16px; color: #ccc; text-align: center; padding: 8px 0 4px; }
+#ctx-label { font-size: 12px; color: #444; text-align: center; text-transform: uppercase; letter-spacing: 1px; min-height: 16px; }
+#now-title { font-size: 22px; color: #fff; text-align: center; min-height: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.still { height: 150px; background: #000; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: #444; flex-shrink: 0; }
+.bar { height: 6px; background: #2a2a2a; border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: #f0c040; }
+.time { font-size: 13px; color: #888; text-align: right; font-variant-numeric: tabular-nums; }
+.transport { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.transport button { flex: 1; padding: 18px 8px; border-radius: 12px; border: none; background: #2a2a2a; color: #fff; font-size: 24px; cursor: pointer; touch-action: manipulation; }
+.transport button:active { background: #f0c040; color: #111; }
+.transport .cc { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
+.transport .cc.on { background: #f0c040; color: #111; }
+.jump { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.jump-btn { padding: 12px 4px; border-radius: 10px; border: none; background: #1f1f1f; color: #ccc; font-size: 13px; cursor: pointer; touch-action: manipulation; font-variant-numeric: tabular-nums; }
+.jump-btn:active { background: #f0c040; color: #111; }
+.bignext { background: #1f1f1f; border: 2px solid #2a2a2a; border-radius: 10px; padding: 12px; text-align: center; font-size: 14px; color: #888; min-height: 44px; }
 </style>
 </head>
 <body>
-<div id="conn-status">connecting\u2026</div>
+<div id="conn-status">connecting…</div>
 <div id="ctx-label"></div>
-<div id="ctx-title"></div>
-<div id="actions"></div>
+<div id="now-title"></div>
+<div class="still">▶</div>
+<div class="bar"><i id="bar-fill"></i></div>
+<div id="time" class="time"></div>
+<div class="transport">
+  <button id="c-prev" aria-label="Previous">⏮</button>
+  <button id="c-toggle" aria-label="Play/Pause">⏯</button>
+  <button id="c-next" aria-label="Next">⏭</button>
+  <button id="c-cc" class="cc" aria-label="Subtitles">CC</button>
+</div>
+<div class="jump" id="jump"></div>
+<div id="upnext" class="bignext"></div>
 <script type="module">
 import { initPage } from '../ui/screens/companion-video.js';
 initPage();
