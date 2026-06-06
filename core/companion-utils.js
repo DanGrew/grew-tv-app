@@ -26,6 +26,17 @@ export function displayLabel(payload) {
   return [payload.context_id].filter(Boolean).map(titleCase).concat([''])[0];
 }
 
+// Companion Home search (TASK-117): case-insensitive title substring match.
+// v1 is title-only by design (small library); tag/format search is parked.
+export function filterByTitle(cards, query) {
+  var q = (query || '').trim().toLowerCase();
+  return [q].filter(Boolean).map(function() {
+    return (cards || []).filter(function(c) {
+      return (c.title || '').toLowerCase().indexOf(q) > -1;
+    });
+  }).concat([cards || []])[0];
+}
+
 export function getContentBasePath(manifestCache) {
   return [manifestCache].filter(Boolean)
     .map(function(m) { return m.contentBase; })

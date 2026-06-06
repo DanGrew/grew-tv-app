@@ -39,6 +39,20 @@ export function resumeAfter(resumePositionSec, durationSec) {
   return Math.max(0, resumePositionSec || 0);
 }
 
+// Backend /api/continue-watching rows -> a progress map keyed by video id, so
+// the Home rails reuse the pure continueWatching()/tileModel() path off the
+// authoritative backend progress instead of localStorage.
+// rows: [{ item_id, position_secs, duration_secs, last_watched, ... }].
+export function progressMapFromCW(rows) {
+  return (rows || []).reduce(function(map, r) {
+    map[r.item_id] = {
+      resumePositionSec: r.position_secs || 0,
+      lastPlayed: r.last_watched || 0
+    };
+    return map;
+  }, {});
+}
+
 // videos: [{ id, durationSec, ... }]; progress: { id: { resumePositionSec, lastPlayed } }.
 // Returns the mid-watch videos, most-recently-played first.
 export function continueWatching(videos, progress) {

@@ -1,6 +1,6 @@
 import { fmt } from '../../core/time.js';
 import { EVENTS, SOURCES, createEvent } from '../../core/telemetry-schema.js';
-import { mediaUrl } from '../../core/app-api.js';
+import { mediaUrl, saveProgress } from '../../core/app-api.js';
 
 var SKIP_AMOUNTS   = [10, 30, 120, 300, 900, 1800];
 var SKIP_LABELS    = ['10s', '30s', '2m', '5m', '15m', '30m'];
@@ -40,6 +40,7 @@ export function setup(config) {
   var currentVideo         = null;
   var returnPage           = null;
   var lastSaveTime         = 0;
+  var lastBackendSave      = 0;
   var lastDroppedFrames    = 0;
   var pendingResumePosition = 0;
   var skipPopup            = null;
@@ -378,11 +379,17 @@ export function setup(config) {
         var key = 'grew-tv:position:' + rec.id;
         [key].filter(function() { return video.duration - video.currentTime < 30; }).forEach(function() { localStorage.removeItem(key); });
         [key].filter(function() { return video.duration - video.currentTime >= 30; }).filter(function() { return now - lastSaveTime > 5000; }).forEach(function() { lastSaveTime = now; localStorage.setItem(key, video.currentTime); });
+        // Dual-write to the backend (FEAT-017 source of truth) on its own throttle,
+        // ungated by the 30s rule above so true position drives Continue Watching.
+        [rec].filter(function() { return now - lastBackendSave > 5000; }).forEach(function() { lastBackendSave = now; saveProgress(server, rec.id, video.currentTime, video.duration).catch(function() {}); });
       });
     });
   });
 
-  video.addEventListener('ended', function() { onEnded(); });
+  video.addEventListener('ended', function() {
+    [currentVideo].filter(Boolean).forEach(function(rec) { saveProgress(server, rec.id, video.duration, video.duration).catch(function() {}); });
+    onEnded();
+  });
   video.addEventListener('play', function() {
     document.getElementById('btn-play-pause').textContent = '⏸';
     sendTelemetry(EVENTS.VIDEO_PLAY, SOURCES.TV, { meta: { perf: performance.now() } });

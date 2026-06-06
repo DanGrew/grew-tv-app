@@ -5,6 +5,7 @@ import {
   isMidWatch,
   resumeAfter,
   continueWatching,
+  progressMapFromCW,
   seriesProgressPercent,
   seriesIsMidWatch
 } from '../../core/progress.js';
@@ -70,6 +71,31 @@ describe('continueWatching', () => {
   });
   it('empty when no progress', () => expect(continueWatching(videos, {})).toEqual([]));
   it('tolerates null inputs', () => expect(continueWatching(null, null)).toEqual([]));
+});
+
+describe('progressMapFromCW', () => {
+  it('maps backend rows to a progress map', () => {
+    const rows = [
+      { item_id: 'a', position_secs: 120, duration_secs: 600, last_watched: '2026-06-05T00:00:00Z' },
+      { item_id: 'b', position_secs: 30, duration_secs: 600, last_watched: '2026-06-01T00:00:00Z' }
+    ];
+    expect(progressMapFromCW(rows)).toEqual({
+      a: { resumePositionSec: 120, lastPlayed: '2026-06-05T00:00:00Z' },
+      b: { resumePositionSec: 30, lastPlayed: '2026-06-01T00:00:00Z' }
+    });
+  });
+  it('defaults missing fields', () => {
+    expect(progressMapFromCW([{ item_id: 'x' }])).toEqual({ x: { resumePositionSec: 0, lastPlayed: 0 } });
+  });
+  it('tolerates null', () => expect(progressMapFromCW(null)).toEqual({}));
+  it('feeds continueWatching end-to-end', () => {
+    const videos = [{ id: 'a', durationSec: 600 }, { id: 'b', durationSec: 600 }];
+    const rows = [
+      { item_id: 'a', position_secs: 100, last_watched: 1000 },
+      { item_id: 'b', position_secs: 100, last_watched: 5000 }
+    ];
+    expect(continueWatching(videos, progressMapFromCW(rows)).map(v => v.id)).toEqual(['b', 'a']);
+  });
 });
 
 describe('series progress', () => {
