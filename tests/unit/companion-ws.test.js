@@ -97,6 +97,56 @@ describe('connect', () => {
     expect(MockWS.instances[0].sent[before].payload.intent).toBe('pause');
   });
 
+  it('calls onAppState for app_state message', () => {
+    var received = [];
+    connect('ws://host:8766', () => {}, () => {}, function(p) { received.push(p); });
+    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'app_state', payload: { itemId: 'ollie-car', positionSec: 5, playing: true } }) });
+    expect(received).toHaveLength(1);
+    expect(received[0].itemId).toBe('ollie-car');
+  });
+
+  it('appState() returns the last snapshot payload', () => {
+    var api = connect('ws://host:8766', () => {}, () => {});
+    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'app_state', payload: { itemId: 'film-3', playing: false } }) });
+    expect(api.appState().itemId).toBe('film-3');
+  });
+
+  it('position() interpolates while playing using local clock', () => {
+    var t = 1000;
+    vi.setSystemTime(t);
+    var api = connect('ws://host:8766', () => {}, () => {});
+    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'app_state', payload: { positionSec: 30, durationSec: 600, playing: true } }) });
+    vi.setSystemTime(t + 10000);   // +10s local
+    expect(api.position()).toBe(40);
+  });
+
+  it('position() holds steady when paused', () => {
+    var api = connect('ws://host:8766', () => {}, () => {});
+    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'app_state', payload: { positionSec: 30, playing: false } }) });
+    vi.advanceTimersByTime(10000);
+    expect(api.position()).toBe(30);
+  });
+
+  it('new intent senders emit correct intents', () => {
+    var api = connect('ws://host:8766', () => {}, () => {});
+    MockWS.instances[0].onopen();
+    var ws = MockWS.instances[0];
+    api.play('film-1');
+    expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('play');
+    expect(ws.sent[ws.sent.length - 1].payload.params.id).toBe('film-1');
+    api.skip(-30);
+    expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('skip');
+    expect(ws.sent[ws.sent.length - 1].payload.params.deltaSec).toBe(-30);
+    api.next();
+    expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('next');
+    api.prev();
+    expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('prev');
+    api.setProfile('kids');
+    expect(ws.sent[ws.sent.length - 1].payload.params.profile).toBe('kids');
+    api.toggleCaptions();
+    expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('toggleCaptions');
+  });
+
   it('sendIntent passes params', () => {
     var api = connect('ws://host:8766', () => {}, () => {});
     MockWS.instances[0].onopen();
