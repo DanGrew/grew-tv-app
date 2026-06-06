@@ -12,6 +12,23 @@ export function loadBrowse(serverUrl, profile) {
   return getJson(serverUrl + '/api/browse?profile=' + encodeURIComponent(profile));
 }
 
+// Mid-watch videos for a profile, newest first (FEAT-017). Backs the Home
+// Continue Watching rail and the companion shortcut. Backend is the source of
+// truth for progress, so this — not localStorage — drives cross-device CW.
+export function loadContinueWatching(serverUrl, profile) {
+  return getJson(serverUrl + '/api/continue-watching?profile=' + encodeURIComponent(profile));
+}
+
+// Persist a resume position to the backend. Dual-written alongside localStorage
+// during the FEAT-017 transition (TASK-118/119 retire the localStorage copy).
+export function saveProgress(serverUrl, id, positionSec, durationSec) {
+  return fetch(serverUrl + '/api/progress/' + encodeURIComponent(id), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ position_secs: positionSec, duration_secs: durationSec })
+  });
+}
+
 export function loadVideo(serverUrl, id) {
   return getJson(serverUrl + '/api/video/' + encodeURIComponent(id));
 }

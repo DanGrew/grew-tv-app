@@ -3,9 +3,9 @@ const { installApi } = require('./fixtures/api.js');
 
 const BROWSE_URL = 'http://localhost:8765/api/browse**';
 
-// kids browse: [0] Toy Story (video), [1] Finding Nemo (video), [2] Bluey (series).
-const SERIES_TILE = 2;
-const VIDEO_TILE = 0;
+// Home rails (TASK-117): tiles are addressed by data-id, not grid position.
+const SERIES_TILE = '.film-tile[data-id="bluey"]';
+const VIDEO_TILE = '.film-tile[data-id="toy-story-main"]';
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function openDetail(page) {
-  await page.locator('.film-tile').nth(SERIES_TILE).click();
+  await page.locator(SERIES_TILE).click();
   await expect(page.locator('#screen-detail')).toBeVisible();
   await expect(page.locator('.detail-row').first()).toBeVisible();
 }
@@ -83,7 +83,7 @@ test('back button from detail returns to browse', async ({ page }) => {
 });
 
 test('browse source tile is re-focused on back from detail', async ({ page }) => {
-  const seriesTile = page.locator('.film-tile').nth(SERIES_TILE);
+  const seriesTile = page.locator(SERIES_TILE);
   await seriesTile.focus();
   await seriesTile.click();
   await expect(page.locator('#screen-detail')).toBeVisible();
@@ -136,7 +136,7 @@ test('Escape on browse does not crash or navigate away', async ({ page }) => {
 });
 
 test('video onEnter focuses play-pause button', async ({ page }) => {
-  await page.locator('.film-tile').nth(VIDEO_TILE).click();
+  await page.locator(VIDEO_TILE).click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
 });

@@ -1,8 +1,10 @@
 import { getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
-import { browseArrow, buildGrid } from './screen-browse.js';
+import { railArrow, renderRails } from './screen-browse.js';
+import { buildRails } from '../../core/home-rails.js';
+import { progressMapFromCW } from '../../core/progress.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, scanDevices } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, scanDevices } from '../../core/app-api.js';
 
 var SERVER = 'http://localhost:8765';
 var LAST_TILE_KEY = 'grew-tv:last-tile';
@@ -27,7 +29,7 @@ export function initBrowsePage() {
 
   function hideSettings() {
     document.getElementById('screen-settings').classList.remove('active');
-    [document.querySelector('.film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
+    [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
   }
 
   document.getElementById('btn-settings').addEventListener('click', showSettings);
@@ -36,17 +38,19 @@ export function initBrowsePage() {
   document.addEventListener('keydown', dispatchKey);
 
   initPage({
-    onEnter: function() { [document.querySelector('.film-tile')].filter(Boolean).forEach(function(t) { t.focus(); }); },
-    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow },
+    onEnter: function() { [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); }); },
+    keys: { ArrowLeft: railArrow, ArrowRight: railArrow, ArrowUp: railArrow, ArrowDown: railArrow },
     remote: {}
   });
 
+  var profile = [getProfile()].filter(Boolean).concat(['kids'])[0];
+
   var wsApp = connectApp('ws://localhost:8766', function(intent, params) {
     var INTENTS = {
-      navigate_up:    function() { browseArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
-      navigate_down:  function() { browseArrow({ key: 'ArrowDown',  preventDefault: function() {} }); },
-      navigate_left:  function() { browseArrow({ key: 'ArrowLeft',  preventDefault: function() {} }); },
-      navigate_right: function() { browseArrow({ key: 'ArrowRight', preventDefault: function() {} }); },
+      navigate_up:    function() { railArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
+      navigate_down:  function() { railArrow({ key: 'ArrowDown',  preventDefault: function() {} }); },
+      navigate_left:  function() { railArrow({ key: 'ArrowLeft',  preventDefault: function() {} }); },
+      navigate_right: function() { railArrow({ key: 'ArrowRight', preventDefault: function() {} }); },
       select:         function() {
         var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
         var target = [id].filter(Boolean).map(function(i) { return document.querySelector('.film-tile[data-id="' + i + '"]'); }).filter(Boolean)[0];
@@ -57,8 +61,8 @@ export function initBrowsePage() {
     [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
   });
   wsApp.sendContext({ context_id: 'browse' });
-
-  var profile = [getProfile()].filter(Boolean).concat(['kids'])[0];
+  // Tell the companion the app is on Home (drives its catalog context + profile).
+  wsApp.sendAppState({ screen: 'home', profile: profile });
 
   // A video card plays directly; a series card opens its detail screen.
   var SELECT = {
@@ -66,12 +70,20 @@ export function initBrowsePage() {
     series: function(card) { navTo('detail.html', { series: card.id }); }
   };
 
-  loadBrowse(SERVER, profile)
-    .then(function(browse) {
-      buildGrid(SERVER, browse.content, profile, function(card) {
-        sessionStorage.setItem(LAST_TILE_KEY, card.id);
-        SELECT[card.kind](card);
-      });
+  function onSelect(card) {
+    sessionStorage.setItem(LAST_TILE_KEY, card.id);
+    SELECT[card.kind](card);
+  }
+
+  Promise.all([
+    loadBrowse(SERVER, profile),
+    loadContinueWatching(SERVER, profile).catch(function() { return { content: [] }; })
+  ])
+    .then(function(res) {
+      var browse = res[0];
+      var progress = progressMapFromCW(res[1].content);
+      var rails = buildRails(browse.content, progress);
+      renderRails(SERVER, rails, progress, profile, onSelect);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
     })
     .catch(function() { navTo('error.html'); });

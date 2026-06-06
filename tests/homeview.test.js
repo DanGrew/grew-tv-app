@@ -13,18 +13,37 @@ test('profile screen shown on load, Kids button focused', async ({ page }) => {
   await expect(page.locator('#btn-kids')).toBeFocused();
 });
 
-test('click Kids loads browse grid with kids cards', async ({ page }) => {
+test('click Kids loads home rails (Series then Films) with kids cards', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
+  // No mid-watch progress -> Continue Watching omitted; leads with Series.
+  await expect(page.locator('.rail-title')).toHaveText(['Series', 'Films']);
   await expect(page.locator('.film-tile')).toHaveCount(3);
-  await expect(page.locator('.tile-title').first()).toContainText('Toy Story');
+  await expect(page.locator('.film-tile[data-id="toy-story-main"] .tile-title')).toContainText('Toy Story');
+  await expect(page.locator('.rail-row[data-rail="series"] .film-tile')).toHaveCount(1);
+  await expect(page.locator('.rail-row[data-rail="films"] .film-tile')).toHaveCount(2);
 });
 
-test('click Adults loads browse grid with adults cards', async ({ page }) => {
+test('Continue Watching rail leads when a video is mid-watch', async ({ page }) => {
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: [
+      { item_id: 'finding-nemo-main', position_secs: 1200, duration_secs: 6000, last_watched: '2026-06-05T00:00:00Z' }
+    ] })
+  }));
+  await page.locator('#btn-kids').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  await expect(page.locator('.rail-title')).toHaveText(['Continue Watching', 'Series', 'Films']);
+  await expect(page.locator('.rail-row[data-rail="continue"] .film-tile')).toHaveCount(1);
+  await expect(page.locator('.rail-row[data-rail="continue"] .film-tile[data-id="finding-nemo-main"] .tile-progress-fill')).toBeVisible();
+});
+
+test('click Adults loads home rails with adults cards', async ({ page }) => {
   await page.locator('#btn-adults').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
+  await expect(page.locator('.rail-title')).toHaveText(['Films']);
   await expect(page.locator('.film-tile')).toHaveCount(1);
-  await expect(page.locator('.tile-title').first()).toContainText('The Dark Knight');
+  await expect(page.locator('.film-tile[data-id="dark-knight-main"] .tile-title')).toContainText('The Dark Knight');
 });
 
 test('Kids profile request is scoped server-side (no adults content)', async ({ page }) => {
@@ -51,14 +70,14 @@ test('retry button on error returns to profile select', async ({ page }) => {
 
 test('select standalone video plays directly with src set', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile').first().click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#video')).toHaveAttribute('src', /\/media\/toy-story-main\.mp4/);
 });
 
 test('back button returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile').first().click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.locator('#btn-back-video').click();
@@ -67,7 +86,7 @@ test('back button returns to browse screen', async ({ page }) => {
 
 test('Escape key returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile').first().click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.locator('#btn-back-video').focus();
@@ -77,34 +96,42 @@ test('Escape key returns to browse screen', async ({ page }) => {
 
 test('focus returns to source tile after back', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile').first().click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.locator('#btn-back-video').click();
-  await expect(page.locator('.film-tile').first()).toBeFocused();
+  await expect(page.locator('.film-tile[data-id="toy-story-main"]')).toBeFocused();
 });
 
 test('Enter on focused video tile opens video screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile').first().focus();
+  await page.locator('.film-tile[data-id="toy-story-main"]').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#screen-video')).toBeVisible();
 });
 
-test('arrow keys navigate between tiles', async ({ page }) => {
+test('arrow keys scroll within a rail', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
-  const firstTile = page.locator('.film-tile').nth(0);
-  const secondTile = page.locator('.film-tile').nth(1);
-  await firstTile.focus();
-  await expect(firstTile).toBeFocused();
+  const firstFilm = page.locator('.rail-row[data-rail="films"] .film-tile').nth(0);
+  const secondFilm = page.locator('.rail-row[data-rail="films"] .film-tile').nth(1);
+  await firstFilm.focus();
+  await expect(firstFilm).toBeFocused();
   await page.keyboard.press('ArrowRight');
-  await expect(secondTile).toBeFocused();
+  await expect(secondFilm).toBeFocused();
+});
+
+test('arrow down moves from Series rail to Films rail', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  await page.locator('.rail-row[data-rail="series"] .film-tile[data-id="bluey"]').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.rail-row[data-rail="films"] .film-tile').first()).toBeFocused();
 });
 
 async function goToVideoScreen(page) {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile').first().click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
 }

@@ -39,6 +39,13 @@ const BROWSE = {
   }
 };
 
+// Continue-watching is empty by default; tests that exercise the CW rail
+// override the route with their own payload.
+const CONTINUE = {
+  kids:   { profile: 'kids',   content: [] },
+  adults: { profile: 'adults', content: [] }
+};
+
 function nextOf(seriesId, videoId) {
   var s = SERIES[seriesId];
   if (!s) return null;
@@ -59,6 +66,10 @@ async function installApi(page) {
     var profile = new URL(route.request().url()).searchParams.get('profile');
     return json(route, 200, BROWSE[profile] || { profile: profile, content: [] });
   });
+  await page.route('**/api/continue-watching**', function(route) {
+    var profile = new URL(route.request().url()).searchParams.get('profile');
+    return json(route, 200, CONTINUE[profile] || { profile: profile, content: [] });
+  });
   await page.route('**/api/video/*', function(route) {
     var v = VIDEOS[lastSegment(route.request().url(), '/api/video/')];
     return v ? json(route, 200, v) : json(route, 404, { error: 'not found' });
@@ -76,4 +87,4 @@ async function installApi(page) {
   });
 }
 
-module.exports = { VIDEOS, SERIES, BROWSE, nextOf, installApi };
+module.exports = { VIDEOS, SERIES, BROWSE, CONTINUE, nextOf, installApi };
