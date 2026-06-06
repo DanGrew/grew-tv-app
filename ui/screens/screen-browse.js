@@ -1,7 +1,7 @@
 import { registerScreen } from '../../core/screen-registry.js';
+import { mediaUrl } from '../../core/app-api.js';
 
 var ARROW_DELTA   = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
-var FILM_FILTER   = { kids: function(f) { return f.profile === 'kids'; }, adults: function() { return true; } };
 var PROFILE_LABEL = { kids: 'Kids', adults: 'Adults' };
 var PLAY_KEYS     = { Enter: true, ' ': true };
 
@@ -13,27 +13,32 @@ export function browseArrow(e) {
   [tiles[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).forEach(function(t) { t.focus(); });
 }
 
-export function buildGrid(allFilms, contentBase, profile, onSelect) {
+// cards: v3 browse entries {kind:'video'|'series', id, title, poster, ...}.
+// Already profile-scoped + availability-filtered by the backend, so the grid
+// renders them as-is. onSelect(card) — the page routes by card.kind.
+export function buildGrid(server, cards, profile, onSelect) {
   var grid = document.getElementById('grid');
   grid.innerHTML = '';
   document.getElementById('profile-label').textContent = PROFILE_LABEL[profile];
-  var filtered = allFilms.filter(FILM_FILTER[profile]).filter(function(f) { return f.available !== false; });
-  [grid].filter(function() { return filtered.length === 0; }).forEach(function(g) {
+  [grid].filter(function() { return cards.length === 0; }).forEach(function(g) {
     g.innerHTML = '<div style="font-size:32px;color:#666;grid-column:1/-1;text-align:center;padding:80px 0">No films available</div>';
   });
-  filtered.forEach(function(film, i) {
+  cards.forEach(function(card, i) {
     var tile = document.createElement('div');
     tile.className = 'film-tile';
     tile.tabIndex = 0;
     tile.setAttribute('data-index', i);
-    tile.setAttribute('data-id', film.id);
-    tile.innerHTML =
-      '<div class="tile-title">' + film.title + '</div>' +
-      '<img class="film-poster" src="' + contentBase + film.poster + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
-      '<div class="film-poster-placeholder" style="display:none">\uD83C\uDFAC</div>';
-    tile.addEventListener('click', function() { onSelect(film); });
+    tile.setAttribute('data-id', card.id);
+    tile.setAttribute('data-kind', card.kind);
+    var poster = mediaUrl(server, card.poster);
+    var posterHtml = [poster].filter(Boolean).map(function(src) {
+      return '<img class="film-poster" src="' + src + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+        '<div class="film-poster-placeholder" style="display:none">🎬</div>';
+    }).concat(['<div class="film-poster-placeholder" style="display:flex">🎬</div>'])[0];
+    tile.innerHTML = '<div class="tile-title">' + card.title + '</div>' + posterHtml;
+    tile.addEventListener('click', function() { onSelect(card); });
     tile.addEventListener('keydown', function(e) {
-      [film].filter(function() { return PLAY_KEYS[e.key]; }).forEach(function(f) { e.preventDefault(); onSelect(f); });
+      [card].filter(function() { return PLAY_KEYS[e.key]; }).forEach(function(c) { e.preventDefault(); onSelect(c); });
     });
     grid.appendChild(tile);
   });

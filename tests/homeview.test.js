@@ -1,22 +1,10 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
+const { installApi } = require('./fixtures/api.js');
 
-const MANIFEST_URL = 'http://localhost:8765/manifest.json';
-const FIXTURE = require('./fixtures/manifest.js');
-
-async function interceptManifest(page, fixture) {
-  await page.route(MANIFEST_URL, route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(fixture.manifest)
-  }));
-}
-
-async function interceptManifestError(page) {
-  await page.route(MANIFEST_URL, route => route.fulfill({ status: 500 }));
-}
+const BROWSE_URL = 'http://localhost:8765/api/browse**';
 
 test.beforeEach(async ({ page }) => {
+  await installApi(page);
   await page.goto('/app/homeview/profile.html');
 });
 
@@ -25,63 +13,50 @@ test('profile screen shown on load, Kids button focused', async ({ page }) => {
   await expect(page.locator('#btn-kids')).toBeFocused();
 });
 
-test('click Kids loads browse grid with kids films', async ({ page }) => {
-  await interceptManifest(page, FIXTURE);
+test('click Kids loads browse grid with kids cards', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
-  await expect(page.locator('.film-tile')).toHaveCount(2);
+  await expect(page.locator('.film-tile')).toHaveCount(3);
   await expect(page.locator('.tile-title').first()).toContainText('Toy Story');
 });
 
-test('click Adults loads browse grid with all films', async ({ page }) => {
-  await interceptManifest(page, FIXTURE);
+test('click Adults loads browse grid with adults cards', async ({ page }) => {
   await page.locator('#btn-adults').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
-  await expect(page.locator('.film-tile')).toHaveCount(3);
+  await expect(page.locator('.film-tile')).toHaveCount(1);
+  await expect(page.locator('.tile-title').first()).toContainText('The Dark Knight');
 });
 
-test('Kids profile does not show adults-only films', async ({ page }) => {
-  await interceptManifest(page, FIXTURE);
+test('Kids profile request is scoped server-side (no adults content)', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
   const titles = await page.locator('.tile-title').allTextContents();
   expect(titles).not.toContain('The Dark Knight');
 });
 
-test('Adults profile shows all films', async ({ page }) => {
-  await interceptManifest(page, FIXTURE);
-  await page.locator('#btn-adults').click();
-  await expect(page.locator('#screen-browse')).toBeVisible();
-  await expect(page.locator('.film-tile')).toHaveCount(3);
-  const titles = await page.locator('.tile-title').allTextContents();
-  expect(titles).toContain('The Dark Knight');
-});
-
-test('manifest 500 shows error screen', async ({ page }) => {
-  await interceptManifestError(page);
+test('browse 500 shows error screen', async ({ page }) => {
+  await page.route(BROWSE_URL, route => route.fulfill({ status: 500 }));
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-error')).toBeVisible();
   await expect(page.locator('#screen-browse')).not.toBeVisible();
 });
 
 test('retry button on error returns to profile select', async ({ page }) => {
-  await interceptManifestError(page);
+  await page.route(BROWSE_URL, route => route.fulfill({ status: 500 }));
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-error')).toBeVisible();
   await page.locator('#btn-retry').click();
   await expect(page.locator('#screen-profile')).toBeVisible();
 });
 
-test('select film shows video screen with src set', async ({ page }) => {
-  await interceptManifest(page, FIXTURE);
+test('select standalone video plays directly with src set', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
-  await expect(page.locator('#video')).toHaveAttribute('src', /toy-story/);
+  await expect(page.locator('#video')).toHaveAttribute('src', /\/media\/toy-story-main\.mp4/);
 });
 
 test('back button returns to browse screen', async ({ page }) => {
-  await interceptManifest(page, FIXTURE);
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
@@ -91,7 +66,6 @@ test('back button returns to browse screen', async ({ page }) => {
 });
 
 test('Escape key returns to browse screen', async ({ page }) => {
-  await interceptManifest(page, FIXTURE);
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
@@ -101,8 +75,7 @@ test('Escape key returns to browse screen', async ({ page }) => {
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
 
-test('focus returns to first grid tile after back', async ({ page }) => {
-  await interceptManifest(page, FIXTURE);
+test('focus returns to source tile after back', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
@@ -111,16 +84,14 @@ test('focus returns to first grid tile after back', async ({ page }) => {
   await expect(page.locator('.film-tile').first()).toBeFocused();
 });
 
-test('Enter on focused tile opens video screen', async ({ page }) => {
-  await interceptManifest(page, FIXTURE);
+test('Enter on focused video tile opens video screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#screen-video')).toBeVisible();
 });
 
-test('arrow keys navigate between film tiles', async ({ page }) => {
-  await interceptManifest(page, FIXTURE);
+test('arrow keys navigate between tiles', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
   const firstTile = page.locator('.film-tile').nth(0);
@@ -132,7 +103,6 @@ test('arrow keys navigate between film tiles', async ({ page }) => {
 });
 
 async function goToVideoScreen(page) {
-  await interceptManifest(page, FIXTURE);
   await page.locator('#btn-kids').click();
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();

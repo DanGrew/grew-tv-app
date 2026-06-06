@@ -1,5 +1,6 @@
 import { fmt } from '../../core/time.js';
 import { EVENTS, SOURCES, createEvent } from '../../core/telemetry-schema.js';
+import { mediaUrl } from '../../core/app-api.js';
 
 var SKIP_AMOUNTS   = [10, 30, 120, 300, 900, 1800];
 var SKIP_LABELS    = ['10s', '30s', '2m', '5m', '15m', '30m'];
@@ -7,8 +8,8 @@ var SKIP_BTN_ID    = { back: 'btn-skip-back', fwd: 'btn-skip-fwd' };
 var SKIP_IDS       = { 'btn-skip-back': true, 'btn-skip-fwd': true };
 var SKIP_DIRECTION = { 'btn-skip-back': 'back', 'btn-skip-fwd': 'fwd' };
 var SKIP_TEXT_FN   = {
-  back: function(lbl) { return '\u00ab ' + lbl; },
-  fwd:  function(lbl) { return lbl + ' \u00bb'; }
+  back: function(lbl) { return '« ' + lbl; },
+  fwd:  function(lbl) { return lbl + ' »'; }
 };
 var SKIP_DELTA_FN  = {
   back: function(amt) { return -amt; },
@@ -25,19 +26,18 @@ var VIDEO_REMOTE_DOWN     = { 'btn-skip-back': 'btn-back-video', 'btn-play-pause
 var VIDEO_REMOTE_UP       = { 'btn-back-video': 'btn-play-pause' };
 
 export function setup(config) {
-  var video       = config.video;
-  var contentBase = config.contentBase;
-  var onStop      = config.onStop;
-  var onNext      = [config.onNext  ].filter(Boolean).concat([function() {}])[0];
-  var onPrev      = [config.onPrev  ].filter(Boolean).concat([function() {}])[0];
-  var onIntent    = [config.onIntent].filter(Boolean).concat([function() {}])[0];
+  var video    = config.video;
+  var server   = config.server;
+  var onStop   = config.onStop;
+  var onEnded  = [config.onEnded ].filter(Boolean).concat([function() { stopPlayback(); }])[0];
+  var onNext   = [config.onNext  ].filter(Boolean).concat([function() {}])[0];
+  var onPrev   = [config.onPrev  ].filter(Boolean).concat([function() {}])[0];
+  var onIntent = [config.onIntent].filter(Boolean).concat([function() {}])[0];
 
   var wakeLock             = null;
   var controlsTimer        = null;
   var currentBlobUrl       = null;
-  var currentFilm          = null;
-  var currentItem          = null;
-  var currentItemIndex     = -1;
+  var currentVideo         = null;
   var returnPage           = null;
   var lastSaveTime         = 0;
   var lastDroppedFrames    = 0;
@@ -189,7 +189,7 @@ export function setup(config) {
     ArrowUp: function() { document.getElementById('btn-play-pause').focus(); }
   };
 
-  // Subtitle toggle (FEAT-013) — only reachable/visible when the current item
+  // Subtitle toggle (FEAT-013) — only reachable/visible when the current video
   // carries a subtitles track; absent ⇒ btn-cc stays hidden and nav is unchanged.
   var CC_NAV = {
     ArrowLeft: function() { document.getElementById('btn-skip-fwd').focus(); },
@@ -265,9 +265,7 @@ export function setup(config) {
     onIntent('stop');
     releaseWakeLock();
     var rp = returnPage;
-    currentItem = null;
-    currentFilm = null;
-    currentItemIndex = -1;
+    currentVideo = null;
     returnPage = null;
     onStop(rp);
   }
@@ -280,8 +278,7 @@ export function setup(config) {
 
   function doRestart() {
     pendingResumePosition = 0;
-    var key = 'grew-tv:position:' + currentFilm.id + ':' + currentItem.id;
-    localStorage.removeItem(key);
+    localStorage.removeItem('grew-tv:position:' + currentVideo.id);
     startPlayback(0);
   }
 
@@ -290,20 +287,20 @@ export function setup(config) {
     return !!b && !b.classList.contains('hidden');
   }
 
-  // Build the native subtitle <track> for the current item (FEAT-013). One
+  // Build the native subtitle <track> for the current video (FEAT-013). One
   // English track per video; absent subtitles ⇒ no track and the CC toggle
   // stays hidden, leaving playback chrome unchanged.
-  function setSubtitleTrack(playItem) {
+  function setSubtitleTrack(record) {
     Array.prototype.slice.call(video.querySelectorAll('track'))
       .forEach(function(t) { video.removeChild(t); });
     var cc = document.getElementById('btn-cc');
     cc.classList.add('hidden');
-    [playItem.subtitles].filter(Boolean).forEach(function(file) {
+    [record.subtitles].filter(Boolean).forEach(function(file) {
       var track = document.createElement('track');
       track.kind = 'subtitles';
       track.srclang = 'en';
       track.label = 'English';
-      track.src = contentBase + file;
+      track.src = mediaUrl(server, file);
       track['default'] = true;
       video.appendChild(track);
       cc.classList.remove('hidden');
@@ -321,23 +318,21 @@ export function setup(config) {
     });
   }
 
-  function playFilm(film, item, from) {
-    var playItem = [item].filter(Boolean).concat(film.items)[0];
-    var playFrom = [from].filter(Boolean).concat(['browse.html'])[0];
+  // record: a full /api/video record (the watchable leaf). A video is the unit
+  // of playback in v3 — there is no item list; series auto-advance is driven by
+  // the page via /api/next.
+  function playVideo(record, from) {
+    var playFrom = [from].filter(Boolean).concat(['browse'])[0];
     [currentBlobUrl].filter(Boolean).forEach(function() { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; });
-    currentFilm       = film;
-    currentItem       = playItem;
-    currentItemIndex  = film.items.indexOf(playItem);
-    returnPage        = playFrom;
-    _currentDisplay   = { id: playItem.id, title: [playItem.label, film.title].filter(Boolean)[0] };
-    video.src         = contentBase + playItem.id + '.mp4';
-    setSubtitleTrack(playItem);
-    var labelSuffix   = [playItem.label, playItem.title].filter(Boolean).map(function(l) { return ' \u2014 ' + l; }).concat([''])[0];
-    document.getElementById('film-title-video').textContent = film.title + labelSuffix;
-    onIntent('play', { title: film.title + labelSuffix });
-    var resumeKey = 'grew-tv:position:' + film.id + ':' + playItem.id;
-    var saved     = localStorage.getItem(resumeKey);
-    var t         = [saved].filter(Boolean).map(parseFloat)[0];
+    currentVideo    = record;
+    returnPage      = playFrom;
+    _currentDisplay = { id: record.id, title: record.title };
+    video.src       = mediaUrl(server, record.id + '.mp4');
+    setSubtitleTrack(record);
+    document.getElementById('film-title-video').textContent = record.title;
+    onIntent('play', { title: record.title });
+    var saved = localStorage.getItem('grew-tv:position:' + record.id);
+    var t     = [saved].filter(Boolean).map(parseFloat)[0];
     [t].filter(function(x) { return x > 5; }).forEach(function(x) {
       pendingResumePosition = x;
       document.getElementById('resume-time').textContent = fmt(x);
@@ -359,8 +354,8 @@ export function setup(config) {
   remote.play     = function() { video.play().catch(function() {}); showControls(); };
   remote.pause    = function() { video.pause(); showControls(); };
   remote.toggle   = function() { VIDEO_TOGGLE[video.paused](); showControls(); };
-  remote.next     = function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex + 1]].filter(Boolean).forEach(function() { onNext(); }); }); };
-  remote.prev     = function() { [currentFilm].filter(Boolean).forEach(function(f) { [f.items[currentItemIndex - 1]].filter(Boolean).forEach(function() { onPrev(); }); }); };
+  remote.next     = function() { onNext(); };
+  remote.prev     = function() { onPrev(); };
   remote.vol_up   = function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); };
   remote.vol_down = function() { video.volume = Math.max(0, video.volume - 0.1); showControls(); };
   remote.skip_back = function() { openSkipPopup('back'); };
@@ -377,24 +372,24 @@ export function setup(config) {
 
   video.addEventListener('timeupdate', function() {
     [video.duration].filter(Boolean).forEach(updateProgress);
-    [currentFilm].filter(Boolean).forEach(function(film) {
+    [currentVideo].filter(Boolean).forEach(function(rec) {
       var now = Date.now();
-      [currentItem].filter(Boolean).filter(function() { return video.currentTime > 0; }).filter(function() { return !isNaN(video.duration); }).forEach(function() {
-        var key = 'grew-tv:position:' + film.id + ':' + currentItem.id;
+      [rec].filter(function() { return video.currentTime > 0; }).filter(function() { return !isNaN(video.duration); }).forEach(function() {
+        var key = 'grew-tv:position:' + rec.id;
         [key].filter(function() { return video.duration - video.currentTime < 30; }).forEach(function() { localStorage.removeItem(key); });
         [key].filter(function() { return video.duration - video.currentTime >= 30; }).filter(function() { return now - lastSaveTime > 5000; }).forEach(function() { lastSaveTime = now; localStorage.setItem(key, video.currentTime); });
       });
     });
   });
 
-  video.addEventListener('ended', stopPlayback);
+  video.addEventListener('ended', function() { onEnded(); });
   video.addEventListener('play', function() {
-    document.getElementById('btn-play-pause').textContent = '\u23f8';
+    document.getElementById('btn-play-pause').textContent = '⏸';
     sendTelemetry(EVENTS.VIDEO_PLAY, SOURCES.TV, { meta: { perf: performance.now() } });
     sampleFrameDrops();
   });
   video.addEventListener('pause', function() {
-    document.getElementById('btn-play-pause').textContent = '\u25b6';
+    document.getElementById('btn-play-pause').textContent = '▶';
     sendTelemetry(EVENTS.VIDEO_PAUSE, SOURCES.TV, { meta: { perf: performance.now() } });
   });
   video.addEventListener('waiting', function() {
@@ -417,7 +412,5 @@ export function setup(config) {
   document.getElementById('btn-cc').addEventListener('click', toggleSubtitles);
   document.getElementById('screen-video').addEventListener('click', showControls);
 
-  function updateContentBase(base) { contentBase = base; }
-
-  return { playFilm, doResume, doRestart, handleVideoKey, openSkipPopup, showControls, currentVideoDisplay, updateContentBase, remote };
+  return { playVideo, doResume, doRestart, handleVideoKey, openSkipPopup, showControls, currentVideoDisplay, stop: stopPlayback, remote };
 }

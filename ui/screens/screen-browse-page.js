@@ -2,7 +2,7 @@ import { getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, buildGrid } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadManifest, scanDevices } from '../../core/app-manifest.js';
+import { loadBrowse, scanDevices } from '../../core/app-api.js';
 
 var SERVER = 'http://localhost:8765';
 var LAST_TILE_KEY = 'grew-tv:last-tile';
@@ -13,9 +13,9 @@ export function initBrowsePage() {
     document.getElementById('btn-back-settings').focus();
     var status = document.getElementById('settings-device-status');
     var btn = document.getElementById('btn-refresh');
-    status.textContent = 'Scanning\u2026';
+    status.textContent = 'Scanning…';
     btn.disabled = true;
-    btn.textContent = 'Scanning\u2026';
+    btn.textContent = 'Scanning…';
     scanDevices(SERVER)
       .then(function(d) {
         var devices = [d.devices].filter(Array.isArray).concat([[]])[0];
@@ -58,16 +58,19 @@ export function initBrowsePage() {
   });
   wsApp.sendContext({ context_id: 'browse' });
 
-  loadManifest(SERVER)
-    .then(function(manifest) {
-      var profile = [getProfile()].filter(Boolean).concat(['kids'])[0];
-      buildGrid(manifest.content, manifest.contentBase, profile, function(film) {
-        sessionStorage.setItem(LAST_TILE_KEY, film.id);
-        var TILE_NAV = {
-          'true':  function() { navTo('video.html', { film: film.id, item: 0, from: 'browse' }); },
-          'false': function() { navTo('detail.html', { film: film.id }); }
-        };
-        TILE_NAV[film.items.length === 1]();
+  var profile = [getProfile()].filter(Boolean).concat(['kids'])[0];
+
+  // A video card plays directly; a series card opens its detail screen.
+  var SELECT = {
+    video:  function(card) { navTo('video.html', { video: card.id, from: 'browse' }); },
+    series: function(card) { navTo('detail.html', { series: card.id }); }
+  };
+
+  loadBrowse(SERVER, profile)
+    .then(function(browse) {
+      buildGrid(SERVER, browse.content, profile, function(card) {
+        sessionStorage.setItem(LAST_TILE_KEY, card.id);
+        SELECT[card.kind](card);
       });
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
     })

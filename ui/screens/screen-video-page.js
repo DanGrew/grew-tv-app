@@ -2,7 +2,7 @@ import { getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadManifest } from '../../core/app-manifest.js';
+import { loadVideo, loadNext } from '../../core/app-api.js';
 
 var SERVER = 'http://localhost:8765';
 var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
@@ -12,39 +12,39 @@ var SKIP_ACTIONS = [
 ];
 
 export function initVideoPage() {
-  var filmId = getParam('film');
-  var from   = [getParam('from')].filter(Boolean).concat(['browse'])[0];
-  var filmData = null;
+  var videoId  = getParam('video');
+  var seriesId = getParam('series');
+  var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var wsApp = null;
   var player;
 
+  // End-of-video / next: within a series, advance to /api/next; otherwise (a
+  // standalone video, or the end of the series) leave playback.
+  function advance() {
+    [seriesId].filter(Boolean).forEach(function() {
+      loadNext(SERVER, seriesId, videoId)
+        .then(function(d) {
+          [d.next].filter(Boolean).forEach(function(n) { navTo('video.html', { video: n.video.id, series: seriesId, from: from }); });
+          [!d.next].filter(Boolean).forEach(function() { player.stop(); });
+        })
+        .catch(function() { player.stop(); });
+    });
+    [!seriesId].filter(Boolean).forEach(function() { player.stop(); });
+  }
+
   player = setupPlayer({
     video: document.getElementById('video'),
-    contentBase: '',
+    server: SERVER,
     onStop: function() {
       var STOP_NAV = {
-        detail: function() { navTo('detail.html', { film: filmId }); },
+        detail: function() { navTo('detail.html', { series: seriesId }); },
         browse: function() { navTo('browse.html'); }
       };
       [STOP_NAV[from]].filter(Boolean).forEach(function(fn) { fn(); });
       [!STOP_NAV[from]].filter(Boolean).forEach(function() { navTo('browse.html'); });
     },
-    onNext: function() {
-      var idx = parseInt([getParam('item')].filter(Boolean).concat(['0'])[0]);
-      [filmData].filter(Boolean).forEach(function(f) {
-        [f.items[idx + 1]].filter(Boolean).forEach(function() {
-          navTo('video.html', { film: filmId, item: idx + 1, from: from });
-        });
-      });
-    },
-    onPrev: function() {
-      var idx = parseInt([getParam('item')].filter(Boolean).concat(['0'])[0]);
-      [filmData].filter(Boolean).forEach(function(f) {
-        [f.items[idx - 1]].filter(Boolean).forEach(function() {
-          navTo('video.html', { film: filmId, item: idx - 1, from: from });
-        });
-      });
-    },
+    onEnded: advance,
+    onNext: advance,
     onIntent: function(intent) {
       var VIDEO_CTX = { play: true, video: true };
       [wsApp].filter(Boolean).forEach(function(ws) {
@@ -68,16 +68,7 @@ export function initVideoPage() {
 
   document.addEventListener('keydown', dispatchKey);
 
-  loadManifest(SERVER)
-    .then(function(manifest) {
-      var film = manifest.content.filter(function(f) { return f.id === filmId; })[0];
-      [!film].filter(Boolean).forEach(function() { navTo('error.html'); });
-      [film].filter(Boolean).forEach(function(f) {
-        filmData = f;
-        player.updateContentBase(manifest.contentBase);
-        var itemIdx = parseInt([getParam('item')].filter(Boolean).concat(['0'])[0]);
-        player.playFilm(f, f.items[itemIdx], from);
-      });
-    })
+  loadVideo(SERVER, videoId)
+    .then(function(record) { player.playVideo(record, from); })
     .catch(function() { navTo('error.html'); });
 }

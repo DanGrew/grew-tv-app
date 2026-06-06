@@ -2,12 +2,12 @@ import { getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadManifest } from '../../core/app-manifest.js';
+import { loadSeries } from '../../core/app-api.js';
 
 var SERVER = 'http://localhost:8765';
 
 export function initDetailPage() {
-  var filmId = getParam('film');
+  var seriesId = getParam('series');
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
 
@@ -24,7 +24,7 @@ export function initDetailPage() {
     };
     [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
   });
-  wsApp.sendContext({ context_id: 'detail', film_id: filmId });
+  wsApp.sendContext({ context_id: 'detail', series_id: seriesId });
 
   document.getElementById('btn-back-detail').addEventListener('click', goBack);
   document.addEventListener('keydown', dispatchKey);
@@ -40,16 +40,12 @@ export function initDetailPage() {
     remote: {}
   });
 
-  loadManifest(SERVER)
-    .then(function(manifest) {
-      var film = manifest.content.filter(function(f) { return f.id === filmId; })[0];
-      [film].filter(Boolean).forEach(function(f) {
-        buildDetailList(f, manifest.contentBase, function(item, idx) {
-          navTo('video.html', { film: filmId, item: idx, from: 'detail' });
-        });
-        focusFirstDetailRow();
+  loadSeries(SERVER, seriesId)
+    .then(function(series) {
+      buildDetailList(SERVER, series, function(item) {
+        navTo('video.html', { video: item.video.id, series: seriesId, from: 'detail' });
       });
-      [!film].filter(Boolean).forEach(function() { navTo('error.html'); });
+      focusFirstDetailRow();
     })
     .catch(function() { navTo('error.html'); });
 }
