@@ -124,12 +124,37 @@ function buildRow(server, series, progress, onPlayItem, item, i) {
   return row;
 }
 
+// Series header poster: real art when get_series carries one, else the 🎬
+// placeholder. Same per-element graceful fallback as the tile/episode thumbs —
+// an onerror swap covers a poster ref whose file is missing on the server.
+function setHeaderPoster(server, series) {
+  var img = document.getElementById('detail-header-poster');
+  var ph = document.getElementById('detail-header-placeholder');
+  var src = mediaUrl(server, series.poster);
+  ({
+    true: function() {
+      img.src = src;
+      img.style.display = 'block';
+      ph.style.display = 'none';
+      img.addEventListener('error', function() {
+        img.style.display = 'none';
+        ph.style.display = 'flex';
+      });
+    },
+    false: function() {
+      img.style.display = 'none';
+      ph.style.display = 'flex';
+    }
+  })[String(!!src)]();
+}
+
 // series: v3 /api/series record {title, poster, items:[{season?, episode?,
 // video:<full record>}]}. progress: id -> {resumePositionSec, lastPlayed} from
 // /api/continue-watching (backend is the source of truth — no localStorage).
 // onPlayItem(item, i, mode) where mode is 'resume' (row default) or 'restart'.
 export function buildDetailList(server, series, progress, onPlayItem) {
   document.getElementById('detail-title').textContent = series.title;
+  setHeaderPoster(server, series);
   var list = document.getElementById('detail-list');
   list.innerHTML = '';
   var ctx = { lastSeason: null };
