@@ -19,8 +19,8 @@ export function loadContinueWatching(serverUrl, profile) {
   return getJson(serverUrl + '/api/continue-watching?profile=' + encodeURIComponent(profile));
 }
 
-// Persist a resume position to the backend. Dual-written alongside localStorage
-// during the FEAT-017 transition (TASK-118/119 retire the localStorage copy).
+// Persist a resume position to the backend — the sole progress store (FEAT-017).
+// The legacy localStorage copy was retired in TASK-119; this is the only writer.
 export function saveProgress(serverUrl, id, positionSec, durationSec) {
   return fetch(serverUrl + '/api/progress/' + encodeURIComponent(id), {
     method: 'POST',

@@ -105,19 +105,20 @@ test('Escape from video after detail returns to detail', async ({ page }) => {
   await page.keyboard.press('Enter');
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
-  await page.locator('#btn-back-video').focus();
   await page.keyboard.press('Escape');
   await expect(page.locator('#screen-detail')).toBeVisible();
 });
 
-test('series video auto-advances to the next episode on end', async ({ page }) => {
+test('series video shows Up next countdown then advances on end', async ({ page }) => {
   await openDetail(page);
   await page.locator('.detail-row').first().focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/);
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
-  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
+  await expect(page.locator('#upnext-overlay')).toBeVisible();
+  await expect(page.locator('#upnext-text')).toContainText('The Weekend');
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/, { timeout: 8000 });
 });
 
 test('last episode end returns to detail (no next)', async ({ page }) => {

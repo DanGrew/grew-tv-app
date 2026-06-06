@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { getProfile, setProfile, getParam, navTo } from '../../core/state.js';
+import { getProfile, setProfile, getCaptions, setCaptions, getParam, navTo } from '../../core/state.js';
 
 describe('getProfile / setProfile', () => {
   var store;
@@ -24,6 +24,32 @@ describe('getProfile / setProfile', () => {
     setProfile('kids');
     setProfile('adults');
     expect(getProfile()).toBe('adults');
+  });
+});
+
+describe('getCaptions / setCaptions', () => {
+  var store;
+  beforeEach(() => {
+    store = {};
+    vi.stubGlobal('localStorage', {
+      getItem:    (k) => store[k] ?? null,
+      setItem:    (k, v) => { store[k] = v; },
+      removeItem: (k) => { delete store[k]; }
+    });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('defaults to off when unset', () => {
+    expect(getCaptions()).toBe(false);
+  });
+  it('returns true after setCaptions(true)', () => {
+    setCaptions(true);
+    expect(getCaptions()).toBe(true);
+  });
+  it('returns false after setCaptions(false)', () => {
+    setCaptions(true);
+    setCaptions(false);
+    expect(getCaptions()).toBe(false);
   });
 });
 
