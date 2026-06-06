@@ -46,6 +46,11 @@ const CONTINUE = {
   adults: { profile: 'adults', content: [] }
 };
 
+// Per-video watch progress (GET /api/progress/{id}). Empty by default — every
+// video reads as the zero-state record; tests that need a resume point override
+// the route. Backend is the FEAT-017 source of truth, not localStorage.
+const PROGRESS = {};
+
 function nextOf(seriesId, videoId) {
   var s = SERIES[seriesId];
   if (!s) return null;
@@ -78,6 +83,11 @@ async function installApi(page) {
     var s = SERIES[lastSegment(route.request().url(), '/api/series/')];
     return s ? json(route, 200, s) : json(route, 404, { error: 'not found' });
   });
+  await page.route('**/api/progress/*', function(route) {
+    var id = lastSegment(route.request().url(), '/api/progress/');
+    var p = PROGRESS[id] || { item_id: id, position_secs: 0, duration_secs: null, completed: false, last_watched: null };
+    return json(route, 200, p);
+  });
   await page.route('**/api/next/*/*', function(route) {
     var tail = route.request().url().split('/api/next/')[1].split('?')[0].split('/');
     return json(route, 200, { next: nextOf(decodeURIComponent(tail[0]), decodeURIComponent(tail[1])) });
@@ -87,4 +97,4 @@ async function installApi(page) {
   });
 }
 
-module.exports = { VIDEOS, SERIES, BROWSE, CONTINUE, nextOf, installApi };
+module.exports = { VIDEOS, SERIES, BROWSE, CONTINUE, PROGRESS, nextOf, installApi };

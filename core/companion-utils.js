@@ -1,7 +1,5 @@
-var SCREEN_TO_PAGE = { resume_prompt: 'video' };
-
 export function screenPage(contextId) {
-  return SCREEN_TO_PAGE[contextId] || contextId;
+  return contextId;
 }
 
 export function titleCase(str) {

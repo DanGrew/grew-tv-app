@@ -1,4 +1,4 @@
-import { loadBrowse, loadVideo, loadSeries, loadNext, scanDevices, mediaUrl } from '../../core/app-api.js';
+import { loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, scanDevices, mediaUrl } from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
   var calls = [];
@@ -44,6 +44,19 @@ describe('loadNext', () => {
     var calls = fakeFetch({ next: null });
     await loadNext('http://s', 'bluey', 'bluey-s1e01');
     expect(calls[0].url).toBe('http://s/api/next/bluey/bluey-s1e01');
+  });
+});
+
+describe('loadProgress', () => {
+  it('GETs /api/progress/{id}, no-store', async () => {
+    var calls = fakeFetch({ item_id: 'a', position_secs: 90, duration_secs: 600 });
+    await loadProgress('http://s', 'a');
+    expect(calls[0].url).toBe('http://s/api/progress/a');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('resolves parsed JSON', async () => {
+    fakeFetch({ item_id: 'a', position_secs: 90, duration_secs: 600 });
+    expect(await loadProgress('http://s', 'a')).toEqual({ item_id: 'a', position_secs: 90, duration_secs: 600 });
   });
 });
 

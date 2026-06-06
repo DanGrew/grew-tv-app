@@ -7,27 +7,6 @@ var FALLBACK_VIDEO_ACTIONS = [
   'skip_fwd_10','skip_fwd_30','skip_fwd_120','skip_fwd_300','skip_fwd_900','skip_fwd_1800'
 ];
 
-function renderResumePrompt(actionsEl, sendIntent) {
-  actionsEl.innerHTML = '';
-  actionsEl.style.display = '';
-  actionsEl.style.flexDirection = '';
-  actionsEl.style.alignItems = '';
-  var row = document.createElement('div');
-  row.className = 'ctrl-row';
-  row.style.marginTop = '40px';
-  var btnResume = document.createElement('button');
-  btnResume.className = 'ctrl-btn';
-  btnResume.textContent = 'Resume';
-  btnResume.addEventListener('click', function() { sendIntent('resume'); });
-  var btnRestart = document.createElement('button');
-  btnRestart.className = 'ctrl-btn';
-  btnRestart.textContent = 'Restart';
-  btnRestart.addEventListener('click', function() { sendIntent('restart'); });
-  row.appendChild(btnResume);
-  row.appendChild(btnRestart);
-  actionsEl.appendChild(row);
-}
-
 function buildSkipBtn(actionId, sendIntent, showMain) {
   var btn = document.createElement('button');
   btn.className = 'action-btn';
@@ -123,9 +102,6 @@ export function initPage() {
 
   function tryRender() {
     [state.latestPayload].filter(Boolean).forEach(function(p) {
-      [p.context_id === 'resume_prompt'].filter(Boolean).forEach(function() {
-        renderResumePrompt(els.actionsEl, getApi().sendIntent);
-      });
       [p.context_id === 'video'].filter(Boolean).forEach(function() {
         renderVideo(p, els.actionsEl, getApi().sendIntent, state.manifestCache);
       });

@@ -49,17 +49,49 @@ TV (HDMI) ← Mac Mini running Chrome in kiosk mode
 
 ## Code Patterns
 
-Boolean dispatch table — not `if/else`:
+**Cyclomatic complexity is capped at 1 for every function in `ui/**/*.js` and
+`app/**` inline `<script>` blocks** (`scripts/check-ui-cyclomatic.js`). That
+means NO branching keywords in those functions: no `if`/`else`, `for`/`while`,
+ternary `?:`, or `&&`/`||`/`??`. `core/` is EXEMPT (use `if` freely there).
+Express conditionals as:
+
 ```js
-// correct — parens required when used as a statement (bare { is parsed as a block)
+// branch -> boolean dispatch table (parens required as a statement)
 ({ true: () => doThis(), false: () => doThat() })[condition]();
+
+// `a || fallback` -> filter+concat (|| would add complexity)
+var x = [maybe].filter(Boolean).concat([fallback])[0];
 
 // forbidden — triggers no-filter-conditional arch check
 [condition].filter(Boolean).forEach(() => doThis());
 [condition ? fn : null].filter(Boolean).forEach(f => f());
 ```
 
-Pure functions with no DOM access belong in `core/`, not `ui/` or `app/`.
+`[value].filter(Boolean).forEach(...)` for a real *value* is fine (and common);
+only a bare boolean/negated-param sentinel is rejected.
+
+Pure functions with no DOM access belong in `core/`, not `ui/` or `app/`
+(`no-pure-fn-outside-core`). A function counts as "has DOM" only if it contains a
+DOM token (`document`, `.style`, `.classList`, `.appendChild`, …) — an
+HTML-string builder (e.g. `'<div style="…">'`, no leading dot) reads as pure, so
+move shared markup helpers into `core/` (with a unit test).
+
+## Before you edit (pre-flight)
+
+Read this BEFORE writing screen code — these gate the PR in CI even when local
+`git push` passes:
+
+- **CI cyclomatic blocks PRE-EXISTING violations in any file you touch.** It
+  classifies by filename (`git diff origin/main...HEAD`), not by which lines you
+  changed. Touch a screen that already has a complexity-2 function and you must
+  make it complexity-1 too. Local pre-push often passes anyway (its touched-file
+  set goes empty when `origin/main` is stale) — **CI is the real gate.** Check
+  with: `node scripts/check-ui-cyclomatic.js /tmp/o.txt`.
+- **e2e tests assert screen behaviour.** Change or remove a screen feature and
+  you must update/delete its `tests/*.test.js` (e.g. removing the resume prompt
+  obsoleted `tests/screen-resume.test.js`). Mock new endpoints in
+  `tests/fixtures/api.js`. e2e is CI-only; run locally with
+  `npx playwright test tests/<file>.test.js` before pushing.
 
 ## Tests
 

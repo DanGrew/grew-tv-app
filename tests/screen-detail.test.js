@@ -26,9 +26,9 @@ test('series tile opens detail screen, not video', async ({ page }) => {
   await expect(page.locator('#detail-title')).toContainText('Bluey');
 });
 
-test('detail onEnter focuses first available row', async ({ page }) => {
+test('detail onEnter focuses the Play next action', async ({ page }) => {
   await openDetail(page);
-  await expect(page.locator('.detail-row').first()).toBeFocused();
+  await expect(page.locator('#btn-play-next')).toBeFocused();
 });
 
 test('detail renders all series items as rows', async ({ page }) => {
@@ -56,11 +56,11 @@ test('ArrowUp moves focus to previous detail row', async ({ page }) => {
   await expect(page.locator('.detail-row').first()).toBeFocused();
 });
 
-test('ArrowUp at first row does not move focus', async ({ page }) => {
+test('ArrowUp from first row moves focus to Play next', async ({ page }) => {
   await openDetail(page);
   await page.locator('.detail-row').first().focus();
   await page.keyboard.press('ArrowUp');
-  await expect(page.locator('.detail-row').first()).toBeFocused();
+  await expect(page.locator('#btn-play-next')).toBeFocused();
 });
 
 test('Escape from detail returns to browse', async ({ page }) => {

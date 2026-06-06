@@ -33,6 +33,13 @@ export function loadVideo(serverUrl, id) {
   return getJson(serverUrl + '/api/video/' + encodeURIComponent(id));
 }
 
+// Backend watch progress for one video (FEAT-017 source of truth). Returns the
+// zero-state record ({position_secs:0,...}) when nothing is saved, so the player
+// resumes by default without the old localStorage resume/restart prompt.
+export function loadProgress(serverUrl, id) {
+  return getJson(serverUrl + '/api/progress/' + encodeURIComponent(id));
+}
+
 export function loadSeries(serverUrl, id) {
   return getJson(serverUrl + '/api/series/' + encodeURIComponent(id));
 }

@@ -20,6 +20,8 @@ var VIDEO_PLAY_PAUSE_KEYS = { ' ': true, Enter: true };
 var TOGGLE_INTENT         = { 'true': 'play', 'false': 'pause' };
 var SKIP_LEFT_TARGET      = { 'btn-skip-fwd': 'btn-play-pause', 'btn-skip-back': 'btn-back-video' };
 var SKIP_RIGHT_TARGET     = { 'btn-skip-back': 'btn-play-pause', 'btn-skip-fwd': 'btn-back-video' };
+// Only from btn-skip-fwd while CC is showing does Right land on the CC toggle.
+var SKIP_RIGHT_CC         = { 'btn-skip-fwd:true': 'btn-cc' };
 var VIDEO_REMOTE_LEFT     = { 'btn-skip-fwd': 'btn-play-pause', 'btn-play-pause': 'btn-skip-back', 'btn-skip-back': 'btn-back-video' };
 var VIDEO_REMOTE_RIGHT    = { 'btn-skip-back': 'btn-play-pause', 'btn-play-pause': 'btn-skip-fwd', 'btn-skip-fwd': 'btn-back-video' };
 var VIDEO_REMOTE_DOWN     = { 'btn-skip-back': 'btn-back-video', 'btn-play-pause': 'btn-back-video', 'btn-skip-fwd': 'btn-back-video' };
@@ -42,7 +44,6 @@ export function setup(config) {
   var lastSaveTime         = 0;
   var lastBackendSave      = 0;
   var lastDroppedFrames    = 0;
-  var pendingResumePosition = 0;
   var skipPopup            = null;
   var _currentDisplay      = {};
 
@@ -178,8 +179,7 @@ export function setup(config) {
     ArrowRight: function() {
       var id = document.activeElement.id;
       // From btn-skip-fwd, step right onto the CC toggle when it is showing.
-      var target = ([id].filter(function(x) { return x === 'btn-skip-fwd' && ccVisible(); })
-        .map(function() { return 'btn-cc'; }))[0] || SKIP_RIGHT_TARGET[id];
+      var target = [SKIP_RIGHT_CC[id + ':' + ccVisible()]].filter(Boolean).concat([SKIP_RIGHT_TARGET[id]])[0];
       document.getElementById(target).focus();
     },
     ArrowDown:  function() { document.getElementById('btn-back-video').focus(); },
@@ -204,9 +204,6 @@ export function setup(config) {
     ArrowDown:  function() { document.getElementById('btn-back-video').focus(); }
   };
 
-  var EXIT_FN   = { 'true': doRestart, 'false': stopPlayback };
-  var RESUME_NAV = { 'btn-resume': { ArrowRight: 'btn-restart' }, 'btn-restart': { ArrowLeft: 'btn-resume' } };
-
   var POPUP_HANDLERS = {
     'true':  function(e) {
       [POPUP_NAV[e.key]].filter(Boolean).forEach(function(fn) { e.preventDefault(); fn(); });
@@ -216,11 +213,7 @@ export function setup(config) {
       var onBack      = document.activeElement.id === 'btn-back-video';
       var onPlayPause = document.activeElement.id === 'btn-play-pause';
       var onCc        = document.activeElement.id === 'btn-cc';
-      var onResume    = pendingResumePosition > 0;
-      [EXIT_FN[onResume + '']].filter(function() { return VIDEO_STOP_KEYS[e.key]; }).forEach(function(f) { e.preventDefault(); f(); });
-      [RESUME_NAV[document.activeElement.id]].filter(Boolean).filter(function() { return onResume; }).forEach(function(nav) {
-        [nav[e.key]].filter(Boolean).forEach(function(id) { e.preventDefault(); document.getElementById(id).focus(); });
-      });
+      [stopPlayback].filter(function() { return VIDEO_STOP_KEYS[e.key]; }).forEach(function(f) { e.preventDefault(); f(); });
       [SKIP_NAV[e.key]].filter(Boolean).filter(function() { return onSkip; }).forEach(function(fn) { e.preventDefault(); fn(); });
       [BACK_NAV[e.key]].filter(Boolean).filter(function() { return onBack; }).forEach(function(fn) { e.preventDefault(); fn(); });
       [PLAY_PAUSE_NAV[e.key]].filter(Boolean).filter(function() { return onPlayPause; }).forEach(function(fn) { e.preventDefault(); fn(); });
@@ -236,7 +229,6 @@ export function setup(config) {
   }
 
   function startPlayback(seekTo) {
-    document.getElementById('screen-resume').style.display = 'none';
     document.getElementById('screen-video').style.display = '';
     onIntent('video');
     acquireWakeLock();
@@ -271,21 +263,8 @@ export function setup(config) {
     onStop(rp);
   }
 
-  function doResume() {
-    var t = pendingResumePosition;
-    pendingResumePosition = 0;
-    startPlayback(t);
-  }
-
-  function doRestart() {
-    pendingResumePosition = 0;
-    localStorage.removeItem('grew-tv:position:' + currentVideo.id);
-    startPlayback(0);
-  }
-
   function ccVisible() {
-    var b = document.getElementById('btn-cc');
-    return !!b && !b.classList.contains('hidden');
+    return !document.getElementById('btn-cc').classList.contains('hidden');
   }
 
   // Build the native subtitle <track> for the current video (FEAT-013). One
@@ -313,16 +292,18 @@ export function setup(config) {
     [video.textTracks.length].filter(Boolean).forEach(function() {
       var tt = video.textTracks[0];
       var SET = { 'showing': 'hidden', 'hidden': 'showing' };
-      tt.mode = SET[tt.mode] || 'hidden';
+      tt.mode = [SET[tt.mode]].filter(Boolean).concat(['hidden'])[0];
       document.getElementById('btn-cc').classList.toggle('cc-off', tt.mode !== 'showing');
       showControls();
     });
   }
 
-  // record: a full /api/video record (the watchable leaf). A video is the unit
-  // of playback in v3 — there is no item list; series auto-advance is driven by
-  // the page via /api/next.
-  function playVideo(record, from) {
+  // record: a full /api/video record (the watchable leaf). startSec is resolved
+  // by the page from the backend (the FEAT-017 source of truth) — resume by
+  // default, 0 on an explicit restart. No localStorage read, no resume prompt
+  // (TASK-118 folded resume/restart into the detail screen). A video is the unit
+  // of playback in v3; series auto-advance is driven by the page via /api/next.
+  function playVideo(record, from, startSec) {
     var playFrom = [from].filter(Boolean).concat(['browse'])[0];
     [currentBlobUrl].filter(Boolean).forEach(function() { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; });
     currentVideo    = record;
@@ -332,17 +313,7 @@ export function setup(config) {
     setSubtitleTrack(record);
     document.getElementById('film-title-video').textContent = record.title;
     onIntent('play', { title: record.title });
-    var saved = localStorage.getItem('grew-tv:position:' + record.id);
-    var t     = [saved].filter(Boolean).map(parseFloat)[0];
-    [t].filter(function(x) { return x > 5; }).forEach(function(x) {
-      pendingResumePosition = x;
-      document.getElementById('resume-time').textContent = fmt(x);
-      document.getElementById('screen-video').style.display = 'none';
-      document.getElementById('screen-resume').style.display = 'flex';
-      document.getElementById('btn-resume').focus();
-      onIntent('resume_prompt');
-    });
-    [t].filter(function(x) { return !(x > 5); }).forEach(function() { startPlayback(0); });
+    startPlayback(startSec);
   }
 
   function currentVideoDisplay() { return _currentDisplay; }
@@ -367,8 +338,6 @@ export function setup(config) {
   remote.up     = function() { var p = skipPopup; [p].filter(Boolean).forEach(function() { POPUP_NAV.ArrowUp(); }); [!p].filter(Boolean).forEach(function() { [VIDEO_REMOTE_UP[document.activeElement.id]].filter(Boolean).forEach(function(id) { showControls(); document.getElementById(id).focus(); }); }); };
   remote.select = function() { var p = skipPopup; [p].filter(Boolean).forEach(function() { POPUP_NAV.Enter(); }); [!p].filter(Boolean).forEach(function() { showControls(); document.activeElement.click(); }); };
   remote.back   = function() { var p = skipPopup; [p].filter(Boolean).forEach(function() { POPUP_NAV.Escape(); }); [!p].filter(Boolean).forEach(function() { stopPlayback(); }); };
-  remote.resume  = function() { doResume(); };
-  remote.restart = function() { doRestart(); };
   remote.cc      = function() { [ccVisible()].filter(Boolean).forEach(toggleSubtitles); };
 
   video.addEventListener('timeupdate', function() {
@@ -411,13 +380,11 @@ export function setup(config) {
   });
 
   document.getElementById('btn-play-pause').addEventListener('click', togglePlayPause);
-  document.getElementById('btn-resume').addEventListener('click', doResume);
-  document.getElementById('btn-restart').addEventListener('click', doRestart);
   document.getElementById('btn-back-video').addEventListener('click', stopPlayback);
   document.getElementById('btn-skip-back').addEventListener('click', function() { openSkipPopup('back'); });
   document.getElementById('btn-skip-fwd').addEventListener('click', function() { openSkipPopup('fwd'); });
   document.getElementById('btn-cc').addEventListener('click', toggleSubtitles);
   document.getElementById('screen-video').addEventListener('click', showControls);
 
-  return { playVideo, doResume, doRestart, handleVideoKey, openSkipPopup, showControls, currentVideoDisplay, stop: stopPlayback, remote };
+  return { playVideo, handleVideoKey, openSkipPopup, showControls, currentVideoDisplay, stop: stopPlayback, remote };
 }
