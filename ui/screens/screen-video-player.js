@@ -20,6 +20,8 @@ var VIDEO_PLAY_PAUSE_KEYS = { ' ': true, Enter: true };
 var TOGGLE_INTENT         = { 'true': 'play', 'false': 'pause' };
 var SKIP_LEFT_TARGET      = { 'btn-skip-fwd': 'btn-play-pause', 'btn-skip-back': 'btn-back-video' };
 var SKIP_RIGHT_TARGET     = { 'btn-skip-back': 'btn-play-pause', 'btn-skip-fwd': 'btn-back-video' };
+// Only from btn-skip-fwd while CC is showing does Right land on the CC toggle.
+var SKIP_RIGHT_CC         = { 'btn-skip-fwd:true': 'btn-cc' };
 var VIDEO_REMOTE_LEFT     = { 'btn-skip-fwd': 'btn-play-pause', 'btn-play-pause': 'btn-skip-back', 'btn-skip-back': 'btn-back-video' };
 var VIDEO_REMOTE_RIGHT    = { 'btn-skip-back': 'btn-play-pause', 'btn-play-pause': 'btn-skip-fwd', 'btn-skip-fwd': 'btn-back-video' };
 var VIDEO_REMOTE_DOWN     = { 'btn-skip-back': 'btn-back-video', 'btn-play-pause': 'btn-back-video', 'btn-skip-fwd': 'btn-back-video' };
@@ -177,8 +179,7 @@ export function setup(config) {
     ArrowRight: function() {
       var id = document.activeElement.id;
       // From btn-skip-fwd, step right onto the CC toggle when it is showing.
-      var target = ([id].filter(function(x) { return x === 'btn-skip-fwd' && ccVisible(); })
-        .map(function() { return 'btn-cc'; }))[0] || SKIP_RIGHT_TARGET[id];
+      var target = [SKIP_RIGHT_CC[id + ':' + ccVisible()]].filter(Boolean).concat([SKIP_RIGHT_TARGET[id]])[0];
       document.getElementById(target).focus();
     },
     ArrowDown:  function() { document.getElementById('btn-back-video').focus(); },
@@ -263,8 +264,7 @@ export function setup(config) {
   }
 
   function ccVisible() {
-    var b = document.getElementById('btn-cc');
-    return !!b && !b.classList.contains('hidden');
+    return !document.getElementById('btn-cc').classList.contains('hidden');
   }
 
   // Build the native subtitle <track> for the current video (FEAT-013). One
@@ -292,7 +292,7 @@ export function setup(config) {
     [video.textTracks.length].filter(Boolean).forEach(function() {
       var tt = video.textTracks[0];
       var SET = { 'showing': 'hidden', 'hidden': 'showing' };
-      tt.mode = SET[tt.mode] || 'hidden';
+      tt.mode = [SET[tt.mode]].filter(Boolean).concat(['hidden'])[0];
       document.getElementById('btn-cc').classList.toggle('cc-off', tt.mode !== 'showing');
       showControls();
     });

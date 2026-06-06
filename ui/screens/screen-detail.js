@@ -60,7 +60,10 @@ function seasonHeader(list, season) {
 }
 
 function maybeSeasonHeader(list, item, ctx) {
-  [item.season].filter(function(s) { return s != null && s !== ctx.lastSeason; }).forEach(function(s) { seasonHeader(list, s); ctx.lastSeason = s; });
+  [item.season]
+    .filter(function(s) { return s != null; })
+    .filter(function(s) { return s !== ctx.lastSeason; })
+    .forEach(function(s) { seasonHeader(list, s); ctx.lastSeason = s; });
 }
 
 function thumbMarkup(src) {
