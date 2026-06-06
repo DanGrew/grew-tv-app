@@ -1,23 +1,12 @@
 const { test, expect } = require('@playwright/test');
+const { installApi } = require('./fixtures/api.js');
 
-const MANIFEST_URL = 'http://localhost:8765/manifest.json';
-const FIXTURE = require('./fixtures/manifest.js');
-const MULTI = require('./fixtures/manifest-multi.js');
-
-const FILM_ID = 'toy-story';
-const ITEM_ID = 'toy-story-main';
-const RESUME_KEY = `grew-tv:position:${FILM_ID}:${ITEM_ID}`;
-
-async function interceptManifest(page, fixture) {
-  await page.route(MANIFEST_URL, route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(fixture.manifest)
-  }));
-}
+// Progress is keyed by video id in v3 (matching /api/progress).
+const VIDEO_ID = 'toy-story-main';
+const RESUME_KEY = `grew-tv:position:${VIDEO_ID}`;
+const SERIES_TILE = 2;
 
 async function goToBrowse(page) {
-  await interceptManifest(page, FIXTURE);
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
 }
@@ -35,12 +24,13 @@ async function mockVideoReady(page) {
 }
 
 test.beforeEach(async ({ page }) => {
+  await installApi(page);
   await page.goto('/app/homeview/profile.html');
 });
 
 // --- prompt visibility ---
 
-test('no saved position — film plays directly without resume prompt', async ({ page }) => {
+test('no saved position — video plays directly without resume prompt', async ({ page }) => {
   await goToBrowse(page);
   await page.locator('.film-tile').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
@@ -163,16 +153,14 @@ test('Backspace from resume prompt acts as Restart', async ({ page }) => {
 // --- detail screen indicator ---
 
 test('detail row shows position indicator when saved position exists', async ({ page }) => {
-  await interceptManifest(page, MULTI);
-  await page.evaluate(() => localStorage.setItem('grew-tv:position:test-series:ep1', '125'));
+  await page.evaluate(() => localStorage.setItem('grew-tv:position:bluey-s1e01', '125'));
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile').nth(1).click();
+  await page.locator('.film-tile').nth(SERIES_TILE).click();
   await expect(page.locator('.detail-resume').first()).toContainText('2:05');
 });
 
 test('detail row shows no indicator when no saved position', async ({ page }) => {
-  await interceptManifest(page, MULTI);
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile').nth(1).click();
+  await page.locator('.film-tile').nth(SERIES_TILE).click();
   await expect(page.locator('.detail-resume')).toHaveCount(0);
 });
