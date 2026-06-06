@@ -88,7 +88,9 @@ E2E tests run in CI only.
 
 Preferred — use `media-manager.py` from the `grew-tv` repo (serves app + WebSocket server together):
 ```bash
-python installation/media-manager.py --app-dir <path-to-grew-tv-app> --volumes-dir <path-to-volumes>
+python3 media-manager/core/media-manager.py --app-dir <path-to-grew-tv-app> --volumes-dir <content-dir> --content-root <content-dir>
+# --content-root is what /media/ serves (posters + mp4). Without it, content-root
+#   defaults to /Volumes/GREW-TV and posters/playback 404 when content lives elsewhere.
 # Companion at http://localhost:8765/companion/
 # WebSocket at ws://localhost:8766
 ```
