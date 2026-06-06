@@ -26,6 +26,7 @@ export function initPage() {
   };
   var config = defaultConfig();
   var pinEntry = '';
+  var onProfile = false;
   var dotsEl = null;
   var keypadWrap = null;
   var keypadTitle = null;
@@ -153,6 +154,7 @@ export function initPage() {
     ({
       true: function() { window.location.href = page + '.html'; },
       false: function() {
+        onProfile = true;
         els.ctxLabel.textContent = 'Profile';
         els.ctxTitle.textContent = "Who's watching?";
         renderPicker();
@@ -161,5 +163,10 @@ export function initPage() {
   }
 
   api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; });
-  loadConfig(server).then(parseConfig).then(function(cfg) { config = cfg; }).catch(noop);
+  // Config may land after the picker first renders (default config) — re-render
+  // so real photos/labels appear. Skips a rebuild when not on the profile view.
+  loadConfig(server).then(parseConfig).then(function(cfg) {
+    config = cfg;
+    [onProfile].filter(Boolean).forEach(renderPicker);
+  }).catch(noop);
 }
