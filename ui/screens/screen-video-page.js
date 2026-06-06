@@ -2,9 +2,19 @@ import { getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadVideo, loadNext } from '../../core/app-api.js';
+import { loadVideo, loadNext, loadProgress } from '../../core/app-api.js';
+import { isMidWatch } from '../../core/progress.js';
 
 var SERVER = 'http://localhost:8765';
+
+// Resume start: explicit restart -> 0; otherwise the backend resume position
+// when the video is still mid-watch (finished/unwatched -> 0). Replaces the old
+// localStorage read + resume/restart prompt (TASK-118).
+var RESUME_BY_RESTART = {
+  'true':  function() { return 0; },
+  'false': function(prog) { return [prog.position_secs].filter(function(p) { return isMidWatch(p, prog.duration_secs); }).concat([0])[0]; }
+};
+function resumeStart(restart, prog) { return RESUME_BY_RESTART[!!restart + ''](prog); }
 var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 var SKIP_ACTIONS = [
   'skip_back_10', 'skip_back_30', 'skip_back_120', 'skip_back_300', 'skip_back_900', 'skip_back_1800',
@@ -51,9 +61,6 @@ export function initVideoPage() {
         [VIDEO_CTX[intent]].filter(Boolean).forEach(function() {
           ws.sendContext({ context_id: 'video', actions: SKIP_ACTIONS, display: player.currentVideoDisplay() });
         });
-        [intent === 'resume_prompt'].filter(Boolean).forEach(function() {
-          ws.sendContext({ context_id: 'resume_prompt' });
-        });
       });
     }
   });
@@ -68,7 +75,11 @@ export function initVideoPage() {
 
   document.addEventListener('keydown', dispatchKey);
 
-  loadVideo(SERVER, videoId)
-    .then(function(record) { player.playVideo(record, from); })
+  var restart = getParam('restart');
+  Promise.all([
+    loadVideo(SERVER, videoId),
+    loadProgress(SERVER, videoId).catch(function() { return { position_secs: 0, duration_secs: null }; })
+  ])
+    .then(function(res) { player.playVideo(res[0], from, resumeStart(restart, res[1])); })
     .catch(function() { navTo('error.html'); });
 }

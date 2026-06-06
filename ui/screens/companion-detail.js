@@ -1,60 +1,17 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadManifest } from '../../core/companion-manifest.js';
-import { screenPage, titleCase, displayTitle, displayLabel, getContentBasePath } from '../../core/companion-utils.js';
+import { loadSeries, loadContinueWatching, mediaUrl } from '../../core/app-api.js';
+import { screenPage } from '../../core/companion-utils.js';
+import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
+import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
 
-function renderNoContent(actionsEl, text) {
-  var p = document.createElement('div');
-  p.className = 'no-actions';
-  p.textContent = text;
-  actionsEl.appendChild(p);
-}
-
-function renderItem(item, film, actionsEl, sendIntent, basePath) {
-  var poster = [item.poster].filter(Boolean).concat([film.poster].filter(Boolean)).concat([''])[0];
-  var btn = document.createElement('button');
-  btn.className = 'tile-btn';
-  var img = document.createElement('img');
-  img.src = window.location.origin + basePath + poster;
-  img.alt = [item.label, item.title].filter(Boolean).concat([''])[0];
-  btn.appendChild(img);
-  var span = document.createElement('span');
-  span.textContent = [item.label, item.title].filter(Boolean).concat([titleCase(item.id)])[0];
-  btn.appendChild(span);
-  btn.addEventListener('click', function() { sendIntent('play', { id: item.id }); });
-  actionsEl.appendChild(btn);
-}
-
-function renderFilmItems(film, actionsEl, sendIntent, manifestCache) {
-  var basePath = getContentBasePath(manifestCache);
-  var items = [film.items].filter(Boolean).concat([[]])[0];
-  [items.length === 0].filter(Boolean).forEach(function() { renderNoContent(actionsEl, 'No content'); });
-  [items].filter(function(i) { return i.length > 0; }).forEach(function(i) {
-    i.forEach(function(item) { renderItem(item, film, actionsEl, sendIntent, basePath); });
-  });
-}
-
-function renderForFilm(filmId, state, actionsEl, sendIntent) {
-  var content = [state.manifestCache].filter(Boolean)
-    .map(function(m) { return m.content; }).filter(Boolean).concat([[]])[0];
-  var film = content.filter(function(f) { return f.id === filmId; })[0];
-  [!film].filter(Boolean).forEach(function() { renderNoContent(actionsEl, 'No content'); });
-  [film].filter(Boolean).forEach(function(f) { renderFilmItems(f, actionsEl, sendIntent, state.manifestCache); });
-}
-
-function render(payload, state, actionsEl, sendIntent) {
-  actionsEl.innerHTML = '';
-  actionsEl.style.display = 'flex';
-  actionsEl.style.flexDirection = 'column';
-  actionsEl.style.alignItems = 'center';
-  [state.manifestFailed].filter(Boolean).forEach(function() { renderNoContent(actionsEl, 'Unable to load'); });
-  [!state.manifestFailed].filter(Boolean).forEach(function() {
-    [!payload.film_id].filter(Boolean).forEach(function() { renderNoContent(actionsEl, 'No content'); });
-    [payload.film_id].filter(Boolean).forEach(function(fid) { renderForFilm(fid, state, actionsEl, sendIntent); });
-  });
-}
-
+// Companion series context (TASK-118): the episode list with per-episode
+// progress + a Play-next button, fetched straight from the backend (catalog +
+// progress are backend state). Only the live context — which series the app is
+// on, and the profile — arrives over WS. Tapping a row plays it on the TV
+// (resume by default); Play next teleports to the next-in-order episode.
 export function initPage() {
   var host = window.location.hostname;
+  var server = 'http://' + host + ':8765';
   var els = {
     connStatus: document.getElementById('conn-status'),
     ctxLabel: document.getElementById('ctx-label'),
@@ -62,33 +19,81 @@ export function initPage() {
     actionsEl: document.getElementById('actions'),
     backBtn: document.getElementById('btn-back')
   };
-  var state = { manifestCache: null, manifestFailed: false, latestPayload: null };
+  var state = { seriesId: null, profile: null, series: null, progress: {} };
   var api = {};
-  function getApi() { return api; }
 
-  els.backBtn.addEventListener('click', function() { getApi().sendIntent('back'); });
+  els.backBtn.addEventListener('click', function() { api.sendIntent('back'); });
 
-  function tryRender() {
-    [state.latestPayload].filter(Boolean).forEach(function(p) {
-      render(p, state, els.actionsEl, getApi().sendIntent);
+  function episodeBtn(item) {
+    var video = item.video;
+    var resume = resumeOf(state.progress[video.id]);
+    var mid = isMidWatch(resume, video.duration);
+    var posterName = [video.poster, state.series.poster].filter(Boolean)[0];
+    var btn = document.createElement('button');
+    btn.className = 'tile-btn';
+    btn.setAttribute('data-id', video.id);
+    btn.innerHTML = '<img src="' + mediaUrl(server, posterName) + '" alt="">' +
+      '<span>' + episodeLabel(item) + '</span>' + progressBarMarkup(mid, percent(resume, video.duration), 'ep-progress');
+    btn.addEventListener('click', function() { api.sendIntent('play', { id: video.id }); });
+    return btn;
+  }
+
+  function playNextBtn() {
+    var btn = document.createElement('button');
+    btn.className = 'play-next-btn';
+    btn.textContent = '▶ Play next';
+    btn.addEventListener('click', function() { api.sendIntent('play_next'); });
+    return btn;
+  }
+
+  function renderSeries() {
+    els.actionsEl.appendChild(playNextBtn());
+    state.series.items.forEach(function(item) { els.actionsEl.appendChild(episodeBtn(item)); });
+  }
+
+  function renderNoContent() {
+    var p = document.createElement('div');
+    p.className = 'no-actions';
+    p.textContent = 'No content';
+    els.actionsEl.appendChild(p);
+  }
+
+  var RENDER = { 'true': renderSeries, 'false': renderNoContent };
+  function render() { els.actionsEl.innerHTML = ''; RENDER[!!state.series + ''](); }
+
+  function loadSeriesData(seriesId) {
+    loadSeries(server, seriesId)
+      .then(function(s) { state.series = s; els.ctxTitle.textContent = s.title; render(); })
+      .catch(function() { state.series = null; render(); });
+  }
+
+  function loadCW(profile) {
+    loadContinueWatching(server, profile)
+      .then(function(c) { state.progress = progressMapFromCW([c.content].filter(Boolean).concat([[]])[0]); render(); })
+      .catch(function() { state.progress = {}; render(); });
+  }
+
+  function captureSeries(payload) {
+    els.ctxLabel.textContent = 'Series';
+    [payload.series_id].filter(Boolean).filter(function(id) { return id !== state.seriesId; }).forEach(function(id) {
+      state.seriesId = id;
+      loadSeriesData(id);
     });
   }
 
   function onContext(payload) {
     var page = screenPage(payload.context_id);
-    ({ true: function() { window.location.href = page + '.html'; },
-      false: function() {
-        state.latestPayload = payload;
-        els.ctxTitle.textContent = displayTitle(payload);
-        els.ctxLabel.textContent = displayLabel(payload);
-        tryRender();
-      }
-    })[page !== 'detail']();
+    var ROUTE = {
+      'true':  function() { window.location.href = page + '.html'; },
+      'false': function() { captureSeries(payload); }
+    };
+    ROUTE[(page !== 'detail') + '']();
   }
 
-  loadManifest('http://' + host + ':8765')
-    .then(function(data) { state.manifestCache = data; tryRender(); })
-    .catch(function() { state.manifestFailed = true; state.manifestCache = { content: [] }; tryRender(); });
+  // Profile drives which Continue-Watching set tints the episode bars.
+  function onAppState(snap) {
+    [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(function(p) { state.profile = p; loadCW(p); });
+  }
 
-  api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; });
+  api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; }, onAppState);
 }

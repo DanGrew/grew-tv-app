@@ -31,9 +31,6 @@ describe('screenPage', () => {
     expect(screenPage('video')).toBe('video');
     expect(screenPage('error')).toBe('error');
   });
-  it('maps resume_prompt to video', () => {
-    expect(screenPage('resume_prompt')).toBe('video');
-  });
 });
 
 describe('titleCase', () => {
