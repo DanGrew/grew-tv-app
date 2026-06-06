@@ -23,7 +23,6 @@ export function createTile(server, card, opts) {
   var title = document.createElement('div');
   title.className = 'tile-title';
   title.textContent = m.title;
-  tile.appendChild(title);
 
   var img = document.createElement('img');
   img.className = 'film-poster';
@@ -48,6 +47,7 @@ export function createTile(server, card, opts) {
   placeholder.textContent = '🎬';
   tile.appendChild(img);
   tile.appendChild(placeholder);
+  tile.appendChild(title);
 
   [m.showCC].filter(Boolean).forEach(function() {
     var cc = document.createElement('div');
