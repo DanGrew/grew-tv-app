@@ -36,6 +36,11 @@ test('detail renders all series items as rows', async ({ page }) => {
   await expect(page.locator('.detail-row')).toHaveCount(3);
 });
 
+test('detail header shows the series poster art (TASK-121)', async ({ page }) => {
+  await openDetail(page);
+  await expect(page.locator('#detail-header-poster')).toHaveAttribute('src', /bluey\.jpg$/);
+});
+
 test('detail groups episodes under a season header', async ({ page }) => {
   await openDetail(page);
   await expect(page.locator('.detail-season')).toHaveCount(1);

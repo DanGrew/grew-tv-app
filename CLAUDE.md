@@ -112,6 +112,39 @@ Runs automatically on `git push`. Checks in order:
 
 E2E tests run in CI only.
 
+### Running the gates by hand
+
+Node is not on PATH — it lives at `~/.local/node/bin` (fallback `/opt/homebrew/bin`):
+```bash
+export PATH="$HOME/.local/node/bin:/opt/homebrew/bin:$PATH"
+```
+The pre-push hook is non-executable, so **CI is the real gate** — run the checks
+yourself before pushing. `arch-check.js` and `tv-check.js` are per-rule: each
+takes `<rule> <outputFile>` (bare invocation just prints usage). The canonical
+rule list + exact invocations live in `.githooks/pre-push` — read it and run the
+same loop, e.g.:
+```bash
+for r in no-dom-in-core no-ui-imports no-stray-files no-app-exports no-guard-chain \
+  no-filter-conditional app-index-only no-media-outside-assets no-css-outside-styles \
+  no-md-outside-docs no-json-in-repo no-pure-fn-outside-core; do
+  node scripts/arch-check.js $r /tmp/$r.txt || echo "FAIL $r";
+done
+for r in tv-focus-rings tv-min-font-size tv-no-blank-screen; do
+  node scripts/tv-check.js $r /tmp/$r.txt || echo "FAIL $r"; done
+node scripts/check-ui-cyclomatic.js /tmp/cyclo.txt
+node scripts/check-untested.js
+npm run test:unit
+```
+**Cyclomatic gate false-passes on a fresh branch** (its touched-file set goes
+empty when `origin/main` is stale). Verify your own edited `ui/**` files
+directly instead:
+```bash
+npx eslint --no-eslintrc --parser-options ecmaVersion:2022,sourceType:module \
+  --rule '{"complexity":["error",1]}' ui/screens/<file>.js
+```
+Run the relevant e2e locally too (CI-only otherwise):
+`npx playwright test tests/<file>.test.js`.
+
 ## Local Dev
 
 **App (`app/homeview/index.html`):** open directly in browser. Fetches `http://localhost:8080/manifest.json`.
