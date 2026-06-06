@@ -40,6 +40,13 @@ export function loadProgress(serverUrl, id) {
   return getJson(serverUrl + '/api/progress/' + encodeURIComponent(id));
 }
 
+// Profiles + Adults PIN config (TASK-120). Lives on the media-manager content
+// root as config.json, fetched via the same /media/ route as posters. Callers
+// catch and fall back to profile-config defaults when it is absent/unreadable.
+export function loadConfig(serverUrl) {
+  return getJson(mediaUrl(serverUrl, 'config.json'));
+}
+
 export function loadSeries(serverUrl, id) {
   return getJson(serverUrl + '/api/series/' + encodeURIComponent(id));
 }

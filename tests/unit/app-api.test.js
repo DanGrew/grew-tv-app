@@ -1,4 +1,4 @@
-import { loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, scanDevices, mediaUrl } from '../../core/app-api.js';
+import { loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, loadConfig, scanDevices, mediaUrl } from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
   var calls = [];
@@ -57,6 +57,19 @@ describe('loadProgress', () => {
   it('resolves parsed JSON', async () => {
     fakeFetch({ item_id: 'a', position_secs: 90, duration_secs: 600 });
     expect(await loadProgress('http://s', 'a')).toEqual({ item_id: 'a', position_secs: 90, duration_secs: 600 });
+  });
+});
+
+describe('loadConfig', () => {
+  it('GETs /media/config.json from the content root', async () => {
+    var calls = fakeFetch({ pin: '1234', profiles: [] });
+    await loadConfig('http://s');
+    expect(calls[0].url).toBe('http://s/media/config.json');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('rejects when the file is absent', async () => {
+    fakeFetch({}, false);
+    await expect(loadConfig('http://s')).rejects.toBe(500);
   });
 });
 

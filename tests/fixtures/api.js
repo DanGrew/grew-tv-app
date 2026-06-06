@@ -46,6 +46,17 @@ const CONTINUE = {
   adults: { profile: 'adults', content: [] }
 };
 
+// Profiles + Adults PIN gate (GET /media/config.json, TASK-120). Kids open,
+// Adults locked behind PIN 1234. Photos null -> emoji placeholder. Tests that
+// exercise photos or a different PIN override the route.
+const CONFIG = {
+  pin: '1234',
+  profiles: [
+    { id: 'kids',   label: 'Kids',   locked: false, photo: null },
+    { id: 'adults', label: 'Adults', locked: true,  photo: null }
+  ]
+};
+
 // Per-video watch progress (GET /api/progress/{id}). Empty by default — every
 // video reads as the zero-state record; tests that need a resume point override
 // the route. Backend is the FEAT-017 source of truth, not localStorage.
@@ -95,6 +106,11 @@ async function installApi(page) {
   await page.route('**/media/**', function(route) {
     return route.fulfill({ status: 200, contentType: 'application/octet-stream', body: '' });
   });
+  // Registered after the generic /media route so it wins (Playwright: last match
+  // first). The profile screen fetches this on load.
+  await page.route('**/media/config.json', function(route) {
+    return json(route, 200, CONFIG);
+  });
 }
 
-module.exports = { VIDEOS, SERIES, BROWSE, CONTINUE, PROGRESS, nextOf, installApi };
+module.exports = { VIDEOS, SERIES, BROWSE, CONTINUE, PROGRESS, CONFIG, nextOf, installApi };

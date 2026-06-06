@@ -38,8 +38,13 @@ test('Continue Watching rail leads when a video is mid-watch', async ({ page }) 
   await expect(page.locator('.rail-row[data-rail="continue"] .film-tile[data-id="finding-nemo-main"] .tile-progress-fill')).toBeVisible();
 });
 
-test('click Adults loads home rails with adults cards', async ({ page }) => {
+test('Adults unlocks with the correct PIN and loads adults cards', async ({ page }) => {
   await page.locator('#btn-adults').click();
+  await expect(page.locator('#pin-panel')).toHaveClass(/active/);
+  await page.locator('.key[data-key="1"]').click();
+  await page.locator('.key[data-key="2"]').click();
+  await page.locator('.key[data-key="3"]').click();
+  await page.locator('.key[data-key="4"]').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
   await expect(page.locator('.rail-title')).toHaveText(['Films']);
   await expect(page.locator('.film-tile')).toHaveCount(1);
