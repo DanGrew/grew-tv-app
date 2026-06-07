@@ -27,9 +27,14 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 #search:focus { outline: none; border-color: var(--focus); }
 #scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
 .section-title { font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-#cw-section { display: none; }
-#cw { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
-#cw .tile-btn { width: 130px; flex-shrink: 0; }
+#tabs { display: flex; gap: 8px; overflow-x: auto; flex-shrink: 0; padding-bottom: 2px; }
+.c-tab { flex: 0 0 auto; font-size: 14px; padding: 8px 16px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.c-tab.active { border-color: var(--focus); background: var(--surface-hi); color: var(--focus); }
+#rails-section { display: flex; flex-direction: column; gap: 16px; }
+.c-rail { display: flex; flex-direction: column; gap: 8px; }
+.c-rail-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.c-rail-row .tile-btn { width: 130px; flex-shrink: 0; }
+#search-section { display: none; }
 #grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 #empty { display: none; color: var(--text-muted); font-size: 16px; text-align: center; padding: 40px 0; }
 .tile-btn { display: flex; flex-direction: column; background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; padding: 0; color: var(--text); width: 100%; touch-action: manipulation; transition: border-color var(--dur) var(--ease); }
@@ -50,13 +55,11 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 <div id="conn-status">connecting…</div>
 <div id="breadcrumb"></div>
 <input id="search" type="search" placeholder="Search titles…" autocomplete="off">
+<div id="tabs"></div>
 <div id="scroll">
-  <div id="cw-section">
-    <div class="section-title">Continue Watching</div>
-    <div id="cw"></div>
-  </div>
-  <div>
-    <div class="section-title">All</div>
+  <div id="rails-section"><div id="rails"></div></div>
+  <div id="search-section">
+    <div class="section-title">Results</div>
     <div id="grid"></div>
     <div id="empty">No matches</div>
   </div>

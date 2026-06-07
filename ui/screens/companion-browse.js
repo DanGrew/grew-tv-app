@@ -1,30 +1,35 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadBrowse, loadContinueWatching, mediaUrl } from '../../core/app-api.js';
 import { screenPage, filterByTitle } from '../../core/companion-utils.js';
+import { buildTabs, buildTabRails } from '../../core/home-rails.js';
+import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 
-// Companion Home (TASK-117): full searchable catalog + a Continue-Watching
-// shortcut. Catalog is backend state fetched straight from the API; only the
-// live context (current screen + profile) comes from the app over WS. Tapping a
-// tile sends the `select` intent — the app routes a video to playback and a
-// series to its detail, teleporting the TV.
+// Companion Home (TASK-117 + FEAT-020/TASK-139): a content-type tab strip
+// (Continue / Series / Films / Home Movies) mirroring the app, each tab showing
+// that type's rails — genre rails for Series/Films, person rails for Home
+// Movies, the resume feed for Continue — built from the SAME shared
+// core/home-rails helpers so app and companion group/order identically. Search
+// spans the full catalog (flat grid) and takes over while typing. Tapping a
+// tile sends `select`, teleporting the TV.
 export function initPage() {
   var host = window.location.hostname;
   var server = 'http://' + host + ':8765';
   var els = {
     connStatus: document.getElementById('conn-status'),
     search: document.getElementById('search'),
-    cwSection: document.getElementById('cw-section'),
-    cw: document.getElementById('cw'),
+    tabs: document.getElementById('tabs'),
+    railsSection: document.getElementById('rails-section'),
+    rails: document.getElementById('rails'),
+    searchSection: document.getElementById('search-section'),
     grid: document.getElementById('grid'),
     empty: document.getElementById('empty')
   };
-  var state = { profile: null, cards: [], cw: [], query: '' };
+  var state = { profile: null, cards: [], cw: [], labels: {}, query: '', activeTab: null };
   var api = {};
 
-  // Breadcrumb trail (FEAT-021): Home is the root, so a single inert crumb —
-  // consistent with the app's browse screen. No clickable ancestor here.
+  // Breadcrumb trail (FEAT-021): Home is the root — a single inert crumb.
   function noNav() {}
   mountCompanionBreadcrumb('breadcrumb', buildCrumbs('browse'), noNav);
 
@@ -45,37 +50,86 @@ export function initPage() {
     return btn;
   }
 
-  function renderGrid() {
+  function railRow(rail) {
+    var section = document.createElement('div');
+    section.className = 'c-rail';
+    var h = document.createElement('div');
+    h.className = 'section-title';
+    h.textContent = rail.title;
+    section.appendChild(h);
+    var row = document.createElement('div');
+    row.className = 'c-rail-row';
+    row.setAttribute('data-rail', rail.id);
+    rail.items.forEach(function(card) { row.appendChild(tile(card, card.poster)); });
+    section.appendChild(row);
+    return section;
+  }
+
+  function renderRails() {
+    els.rails.innerHTML = '';
+    var rails = buildTabRails(state.activeTab, state.cards, progressMapFromCW(state.cw), state.labels);
+    rails.forEach(function(rail) { els.rails.appendChild(railRow(rail)); });
+  }
+
+  function markTab() {
+    Array.from(els.tabs.children).forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === state.activeTab); });
+  }
+
+  function selectTab(id) {
+    state.activeTab = id;
+    markTab();
+    renderRails();
+  }
+
+  function tabButton(tab) {
+    var b = document.createElement('button');
+    b.className = 'c-tab';
+    b.setAttribute('data-tab', tab.id);
+    b.textContent = tab.title;
+    b.addEventListener('click', function() { selectTab(tab.id); });
+    return b;
+  }
+
+  function renderTabs() {
+    els.tabs.innerHTML = '';
+    var tabs = buildTabs(state.cards, progressMapFromCW(state.cw));
+    tabs.forEach(function(t) { els.tabs.appendChild(tabButton(t)); });
+    selectTab([tabs[0]].filter(Boolean).map(function(t) { return t.id; }).concat(['films'])[0]);
+  }
+
+  function renderSearch() {
     els.grid.innerHTML = '';
     var shown = filterByTitle(state.cards, state.query);
     els.empty.style.display = ({ true: 'none', false: 'block' })[shown.length > 0];
     shown.forEach(function(card) { els.grid.appendChild(tile(card, card.poster)); });
   }
 
-  // Continue Watching is hidden while searching (search spans the full catalog).
-  function renderCW() {
-    els.cw.innerHTML = '';
-    var show = [state.cw.length > 0, !state.query.trim()].every(Boolean);
-    els.cwSection.style.display = ({ true: 'block', false: 'none' })[show];
-    state.cw.forEach(function(row) {
-      els.cw.appendChild(tile({ id: row.item_id, title: row.title }, row.poster));
-    });
+  // Search takes over the view while typing; otherwise the tab strip + rails.
+  function applyView() {
+    var searching = !!state.query.trim();
+    els.searchSection.style.display = ({ true: 'block', false: 'none' })[searching];
+    els.railsSection.style.display = ({ true: 'none', false: 'block' })[searching];
+    ({ true: renderSearch, false: renderRails })[searching]();
   }
 
   function loadCatalog(profile) {
     state.profile = profile;
     loadBrowse(server, profile)
-      .then(function(b) { state.cards = [b.content].filter(Boolean).concat([[]])[0]; renderGrid(); })
-      .catch(function() { state.cards = []; renderGrid(); });
+      .then(function(b) {
+        state.cards = [b.content].filter(Boolean).concat([[]])[0];
+        state.labels = [b.genreLabels].filter(Boolean).concat([{}])[0];
+        renderTabs();
+        applyView();
+      })
+      .catch(function() { state.cards = []; renderTabs(); applyView(); });
     loadContinueWatching(server, profile)
-      .then(function(c) { state.cw = [c.content].filter(Boolean).concat([[]])[0]; renderCW(); })
-      .catch(function() { state.cw = []; renderCW(); });
+      .then(function(c) { state.cw = [c.content].filter(Boolean).concat([[]])[0]; renderTabs(); applyView(); })
+      .catch(function() { state.cw = []; });
   }
 
   els.search.addEventListener('input', function() {
     state.query = els.search.value;
-    renderGrid();
-    renderCW();
+    applyView();
   });
 
   // Profile (and thus which catalog to show) comes from the live app snapshot;

@@ -142,7 +142,8 @@ test('Escape on browse does not crash or navigate away', async ({ page }) => {
 });
 
 test('video onEnter focuses play-pause button', async ({ page }) => {
-  await page.locator(VIDEO_TILE).click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator(VIDEO_TILE).first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
 });

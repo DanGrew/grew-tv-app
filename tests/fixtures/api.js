@@ -25,16 +25,19 @@ const SERIES = {
 const BROWSE = {
   kids: {
     profile: 'kids',
+    genreLabels: { animation: 'Animation', comedy: 'Comedy' },
     content: [
-      { kind: 'video',  id: 'toy-story-main',    title: 'Toy Story',    poster: 'toy-story.jpg', duration: 4860, type: 'animation', format: 'film' },
-      { kind: 'video',  id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg',      duration: 6000, type: 'animation', format: 'film' },
-      { kind: 'series', id: 'bluey',             title: 'Bluey',        poster: 'bluey.jpg',                     type: 'animation', format: 'tv-series' }
+      { kind: 'video',  id: 'toy-story-main',    title: 'Toy Story',    poster: 'toy-story.jpg', duration: 4860, type: 'animation', format: 'film',       genres: ['animation', 'comedy'], people: null },
+      { kind: 'video',  id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg',      duration: 6000, type: 'animation', format: 'film',       genres: null,                    people: null },
+      { kind: 'series', id: 'bluey',             title: 'Bluey',        poster: 'bluey.jpg',                     type: 'animation', format: 'tv-series',  genres: ['animation'],           people: null },
+      { kind: 'video',  id: 'millie-walk',       title: 'Millie Walk',  poster: 'millie.jpg',    duration: 30,   type: 'home',      format: 'home-movie', genres: null,                    people: ['millie'] }
     ]
   },
   adults: {
     profile: 'adults',
+    genreLabels: {},
     content: [
-      { kind: 'video', id: 'dark-knight-main', title: 'The Dark Knight', poster: 'dk.jpg', duration: 9120, type: 'action', format: 'film' }
+      { kind: 'video', id: 'dark-knight-main', title: 'The Dark Knight', poster: 'dk.jpg', duration: 9120, type: 'action', format: 'film', genres: ['action'], people: null }
     ]
   }
 };

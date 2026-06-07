@@ -13,18 +13,34 @@ test('profile screen shown on load, Kids button focused', async ({ page }) => {
   await expect(page.locator('#btn-kids')).toBeFocused();
 });
 
-test('click Kids loads home rails (Series then Films) with kids cards', async ({ page }) => {
+test('click Kids shows the content-type sidebar, landing on Series', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
-  // No mid-watch progress -> Continue Watching omitted; leads with Series.
-  await expect(page.locator('.rail-title')).toHaveText(['Series', 'Films']);
-  await expect(page.locator('.film-tile')).toHaveCount(3);
-  await expect(page.locator('.film-tile[data-id="toy-story-main"] .tile-title')).toContainText('Toy Story');
-  await expect(page.locator('.rail-row[data-rail="series"] .film-tile')).toHaveCount(1);
-  await expect(page.locator('.rail-row[data-rail="films"] .film-tile')).toHaveCount(2);
+  // No mid-watch -> no Continue tab; tabs follow content present, fixed order.
+  await expect(page.locator('.sidebar-tab')).toHaveText(['Series', 'Films', 'Home Movies']);
+  // Default landing = first tab (Series); its genre rail holds Bluey.
+  await expect(page.locator('.sidebar-tab[data-tab="series"]')).toHaveClass(/active/);
+  await expect(page.locator('.rail-title')).toHaveText(['Animation']);
+  await expect(page.locator('.rail-row[data-rail="genre:animation"] .film-tile[data-id="bluey"]')).toHaveCount(1);
 });
 
-test('Continue Watching rail leads when a video is mid-watch', async ({ page }) => {
+test('selecting the Films tab swaps in genre rails (A-Z), a film in each matching genre', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await expect(page.locator('.rail-title')).toHaveText(['Animation', 'Comedy']);
+  // Toy Story (animation+comedy) appears in both rails; Nemo (type fallback) only Animation.
+  await expect(page.locator('.rail-row[data-rail="genre:animation"] .film-tile')).toHaveCount(2);
+  await expect(page.locator('.rail-row[data-rail="genre:comedy"] .film-tile[data-id="toy-story-main"]')).toHaveCount(1);
+});
+
+test('Home Movies tab shows person rails', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
+  await expect(page.locator('.rail-title')).toHaveText(['Millie']);
+  await expect(page.locator('.rail-row[data-rail="person:millie"] .film-tile[data-id="millie-walk"]')).toHaveCount(1);
+});
+
+test('Continue tab leads and is the default landing when a video is mid-watch', async ({ page }) => {
   await page.route('**/api/continue-watching**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', content: [
@@ -33,12 +49,13 @@ test('Continue Watching rail leads when a video is mid-watch', async ({ page }) 
   }));
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
-  await expect(page.locator('.rail-title')).toHaveText(['Continue Watching', 'Series', 'Films']);
+  await expect(page.locator('.sidebar-tab')).toHaveText(['Continue Watching', 'Series', 'Films', 'Home Movies']);
+  await expect(page.locator('.sidebar-tab[data-tab="continue"]')).toHaveClass(/active/);
   await expect(page.locator('.rail-row[data-rail="continue"] .film-tile')).toHaveCount(1);
   await expect(page.locator('.rail-row[data-rail="continue"] .film-tile[data-id="finding-nemo-main"] .tile-progress-fill')).toBeVisible();
 });
 
-test('Adults unlocks with the correct PIN and loads adults cards', async ({ page }) => {
+test('Adults unlocks with the correct PIN and lands on its genre rails', async ({ page }) => {
   await page.locator('#btn-adults').click();
   await expect(page.locator('#pin-panel')).toHaveClass(/active/);
   await page.locator('.key[data-key="1"]').click();
@@ -46,8 +63,8 @@ test('Adults unlocks with the correct PIN and loads adults cards', async ({ page
   await page.locator('.key[data-key="3"]').click();
   await page.locator('.key[data-key="4"]').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
-  await expect(page.locator('.rail-title')).toHaveText(['Films']);
-  await expect(page.locator('.film-tile')).toHaveCount(1);
+  await expect(page.locator('.sidebar-tab')).toHaveText(['Films']);
+  await expect(page.locator('.rail-title')).toHaveText(['Action']);
   await expect(page.locator('.film-tile[data-id="dark-knight-main"] .tile-title')).toContainText('The Dark Knight');
 });
 
@@ -75,14 +92,16 @@ test('retry button on error returns to profile select', async ({ page }) => {
 
 test('select standalone video plays directly with src set', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile[data-id="toy-story-main"]').click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#video')).toHaveAttribute('src', /\/media\/toy-story-main\.mp4/);
 });
 
 test('Escape key returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile[data-id="toy-story-main"]').click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.keyboard.press('Escape');
@@ -91,7 +110,8 @@ test('Escape key returns to browse screen', async ({ page }) => {
 
 test('Backspace key returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile[data-id="toy-story-main"]').click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.keyboard.press('Backspace');
@@ -100,42 +120,64 @@ test('Backspace key returns to browse screen', async ({ page }) => {
 
 test('focus returns to source tile after Escape', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile[data-id="toy-story-main"]').click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.film-tile[data-id="toy-story-main"]')).toBeFocused();
+  await expect(page.locator('.film-tile[data-id="toy-story-main"]').first()).toBeFocused();
 });
 
 test('Enter on focused video tile opens video screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile[data-id="toy-story-main"]').focus();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').first().focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#screen-video')).toBeVisible();
 });
 
 test('arrow keys scroll within a rail', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await expect(page.locator('#screen-browse')).toBeVisible();
-  const firstFilm = page.locator('.rail-row[data-rail="films"] .film-tile').nth(0);
-  const secondFilm = page.locator('.rail-row[data-rail="films"] .film-tile').nth(1);
-  await firstFilm.focus();
-  await expect(firstFilm).toBeFocused();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  const first = page.locator('.rail-row[data-rail="genre:animation"] .film-tile').nth(0);
+  const second = page.locator('.rail-row[data-rail="genre:animation"] .film-tile').nth(1);
+  await first.focus();
+  await expect(first).toBeFocused();
   await page.keyboard.press('ArrowRight');
-  await expect(secondFilm).toBeFocused();
+  await expect(second).toBeFocused();
 });
 
-test('arrow down moves from Series rail to Films rail', async ({ page }) => {
+test('arrow down moves between genre rails', async ({ page }) => {
   await page.locator('#btn-kids').click();
-  await expect(page.locator('#screen-browse')).toBeVisible();
-  await page.locator('.rail-row[data-rail="series"] .film-tile[data-id="bluey"]').focus();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator('.rail-row[data-rail="genre:animation"] .film-tile').first().focus();
   await page.keyboard.press('ArrowDown');
-  await expect(page.locator('.rail-row[data-rail="films"] .film-tile').first()).toBeFocused();
+  await expect(page.locator('.rail-row[data-rail="genre:comedy"] .film-tile').first()).toBeFocused();
+});
+
+test('ArrowLeft at the first column hops into the sidebar; ArrowRight returns to the rails', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator('.rail-row[data-rail="genre:animation"] .film-tile').first().focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.sidebar-tab[data-tab="films"]')).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.rail-row .film-tile').first()).toBeFocused();
+});
+
+test('ArrowDown in the sidebar moves to the next tab and swaps the rails', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await page.locator('.sidebar-tab[data-tab="series"]').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.sidebar-tab[data-tab="films"]')).toBeFocused();
+  await expect(page.locator('.sidebar-tab[data-tab="films"]')).toHaveClass(/active/);
+  await expect(page.locator('.rail-title')).toHaveText(['Animation', 'Comedy']);
 });
 
 async function goToVideoScreen(page) {
   await page.locator('#btn-kids').click();
-  await page.locator('.film-tile[data-id="toy-story-main"]').click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
 }
@@ -320,6 +362,7 @@ test('CC button shows for a video with subtitles', async ({ page }) => {
 
 test('CC button hidden for a video without subtitles', async ({ page }) => {
   await page.locator('#btn-kids').click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.film-tile[data-id="finding-nemo-main"]').click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-cc')).toHaveClass(/hidden/);

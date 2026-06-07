@@ -45,8 +45,9 @@ test('browse shows a single non-clickable Home crumb', async ({ page }) => {
   await page.goto('/companion/browse.html');
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Home');
   await expect(page.locator('#breadcrumb .crumb-link')).toHaveCount(0);
-  // Guards the cyclomatic-1 refactor of the catalog render path.
-  await expect(page.locator('#grid .tile-btn')).toHaveCount(3);
+  // Guards the cyclomatic-1 refactor of the catalog render path (FEAT-020: the
+  // catalog is now a content-type tab strip + per-type rails, not a flat grid).
+  await expect(page.locator('.c-tab')).toHaveText(['Series', 'Films', 'Home Movies']);
 });
 
 test('detail shows Home (clickable) then the series as current', async ({ page }) => {

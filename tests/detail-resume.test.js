@@ -36,7 +36,8 @@ test.beforeEach(async ({ page }) => {
 
 test('film plays directly — no resume/restart prompt exists', async ({ page }) => {
   await goToBrowse(page);
-  await page.locator(`.film-tile[data-id="${FILM}"]`).click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator(`.film-tile[data-id="${FILM}"]`).first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#screen-resume')).toHaveCount(0);
 });
