@@ -59,7 +59,10 @@ if (rule === 'tv-focus-rings') {
 }
 
 if (rule === 'tv-min-font-size') {
-  const MIN_PX = 20;
+  // Lowered 20 -> 10 (TASK-074): the FEAT-017-glass mockup is the design
+  // authority and uses 10-15px labels; matching it takes priority over the
+  // old 10ft-legibility floor. 10px keeps a sane guard against typos.
+  const MIN_PX = 10;
   getAllHtml(path.join(ROOT, 'app')).forEach(file => {
     const rel = path.relative(ROOT, file).replace(/\\/g, '/');
     scanned.push(rel);
