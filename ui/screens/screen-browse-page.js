@@ -1,7 +1,6 @@
 import { getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
-import { railArrow, renderRails } from './screen-browse.js';
-import { buildRails } from '../../core/home-rails.js';
+import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, scanDevices } from '../../core/app-api.js';
@@ -10,6 +9,7 @@ import { mountBreadcrumb } from './breadcrumb.js';
 
 var SERVER = 'http://localhost:8765';
 var LAST_TILE_KEY = 'grew-tv:last-tile';
+var LAST_TAB_KEY = 'grew-tv:last-tab';
 
 export function initBrowsePage() {
   function showSettings() {
@@ -42,7 +42,7 @@ export function initBrowsePage() {
 
   initPage({
     onEnter: function() { [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); }); },
-    keys: { ArrowLeft: railArrow, ArrowRight: railArrow, ArrowUp: railArrow, ArrowDown: railArrow },
+    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow },
     remote: {}
   });
 
@@ -50,10 +50,10 @@ export function initBrowsePage() {
 
   var wsApp = connectApp('ws://localhost:8766', function(intent, params) {
     var INTENTS = {
-      navigate_up:    function() { railArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
-      navigate_down:  function() { railArrow({ key: 'ArrowDown',  preventDefault: function() {} }); },
-      navigate_left:  function() { railArrow({ key: 'ArrowLeft',  preventDefault: function() {} }); },
-      navigate_right: function() { railArrow({ key: 'ArrowRight', preventDefault: function() {} }); },
+      navigate_up:    function() { browseArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
+      navigate_down:  function() { browseArrow({ key: 'ArrowDown',  preventDefault: function() {} }); },
+      navigate_left:  function() { browseArrow({ key: 'ArrowLeft',  preventDefault: function() {} }); },
+      navigate_right: function() { browseArrow({ key: 'ArrowRight', preventDefault: function() {} }); },
       select:         function() {
         var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
         var target = [id].filter(Boolean).map(function(i) { return document.querySelector('.film-tile[data-id="' + i + '"]'); }).filter(Boolean)[0];
@@ -75,6 +75,7 @@ export function initBrowsePage() {
 
   function onSelect(card) {
     sessionStorage.setItem(LAST_TILE_KEY, card.id);
+    sessionStorage.setItem(LAST_TAB_KEY, getActiveTab());
     SELECT[card.kind](card);
   }
 
@@ -85,8 +86,8 @@ export function initBrowsePage() {
     .then(function(res) {
       var browse = res[0];
       var progress = progressMapFromCW(res[1].content);
-      var rails = buildRails(browse.content, progress);
-      renderRails(SERVER, rails, progress, profile, onSelect);
+      var labels = [browse.genreLabels].filter(Boolean).concat([{}])[0];
+      renderBrowse(SERVER, browse.content, progress, labels, profile, onSelect, sessionStorage.getItem(LAST_TAB_KEY));
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
     })
     .catch(function() { navTo('error.html'); });

@@ -55,7 +55,8 @@ test('clicking the series crumb on the player opens that series detail', async (
 });
 
 test('a film player shows Home > Title (no series crumb)', async ({ page }) => {
-  await page.locator(FILM_TILE).click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator(FILM_TILE).first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#breadcrumb .crumb-link')).toHaveText('Home');
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Toy Story');

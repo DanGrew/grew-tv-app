@@ -1,8 +1,16 @@
 import { registerScreen } from '../../core/screen-registry.js';
 import { createTile } from '../../components/tile.js';
+import { buildTabs, buildTabRails, clampIndex } from '../../core/home-rails.js';
 
 var PROFILE_LABEL = { kids: 'Kids', adults: 'Adults' };
 var PLAY_KEYS     = { Enter: true, ' ': true };
+
+// FEAT-020 (TASK-138): the browse screen is a content-type sidebar plus a
+// rail area. Selecting a sidebar tab swaps the rails to that content type's
+// rails. Pure grouping/ordering lives in core/home-rails.js; this module owns
+// the DOM and the two-zone (sidebar / rails) d-pad focus model. Module state
+// holds the last-rendered data so a tab switch can rebuild the rails.
+var STATE = { server: null, cards: [], progress: {}, labels: {}, profile: null, onSelect: null };
 
 function tilesIn(railEl) {
   return Array.from(railEl.querySelectorAll('.film-tile'));
@@ -12,18 +20,53 @@ function allRows() {
   return Array.from(document.querySelectorAll('.rail-row'));
 }
 
+function sidebarTabs() {
+  return Array.from(document.querySelectorAll('.sidebar-tab'));
+}
+
+function focusFirstTile() {
+  [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
+}
+
+function focusActiveTab() {
+  [document.querySelector('.sidebar-tab.active')].filter(Boolean).forEach(function(t) { t.focus(); });
+}
+
+function focusTab(i) {
+  var tabs = sidebarTabs();
+  [tabs[clampIndex(i, tabs.length)]].filter(Boolean).forEach(function(t) { t.focus(); });
+}
+
 function focusCol(railEl, col) {
   [railEl].filter(Boolean).forEach(function(r) {
     var tiles = tilesIn(r);
-    var last = tiles.length - 1;
-    var idx = col < 0 ? 0 : (col > last ? last : col);
-    [tiles[idx]].filter(Boolean).forEach(function(t) { t.focus(); });
+    [tiles[clampIndex(col, tiles.length)]].filter(Boolean).forEach(function(t) { t.focus(); });
   });
 }
 
-// 2-D d-pad: left/right scroll within a rail; up/down change rail, keeping the
-// column (clamped to the target rail's length). Same-id tiles can repeat across
-// rails (a Continue-Watching item also lives in Films) — focus is positional.
+// Leftward from the rails: step a column, or hop into the sidebar at the
+// leftmost column (the new content-type focus zone).
+function leftFromRail(railEl, col) {
+  ({ true: focusActiveTab, false: function() { focusCol(railEl, col - 1); } })[col <= 0]();
+}
+
+// Sidebar zone: Up/Down move between tabs (each focus swaps the rails, below);
+// Right enters the rails; Left is the edge.
+export function sidebarArrow(e) {
+  e.preventDefault();
+  var idx = sidebarTabs().indexOf(document.activeElement);
+  var SMOVE = {
+    ArrowUp:    function() { focusTab(idx - 1); },
+    ArrowDown:  function() { focusTab(idx + 1); },
+    ArrowRight: function() { focusFirstTile(); },
+    ArrowLeft:  function() {}
+  };
+  [SMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
+}
+
+// Rails zone: left/right scroll within a rail (left at col 0 hops to the
+// sidebar); up/down change rail keeping the column. Same-id tiles can repeat
+// across rails (a card in two genres) — focus is positional.
 export function railArrow(e) {
   e.preventDefault();
   var active = document.activeElement;
@@ -32,7 +75,7 @@ export function railArrow(e) {
   var tiles = [rows[railIdx]].filter(Boolean).map(tilesIn).concat([[]])[0];
   var col = tiles.indexOf(active);
   var MOVE = {
-    ArrowLeft:  function() { focusCol(rows[railIdx], col - 1); },
+    ArrowLeft:  function() { leftFromRail(rows[railIdx], col); },
     ArrowRight: function() { focusCol(rows[railIdx], col + 1); },
     ArrowUp:    function() { focusCol(rows[railIdx - 1], col); },
     ArrowDown:  function() { focusCol(rows[railIdx + 1], col); }
@@ -42,41 +85,101 @@ export function railArrow(e) {
   });
 }
 
-// rails: output of core/home-rails.buildRails — [{id, title, items:[card]}].
-// progress: the id->entry map (also drives each tile's mid-watch bar).
-// onSelect(card) — the page routes by card.kind.
-export function renderRails(server, rails, progress, profile, onSelect) {
-  document.getElementById('profile-label').textContent = PROFILE_LABEL[profile];
+function zoneOf() {
+  return [document.activeElement.closest('#sidebar')].filter(Boolean).map(function() { return 'sidebar'; }).concat(['rails'])[0];
+}
+
+var ZONE = { sidebar: sidebarArrow, rails: railArrow };
+
+// Single d-pad entry point — routes the arrow to the zone holding focus.
+export function browseArrow(e) {
+  ZONE[zoneOf()](e);
+}
+
+function railSection(rail) {
+  var section = document.createElement('div');
+  section.className = 'rail';
+  var h = document.createElement('div');
+  h.className = 'rail-title';
+  h.textContent = rail.title;
+  section.appendChild(h);
+  var row = document.createElement('div');
+  row.className = 'rail-row';
+  row.setAttribute('data-rail', rail.id);
+  rail.items.forEach(function(card) {
+    row.appendChild(createTile(STATE.server, card, { progress: STATE.progress, onSelect: STATE.onSelect }));
+  });
+  section.appendChild(row);
+  return section;
+}
+
+function renderRailRows(rails) {
   var root = document.getElementById('rails');
   root.innerHTML = '';
   [rails].filter(function() { return rails.length === 0; }).forEach(function() {
-    root.innerHTML = '<div class="home-empty">No films available</div>';
+    root.innerHTML = '<div class="home-empty">Nothing here yet</div>';
   });
-  rails.forEach(function(rail) {
-    var section = document.createElement('div');
-    section.className = 'rail';
-    var h = document.createElement('div');
-    h.className = 'rail-title';
-    h.textContent = rail.title;
-    section.appendChild(h);
-    var row = document.createElement('div');
-    row.className = 'rail-row';
-    row.setAttribute('data-rail', rail.id);
-    rail.items.forEach(function(card) {
-      row.appendChild(createTile(server, card, { progress: progress, onSelect: onSelect }));
-    });
-    section.appendChild(row);
-    root.appendChild(section);
-  });
-  [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
+  rails.forEach(function(rail) { root.appendChild(railSection(rail)); });
+}
+
+function markActive(tabId) {
+  sidebarTabs().forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === tabId); });
+}
+
+// Show one tab's rails (does not move focus — the caller decides). Called both
+// on initial render and whenever a sidebar tab gains focus.
+function selectTab(tabId) {
+  STATE.activeTab = tabId;
+  markActive(tabId);
+  renderRailRows(buildTabRails(tabId, STATE.cards, STATE.progress, STATE.labels));
+}
+
+function tabButton(tab) {
+  var btn = document.createElement('button');
+  btn.className = 'sidebar-tab';
+  btn.setAttribute('data-tab', tab.id);
+  btn.textContent = tab.title;
+  btn.addEventListener('focus', function() { selectTab(tab.id); });
+  btn.addEventListener('click', function() { focusFirstTile(); });
+  return btn;
+}
+
+function renderSidebar(tabs) {
+  var bar = document.getElementById('sidebar');
+  bar.innerHTML = '';
+  tabs.forEach(function(tab) { bar.appendChild(tabButton(tab)); });
+}
+
+// The tab currently shown — the page persists it so returning to browse lands
+// on the same tab (and thus can restore focus to the last-opened tile).
+export function getActiveTab() {
+  return STATE.activeTab;
+}
+
+// rails come from buildTabRails per the selected tab; the page passes the raw
+// /api/browse cards + progress + genreLabels, the select handler, and an
+// optional initialTab to land on (else the first tab).
+export function renderBrowse(server, cards, progress, labels, profile, onSelect, initialTab) {
+  STATE.server = server;
+  STATE.cards = cards;
+  STATE.progress = progress;
+  STATE.labels = labels;
+  STATE.profile = profile;
+  STATE.onSelect = onSelect;
+  document.getElementById('profile-label').textContent = PROFILE_LABEL[profile];
+  var tabs = buildTabs(cards, progress);
+  var ids = tabs.map(function(t) { return t.id; });
+  renderSidebar(tabs);
+  selectTab([initialTab].filter(function(t) { return ids.indexOf(t) >= 0; }).concat(ids).concat(['films'])[0]);
+  focusFirstTile();
 }
 
 export { PLAY_KEYS };
 
 export function setup() {
   registerScreen('screen-browse', {
-    onEnter: function() { [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); }); },
-    keys: { ArrowLeft: railArrow, ArrowRight: railArrow, ArrowUp: railArrow, ArrowDown: railArrow },
+    onEnter: focusFirstTile,
+    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow },
     remote: {}
   });
 }
