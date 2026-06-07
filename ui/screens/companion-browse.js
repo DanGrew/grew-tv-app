@@ -4,6 +4,7 @@ import { screenPage, filterByTitle } from '../../core/companion-utils.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
+import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 
 // Companion Home (TASK-117 + FEAT-020/TASK-139): a content-type tab strip
@@ -143,6 +144,12 @@ export function initPage() {
     var page = screenPage(payload.context_id);
     [page].filter(function(p) { return p !== 'browse'; }).forEach(function(p) { window.location.href = p + '.html'; });
   }
+
+  // BUG-007: Switch profile drives the TV back to the picker via the same
+  // `navigate` intent the breadcrumb crumbs use — the app teleports and echoes
+  // the `profile` context back, which onContext above then follows. One path.
+  function switchProfile() { api.sendIntent('navigate', switchProfileTarget()); }
+  document.getElementById('switch-profile').addEventListener('click', switchProfile);
 
   api = connect('ws://' + host + ':8766', onContext, function(s) { els.connStatus.textContent = s; }, onAppState);
 }

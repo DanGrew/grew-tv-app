@@ -5,11 +5,13 @@ import { progressMapFromCW } from '../../core/progress.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, scanDevices } from '../../core/app-api.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
+import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
 var SERVER = 'http://localhost:8765';
 var LAST_TILE_KEY = 'grew-tv:last-tile';
 var LAST_TAB_KEY = 'grew-tv:last-tab';
+var ACTIVATE_KEYS = { Enter: true, ' ': true };
 
 export function initBrowsePage() {
   function showSettings() {
@@ -33,6 +35,21 @@ export function initBrowsePage() {
     document.getElementById('screen-settings').classList.remove('active');
     [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
   }
+
+  // BUG-007: the top-right profile control returns to the picker. Activating it
+  // navigates the TV to profile.html, whose own load pushes the `profile`
+  // context so the companion follows. Re-entering a locked profile re-runs the
+  // PIN gate there — no silent re-entry.
+  function goToProfile() {
+    var t = switchProfileTarget();
+    navTo(t.page, t.params);
+  }
+
+  var profileLabel = document.getElementById('profile-label');
+  profileLabel.addEventListener('click', goToProfile);
+  profileLabel.addEventListener('keydown', function(e) {
+    [ACTIVATE_KEYS[e.key]].filter(Boolean).forEach(function() { e.preventDefault(); goToProfile(); });
+  });
 
   document.getElementById('btn-settings').addEventListener('click', showSettings);
   document.getElementById('btn-back-settings').addEventListener('click', hideSettings);
@@ -59,7 +76,8 @@ export function initBrowsePage() {
         var target = [id].filter(Boolean).map(function(i) { return document.querySelector('.film-tile[data-id="' + i + '"]'); }).filter(Boolean)[0];
         ([target].filter(Boolean).concat([document.activeElement]))[0].click();
       },
-      back:           function() { navTo('profile.html'); }
+      back:           function() { navTo('profile.html'); },
+      navigate:       function() { navTo(params.page, params.params); }
     };
     [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
   });

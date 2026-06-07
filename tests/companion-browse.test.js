@@ -13,14 +13,17 @@ function msg(type, payload) { return JSON.stringify({ type, payload }); }
 function mockApp(page, appState) {
   let version = 1;
   return page.routeWebSocket(/:8766/, (ws) => {
-    function push() {
+    function push(contextId) {
       version += 1;
-      ws.send(msg('context', { version: version, context_id: 'browse' }));
+      ws.send(msg('context', { version: version, context_id: contextId }));
       ws.send(msg('app_state', appState));
     }
     ws.onMessage(function(raw) {
       const m = JSON.parse(raw);
-      if (m.type === 'snapshot_request') push();
+      if (m.type === 'snapshot_request') push('browse');
+      // BUG-007: the app turns a `navigate` intent into a teleport and echoes the
+      // target screen's context back — mirror that so the companion follows.
+      if (m.type === 'intent' && m.payload.intent === 'navigate') push(m.payload.params.page.replace('.html', ''));
     });
   });
 }
@@ -61,6 +64,12 @@ test('search takes over with a flat grid across the catalog, then restores rails
   await page.locator('#search').fill('');
   await expect(page.locator('#rails-section')).toBeVisible();
   await expect(page.locator('#search-section')).toBeHidden();
+});
+
+test('Switch profile drives the picker — navigate intent echoes a profile context, companion follows (BUG-007)', async ({ page }) => {
+  await expect(page.locator('#switch-profile')).toBeVisible();
+  await page.locator('#switch-profile').click();
+  await expect(page).toHaveURL(/companion\/profile\.html$/);
 });
 
 test('Continue tab leads when a video is mid-watch', async ({ page }) => {

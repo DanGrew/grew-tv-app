@@ -75,6 +75,33 @@ test('Kids profile request is scoped server-side (no adults content)', async ({ 
   expect(titles).not.toContain('The Dark Knight');
 });
 
+test('the profile control returns to the Who\'s watching picker (BUG-007)', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  await expect(page.locator('#profile-label')).toContainText('Kids');
+  await page.locator('#profile-label').click();
+  await expect(page.locator('#screen-profile')).toBeVisible();
+});
+
+test('d-pad Up from the top rail reaches the profile control; Enter opens the picker', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  await page.locator('.rail-row .film-tile').first().focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('#profile-label')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#screen-profile')).toBeVisible();
+});
+
+test('switching profile re-requires the PIN to re-enter locked Adults (respect the lock)', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  await page.locator('#profile-label').click();
+  await expect(page.locator('#screen-profile')).toBeVisible();
+  await page.locator('#btn-adults').click();
+  await expect(page.locator('#pin-panel')).toHaveClass(/active/);
+});
+
 test('browse 500 shows error screen', async ({ page }) => {
   await page.route(BROWSE_URL, route => route.fulfill({ status: 500 }));
   await page.locator('#btn-kids').click();
