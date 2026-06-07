@@ -55,6 +55,21 @@ describe('tileModel — series', () => {
   });
 });
 
+describe('tileModel — sub-label (clip count)', () => {
+  it('series with clipCount renders "{n} clips"', () => {
+    expect(tileModel({ kind: 'series', id: 's', clipCount: 6 }, {}).sub).toBe('6 clips');
+  });
+  it('singular clip', () => {
+    expect(tileModel({ kind: 'series', id: 's', clipCount: 1 }, {}).sub).toBe('1 clip');
+  });
+  it('series without clipCount has no sub', () => {
+    expect(tileModel({ kind: 'series', id: 's' }, {}).sub).toBeNull();
+  });
+  it('video cards never get a sub-label', () => {
+    expect(tileModel({ kind: 'video', id: 'v', clipCount: 3 }, {}).sub).toBeNull();
+  });
+});
+
 describe('tileModel — defaults', () => {
   it('defaults kind to video and title/poster safely', () => {
     const m = tileModel({ id: 'x' }, {});

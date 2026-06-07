@@ -49,6 +49,13 @@ export function createTile(server, card, opts) {
   tile.appendChild(placeholder);
   tile.appendChild(title);
 
+  [m.sub].filter(Boolean).forEach(function(text) {
+    var sub = document.createElement('div');
+    sub.className = 'tile-sub';
+    sub.textContent = text;
+    tile.appendChild(sub);
+  });
+
   [m.showCC].filter(Boolean).forEach(function() {
     var cc = document.createElement('div');
     cc.className = 'tile-cc';
