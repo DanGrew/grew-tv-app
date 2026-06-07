@@ -39,8 +39,8 @@ describe('getCaptions / setCaptions', () => {
   });
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  it('defaults to off when unset', () => {
-    expect(getCaptions()).toBe(false);
+  it('defaults to on when unset (BUG-003)', () => {
+    expect(getCaptions()).toBe(true);
   });
   it('returns true after setCaptions(true)', () => {
     setCaptions(true);

@@ -420,16 +420,23 @@ test('CC button hidden for a video without subtitles', async ({ page }) => {
   await expect(page.locator('#btn-cc')).toHaveClass(/hidden/);
 });
 
+test('subtitles show by default on first play, no stored pref (BUG-003)', async ({ page }) => {
+  await goToVideoScreen(page);
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv:captions'))).toBeNull();
+  await expect(page.locator('#btn-cc')).not.toHaveClass(/cc-off/);
+  await expect.poll(() => page.evaluate(() => document.getElementById('video').textTracks[0].mode)).toBe('showing');
+});
+
 test('CC preference is sticky across videos', async ({ page }) => {
   await goToVideoScreen(page);
-  await expect(page.locator('#btn-cc')).toHaveClass(/cc-off/);
-  await page.locator('#btn-cc').click();
   await expect(page.locator('#btn-cc')).not.toHaveClass(/cc-off/);
-  expect(await page.evaluate(() => localStorage.getItem('grew-tv:captions'))).toBe('on');
+  await page.locator('#btn-cc').click();
+  await expect(page.locator('#btn-cc')).toHaveClass(/cc-off/);
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv:captions'))).toBe('off');
   await page.goto('/app/homeview/video.html?video=bluey-s1e01');
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-cc')).not.toHaveClass(/hidden/);
-  await expect(page.locator('#btn-cc')).not.toHaveClass(/cc-off/);
+  await expect(page.locator('#btn-cc')).toHaveClass(/cc-off/);
 });
 
 test('standalone film at end returns to its origin', async ({ page }) => {
