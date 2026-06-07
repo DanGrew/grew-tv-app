@@ -8,9 +8,10 @@ export function setProfile(p) {
 
 // Global sticky captions preference (FEAT-017): toggle once and captions stay
 // on for every video that has them until toggled off. Held app-side, relayed to
-// the companion via the app_state `captionsOn` field. Default off when unset.
+// the companion via the app_state `captionsOn` field. Default ON when unset
+// (BUG-003): subtitles show on first play; only an explicit 'off' disables them.
 export function getCaptions() {
-  return localStorage.getItem('grew-tv:captions') === 'on';
+  return localStorage.getItem('grew-tv:captions') !== 'off';
 }
 
 export function setCaptions(on) {
