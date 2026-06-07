@@ -10,10 +10,16 @@ var AVAILABLE_ROW = {
   'false': { className: 'detail-row unavailable', tabIndex: -1 }
 };
 
-// Up/Down move between vertical stops: the header Play-next action plus every
-// available episode row. A focused per-row Restart control counts as its row.
+// Up/Down move between vertical stops: clickable breadcrumb crumbs (top), then
+// the header Play-next action, then every available episode row. A focused
+// per-row Restart control counts as its row.
+function crumbStops() {
+  return Array.from(document.querySelectorAll('#breadcrumb .crumb-link'));
+}
+
 function verticalStops() {
-  return [document.getElementById('btn-play-next')].filter(Boolean)
+  return crumbStops()
+    .concat([document.getElementById('btn-play-next')].filter(Boolean))
     .concat(Array.from(document.querySelectorAll('.detail-row:not(.unavailable)')));
 }
 
@@ -48,8 +54,10 @@ export function detailLeft(e) {
     .forEach(function(r) { r.focus(); });
 }
 
+// Default focus lands on Play-next (not the breadcrumb): the crumbs are a stop
+// you reach by pressing Up, never the entry focus.
 export function focusFirstDetailRow() {
-  [verticalStops()[0]].filter(Boolean).forEach(function(s) { s.focus(); });
+  [document.getElementById('btn-play-next')].filter(Boolean).forEach(function(s) { s.focus(); });
 }
 
 function seasonHeader(list, season) {

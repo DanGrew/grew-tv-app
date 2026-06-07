@@ -120,8 +120,15 @@ export function setup(config) {
   };
 
   // ── transport d-pad nav (model: L/R = quick ±10s; U/D cycles buttons) ──────
+  // Clickable breadcrumb crumbs (FEAT-021) join the Up/Down cycle ahead of the
+  // transport so the trail is d-pad reachable; Enter on one navigates via click.
+  function crumbStops() {
+    return Array.prototype.slice.call(document.querySelectorAll('#breadcrumb .crumb-link'));
+  }
+
   function focusList() {
-    return FOCUS_ORDER.map(function(id) { return document.getElementById(id); })
+    return crumbStops()
+      .concat(FOCUS_ORDER.map(function(id) { return document.getElementById(id); }))
       .filter(function(el) { return !el.classList.contains('hidden'); });
   }
 

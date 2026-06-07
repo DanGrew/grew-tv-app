@@ -4,6 +4,8 @@ import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadVideo, loadNext, loadSeries, loadProgress } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
+import { buildCrumbs } from '../../core/breadcrumb.js';
+import { mountBreadcrumb } from './breadcrumb.js';
 
 var SERVER = 'http://localhost:8765';
 
@@ -26,6 +28,22 @@ export function initVideoPage() {
   var player;
 
   function goTo(id) { navTo('video.html', { video: id, series: seriesId, from: from }); }
+
+  // Breadcrumb trail (FEAT-021): a film is Home > Title; a series episode is
+  // Home > Series > Episode, so the series crumb needs the series title (fetched;
+  // graceful fallback to 'Series' when /api/series is unavailable).
+  function mountCrumbs(videoTitle, seriesTitle) {
+    mountBreadcrumb('breadcrumb', buildCrumbs('video', { seriesId: seriesId, seriesTitle: seriesTitle, videoTitle: videoTitle }));
+  }
+  var CRUMB_BUILD = {
+    'true': function(videoTitle) {
+      loadSeries(SERVER, seriesId)
+        .then(function(s) { mountCrumbs(videoTitle, s.title); })
+        .catch(function() { mountCrumbs(videoTitle, 'Series'); });
+    },
+    'false': function(videoTitle) { mountCrumbs(videoTitle, null); }
+  };
+  function buildVideoCrumbs(videoTitle) { CRUMB_BUILD[!!seriesId + ''](videoTitle); }
 
   // Resolve the next episode, then act on it; no next (end of series) -> stop.
   function loadNextThen(action) {
@@ -116,6 +134,6 @@ export function initVideoPage() {
     loadVideo(SERVER, videoId),
     loadProgress(SERVER, videoId).catch(function() { return { position_secs: 0, duration_secs: null }; })
   ])
-    .then(function(res) { player.playVideo(res[0], from, resumeStart(restart, res[1])); player.setSeriesMode(!!seriesId); showUpNextLine(); })
+    .then(function(res) { player.playVideo(res[0], from, resumeStart(restart, res[1])); player.setSeriesMode(!!seriesId); showUpNextLine(); buildVideoCrumbs(res[0].title); })
     .catch(function() { navTo('error.html'); });
 }

@@ -5,6 +5,8 @@ import { connectApp } from '../../core/app-ws.js';
 import { loadSeries, loadContinueWatching } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { playNextIndex } from '../../core/series-detail.js';
+import { buildCrumbs } from '../../core/breadcrumb.js';
+import { mountBreadcrumb } from './breadcrumb.js';
 
 var SERVER = 'http://localhost:8765';
 
@@ -71,6 +73,7 @@ export function initDetailPage() {
     .then(function(res) {
       state.series = res[0];
       state.progress = progressMapFromCW(res[1].content);
+      mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: seriesId, seriesTitle: state.series.title }));
       buildDetailList(SERVER, state.series, state.progress, onPlayItem);
       focusFirstDetailRow();
     })
