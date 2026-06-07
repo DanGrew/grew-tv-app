@@ -51,7 +51,7 @@ button:hover { background: var(--surface-hi); }
 .film-tile { position: relative; flex: 0 0 248px; width: 248px; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); cursor: pointer; overflow: hidden; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); }
 .film-tile:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); transform: scale(1.05); z-index: 1; }
 .film-tile:focus .tile-title { color: var(--focus); }
-.film-poster { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: var(--surface-hi); display: block; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.film-poster { width: 100%; aspect-ratio: 16/9; object-fit: contain; background: #000; display: block; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .film-poster-placeholder { width: 100%; aspect-ratio: 16/9; background: var(--surface-hi); display: flex; align-items: center; justify-content: center; font-size: 30px; color: var(--text-muted); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .tile-title { font-size: 15px; padding: 10px 12px 12px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur) var(--ease); }
 .tile-sub { margin-top: -8px; padding: 0 12px 10px; font-size: 12px; color: var(--text-muted); }
