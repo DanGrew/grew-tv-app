@@ -32,6 +32,10 @@ function focusActiveTab() {
   [document.querySelector('.sidebar-tab.active')].filter(Boolean).forEach(function(t) { t.focus(); });
 }
 
+function focusToggle() {
+  document.querySelector('.sidebar-toggle').focus();
+}
+
 // BUG-007: the top-right profile control is the third focus target. It is the
 // edge above both zones — Up from the top tab or the top rail lands here.
 function focusProfileLabel() {
@@ -62,8 +66,10 @@ function upFromRail(rows, railIdx, col) {
   ({ true: focusProfileLabel, false: function() { focusCol(rows[railIdx - 1], col); } })[railIdx <= 0]();
 }
 
+// The collapse toggle sits above the tabs; Up from the top tab lands on it
+// (and Up from the toggle continues to the profile control — see toggleArrow).
 function upFromTab(idx) {
-  ({ true: focusProfileLabel, false: function() { focusTab(idx - 1); } })[idx <= 0]();
+  ({ true: focusToggle, false: function() { focusTab(idx - 1); } })[idx <= 0]();
 }
 
 // Sidebar zone: Up/Down move between tabs (each focus swaps the rails, below);
@@ -78,6 +84,20 @@ export function sidebarArrow(e) {
     ArrowLeft:  function() {}
   };
   [SMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
+}
+
+// Toggle zone: the collapse button above the tabs. Down drops to the first tab,
+// Up rises to the profile control, Right enters the rails; Enter (native button
+// click) flips the sidebar's collapsed class.
+export function toggleArrow(e) {
+  e.preventDefault();
+  var TMOVE = {
+    ArrowUp:    focusProfileLabel,
+    ArrowDown:  function() { focusTab(0); },
+    ArrowRight: focusFirstTile,
+    ArrowLeft:  function() {}
+  };
+  [TMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
 }
 
 // Topbar zone: the profile control sits above both zones. Down drops into the
@@ -116,15 +136,21 @@ function topbarZone() {
   return [document.activeElement.closest('#profile-label')].filter(Boolean).map(function() { return 'topbar'; });
 }
 
+// Checked before sidebarZone — the toggle lives inside #sidebar, so its more
+// specific match must win.
+function toggleZone() {
+  return [document.activeElement.closest('.sidebar-toggle')].filter(Boolean).map(function() { return 'toggle'; });
+}
+
 function sidebarZone() {
   return [document.activeElement.closest('#sidebar')].filter(Boolean).map(function() { return 'sidebar'; });
 }
 
 function zoneOf() {
-  return topbarZone().concat(sidebarZone()).concat(['rails'])[0];
+  return topbarZone().concat(toggleZone()).concat(sidebarZone()).concat(['rails'])[0];
 }
 
-var ZONE = { sidebar: sidebarArrow, rails: railArrow, topbar: profileArrow };
+var ZONE = { toggle: toggleArrow, sidebar: sidebarArrow, rails: railArrow, topbar: profileArrow };
 
 // Single d-pad entry point — routes the arrow to the zone holding focus.
 export function browseArrow(e) {
@@ -179,9 +205,23 @@ function tabButton(tab) {
   return btn;
 }
 
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+}
+
+function toggleButton() {
+  var btn = document.createElement('button');
+  btn.className = 'sidebar-toggle';
+  btn.setAttribute('aria-label', 'Toggle menu');
+  btn.textContent = '☰';
+  btn.addEventListener('click', toggleSidebar);
+  return btn;
+}
+
 function renderSidebar(tabs) {
   var bar = document.getElementById('sidebar');
   bar.innerHTML = '';
+  bar.appendChild(toggleButton());
   tabs.forEach(function(tab) { bar.appendChild(tabButton(tab)); });
 }
 

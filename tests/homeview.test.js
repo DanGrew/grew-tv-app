@@ -201,6 +201,31 @@ test('ArrowDown in the sidebar moves to the next tab and swaps the rails', async
   await expect(page.locator('.rail-title')).toHaveText(['Animation', 'Comedy']);
 });
 
+test('ArrowUp from the top tab reaches the collapse toggle; Enter collapses the sidebar', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await page.locator('.sidebar-tab[data-tab="series"]').focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('.sidebar-toggle')).toBeFocused();
+  await expect(page.locator('#sidebar')).not.toHaveClass(/collapsed/);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#sidebar')).toHaveClass(/collapsed/);
+  // Toggle again to expand.
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#sidebar')).not.toHaveClass(/collapsed/);
+});
+
+test('from the toggle, ArrowDown returns to the first tab and ArrowUp reaches the profile control', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await page.locator('.sidebar-tab[data-tab="series"]').focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('.sidebar-toggle')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.sidebar-tab[data-tab="series"]')).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('#profile-label')).toBeFocused();
+});
+
 async function goToVideoScreen(page) {
   await page.locator('#btn-kids').click();
   await page.locator('.sidebar-tab[data-tab="films"]').click();
