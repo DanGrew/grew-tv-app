@@ -13,6 +13,13 @@ export function skipLabel(actionId) {
   return SKIP_LABEL_MAP[secs] || secs + 's';
 }
 
+// The player app_state itemId is the series id for an episode and the video id
+// for a film (itemId === episodeId). Returns the series id, or undefined for a
+// film, so the companion breadcrumb (FEAT-021) tells an episode from a film.
+export function seriesIdFromSnap(snap) {
+  return [snap.itemId].filter(function() { return snap.itemId !== snap.episodeId; })[0];
+}
+
 export function displayTitle(payload) {
   return [payload.display].filter(Boolean)
     .map(function(d) { return d.title; })

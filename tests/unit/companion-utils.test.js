@@ -1,4 +1,13 @@
-import { screenPage, titleCase, skipLabel, displayTitle, displayLabel, getContentBasePath, filterByTitle } from '../../core/companion-utils.js';
+import { screenPage, titleCase, skipLabel, displayTitle, displayLabel, getContentBasePath, filterByTitle, seriesIdFromSnap } from '../../core/companion-utils.js';
+
+describe('seriesIdFromSnap', () => {
+  it('returns the series id for an episode (itemId !== episodeId)', () => {
+    expect(seriesIdFromSnap({ itemId: 'bluey', episodeId: 'bluey-s1e03' })).toBe('bluey');
+  });
+  it('returns undefined for a film (itemId === episodeId)', () => {
+    expect(seriesIdFromSnap({ itemId: 'toy-story-main', episodeId: 'toy-story-main' })).toBeUndefined();
+  });
+});
 
 describe('filterByTitle', () => {
   const cards = [

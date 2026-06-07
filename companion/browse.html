@@ -36,10 +36,19 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 .tile-btn img { width: 100%; height: 120px; object-fit: cover; background: var(--surface-hi); flex-shrink: 0; }
 .tile-btn span { color: var(--text); font-size: 14px; padding: 8px; text-align: left; }
 .tile-btn:active { border-color: var(--focus); }
+#breadcrumb { flex-shrink: 0; }
+.breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.crumb { font-size: 13px; }
+.crumb-current { color: var(--text-muted); }
+.crumb-sep { color: var(--text-muted); font-size: 13px; }
+.crumb-link { background: none; border: none; padding: 2px 4px; margin: 0; color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); touch-action: manipulation; transition: color var(--dur) var(--ease); }
+.crumb-link:active { color: var(--focus); }
+.crumb-link:focus { outline: 1px solid var(--focus); }
 </style>
 </head>
 <body>
 <div id="conn-status">connecting…</div>
+<div id="breadcrumb"></div>
 <input id="search" type="search" placeholder="Search titles…" autocomplete="off">
 <div id="scroll">
   <div id="cw-section">
