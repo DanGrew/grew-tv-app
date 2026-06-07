@@ -49,11 +49,18 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 .crumb-link { background: none; border: none; padding: 2px 4px; margin: 0; color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); touch-action: manipulation; transition: color var(--dur) var(--ease); }
 .crumb-link:active { color: var(--focus); }
 .crumb-link:focus { outline: 1px solid var(--focus); }
+#topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+#switch-profile { flex: 0 0 auto; font-size: 13px; padding: 8px 14px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#switch-profile:active { border-color: var(--focus); color: var(--focus); }
+#switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 </style>
 </head>
 <body>
 <div id="conn-status">connecting…</div>
-<div id="breadcrumb"></div>
+<div id="topbar">
+  <div id="breadcrumb"></div>
+  <button id="switch-profile" type="button">👤 Switch profile</button>
+</div>
 <input id="search" type="search" placeholder="Search titles…" autocomplete="off">
 <div id="tabs"></div>
 <div id="scroll">

@@ -32,6 +32,12 @@ function focusActiveTab() {
   [document.querySelector('.sidebar-tab.active')].filter(Boolean).forEach(function(t) { t.focus(); });
 }
 
+// BUG-007: the top-right profile control is the third focus target. It is the
+// edge above both zones — Up from the top tab or the top rail lands here.
+function focusProfileLabel() {
+  document.getElementById('profile-label').focus();
+}
+
 function focusTab(i) {
   var tabs = sidebarTabs();
   [tabs[clampIndex(i, tabs.length)]].filter(Boolean).forEach(function(t) { t.focus(); });
@@ -50,18 +56,39 @@ function leftFromRail(railEl, col) {
   ({ true: focusActiveTab, false: function() { focusCol(railEl, col - 1); } })[col <= 0]();
 }
 
+// Upward from the top rail (or the top tab): hop to the profile control;
+// otherwise step a rail / tab as before.
+function upFromRail(rows, railIdx, col) {
+  ({ true: focusProfileLabel, false: function() { focusCol(rows[railIdx - 1], col); } })[railIdx <= 0]();
+}
+
+function upFromTab(idx) {
+  ({ true: focusProfileLabel, false: function() { focusTab(idx - 1); } })[idx <= 0]();
+}
+
 // Sidebar zone: Up/Down move between tabs (each focus swaps the rails, below);
 // Right enters the rails; Left is the edge.
 export function sidebarArrow(e) {
   e.preventDefault();
   var idx = sidebarTabs().indexOf(document.activeElement);
   var SMOVE = {
-    ArrowUp:    function() { focusTab(idx - 1); },
+    ArrowUp:    function() { upFromTab(idx); },
     ArrowDown:  function() { focusTab(idx + 1); },
     ArrowRight: function() { focusFirstTile(); },
     ArrowLeft:  function() {}
   };
   [SMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
+}
+
+// Topbar zone: the profile control sits above both zones. Down drops into the
+// rails, Left into the sidebar; activation (Enter) is wired by the page.
+export function profileArrow(e) {
+  e.preventDefault();
+  var PMOVE = {
+    ArrowDown: focusFirstTile,
+    ArrowLeft: focusActiveTab
+  };
+  [PMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
 }
 
 // Rails zone: left/right scroll within a rail (left at col 0 hops to the
@@ -77,7 +104,7 @@ export function railArrow(e) {
   var MOVE = {
     ArrowLeft:  function() { leftFromRail(rows[railIdx], col); },
     ArrowRight: function() { focusCol(rows[railIdx], col + 1); },
-    ArrowUp:    function() { focusCol(rows[railIdx - 1], col); },
+    ArrowUp:    function() { upFromRail(rows, railIdx, col); },
     ArrowDown:  function() { focusCol(rows[railIdx + 1], col); }
   };
   [railIdx].filter(function() { return railIdx >= 0; }).forEach(function() {
@@ -85,11 +112,19 @@ export function railArrow(e) {
   });
 }
 
-function zoneOf() {
-  return [document.activeElement.closest('#sidebar')].filter(Boolean).map(function() { return 'sidebar'; }).concat(['rails'])[0];
+function topbarZone() {
+  return [document.activeElement.closest('#profile-label')].filter(Boolean).map(function() { return 'topbar'; });
 }
 
-var ZONE = { sidebar: sidebarArrow, rails: railArrow };
+function sidebarZone() {
+  return [document.activeElement.closest('#sidebar')].filter(Boolean).map(function() { return 'sidebar'; });
+}
+
+function zoneOf() {
+  return topbarZone().concat(sidebarZone()).concat(['rails'])[0];
+}
+
+var ZONE = { sidebar: sidebarArrow, rails: railArrow, topbar: profileArrow };
 
 // Single d-pad entry point — routes the arrow to the zone holding focus.
 export function browseArrow(e) {
@@ -166,7 +201,7 @@ export function renderBrowse(server, cards, progress, labels, profile, onSelect,
   STATE.labels = labels;
   STATE.profile = profile;
   STATE.onSelect = onSelect;
-  document.getElementById('profile-label').textContent = PROFILE_LABEL[profile];
+  document.getElementById('profile-label').textContent = '👤 ' + PROFILE_LABEL[profile] + ' ▸';
   var tabs = buildTabs(cards, progress);
   var ids = tabs.map(function(t) { return t.id; });
   renderSidebar(tabs);
