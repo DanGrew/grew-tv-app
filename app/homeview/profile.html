@@ -5,31 +5,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grew TV</title>
 <style>
+:root {
+  --bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+  --surface: rgba(255,255,255,0.06);
+  --surface-hi: rgba(255,255,255,0.11);
+  --border: rgba(255,255,255,0.13);
+  --focus: #fff;
+  --focus-glow: 0 0 0 1px rgba(255,255,255,0.6), 0 4px 24px rgba(255,255,255,0.15);
+  --text: rgba(255,255,255,0.95);
+  --text-muted: rgba(255,255,255,0.4);
+  --radius: 16px;
+  --radius-sm: 8px;
+  --dur: 0.18s;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --heading-ls: -0.5px;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #0a0a0a; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-h1 { font-size: 64px; margin-bottom: 16px; letter-spacing: -1px; }
-h2 { font-size: 40px; color: #aaa; margin-bottom: 56px; font-weight: normal; }
-#profile-cards { display: flex; gap: 36px; }
-.profile-card { position: relative; width: 280px; background: #1a1a1a; border: 3px solid #333; border-radius: 16px; overflow: hidden; cursor: pointer; transition: border-color 0.1s, transform 0.1s; }
-.profile-card:focus { outline: none; border-color: #ff0; transform: translateY(-8px); }
-.profile-card:focus .profile-name { color: #ff0; }
-.profile-photo { height: 280px; background: #222; display: flex; align-items: center; justify-content: center; }
+body { background: var(--bg); background-attachment: fixed; background-size: cover; color: var(--text); font-family: var(--font); height: 100vh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+h1 { font-size: 22px; margin-bottom: 10px; letter-spacing: var(--heading-ls); color: var(--text-muted); font-weight: 600; }
+h2 { font-size: 46px; color: var(--text); margin-bottom: 36px; font-weight: normal; letter-spacing: var(--heading-ls); }
+#profile-cards { display: flex; gap: 28px; }
+.profile-card { position: relative; width: 240px; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); overflow: hidden; cursor: pointer; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); }
+.profile-card:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); transform: translateY(-8px) scale(1.03); }
+.profile-card:focus .profile-name { color: var(--focus); }
+.profile-photo { height: 240px; background: var(--surface-hi); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .profile-photo.kids { background: linear-gradient(160deg, #3a7bd5, #00d2ff); }
 .profile-photo.adults { background: linear-gradient(160deg, #834d9b, #d04ed6); }
 .profile-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.profile-photo-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 96px; }
-.profile-name { padding: 22px; font-size: 30px; text-align: center; }
-.lock-badge { position: absolute; top: 16px; right: 16px; width: 48px; height: 48px; border-radius: 50%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 24px; z-index: 2; }
-#pin-panel { display: none; margin-top: 44px; padding: 32px; background: #1a1a1a; border: 3px solid #333; border-radius: 16px; flex-direction: column; align-items: center; gap: 24px; }
+.profile-photo-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 84px; }
+.profile-name { padding: 16px; font-size: 24px; text-align: center; background: linear-gradient(transparent, rgba(0,0,0,0.35)); transition: color var(--dur) var(--ease); }
+.lock-badge { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; font-size: 16px; z-index: 2; }
+#pin-panel { display: none; margin-top: 24px; padding: 28px; width: 280px; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); flex-direction: column; align-items: center; gap: 20px; }
 #pin-panel.active { display: flex; }
 #pin-panel.shake { animation: shake 0.4s; }
-.pin-title { font-size: 24px; color: #aaa; }
-.pin-dots { display: flex; gap: 20px; }
-.pin-dots span { width: 20px; height: 20px; border-radius: 50%; border: 3px solid #555; }
-.pin-dots span.on { background: #ff0; border-color: #ff0; }
-.keypad { display: grid; grid-template-columns: repeat(3, 88px); gap: 16px; }
-.key { width: 88px; height: 88px; background: #222; border: 3px solid #444; border-radius: 12px; font-size: 36px; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: border-color 0.1s, color 0.1s; }
-.key:focus { outline: none; border-color: #ff0; color: #ff0; }
+.pin-title { font-size: 18px; color: var(--text-muted); letter-spacing: 1px; }
+.pin-dots { display: flex; gap: 16px; }
+.pin-dots span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--text-muted); }
+.pin-dots span.on { background: var(--focus); border-color: var(--focus); }
+.keypad { display: grid; grid-template-columns: repeat(3, 64px); gap: 12px; }
+.key { width: 64px; height: 64px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); font-size: 26px; color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.key:focus { outline: none; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-12px); } 40%, 80% { transform: translateX(12px); } }
 #error-msg { display: none; }
 </style>

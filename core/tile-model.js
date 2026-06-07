@@ -35,6 +35,13 @@ export function tileModel(card, ctx) {
 
   var cc = c.hasCC != null ? c.hasCC : hasVtt(card);
 
+  // Series sub-label: clip count from the v3 browse card (backend `clipCount`).
+  // Absent (video cards, or older backend without the field) -> no sub-label.
+  var sub = null;
+  if (kind === 'series' && card.clipCount != null) {
+    sub = card.clipCount === 1 ? '1 clip' : card.clipCount + ' clips';
+  }
+
   return {
     id: card.id,
     kind: kind,
@@ -42,6 +49,7 @@ export function tileModel(card, ctx) {
     poster: card.poster || null,
     percent: pct,
     showBar: showBar,
-    showCC: !!cc
+    showCC: !!cc,
+    sub: sub
   };
 }

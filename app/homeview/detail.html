@@ -5,37 +5,53 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grew TV</title>
 <style>
+:root {
+  --bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+  --surface: rgba(255,255,255,0.06);
+  --surface-hi: rgba(255,255,255,0.11);
+  --border: rgba(255,255,255,0.13);
+  --focus: #fff;
+  --focus-glow: 0 0 0 1px rgba(255,255,255,0.6), 0 4px 24px rgba(255,255,255,0.15);
+  --text: rgba(255,255,255,0.95);
+  --text-muted: rgba(255,255,255,0.4);
+  --radius: 16px;
+  --radius-sm: 8px;
+  --dur: 0.18s;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --heading-ls: -0.5px;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #0a0a0a; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-button { background: #1a1a1a; color: #fff; border: 3px solid #444; border-radius: 12px; font-size: 40px; padding: 28px 60px; cursor: pointer; min-width: 260px; text-align: center; }
-button:focus { outline: none; border-color: #ff0; background: #1a1a00; color: #ff0; }
-button:hover { background: #222; }
-#detail-title { font-size: 48px; flex-shrink: 0; }
-.detail-header-poster { width: 100px; height: 150px; object-fit: cover; background: #222; border-radius: 8px; flex-shrink: 0; }
-.detail-header-placeholder { width: 100px; height: 150px; background: #1e1e1e; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 48px; flex-shrink: 0; }
-#detail-list { flex: 1; overflow-y: auto; padding: 0 60px 60px; }
-.detail-row { display: flex; align-items: center; gap: 24px; padding: 20px; border: 3px solid #333; border-radius: 12px; margin-bottom: 16px; cursor: pointer; background: #1a1a1a; }
-.detail-row:focus { outline: none; border-color: #ff0; }
+body { background: var(--bg); background-attachment: fixed; background-size: cover; color: var(--text); font-family: var(--font); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+button { background: var(--surface); color: var(--text); border: 2.5px solid var(--border); border-radius: var(--radius); font-size: 18px; padding: 14px 26px; cursor: pointer; min-width: 140px; text-align: center; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease); }
+button:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
+button:hover { background: var(--surface-hi); }
+#detail-title { font-size: 42px; letter-spacing: var(--heading-ls); flex-shrink: 0; }
+.detail-header-poster { width: 200px; aspect-ratio: 16/9; object-fit: cover; background: var(--surface-hi); border: 2.5px solid var(--border); border-radius: var(--radius); flex-shrink: 0; }
+.detail-header-placeholder { width: 200px; aspect-ratio: 16/9; background: var(--surface-hi); border: 2.5px solid var(--border); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: 30px; color: var(--text-muted); flex-shrink: 0; }
+#detail-list { flex: 1; overflow-y: auto; padding: 0 48px 48px; }
+.detail-row { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border: 2.5px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; cursor: pointer; background: var(--surface); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease); }
+.detail-row:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 .detail-row.unavailable { opacity: 0.4; cursor: default; }
-.detail-thumb { width: 80px; height: 120px; object-fit: cover; background: #222; border-radius: 6px; flex-shrink: 0; }
-.detail-thumb-placeholder { width: 80px; height: 120px; background: #1e1e1e; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 32px; flex-shrink: 0; }
+.detail-thumb { width: 104px; height: 60px; object-fit: cover; background: var(--surface-hi); border-radius: var(--radius-sm); flex-shrink: 0; }
+.detail-thumb-placeholder { width: 104px; height: 60px; background: var(--surface-hi); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--text-muted); flex-shrink: 0; }
 .detail-info { flex: 1; }
-.detail-label { font-size: 36px; line-height: 1.3; }
-.detail-duration { font-size: 28px; color: #aaa; margin-top: 6px; }
-.detail-progress { height: 8px; background: rgba(255,255,255,0.18); border-radius: 4px; margin-top: 12px; max-width: 480px; }
-.detail-progress-fill { height: 100%; background: #ff0; border-radius: 4px; width: 0; }
-.detail-restart { font-size: 24px; padding: 14px 28px; min-width: auto; flex-shrink: 0; }
-.detail-season { font-size: 30px; color: #888; font-weight: 700; padding: 24px 20px 8px; }
-#btn-play-next { font-size: 32px; padding: 18px 40px; min-width: auto; }
+.detail-label { font-size: 19px; line-height: 1.3; }
+.detail-duration { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.detail-progress { height: 4px; background: rgba(0,0,0,0.45); border-radius: 2px; margin-top: 8px; max-width: 320px; }
+.detail-progress-fill { height: 100%; background: var(--focus); border-radius: 2px; width: 0; }
+.detail-restart { font-size: 12px; padding: 5px 12px; min-width: auto; flex-shrink: 0; border-width: 1.5px; }
+.detail-season { font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 600; padding: 18px 16px 8px; }
+#btn-play-next { font-size: 18px; padding: 14px 26px; min-width: auto; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 #error-msg { display: none; }
 </style>
 </head>
 <body id="screen-detail">
-<div style="display:flex;align-items:center;gap:32px;padding:40px 60px 24px;flex-shrink:0">
-  <button id="btn-back-detail" style="font-size:28px;padding:16px 32px;min-width:auto">&#8592; Back</button>
+<div style="display:flex;align-items:center;gap:24px;padding:28px 48px 20px;flex-shrink:0">
+  <button id="btn-back-detail" style="font-size:16px;padding:12px 20px;min-width:auto">&#8592; Back</button>
   <img id="detail-header-poster" class="detail-header-poster" alt="" style="display:none">
   <div id="detail-header-placeholder" class="detail-header-placeholder" style="display:none">&#127916;</div>
-  <div id="detail-title" style="padding:0;font-size:48px;flex:1"></div>
+  <div id="detail-title" style="padding:0;font-size:42px;flex:1"></div>
   <button id="btn-play-next">&#9654; Play next</button>
 </div>
 <div id="detail-list"></div>
