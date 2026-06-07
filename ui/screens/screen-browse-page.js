@@ -5,6 +5,8 @@ import { buildRails } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, scanDevices } from '../../core/app-api.js';
+import { buildCrumbs } from '../../core/breadcrumb.js';
+import { mountBreadcrumb } from './breadcrumb.js';
 
 var SERVER = 'http://localhost:8765';
 var LAST_TILE_KEY = 'grew-tv:last-tile';
@@ -36,6 +38,7 @@ export function initBrowsePage() {
   document.getElementById('btn-back-settings').addEventListener('click', hideSettings);
   document.getElementById('btn-refresh').addEventListener('click', function() { showSettings(); });
   document.addEventListener('keydown', dispatchKey);
+  mountBreadcrumb('breadcrumb', buildCrumbs('browse'));
 
   initPage({
     onEnter: function() { [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); }); },

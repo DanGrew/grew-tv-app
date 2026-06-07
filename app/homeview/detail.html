@@ -43,11 +43,19 @@ button:hover { background: var(--surface-hi); }
 .detail-restart { font-size: 12px; padding: 5px 12px; min-width: auto; flex-shrink: 0; border-width: 1.5px; }
 .detail-season { font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 600; padding: 18px 16px 8px; }
 #btn-play-next { font-size: 18px; padding: 14px 26px; min-width: auto; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
+.breadcrumb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.crumb { font-size: 20px; color: var(--text-muted); }
+.crumb-current { color: var(--text); font-weight: 600; }
+.crumb-link { background: none; border: 2px solid transparent; border-radius: var(--radius-sm); padding: 4px 12px; min-width: auto; font-size: 20px; color: var(--text-muted); }
+.crumb-link:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
+.crumb-link:hover { color: var(--text); background: var(--surface-hi); }
+.crumb-sep { color: var(--text-muted); font-size: 20px; }
 #error-msg { display: none; }
 </style>
 </head>
 <body id="screen-detail">
-<div style="display:flex;align-items:center;gap:24px;padding:28px 48px 20px;flex-shrink:0">
+<div id="breadcrumb" style="padding:22px 48px 0;flex-shrink:0"></div>
+<div style="display:flex;align-items:center;gap:24px;padding:20px 48px 20px;flex-shrink:0">
   <button id="btn-back-detail" style="font-size:16px;padding:12px 20px;min-width:auto">&#8592; Back</button>
   <img id="detail-header-poster" class="detail-header-poster" alt="" style="display:none">
   <div id="detail-header-placeholder" class="detail-header-placeholder" style="display:none">&#127916;</div>
