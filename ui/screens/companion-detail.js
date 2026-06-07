@@ -3,6 +3,8 @@ import { loadSeries, loadContinueWatching, mediaUrl } from '../../core/app-api.j
 import { screenPage } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
+import { buildCrumbs } from '../../core/breadcrumb.js';
+import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 
 // Companion series context (TASK-118): the episode list with per-episode
 // progress + a Play-next button, fetched straight from the backend (catalog +
@@ -23,6 +25,14 @@ export function initPage() {
   var api = {};
 
   els.backBtn.addEventListener('click', function() { api.sendIntent('back'); });
+
+  // Breadcrumb trail (FEAT-021): Home (clickable) > this series (current). Home
+  // sends the `navigate` intent so the app teleports the TV back to browse; the
+  // companion follows on the app's echoed context.
+  function navigate(page, params) { api.sendIntent('navigate', { page: page, params: params }); }
+  function mountCrumbs(seriesTitle) {
+    mountCompanionBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesTitle: seriesTitle }), navigate);
+  }
 
   function episodeBtn(item) {
     var video = item.video;
@@ -63,7 +73,7 @@ export function initPage() {
 
   function loadSeriesData(seriesId) {
     loadSeries(server, seriesId)
-      .then(function(s) { state.series = s; els.ctxTitle.textContent = s.title; render(); })
+      .then(function(s) { state.series = s; els.ctxTitle.textContent = s.title; mountCrumbs(s.title); render(); })
       .catch(function() { state.series = null; render(); });
   }
 

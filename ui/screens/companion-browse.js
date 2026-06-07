@@ -1,6 +1,8 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadBrowse, loadContinueWatching, mediaUrl } from '../../core/app-api.js';
 import { screenPage, filterByTitle } from '../../core/companion-utils.js';
+import { buildCrumbs } from '../../core/breadcrumb.js';
+import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 
 // Companion Home (TASK-117): full searchable catalog + a Continue-Watching
 // shortcut. Catalog is backend state fetched straight from the API; only the
@@ -21,6 +23,11 @@ export function initPage() {
   var state = { profile: null, cards: [], cw: [], query: '' };
   var api = {};
 
+  // Breadcrumb trail (FEAT-021): Home is the root, so a single inert crumb —
+  // consistent with the app's browse screen. No clickable ancestor here.
+  function noNav() {}
+  mountCompanionBreadcrumb('breadcrumb', buildCrumbs('browse'), noNav);
+
   function tap(card) { api.sendIntent('select', { id: card.id }); }
 
   function tile(card, poster) {
@@ -32,7 +39,7 @@ export function initPage() {
     img.alt = '';
     btn.appendChild(img);
     var span = document.createElement('span');
-    span.textContent = card.title || card.id;
+    span.textContent = [card.title].filter(Boolean).concat([card.id])[0];
     btn.appendChild(span);
     btn.addEventListener('click', function() { tap(card); });
     return btn;
@@ -41,15 +48,15 @@ export function initPage() {
   function renderGrid() {
     els.grid.innerHTML = '';
     var shown = filterByTitle(state.cards, state.query);
-    els.empty.style.display = shown.length ? 'none' : 'block';
+    els.empty.style.display = ({ true: 'none', false: 'block' })[shown.length > 0];
     shown.forEach(function(card) { els.grid.appendChild(tile(card, card.poster)); });
   }
 
   // Continue Watching is hidden while searching (search spans the full catalog).
   function renderCW() {
     els.cw.innerHTML = '';
-    var show = state.cw.length > 0 && !state.query.trim();
-    els.cwSection.style.display = show ? 'block' : 'none';
+    var show = [state.cw.length > 0, !state.query.trim()].every(Boolean);
+    els.cwSection.style.display = ({ true: 'block', false: 'none' })[show];
     state.cw.forEach(function(row) {
       els.cw.appendChild(tile({ id: row.item_id, title: row.title }, row.poster));
     });
@@ -58,10 +65,10 @@ export function initPage() {
   function loadCatalog(profile) {
     state.profile = profile;
     loadBrowse(server, profile)
-      .then(function(b) { state.cards = b.content || []; renderGrid(); })
+      .then(function(b) { state.cards = [b.content].filter(Boolean).concat([[]])[0]; renderGrid(); })
       .catch(function() { state.cards = []; renderGrid(); });
     loadContinueWatching(server, profile)
-      .then(function(c) { state.cw = c.content || []; renderCW(); })
+      .then(function(c) { state.cw = [c.content].filter(Boolean).concat([[]])[0]; renderCW(); })
       .catch(function() { state.cw = []; renderCW(); });
   }
 

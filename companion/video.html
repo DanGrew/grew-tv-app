@@ -38,10 +38,19 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 .jump-btn { padding: 12px 4px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface-hi); color: var(--text); font-size: 13px; cursor: pointer; touch-action: manipulation; font-variant-numeric: tabular-nums; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .jump-btn:active { background: var(--surface-hi); border-color: var(--focus); color: var(--focus); }
 .bignext { background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 12px; text-align: center; font-size: 14px; color: var(--text-muted); min-height: 44px; }
+#breadcrumb { flex-shrink: 0; }
+.breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.crumb { font-size: 13px; }
+.crumb-current { color: var(--text-muted); }
+.crumb-sep { color: var(--text-muted); font-size: 13px; }
+.crumb-link { background: none; border: none; padding: 2px 4px; margin: 0; color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); touch-action: manipulation; transition: color var(--dur) var(--ease); }
+.crumb-link:active { color: var(--focus); }
+.crumb-link:focus { outline: 1px solid var(--focus); }
 </style>
 </head>
 <body>
 <div id="conn-status">connecting…</div>
+<div id="breadcrumb"></div>
 <div id="ctx-label"></div>
 <div id="now-title"></div>
 <div class="still">▶</div>

@@ -37,10 +37,19 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .ep-progress-fill { height: 100%; background: var(--focus); border-radius: 2px; width: 0; }
 .play-next-btn { padding: 12px 16px; border-radius: var(--radius-sm); border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); font-size: 16px; font-weight: 700; cursor: pointer; flex-shrink: 0; touch-action: manipulation; }
 .play-next-btn:active { background: var(--surface); }
+#breadcrumb { flex-shrink: 0; }
+.breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.crumb { font-size: 13px; }
+.crumb-current { color: var(--text-muted); }
+.crumb-sep { color: var(--text-muted); font-size: 13px; }
+.crumb-link { background: none; border: none; padding: 2px 4px; margin: 0; color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); touch-action: manipulation; transition: color var(--dur) var(--ease); }
+.crumb-link:active { color: var(--focus); }
+.crumb-link:focus { outline: 1px solid var(--focus); }
 </style>
 </head>
 <body>
 <div id="conn-status">connecting\u2026</div>
+<div id="breadcrumb"></div>
 <div id="ctx-label"></div>
 <div id="ctx-title"></div>
 <button id="btn-back" class="back-btn">← Back</button>

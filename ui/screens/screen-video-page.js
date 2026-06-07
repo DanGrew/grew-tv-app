@@ -123,9 +123,14 @@ export function initVideoPage() {
   VIDEO_KEYS.forEach(function(k) { keys[k] = player.handleVideoKey; });
   initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote });
 
-  wsApp = connectApp('ws://localhost:8766', function(intent, params) {
-    [player.remote[intent]].filter(Boolean).forEach(function(fn) { fn(params); });
-  });
+  // Breadcrumb crumbs on the companion send a `navigate` intent (FEAT-021);
+  // everything else routes to the player's d-pad/transport remote.
+  function appIntent(intent, params) {
+    var EXTRA = { navigate: function() { navTo(params.page, params.params); } };
+    var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
+    [fn].filter(Boolean).forEach(function(f) { f(params); });
+  }
+  wsApp = connectApp('ws://localhost:8766', appIntent);
 
   document.addEventListener('keydown', dispatchKey);
 

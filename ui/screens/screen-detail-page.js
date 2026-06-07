@@ -41,7 +41,8 @@ export function initDetailPage() {
         var target = [id].filter(Boolean).map(function(i) { return document.querySelector('.detail-row[data-id="' + i + '"]'); }).filter(Boolean)[0];
         ([target].filter(Boolean).concat([document.activeElement]))[0].click();
       },
-      back:          function() { goBack(null); }
+      back:          function() { goBack(null); },
+      navigate:      function() { navTo(params.page, params.params); }
     };
     [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
   });

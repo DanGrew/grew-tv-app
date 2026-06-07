@@ -1,8 +1,10 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadNext } from '../../core/app-api.js';
-import { screenPage, displayTitle } from '../../core/companion-utils.js';
+import { loadNext, loadSeries } from '../../core/app-api.js';
+import { screenPage, displayTitle, seriesIdFromSnap } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
+import { buildCrumbs } from '../../core/breadcrumb.js';
+import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 
 // Companion player transport (FEAT-017). Read-only progress bar interpolated
 // locally between 1 Hz app_state snapshots; graduated discrete jumps + prev/next
@@ -27,8 +29,31 @@ export function initPage() {
     jump: document.getElementById('jump'),
     upnext: document.getElementById('upnext')
   };
-  var state = { snap: null, nextKey: null };
+  var state = { snap: null, nextKey: null, loadedSeriesId: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '' } };
   var api = {};
+
+  // Breadcrumb trail (FEAT-021): Home > Series > Episode (film: Home > Title).
+  // Ancestor crumbs send the `navigate` intent — the app teleports the TV and
+  // echoes context back, which onContext follows. The episode title arrives in
+  // the WS context; the series id/title are derived from the app_state snapshot
+  // (itemId is the series for an episode, the video itself for a film) and the
+  // series title is fetched once, mirroring the detail screen.
+  function navigate(page, params) { api.sendIntent('navigate', { page: page, params: params }); }
+  function mountVideoCrumbs() {
+    mountCompanionBreadcrumb('breadcrumb', buildCrumbs('video', state.crumb), navigate);
+  }
+  function loadSeriesTitle(seriesId) {
+    loadSeries(server, seriesId)
+      .then(function(s) { state.crumb.seriesTitle = s.title; mountVideoCrumbs(); })
+      .catch(function() { state.crumb.seriesTitle = 'Series'; mountVideoCrumbs(); });
+  }
+  function captureSeries(snap) {
+    state.crumb.seriesId = seriesIdFromSnap(snap);
+    [state.crumb.seriesId].filter(Boolean).filter(function(id) { return id !== state.loadedSeriesId; }).forEach(function(id) {
+      state.loadedSeriesId = id;
+      loadSeriesTitle(id);
+    });
+  }
 
   function buildJump() {
     JUMP.forEach(function(j) {
@@ -74,13 +99,21 @@ export function initPage() {
     renderControls();
     renderBar();
     fetchUpNext(snap);
+    captureSeries(snap);
+  }
+
+  function onVideoContext(payload) {
+    els.ctxLabel.textContent = 'Now playing';
+    els.title.textContent = displayTitle(payload);
+    state.crumb.videoTitle = displayTitle(payload);
+    mountVideoCrumbs();
   }
 
   function onContext(payload) {
     var page = screenPage(payload.context_id);
     ({ true:  function() { window.location.href = page + '.html'; },
-       false: function() { els.ctxLabel.textContent = 'Now playing'; els.title.textContent = displayTitle(payload); }
-    })[page !== 'video']();
+       false: onVideoContext
+    })[page !== 'video'](payload);
   }
 
   els.toggle.addEventListener('click', function() { api.sendIntent('toggle'); });
