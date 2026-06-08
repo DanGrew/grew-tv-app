@@ -125,6 +125,24 @@ test('select standalone video plays directly with src set', async ({ page }) => 
   await expect(page.locator('#video')).toHaveAttribute('src', /\/media\/toy-story-main\.mp4/);
 });
 
+// BUG-008: a companion `select` carries only an id and its tab is decoupled
+// from the app's, so the chosen card is often absent from the live DOM. The old
+// handler fell back to clicking document.activeElement — re-opening the focused
+// (last-watched) tile. Reproduce the trap: sit on the Films tab with a film
+// focused, then select an off-tab Series id over the WS. It must open that
+// series' detail, not replay the focused film.
+test('companion select resolves an off-tab series to its detail, not the focused film (BUG-008)', async ({ page }) => {
+  let appWs = null;
+  await page.routeWebSocket(/:8766/, function(ws) { appWs = ws; });
+  await page.locator('#btn-kids').click();
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  await page.locator('.film-tile[data-id="toy-story-main"]').first().focus();
+  await expect(page.locator('.film-tile[data-id="bluey"]')).toHaveCount(0);
+  await expect.poll(function() { return appWs !== null; }).toBe(true);
+  await appWs.send(JSON.stringify({ type: 'intent', payload: { intent: 'select', params: { id: 'bluey' } } }));
+  await expect(page).toHaveURL(/detail\.html\?series=bluey/);
+});
+
 test('Escape key returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.sidebar-tab[data-tab="films"]').click();
