@@ -96,6 +96,11 @@ test('d-pad Up from the top rail reaches the profile control; Enter opens the pi
 test('switching profile re-requires the PIN to re-enter locked Adults (respect the lock)', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
+  // #screen-browse can be visible from static markup before the browse module
+  // has wired #profile-label's click handler — CI's slower module eval then
+  // drops an early click. The label's text is set by renderBrowse (after load),
+  // so gating on it guarantees the handler is attached (CI flake fix).
+  await expect(page.locator('#profile-label')).toHaveText(/Kids/);
   await page.locator('#profile-label').click();
   await expect(page.locator('#screen-profile')).toBeVisible();
   await page.locator('#btn-adults').click();
