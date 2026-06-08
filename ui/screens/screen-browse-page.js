@@ -8,7 +8,8 @@ import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
-var SERVER = 'http://localhost:8765';
+// Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
+var SERVER = window.location.origin;
 var LAST_TILE_KEY = 'grew-tv:last-tile';
 var LAST_TAB_KEY = 'grew-tv:last-tab';
 var ACTIVATE_KEYS = { Enter: true, ' ': true };

@@ -14,7 +14,8 @@ import {
   pushDigit, popDigit, isPinComplete, dotFill, keypadNav
 } from '../../core/profile-config.js';
 
-var SERVER = 'http://localhost:8765';
+// Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
+var SERVER = window.location.origin;
 var KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'ok'];
 var KEYPAD_COLS = 3;
 var KEY_LABEL = { back: '⌫', ok: '✓' };

@@ -8,7 +8,8 @@ import { playNextIndex } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
-var SERVER = 'http://localhost:8765';
+// Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
+var SERVER = window.location.origin;
 
 export function initDetailPage() {
   var seriesId = getParam('series');

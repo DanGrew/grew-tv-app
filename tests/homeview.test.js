@@ -1,7 +1,9 @@
 const { test, expect } = require('@playwright/test');
 const { installApi } = require('./fixtures/api.js');
 
-const BROWSE_URL = 'http://localhost:8765/api/browse**';
+// Host-agnostic: the app derives its backend from the page origin (BUG-009), so
+// match by path glob, not a hardcoded host.
+const BROWSE_URL = '**/api/browse**';
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
@@ -458,6 +460,15 @@ test('ArrowUp cycles transport focus play-pause -> prev', async ({ page }) => {
 test('CC button shows for a video with subtitles', async ({ page }) => {
   await goToVideoScreen(page);
   await expect(page.locator('#btn-cc')).not.toHaveClass(/hidden/);
+});
+
+test('subtitle track loads from the page origin, not a hardcoded host (BUG-009)', async ({ page }) => {
+  await goToVideoScreen(page);
+  var origin = new URL(page.url()).origin;
+  var src = await page.locator('#video track').getAttribute('src');
+  // Same-origin .vtt: a cross-origin track (hardcoded localhost while the page is
+  // on 0.0.0.0/LAN) is blocked by the browser and subtitles never render.
+  expect(new URL(src).origin).toBe(origin);
 });
 
 test('CC button hidden for a video without subtitles', async ({ page }) => {
