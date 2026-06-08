@@ -143,6 +143,31 @@ test('companion select resolves an off-tab series to its detail, not the focused
   await expect(page).toHaveURL(/detail\.html\?series=bluey/);
 });
 
+// BUG-009: SELECT[card.kind](card) threw a TypeError for any kind outside
+// video/series. The backend only emits those two, so this guards a
+// malformed/future card — selecting one is a silent no-op (stays on browse, no
+// uncaught error), not a thrown handler. Inject a bogus-kind card into the
+// catalog and select it over the WS.
+test('onSelect ignores an unknown card kind without throwing (BUG-009)', async ({ page }) => {
+  var errors = [];
+  page.on('pageerror', function(e) { errors.push(e.message); });
+  let appWs = null;
+  await page.routeWebSocket(/:8766/, function(ws) { appWs = ws; });
+  await page.route('**/api/browse**', function(route) {
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ profile: 'kids', content: [
+      { kind: 'video', id: 'toy-story-main', title: 'Toy Story', poster: 'toy-story.jpg', duration: 4860, type: 'animation', format: 'film', genres: ['comedy'], people: null },
+      { kind: 'mystery', id: 'weird-x', title: 'Weird', poster: 'weird-x.jpg', type: 'animation', format: 'film', genres: null, people: null }
+    ] }) });
+  });
+  await page.locator('#btn-kids').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  await expect.poll(function() { return appWs !== null; }).toBe(true);
+  await appWs.send(JSON.stringify({ type: 'intent', payload: { intent: 'select', params: { id: 'weird-x' } } }));
+  await page.waitForTimeout(200);
+  await expect(page).toHaveURL(/browse\.html/);
+  expect(errors).toEqual([]);
+});
+
 test('Escape key returns to browse screen', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.sidebar-tab[data-tab="films"]').click();

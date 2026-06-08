@@ -98,10 +98,13 @@ export function initBrowsePage() {
     series: function(card) { navTo('detail.html', { series: card.id }); }
   };
 
+  // An unknown/absent kind is a no-op rather than a thrown TypeError — only
+  // 'video'/'series' route. The backend only emits those two today, so this is
+  // defensive against a future/malformed card, not a live path.
   function onSelect(card) {
     sessionStorage.setItem(LAST_TILE_KEY, card.id);
     sessionStorage.setItem(LAST_TAB_KEY, getActiveTab());
-    SELECT[card.kind](card);
+    [SELECT[card.kind]].filter(Boolean).forEach(function(fn) { fn(card); });
   }
 
   Promise.all([
