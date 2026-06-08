@@ -1,4 +1,4 @@
-import { loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, loadConfig, scanDevices, mediaUrl } from '../../core/app-api.js';
+import { loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, loadConfig, loadSettings, saveSettings, scanDevices, mediaUrl } from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
   var calls = [];
@@ -70,6 +70,30 @@ describe('loadConfig', () => {
   it('rejects when the file is absent', async () => {
     fakeFetch({}, false);
     await expect(loadConfig('http://s')).rejects.toBe(500);
+  });
+});
+
+describe('loadSettings', () => {
+  it('GETs /api/settings', async () => {
+    var calls = fakeFetch({ captionsOn: true });
+    await loadSettings('http://s');
+    expect(calls[0].url).toBe('http://s/api/settings');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('resolves parsed JSON', async () => {
+    fakeFetch({ captionsOn: false });
+    expect(await loadSettings('http://s')).toEqual({ captionsOn: false });
+  });
+});
+
+describe('saveSettings', () => {
+  it('POSTs /api/settings with the captionsOn body', async () => {
+    var calls = fakeFetch({ captionsOn: false });
+    await saveSettings('http://s', false);
+    expect(calls[0].url).toBe('http://s/api/settings');
+    expect(calls[0].opts.method).toBe('POST');
+    expect(calls[0].opts.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ captionsOn: false });
   });
 });
 

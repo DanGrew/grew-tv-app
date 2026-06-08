@@ -1,4 +1,4 @@
-import { getParam, getProfile, navTo } from '../../core/state.js';
+import { getParam, getProfile, navTo, initCaptions } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
@@ -135,9 +135,13 @@ export function initVideoPage() {
   document.addEventListener('keydown', dispatchKey);
 
   var restart = getParam('restart');
+  // initCaptions seeds the global captions cache from the backend (FEAT-023)
+  // before playVideo reads it via getCaptions(); it never rejects (offline keeps
+  // the default), so it cannot fail the Promise.all.
   Promise.all([
     loadVideo(SERVER, videoId),
-    loadProgress(SERVER, videoId).catch(function() { return { position_secs: 0, duration_secs: null }; })
+    loadProgress(SERVER, videoId).catch(function() { return { position_secs: 0, duration_secs: null }; }),
+    initCaptions(SERVER)
   ])
     .then(function(res) { player.playVideo(res[0], from, resumeStart(restart, res[1])); player.setSeriesMode(!!seriesId); showUpNextLine(); buildVideoCrumbs(res[0].title); })
     .catch(function() { navTo('error.html'); });

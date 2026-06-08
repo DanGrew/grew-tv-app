@@ -81,6 +81,14 @@ function lastSegment(url, marker) {
 }
 
 async function installApi(page) {
+  // Global settings (FEAT-023). Stateful per install so a POST sticks for later
+  // GETs — stickiness now lives in the backend, not localStorage. Default ON.
+  var settings = { captionsOn: true };
+  await page.route('**/api/settings', function(route) {
+    var post = route.request().method() === 'POST';
+    [post].filter(Boolean).forEach(function() { settings = JSON.parse(route.request().postData()); });
+    return json(route, 200, settings);
+  });
   await page.route('**/api/browse**', function(route) {
     var profile = new URL(route.request().url()).searchParams.get('profile');
     return json(route, 200, BROWSE[profile] || { profile: profile, content: [] });

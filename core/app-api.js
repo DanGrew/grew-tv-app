@@ -47,6 +47,21 @@ export function loadConfig(serverUrl) {
   return getJson(mediaUrl(serverUrl, 'config.json'));
 }
 
+// Global user settings — server-held single source of truth (FEAT-023),
+// replacing the old per-browser localStorage 'grew-tv:captions'. GET defaults
+// captions ON when unset (BUG-003); POST persists a toggle and echoes the state.
+export function loadSettings(serverUrl) {
+  return getJson(serverUrl + '/api/settings');
+}
+
+export function saveSettings(serverUrl, captionsOn) {
+  return fetch(serverUrl + '/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ captionsOn: captionsOn })
+  });
+}
+
 export function loadSeries(serverUrl, id) {
   return getJson(serverUrl + '/api/series/' + encodeURIComponent(id));
 }

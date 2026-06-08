@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { getProfile, setProfile, getCaptions, setCaptions, getParam, navTo } from '../../core/state.js';
+import { getProfile, setProfile, getCaptions, setCaptions, initCaptions, getParam, navTo } from '../../core/state.js';
 
 describe('getProfile / setProfile', () => {
   var store;
@@ -27,8 +27,11 @@ describe('getProfile / setProfile', () => {
   });
 });
 
-describe('getCaptions / setCaptions', () => {
-  var store;
+// FEAT-023: captions are server-backed (single source of truth), no longer read
+// from localStorage. getCaptions() returns an in-memory cache seeded by
+// initCaptions(); setCaptions() writes through to the backend.
+describe('captions (server-backed)', () => {
+  var store, calls;
   beforeEach(() => {
     store = {};
     vi.stubGlobal('localStorage', {
@@ -36,20 +39,53 @@ describe('getCaptions / setCaptions', () => {
       setItem:    (k, v) => { store[k] = v; },
       removeItem: (k) => { delete store[k]; }
     });
+    calls = [];
+    global.fetch = async (url, opts) => {
+      calls.push({ url, opts });
+      return { ok: true, status: 200, json: async () => ({ captionsOn: false }) };
+    };
   });
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  it('defaults to on when unset (BUG-003)', () => {
-    expect(getCaptions()).toBe(true);
-  });
-  it('returns true after setCaptions(true)', () => {
-    setCaptions(true);
-    expect(getCaptions()).toBe(true);
-  });
-  it('returns false after setCaptions(false)', () => {
-    setCaptions(true);
+  it('setCaptions updates the cache and POSTs to the backend', async () => {
     setCaptions(false);
     expect(getCaptions()).toBe(false);
+    expect(calls[0].url).toContain('/api/settings');
+    expect(calls[0].opts.method).toBe('POST');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ captionsOn: false });
+    setCaptions(true);
+    expect(getCaptions()).toBe(true);
+  });
+
+  it('initCaptions seeds the cache from the backend GET', async () => {
+    await initCaptions('http://s');
+    expect(calls[0].url).toBe('http://s/api/settings');
+    expect(getCaptions()).toBe(false);   // backend says off
+  });
+
+  it('migrates a legacy localStorage key to the backend then deletes it', async () => {
+    store['grew-tv:captions'] = 'off';
+    await initCaptions('http://s');
+    expect(getCaptions()).toBe(false);                       // legacy 'off' honoured
+    expect(calls[0].opts.method).toBe('POST');               // pushed, not GET
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ captionsOn: false });
+    expect(store['grew-tv:captions']).toBeUndefined();       // key removed
+  });
+
+  it('keeps the legacy key when the migration push fails (offline)', async () => {
+    store['grew-tv:captions'] = 'on';
+    global.fetch = async () => { throw new Error('offline'); };
+    await initCaptions('http://s');
+    expect(store['grew-tv:captions']).toBe('on');            // not deleted -> retries next boot
+  });
+
+  it('offline init keeps the current cached value and never throws', async () => {
+    global.fetch = async () => ({ ok: true, status: 200, json: async () => ({ captionsOn: true }) });
+    await initCaptions('http://s');                          // seed ON from backend
+    expect(getCaptions()).toBe(true);
+    global.fetch = async () => { throw new Error('offline'); };
+    await expect(initCaptions('http://s')).resolves.toBe(true);
+    expect(getCaptions()).toBe(true);                        // cache preserved
   });
 });
 
