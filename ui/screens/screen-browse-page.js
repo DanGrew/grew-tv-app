@@ -65,6 +65,14 @@ export function initBrowsePage() {
 
   var profile = [getProfile()].filter(Boolean).concat(['kids'])[0];
 
+  // id -> browse card, filled once /api/browse resolves (below). The companion's
+  // `select` intent carries only an id, and its tab is decoupled from the app's
+  // (the app renders one tab at a time), so the chosen tile is often absent from
+  // the live DOM. Resolve against the full catalog instead of a rendered tile —
+  // BUG-008: the old querySelector + activeElement.click() fallback re-opened the
+  // focused (last-watched) tile whenever the target tile wasn't on the active tab.
+  var catalog = {};
+
   var wsApp = connectApp('ws://localhost:8766', function(intent, params) {
     var INTENTS = {
       navigate_up:    function() { browseArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
@@ -73,8 +81,7 @@ export function initBrowsePage() {
       navigate_right: function() { browseArrow({ key: 'ArrowRight', preventDefault: function() {} }); },
       select:         function() {
         var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
-        var target = [id].filter(Boolean).map(function(i) { return document.querySelector('.film-tile[data-id="' + i + '"]'); }).filter(Boolean)[0];
-        ([target].filter(Boolean).concat([document.activeElement]))[0].click();
+        [catalog[id]].filter(Boolean).forEach(onSelect);
       },
       back:           function() { navTo('profile.html'); },
       navigate:       function() { navTo(params.page, params.params); }
@@ -103,6 +110,7 @@ export function initBrowsePage() {
   ])
     .then(function(res) {
       var browse = res[0];
+      [browse.content].filter(Boolean).concat([[]])[0].forEach(function(c) { catalog[c.id] = c; });
       var progress = progressMapFromCW(res[1].content);
       var labels = [browse.genreLabels].filter(Boolean).concat([{}])[0];
       renderBrowse(SERVER, browse.content, progress, labels, profile, onSelect, sessionStorage.getItem(LAST_TAB_KEY));
