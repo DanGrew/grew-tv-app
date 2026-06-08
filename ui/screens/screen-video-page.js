@@ -7,7 +7,13 @@ import { isMidWatch } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
-var SERVER = 'http://localhost:8765';
+// Derive the backend from the page origin, NOT a hardcoded host (BUG-009): the
+// media-manager serves app + API + media from one origin, but binds 0.0.0.0, so
+// the app can be opened at localhost OR 0.0.0.0 OR a LAN IP. A hardcoded
+// 'http://localhost:8765' then mismatches the page origin and the browser blocks
+// the cross-origin <track> .vtt (subs vanish) while the .mp4 still plays. Using
+// location.origin keeps media same-origin on whatever host the app loads from.
+var SERVER = window.location.origin;
 
 // Resume start: explicit restart -> 0; otherwise the backend resume position
 // when the video is still mid-watch (finished/unwatched -> 0). Backend is the

@@ -1,7 +1,8 @@
 const { test, expect } = require('@playwright/test');
 const { installApi } = require('./fixtures/api.js');
 
-const BROWSE_URL = 'http://localhost:8765/api/browse**';
+// Host-agnostic: the app derives its backend from the page origin (BUG-009).
+const BROWSE_URL = '**/api/browse**';
 
 // Home rails (TASK-117): tiles are addressed by data-id, not grid position.
 const SERIES_TILE = '.film-tile[data-id="bluey"]';
