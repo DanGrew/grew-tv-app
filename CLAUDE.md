@@ -182,4 +182,9 @@ App fetches content from `http://localhost:8080/manifest.json`. Content schema d
 
 ## Tooling
 
-**gh CLI:** not on PATH in bash — always use full path: `"/c/Program Files/GitHub CLI/gh.exe"`
+**gh CLI:** not on PATH in bash — always use full path.
+- macOS (Homebrew): `/opt/homebrew/bin/gh`
+- Windows: `"/c/Program Files/GitHub CLI/gh.exe"`
+
+**Node:** not on PATH — lives at `~/.local/node/bin` (fallback `/opt/homebrew/bin`):
+`export PATH="$HOME/.local/node/bin:/opt/homebrew/bin:$PATH"`
