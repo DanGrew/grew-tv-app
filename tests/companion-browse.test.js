@@ -72,15 +72,22 @@ test('Switch profile drives the picker — navigate intent echoes a profile cont
   await expect(page).toHaveURL(/companion\/profile\.html$/);
 });
 
-test('Continue tab leads when a video is mid-watch', async ({ page }) => {
+test('each tab leads with a Continue Watching rail of its in-progress items (TASK-150)', async ({ page }) => {
   await page.route('**/api/continue-watching**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', content: [
-      { item_id: 'finding-nemo-main', position_secs: 1200, duration_secs: 6000, last_watched: '2026-06-05T00:00:00Z' }
+      { item_id: 'bluey-s1e01', title: 'Daddy Putdown', poster: 'bluey.jpg', position_secs: 200, duration_secs: 420, last_watched: '2026-06-06T00:00:00Z', format: 'tv-series', collection_id: 'bluey', collection_title: 'Bluey' },
+      { item_id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg', position_secs: 1200, duration_secs: 6000, last_watched: '2026-06-05T00:00:00Z', format: 'film', collection_id: null, collection_title: null }
     ] })
   }));
   await page.reload();
-  await expect(page.locator('.c-tab')).toHaveText(['Continue Watching', 'Series', 'Films', 'Home Movies']);
-  await expect(page.locator('.c-tab[data-tab="continue"]')).toHaveClass(/active/);
+  // No standalone Continue tab — it is a rail inside each tab.
+  await expect(page.locator('.c-tab')).toHaveText(['Series', 'Films', 'Home Movies']);
+  await expect(page.locator('.c-tab[data-tab="continue"]')).toHaveCount(0);
+  // Series tab (default) leads with a Continue Watching rail showing the episode.
+  await expect(page.locator('#rails .section-title').first()).toHaveText('Continue Watching');
+  await expect(page.locator('.c-rail-row[data-rail="continue"] .tile-btn[data-id="bluey-s1e01"]')).toHaveText('Bluey · Daddy Putdown');
+  // Films tab leads with its own Continue Watching rail (the film).
+  await page.locator('.c-tab[data-tab="films"]').click();
   await expect(page.locator('.c-rail-row[data-rail="continue"] .tile-btn[data-id="finding-nemo-main"]')).toHaveCount(1);
 });

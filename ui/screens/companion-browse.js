@@ -2,7 +2,6 @@ import { connect } from '../../core/companion-ws.js';
 import { loadBrowse, loadContinueWatching, mediaUrl } from '../../core/app-api.js';
 import { screenPage, filterByTitle } from '../../core/companion-utils.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
-import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
@@ -68,7 +67,7 @@ export function initPage() {
 
   function renderRails() {
     els.rails.innerHTML = '';
-    var rails = buildTabRails(state.activeTab, state.cards, progressMapFromCW(state.cw), state.labels);
+    var rails = buildTabRails(state.activeTab, state.cards, state.cw, state.labels);
     rails.forEach(function(rail) { els.rails.appendChild(railRow(rail)); });
   }
 
@@ -93,7 +92,7 @@ export function initPage() {
 
   function renderTabs() {
     els.tabs.innerHTML = '';
-    var tabs = buildTabs(state.cards, progressMapFromCW(state.cw));
+    var tabs = buildTabs(state.cards);
     tabs.forEach(function(t) { els.tabs.appendChild(tabButton(t)); });
     selectTab([tabs[0]].filter(Boolean).map(function(t) { return t.id; }).concat(['films'])[0]);
   }

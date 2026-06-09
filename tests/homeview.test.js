@@ -42,19 +42,33 @@ test('Home Movies tab shows person rails', async ({ page }) => {
   await expect(page.locator('.rail-row[data-rail="person:millie"] .film-tile[data-id="millie-walk"]')).toHaveCount(1);
 });
 
-test('Continue tab leads and is the default landing when a video is mid-watch', async ({ page }) => {
+test('each content-type tab leads with a Continue Watching rail of its in-progress items (TASK-150)', async ({ page }) => {
   await page.route('**/api/continue-watching**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', content: [
-      { item_id: 'finding-nemo-main', position_secs: 1200, duration_secs: 6000, last_watched: '2026-06-05T00:00:00Z' }
+      { item_id: 'bluey-s1e01', title: 'Daddy Putdown', poster: 'bluey.jpg', position_secs: 200, duration_secs: 420, last_watched: '2026-06-06T00:00:00Z', format: 'tv-series', collection_id: 'bluey', collection_title: 'Bluey' },
+      { item_id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg', position_secs: 1200, duration_secs: 6000, last_watched: '2026-06-05T00:00:00Z', format: 'film', collection_id: null, collection_title: null }
     ] })
   }));
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
-  await expect(page.locator('.sidebar-tab')).toHaveText(['Continue Watching', 'Series', 'Films', 'Home Movies']);
-  await expect(page.locator('.sidebar-tab[data-tab="continue"]')).toHaveClass(/active/);
-  await expect(page.locator('.rail-row[data-rail="continue"] .film-tile')).toHaveCount(1);
-  await expect(page.locator('.rail-row[data-rail="continue"] .film-tile[data-id="finding-nemo-main"] .tile-progress-fill')).toBeVisible();
+  // No standalone Continue tab any more — it is a rail inside each tab.
+  await expect(page.locator('.sidebar-tab')).toHaveText(['Series', 'Films', 'Home Movies']);
+  await expect(page.locator('.sidebar-tab[data-tab="continue"]')).toHaveCount(0);
+
+  // Series tab (default landing) leads with a Continue Watching rail showing the
+  // in-progress EPISODE (not the series), labelled "{series} · {episode}".
+  await expect(page.locator('.rail-title').first()).toHaveText('Continue Watching');
+  const seriesCw = page.locator('.rail-row[data-rail="continue"]');
+  await expect(seriesCw.locator('.film-tile')).toHaveCount(1);
+  await expect(seriesCw.locator('.film-tile[data-id="bluey-s1e01"] .tile-title')).toHaveText('Bluey · Daddy Putdown');
+  await expect(seriesCw.locator('.film-tile[data-id="bluey-s1e01"] .tile-progress-fill')).toBeVisible();
+
+  // Films tab leads with its own Continue Watching rail (the film, not the episode).
+  await page.locator('.sidebar-tab[data-tab="films"]').click();
+  const filmsCw = page.locator('.rail-row[data-rail="continue"]');
+  await expect(filmsCw.locator('.film-tile')).toHaveCount(1);
+  await expect(filmsCw.locator('.film-tile[data-id="finding-nemo-main"] .tile-progress-fill')).toBeVisible();
 });
 
 test('Adults unlocks with the correct PIN and lands on its genre rails', async ({ page }) => {

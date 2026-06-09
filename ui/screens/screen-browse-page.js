@@ -1,7 +1,6 @@
 import { getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
-import { progressMapFromCW } from '../../core/progress.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, scanDevices } from '../../core/app-api.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -114,10 +113,14 @@ export function initBrowsePage() {
   ])
     .then(function(res) {
       var browse = res[0];
+      var cw = [res[1].content].filter(Boolean).concat([[]])[0];
       [browse.content].filter(Boolean).concat([[]])[0].forEach(function(c) { catalog[c.id] = c; });
-      var progress = progressMapFromCW(res[1].content);
+      // Register CW items so a companion `select` on an in-progress tile resolves —
+      // episodes are not browse cards, so add a minimal video card for any id the
+      // browse catalog doesn't already hold (films keep their full browse card).
+      cw.forEach(function(r) { catalog[r.item_id] = [catalog[r.item_id]].filter(Boolean).concat([{ kind: 'video', id: r.item_id }])[0]; });
       var labels = [browse.genreLabels].filter(Boolean).concat([{}])[0];
-      renderBrowse(SERVER, browse.content, progress, labels, profile, onSelect, sessionStorage.getItem(LAST_TAB_KEY));
+      renderBrowse(SERVER, browse.content, cw, labels, profile, onSelect, sessionStorage.getItem(LAST_TAB_KEY));
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
     })
     .catch(function() { navTo('error.html'); });

@@ -1,6 +1,7 @@
 import { registerScreen } from '../../core/screen-registry.js';
 import { createTile } from '../../components/tile.js';
 import { buildTabs, buildTabRails, clampIndex } from '../../core/home-rails.js';
+import { progressMapFromCW } from '../../core/progress.js';
 
 var PROFILE_LABEL = { kids: 'Kids', adults: 'Adults' };
 var PLAY_KEYS     = { Enter: true, ' ': true };
@@ -10,7 +11,7 @@ var PLAY_KEYS     = { Enter: true, ' ': true };
 // rails. Pure grouping/ordering lives in core/home-rails.js; this module owns
 // the DOM and the two-zone (sidebar / rails) d-pad focus model. Module state
 // holds the last-rendered data so a tab switch can rebuild the rails.
-var STATE = { server: null, cards: [], progress: {}, labels: {}, profile: null, onSelect: null };
+var STATE = { server: null, cards: [], cw: [], progress: {}, labels: {}, profile: null, onSelect: null };
 
 function tilesIn(railEl) {
   return Array.from(railEl.querySelectorAll('.film-tile'));
@@ -192,7 +193,7 @@ function markActive(tabId) {
 function selectTab(tabId) {
   STATE.activeTab = tabId;
   markActive(tabId);
-  renderRailRows(buildTabRails(tabId, STATE.cards, STATE.progress, STATE.labels));
+  renderRailRows(buildTabRails(tabId, STATE.cards, STATE.cw, STATE.labels));
 }
 
 function tabButton(tab) {
@@ -232,17 +233,20 @@ export function getActiveTab() {
 }
 
 // rails come from buildTabRails per the selected tab; the page passes the raw
-// /api/browse cards + progress + genreLabels, the select handler, and an
-// optional initialTab to land on (else the first tab).
-export function renderBrowse(server, cards, progress, labels, profile, onSelect, initialTab) {
+// /api/browse cards + the /api/continue-watching rows + genreLabels, the select
+// handler, and an optional initialTab to land on (else the first tab). The CW
+// rows feed both the per-tab Continue Watching rail and the tiles' progress bars
+// (via progressMapFromCW).
+export function renderBrowse(server, cards, cwRows, labels, profile, onSelect, initialTab) {
   STATE.server = server;
   STATE.cards = cards;
-  STATE.progress = progress;
+  STATE.cw = cwRows;
+  STATE.progress = progressMapFromCW(cwRows);
   STATE.labels = labels;
   STATE.profile = profile;
   STATE.onSelect = onSelect;
   document.getElementById('profile-label').textContent = '👤 ' + PROFILE_LABEL[profile] + ' ▸';
-  var tabs = buildTabs(cards, progress);
+  var tabs = buildTabs(cards);
   var ids = tabs.map(function(t) { return t.id; });
   renderSidebar(tabs);
   selectTab([initialTab].filter(function(t) { return ids.indexOf(t) >= 0; }).concat(ids).concat(['films'])[0]);

@@ -78,30 +78,33 @@ describe('clampIndex', () => {
 });
 
 describe('buildTabs', () => {
-  it('shows a tab per content-type present, fixed order, no Continue when nothing mid-watch', () => {
-    expect(buildTabs(TYPED, {}).map(t => t.id)).toEqual(['series', 'films', 'home-movies']);
-  });
-
-  it('leads with Continue when a video is mid-watch', () => {
-    const progress = { nemo: { resumePositionSec: 100, lastPlayed: 1 } };
-    expect(buildTabs(TYPED, progress).map(t => t.id)).toEqual(['continue', 'series', 'films', 'home-movies']);
+  it('shows a tab per content-type present, fixed order, no Continue tab (TASK-150)', () => {
+    expect(buildTabs(TYPED).map(t => t.id)).toEqual(['series', 'films', 'home-movies']);
   });
 
   it('uses display titles', () => {
-    const byId = Object.fromEntries(buildTabs(TYPED, {}).map(t => [t.id, t.title]));
+    const byId = Object.fromEntries(buildTabs(TYPED).map(t => [t.id, t.title]));
     expect(byId['home-movies']).toBe('Home Movies');
     expect(byId['films']).toBe('Films');
   });
 
   it('returns no tabs for empty content', () => {
-    expect(buildTabs([], {})).toEqual([]);
-    expect(buildTabs(null, null)).toEqual([]);
+    expect(buildTabs([])).toEqual([]);
+    expect(buildTabs(null)).toEqual([]);
   });
 });
 
+// TASK-149 /api/continue-watching row shape: carries format + the owning
+// collection (series for an episode; null for a standalone film/home movie).
+const CW = [
+  { item_id: 'toy-story', title: 'Toy Story', poster: 't.jpg', position_secs: 100, duration_secs: 600, format: 'film', collection_id: null, collection_title: null },
+  { item_id: 'm-walk', title: 'Millie Walk', poster: 'm.jpg', position_secs: 5, duration_secs: 30, format: 'home-movie', collection_id: null, collection_title: null },
+  { item_id: 'bluey-s1e01', title: 'Daddy Putdown', poster: 'b.jpg', position_secs: 200, duration_secs: 420, format: 'tv-series', collection_id: 'bluey', collection_title: 'Bluey' }
+];
+
 describe('buildTabRails', () => {
   it('Films -> one genre rail per genre, A-Z by label, item in each matching rail', () => {
-    const rails = buildTabRails('films', TYPED, {}, {});
+    const rails = buildTabRails('films', TYPED, [], {});
     expect(rails.map(r => r.title)).toEqual(['Animation', 'Comedy']);   // A-Z
     expect(rails[0].items.map(c => c.id)).toEqual(['nemo', 'toy-story']); // A-Z by title; nemo via [type] fallback
     expect(rails[1].items.map(c => c.id)).toEqual(['toy-story']);
@@ -109,18 +112,18 @@ describe('buildTabRails', () => {
 
   it('applies genreLabels overrides, else title-cases the slug', () => {
     const labelled = [{ kind: 'video', id: 'x', title: 'X', format: 'film', genres: ['rom-com'] }];
-    expect(buildTabRails('films', labelled, {}, { 'rom-com': 'Rom-Com' })[0].title).toBe('Rom-Com');
-    expect(buildTabRails('films', labelled, {}, {})[0].title).toBe('Rom Com');
+    expect(buildTabRails('films', labelled, [], { 'rom-com': 'Rom-Com' })[0].title).toBe('Rom-Com');
+    expect(buildTabRails('films', labelled, [], {})[0].title).toBe('Rom Com');
   });
 
   it('Series tab groups series cards by genre', () => {
-    const rails = buildTabRails('series', TYPED, {}, {});
+    const rails = buildTabRails('series', TYPED, [], {});
     expect(rails.map(r => r.title)).toEqual(['Animation']);
     expect(rails[0].items.map(c => c.id)).toEqual(['bluey']);
   });
 
   it('Home Movies -> one rail per person + an Other rail for the untagged', () => {
-    const rails = buildTabRails('home-movies', TYPED, {}, {});
+    const rails = buildTabRails('home-movies', TYPED, [], {});
     expect(rails.map(r => r.title)).toEqual(['Millie', 'Ollie', 'Other']); // A-Z incl Other
     const byTitle = Object.fromEntries(rails.map(r => [r.title, r.items.map(c => c.id)]));
     expect(byTitle['Millie']).toEqual(['m-park', 'm-walk']);     // both, A-Z by title (At The Park, Millie Walk)
@@ -128,16 +131,44 @@ describe('buildTabRails', () => {
     expect(byTitle['Other']).toEqual(['orphan']);
   });
 
-  it('Continue tab is the resume feed, empty when nothing mid-watch', () => {
-    expect(buildTabRails('continue', TYPED, {}, {})).toEqual([]);
-    const progress = { nemo: { resumePositionSec: 100, lastPlayed: 1 } };
-    const rails = buildTabRails('continue', TYPED, progress, {});
-    expect(rails[0].id).toBe('continue');
-    expect(rails[0].items.map(c => c.id)).toEqual(['nemo']);
+  it('does not mutate input cards', () => {
+    buildTabRails('films', TYPED, CW, {});
+    expect(TYPED[0].durationSec).toBeUndefined();
   });
 
-  it('does not mutate input cards', () => {
-    buildTabRails('films', TYPED, {}, {});
-    expect(TYPED[0].durationSec).toBeUndefined();
+  // TASK-150 — per-tab Continue Watching rail, built from the CW rows.
+  it('prepends a Continue Watching rail of only this tab’s in-progress items', () => {
+    const films = buildTabRails('films', TYPED, CW, {});
+    expect(films[0].id).toBe('continue');
+    expect(films[0].title).toBe('Continue Watching');
+    expect(films[0].items.map(c => c.id)).toEqual(['toy-story']); // film only; m-walk + episode excluded
+
+    const home = buildTabRails('home-movies', TYPED, CW, {});
+    expect(home[0].id).toBe('continue');
+    expect(home[0].items.map(c => c.id)).toEqual(['m-walk']);
+  });
+
+  it('Series CW rail shows the episode (not the series) labelled "{series} · {episode}"', () => {
+    const rails = buildTabRails('series', TYPED, CW, {});
+    expect(rails.map(r => r.id)).toEqual(['continue', 'genre:animation']); // CW rail leads, genre rail follows
+    const cw = rails[0];
+    expect(cw.items.map(c => c.id)).toEqual(['bluey-s1e01']);   // the episode id, not 'bluey'
+    expect(cw.items[0].title).toBe('Bluey · Daddy Putdown');
+    expect(cw.items[0].kind).toBe('video');                    // selecting plays the episode
+    expect(cw.items[0].durationSec).toBe(420);                 // for the progress bar
+  });
+
+  it('keeps the backend newest-first CW order (does not re-sort A-Z)', () => {
+    const cw = [
+      { item_id: 'film-b', title: 'B', position_secs: 10, duration_secs: 100, format: 'film', collection_title: null },
+      { item_id: 'film-a', title: 'A', position_secs: 10, duration_secs: 100, format: 'film', collection_title: null }
+    ];
+    const films = buildTabRails('films', [], cw, {});
+    expect(films[0].items.map(c => c.id)).toEqual(['film-b', 'film-a']);
+  });
+
+  it('omits the Continue Watching rail when this tab has nothing in progress', () => {
+    expect(buildTabRails('films', TYPED, [], {}).every(r => r.id !== 'continue')).toBe(true);
+    expect(buildTabRails('films', TYPED, null, {}).every(r => r.id !== 'continue')).toBe(true);
   });
 });
