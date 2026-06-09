@@ -19,49 +19,56 @@
   --dur: 0.18s;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --fs-xs: 18px;
+  --fs-sm: 22px;
+  --fs-md: 26px;
+  --fs-lg: 32px;
+  --fs-xl: 40px;
+  --fs-2xl: 52px;
+  --fs-3xl: 64px;
   --heading-ls: -0.5px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); background-attachment: fixed; background-size: cover; color: var(--text); font-family: var(--font); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-button { background: var(--surface); color: var(--text); border: 2.5px solid var(--border); border-radius: var(--radius); font-size: 18px; padding: 14px 26px; cursor: pointer; min-width: 140px; text-align: center; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease); }
+button { background: var(--surface); color: var(--text); border: 2.5px solid var(--border); border-radius: var(--radius); font-size: var(--fs-md); padding: 14px 26px; cursor: pointer; min-width: 140px; text-align: center; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease); }
 button:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 button:hover { background: var(--surface-hi); }
-#detail-title { font-size: 42px; letter-spacing: var(--heading-ls); flex-shrink: 0; }
+#detail-title { font-size: var(--fs-2xl); letter-spacing: var(--heading-ls); flex-shrink: 0; }
 .detail-header-poster { width: 160px; aspect-ratio: 1/1; object-fit: cover; background: #000; border: 2.5px solid var(--border); border-radius: var(--radius); flex-shrink: 0; }
-.detail-header-placeholder { width: 160px; aspect-ratio: 1/1; background: var(--surface-hi); border: 2.5px solid var(--border); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: 56px; color: var(--text-muted); flex-shrink: 0; }
+.detail-header-placeholder { width: 160px; aspect-ratio: 1/1; background: var(--surface-hi); border: 2.5px solid var(--border); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: var(--fs-3xl); color: var(--text-muted); flex-shrink: 0; }
 #detail-list { flex: 1; overflow-y: auto; padding: 0 48px 48px; }
 .detail-row { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border: 2.5px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; cursor: pointer; background: var(--surface); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease); }
 .detail-row:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 .detail-row.unavailable { opacity: 0.4; cursor: default; }
 .detail-thumb { width: 60px; height: 60px; object-fit: cover; background: var(--surface-hi); border-radius: var(--radius-sm); flex-shrink: 0; }
-.detail-thumb-placeholder { width: 60px; height: 60px; background: var(--surface-hi); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--text-muted); flex-shrink: 0; }
+.detail-thumb-placeholder { width: 60px; height: 60px; background: var(--surface-hi); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: var(--fs-lg); color: var(--text-muted); flex-shrink: 0; }
 .detail-info { flex: 1; }
-.detail-label { font-size: 19px; line-height: 1.3; }
-.detail-duration { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.detail-label { font-size: var(--fs-md); line-height: 1.3; }
+.detail-duration { font-size: var(--fs-xs); color: var(--text-muted); margin-top: 3px; }
 .detail-progress { height: 4px; background: rgba(0,0,0,0.45); border-radius: 2px; margin-top: 8px; max-width: 320px; }
 .detail-progress-fill { height: 100%; background: var(--focus); border-radius: 2px; width: 0; }
-.detail-restart { font-size: 12px; padding: 5px 12px; min-width: auto; flex-shrink: 0; border-width: 1.5px; }
-.detail-season { font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 600; padding: 18px 16px 8px; }
-#btn-play-next { font-size: 18px; padding: 14px 26px; min-width: auto; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
-#btn-shuffle { font-size: 18px; padding: 14px 22px; min-width: auto; }
+.detail-restart { font-size: var(--fs-xs); padding: 5px 12px; min-width: auto; flex-shrink: 0; border-width: 1.5px; }
+.detail-season { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 600; padding: 18px 16px 8px; }
+#btn-play-next { font-size: var(--fs-md); padding: 14px 26px; min-width: auto; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
+#btn-shuffle { font-size: var(--fs-md); padding: 14px 22px; min-width: auto; }
 #btn-shuffle.hidden { display: none; }
 .breadcrumb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.crumb { font-size: 20px; color: var(--text-muted); }
+.crumb { font-size: var(--fs-md); color: var(--text-muted); }
 .crumb-current { color: var(--text); font-weight: 600; }
-.crumb-link { background: none; border: 2px solid transparent; border-radius: var(--radius-sm); padding: 4px 12px; min-width: auto; font-size: 20px; color: var(--text-muted); }
+.crumb-link { background: none; border: 2px solid transparent; border-radius: var(--radius-sm); padding: 4px 12px; min-width: auto; font-size: var(--fs-md); color: var(--text-muted); }
 .crumb-link:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 .crumb-link:hover { color: var(--text); background: var(--surface-hi); }
-.crumb-sep { color: var(--text-muted); font-size: 20px; }
+.crumb-sep { color: var(--text-muted); font-size: var(--fs-md); }
 #error-msg { display: none; }
 </style>
 </head>
 <body id="screen-album-detail">
 <div id="breadcrumb" style="padding:22px 48px 0;flex-shrink:0"></div>
 <div style="display:flex;align-items:center;gap:24px;padding:20px 48px 20px;flex-shrink:0">
-  <button id="btn-back-detail" style="font-size:16px;padding:12px 20px;min-width:auto">&#8592; Back</button>
+  <button id="btn-back-detail" style="font-size:var(--fs-sm);padding:12px 20px;min-width:auto">&#8592; Back</button>
   <img id="detail-header-poster" class="detail-header-poster" alt="" style="display:none">
   <div id="detail-header-placeholder" class="detail-header-placeholder" style="display:none">&#128191;</div>
-  <div id="detail-title" style="padding:0;font-size:42px;flex:1"></div>
+  <div id="detail-title" style="padding:0;font-size:var(--fs-2xl);flex:1"></div>
   <button id="btn-play-next">&#9654; Play</button>
   <button id="btn-shuffle">&#128256; Shuffle</button>
 </div>
