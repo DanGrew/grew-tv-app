@@ -36,12 +36,18 @@ export function buildRails(cards, progress) {
 
 // ---------------------------------------------------------------------------
 // FEAT-020 — content-type tabs + per-type rails (TASK-138/139). The browse
-// screen is a content-type sidebar (Continue / Series / Films / Home Movies);
-// selecting a tab swaps the rail area to that type's rails. Series/Films group
-// by genre (genres[], falling back to [type]); Home Movies groups by person
-// (people[]); Continue is the resume feed. All grouping/ordering is pure and
-// unit-tested here so app + companion render identically. (TASK-137 supplies
-// genres[] / people[] / genreLabels through /api/browse.)
+// screen is a content-type sidebar (Series / Films / Home Movies); selecting a
+// tab swaps the rail area to that type's rails. Series/Films group by genre
+// (genres[], falling back to [type]); Home Movies group by person (people[]).
+//
+// TASK-150: Continue Watching is no longer its own tab. Instead each content-type
+// tab leads with a Continue Watching rail of *that type's* in-progress items,
+// built straight from the /api/continue-watching rows (which carry title, poster,
+// duration, `format` and the owning `collection_*`) — no browse-card join, so an
+// in-progress series **episode** surfaces (it is never a browse card). All
+// grouping/ordering is pure and unit-tested here so app + companion render
+// identically. (TASK-137 supplies genres[]/people[]/genreLabels via /api/browse;
+// TASK-149 supplies format + collection on the CW rows.)
 
 // A card's content-type tab. Series cards are always the Series tab; a video's
 // tab comes from its `format`. An unknown/absent video format falls back to
@@ -54,14 +60,13 @@ var FORMAT_TAB = {
 };
 
 var TAB_TITLE = {
-  'continue': 'Continue Watching',
   'series': 'Series',
   'films': 'Films',
   'home-movies': 'Home Movies'
 };
 
 // Fixed display order; which tabs actually appear is data-driven (below).
-var TAB_ORDER = ['continue', 'series', 'films', 'home-movies'];
+var TAB_ORDER = ['series', 'films', 'home-movies'];
 
 function isVideo(card) { return (card.kind || 'video') === 'video'; }
 
@@ -131,31 +136,59 @@ function groupRails(cards, keyer, labeler, prefix) {
     .sort(function(a, b) { return cmpStr(a.title, b.title); });
 }
 
-// The sidebar tabs to show: Continue only when something is mid-watch (it is
-// the default landing when present), plus a tab per content-type with content.
-export function buildTabs(cards, progress) {
+// A continue-watching row's tab — the same format map as browse cards. CW rows
+// (from /api/continue-watching, TASK-149) already carry `format` + collection.
+function cwTabOf(row) { return FORMAT_TAB[row.format] || 'films'; }
+
+// A CW row -> a video tile card. The label prefixes the owning collection when
+// present ("Bluey · Daddy Putdown" for an episode; bare title for a standalone
+// film / home movie). Generic by design: a future audio track reads
+// "Album · Track" with no rail change. kind:'video' so selecting plays the
+// item_id (the episode itself, not its series).
+function cwCard(row) {
+  var label = row.collection_title
+    ? row.collection_title + ' · ' + (row.title || '')
+    : (row.title || '');
+  return {
+    kind: 'video',
+    id: row.item_id,
+    title: label,
+    poster: row.poster,
+    durationSec: row.duration_secs,
+    format: row.format
+  };
+}
+
+// The Continue Watching rail for one tab: the CW rows whose content-type maps to
+// this tab, kept in the backend's newest-first order (not re-sorted). Omitted
+// when this tab has nothing in progress.
+function continueRail(tabId, cwRows) {
+  var items = (cwRows || [])
+    .filter(function(r) { return cwTabOf(r) === tabId; })
+    .map(cwCard);
+  return [{ id: 'continue', title: 'Continue Watching', items: items }]
+    .filter(function(rail) { return rail.items.length > 0; });
+}
+
+// The sidebar tabs to show: a tab per content-type that has browse content.
+// (Continue Watching is no longer a tab — it is a rail inside each tab.)
+export function buildTabs(cards) {
   var all = (cards || []).map(withDurationSec);
-  var cw = continueWatching(all.filter(isVideo), progress || {});
   var present = {};
   all.forEach(function(c) { present[tabOf(c)] = true; });
-  present['continue'] = cw.length > 0;
   return TAB_ORDER
     .filter(function(id) { return present[id]; })
     .map(function(id) { return { id: id, title: TAB_TITLE[id] }; });
 }
 
-// The rails for one tab. Continue -> resume feed; Series/Films -> genre rails;
-// Home Movies -> person rails. genreLabels maps genre slugs to display names.
-export function buildTabRails(tabId, cards, progress, genreLabels) {
+// The rails for one tab: a leading Continue Watching rail (this tab's in-progress
+// items, from cwRows) then the content rails — genre rails for Series/Films,
+// person rails for Home Movies. genreLabels maps genre slugs to display names.
+export function buildTabRails(tabId, cards, cwRows, genreLabels) {
   var all = (cards || []).map(withDurationSec);
-  if (tabId === 'continue') {
-    var cw = continueWatching(all.filter(isVideo), progress || {});
-    return [{ id: 'continue', title: 'Continue Watching', items: cw }]
-      .filter(function(r) { return r.items.length > 0; });
-  }
   var inTab = all.filter(function(c) { return tabOf(c) === tabId; });
-  if (tabId === 'home-movies') {
-    return groupRails(inTab, peopleOf, titleCase, 'person:');
-  }
-  return groupRails(inTab, genresOf, function(slug) { return labelFor(slug, genreLabels); }, 'genre:');
+  var typeRails = (tabId === 'home-movies')
+    ? groupRails(inTab, peopleOf, titleCase, 'person:')
+    : groupRails(inTab, genresOf, function(slug) { return labelFor(slug, genreLabels); }, 'genre:');
+  return continueRail(tabId, cwRows).concat(typeRails);
 }
