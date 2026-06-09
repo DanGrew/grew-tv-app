@@ -8,7 +8,13 @@ const VIDEOS = {
   'dark-knight-main': { id: 'dark-knight-main', title: 'The Dark Knight',  profile: 'adults', duration: 9120, poster: 'dk.jpg',        subtitles: null,                type: 'action',    format: 'film',      tags: null, available: true },
   'bluey-s1e01':      { id: 'bluey-s1e01',      title: 'Daddy Putdown',    profile: 'kids',   duration: 420,  poster: 'bluey.jpg',     subtitles: 'bluey-s1e01.vtt',   type: 'animation', format: 'tv-series', tags: null, available: true },
   'bluey-s1e02':      { id: 'bluey-s1e02',      title: 'The Weekend',      profile: 'kids',   duration: 430,  poster: 'bluey.jpg',     subtitles: null,                type: 'animation', format: 'tv-series', tags: null, available: true },
-  'bluey-s1e03':      { id: 'bluey-s1e03',      title: 'Hammerbarn',       profile: 'kids',   duration: 440,  poster: 'bluey.jpg',     subtitles: null,                type: 'animation', format: 'tv-series', tags: null, available: true }
+  'bluey-s1e03':      { id: 'bluey-s1e03',      title: 'Hammerbarn',       profile: 'kids',   duration: 440,  poster: 'bluey.jpg',     subtitles: null,                type: 'animation', format: 'tv-series', tags: null, available: true },
+  // FEAT-018 audio: album tracks + a standalone single. mediaType audio + ext m4a
+  // drive {id}.m4a + the <audio> player; artist drives the now-playing line.
+  'ootb-01':          { id: 'ootb-01',          title: 'Turn to Stone',    profile: 'kids',   duration: 227,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
+  'ootb-02':          { id: 'ootb-02',          title: 'Mr. Blue Sky',     profile: 'kids',   duration: 245,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
+  'ootb-03':          { id: 'ootb-03',          title: 'Sweet Talkin Woman',profile: 'kids',  duration: 228,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
+  'dancing-queen':    { id: 'dancing-queen',    title: 'Dancing Queen',    profile: 'kids',   duration: 230,  poster: 'dq.jpg',        subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ABBA', available: true }
 };
 
 const SERIES = {
@@ -18,6 +24,27 @@ const SERIES = {
       { season: 1, episode: 1, video: VIDEOS['bluey-s1e01'] },
       { season: 1, episode: 2, video: VIDEOS['bluey-s1e02'] },
       { season: 1, episode: 3, video: VIDEOS['bluey-s1e03'] }
+    ]
+  }
+};
+
+// FEAT-018 albums: a series row format:"album"; items[].episode is the track
+// number. /api/album/{id} resolves to this shape (same as /api/series).
+// Browse cards for the music tab (FEAT-018). Kept out of the default BROWSE so
+// the existing video-only tests still see exactly Series/Films/Home Movies; the
+// music e2e overrides /api/browse to append these.
+const MUSIC_CARDS = [
+  { kind: 'series', id: 'ootb',          title: 'Out of the Blue', poster: 'ootb.jpg', type: null, format: 'album', artist: 'ELO',  clipCount: 3 },
+  { kind: 'video',  id: 'dancing-queen', title: 'Dancing Queen',   poster: 'dq.jpg',   type: null, format: null,    mediaType: 'audio', artist: 'ABBA', duration: 230 }
+];
+
+const ALBUMS = {
+  ootb: {
+    id: 'ootb', title: 'Out of the Blue', profile: 'kids', poster: 'ootb.jpg', format: 'album', artist: 'ELO',
+    items: [
+      { episode: 1, video: VIDEOS['ootb-01'] },
+      { episode: 2, video: VIDEOS['ootb-02'] },
+      { episode: 3, video: VIDEOS['ootb-03'] }
     ]
   }
 };
@@ -105,6 +132,10 @@ async function installApi(page) {
     var s = SERIES[lastSegment(route.request().url(), '/api/series/')];
     return s ? json(route, 200, s) : json(route, 404, { error: 'not found' });
   });
+  await page.route('**/api/album/*', function(route) {
+    var a = ALBUMS[lastSegment(route.request().url(), '/api/album/')];
+    return a ? json(route, 200, a) : json(route, 404, { error: 'not found' });
+  });
   await page.route('**/api/progress/*', function(route) {
     var id = lastSegment(route.request().url(), '/api/progress/');
     var p = PROGRESS[id] || { item_id: id, position_secs: 0, duration_secs: null, completed: false, last_watched: null };
@@ -124,4 +155,4 @@ async function installApi(page) {
   });
 }
 
-module.exports = { VIDEOS, SERIES, BROWSE, CONTINUE, PROGRESS, CONFIG, nextOf, installApi };
+module.exports = { VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, BROWSE, CONTINUE, PROGRESS, CONFIG, nextOf, installApi };

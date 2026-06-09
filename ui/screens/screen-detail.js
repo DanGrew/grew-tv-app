@@ -20,6 +20,7 @@ function crumbStops() {
 function verticalStops() {
   return crumbStops()
     .concat([document.getElementById('btn-play-next')].filter(Boolean))
+    .concat(Array.from(document.querySelectorAll('#btn-shuffle:not(.hidden)')))
     .concat(Array.from(document.querySelectorAll('.detail-row:not(.unavailable)')));
 }
 
