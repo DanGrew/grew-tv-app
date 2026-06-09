@@ -66,6 +66,35 @@ test('search takes over with a flat grid across the catalog, then restores rails
   await expect(page.locator('#search-section')).toBeHidden();
 });
 
+test('builds each poster exactly once — no double-render request storm', async ({ page }) => {
+  // Regression: loadCatalog used to call renderTabs() from BOTH the browse and
+  // the continue-watching callbacks, tearing down and rebuilding every <img>
+  // twice. The aborted-then-recreated requests left posters intermittently
+  // failed. Now it renders once after both settle. Delaying continue-watching
+  // separates the two would-be renders in time so the second render's request
+  // can't coalesce with the first — old code => 2 hits, single render => 1.
+  let hits = 0;
+  await page.route('**/media/bluey.jpg', function(route) {
+    hits += 1;
+    return route.fulfill({ status: 200, contentType: 'image/jpeg', headers: { 'Cache-Control': 'no-store' }, body: '' });
+  });
+  await page.route('**/api/continue-watching**', async function(route) {
+    await new Promise(function(r) { setTimeout(r, 400); });
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ profile: 'kids', content: [] }) });
+  });
+  await page.reload();
+  await expect(page.locator('.c-rail-row[data-rail="genre:animation"] .tile-btn[data-id="bluey"]')).toHaveCount(1);
+  await page.waitForTimeout(700);
+  expect(hits).toBe(1);
+});
+
+test('a poster that fails to load is hidden, not left as a broken image', async ({ page }) => {
+  await page.route('**/media/bluey.jpg', function(route) { return route.abort(); });
+  await page.reload();
+  var img = page.locator('.c-rail-row[data-rail="genre:animation"] .tile-btn[data-id="bluey"] img');
+  await expect(img).toHaveCSS('display', 'none');
+});
+
 test('Switch profile drives the picker — navigate intent echoes a profile context, companion follows (BUG-007)', async ({ page }) => {
   await expect(page.locator('#switch-profile')).toBeVisible();
   await page.locator('#switch-profile').click();

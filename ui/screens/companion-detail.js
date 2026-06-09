@@ -34,6 +34,24 @@ export function initPage() {
     mountCompanionBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesTitle: seriesTitle }), navigate);
   }
 
+  // Poster <img> with a load-failure fallback: a missing/abortive poster hides
+  // the image rather than showing a broken icon (matches companion-browse and
+  // the app's tile.js). loading="lazy" trims the initial poster request burst.
+  function posterImg(posterName) {
+    var img = document.createElement('img');
+    img.alt = '';
+    img.loading = 'lazy';
+    var src = mediaUrl(server, posterName);
+    ({
+      true: function() {
+        img.src = src;
+        img.addEventListener('error', function() { img.style.display = 'none'; });
+      },
+      false: function() { img.style.display = 'none'; }
+    })[String(!!src)]();
+    return img;
+  }
+
   function episodeBtn(item) {
     var video = item.video;
     var resume = resumeOf(state.progress[video.id]);
@@ -42,8 +60,9 @@ export function initPage() {
     var btn = document.createElement('button');
     btn.className = 'tile-btn';
     btn.setAttribute('data-id', video.id);
-    btn.innerHTML = '<img src="' + mediaUrl(server, posterName) + '" alt="">' +
-      '<span>' + episodeLabel(item) + '</span>' + progressBarMarkup(mid, percent(resume, video.duration), 'ep-progress');
+    btn.appendChild(posterImg(posterName));
+    btn.insertAdjacentHTML('beforeend',
+      '<span>' + episodeLabel(item) + '</span>' + progressBarMarkup(mid, percent(resume, video.duration), 'ep-progress'));
     btn.addEventListener('click', function() { api.sendIntent('play', { id: video.id }); });
     return btn;
   }
