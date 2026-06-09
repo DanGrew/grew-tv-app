@@ -14,6 +14,8 @@ import {
   createPrevIntent,
   createSetProfileIntent,
   createToggleCaptionsIntent,
+  createShuffleIntent,
+  createPlayAlbumIntent,
   interpolatePosition,
   createHeartbeat
 } from '../../core/ws-protocol.js';
@@ -133,10 +135,11 @@ describe('APP_STATE message type', () => {
 });
 
 describe('INTENTS', () => {
-  it('has the six FEAT-017 intents', () => {
+  it('has the FEAT-017 six plus the FEAT-018 music pair', () => {
     expect(INTENTS).toEqual({
       PLAY: 'play', SKIP: 'skip', NEXT: 'next', PREV: 'prev',
-      SET_PROFILE: 'setProfile', TOGGLE_CAPTIONS: 'toggleCaptions'
+      SET_PROFILE: 'setProfile', TOGGLE_CAPTIONS: 'toggleCaptions',
+      SHUFFLE: 'shuffle', PLAY_ALBUM: 'playAlbum'
     });
   });
 });
@@ -152,16 +155,16 @@ describe('createAppState', () => {
     expect(createAppState({}).type).toBe('app_state');
   });
 
-  it('passes through all snapshot fields', () => {
+  it('passes through all snapshot fields (incl. FEAT-018 shuffle)', () => {
     const p = createAppState({
-      screen: 'player', itemId: 'ollie-car', episodeId: null,
+      screen: 'player', itemId: 'ootb', episodeId: 'ootb-02',
       positionSec: 42, durationSec: 380, playing: true,
-      profile: 'kids', captionsOn: true
+      profile: 'kids', captionsOn: true, shuffle: true
     }).payload;
     expect(p).toEqual({
-      screen: 'player', itemId: 'ollie-car', episodeId: null,
+      screen: 'player', itemId: 'ootb', episodeId: 'ootb-02',
       positionSec: 42, durationSec: 380, playing: true,
-      profile: 'kids', captionsOn: true
+      profile: 'kids', captionsOn: true, shuffle: true
     });
   });
 
@@ -172,6 +175,7 @@ describe('createAppState', () => {
     expect(p.durationSec).toBeNull();
     expect(p.playing).toBe(false);
     expect(p.captionsOn).toBe(false);
+    expect(p.shuffle).toBe(false);
   });
 });
 
@@ -198,6 +202,14 @@ describe('intent builders', () => {
   });
   it('createToggleCaptionsIntent sets intent', () => {
     expect(createToggleCaptionsIntent().payload.intent).toBe('toggleCaptions');
+  });
+  it('createShuffleIntent sets the shuffle intent', () => {
+    expect(createShuffleIntent().payload.intent).toBe('shuffle');
+  });
+  it('createPlayAlbumIntent carries the album id, defaulting to null', () => {
+    expect(createPlayAlbumIntent('ootb').payload.intent).toBe('playAlbum');
+    expect(createPlayAlbumIntent('ootb').payload.params.id).toBe('ootb');
+    expect(createPlayAlbumIntent().payload.params.id).toBeNull();
   });
 });
 
