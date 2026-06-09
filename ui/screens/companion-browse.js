@@ -35,14 +35,30 @@ export function initPage() {
 
   function tap(card) { api.sendIntent('select', { id: card.id }); }
 
+  // Poster <img> with a load-failure fallback: a missing/abortive poster hides
+  // the image instead of showing a broken icon (matches the app's tile.js and
+  // companion-profile). loading="lazy" keeps off-screen rail posters from all
+  // firing at once and saturating the browser's per-origin connection cap.
+  function posterImg(poster) {
+    var img = document.createElement('img');
+    img.alt = '';
+    img.loading = 'lazy';
+    var src = mediaUrl(server, poster);
+    ({
+      true: function() {
+        img.src = src;
+        img.addEventListener('error', function() { img.style.display = 'none'; });
+      },
+      false: function() { img.style.display = 'none'; }
+    })[String(!!src)]();
+    return img;
+  }
+
   function tile(card, poster) {
     var btn = document.createElement('button');
     btn.className = 'tile-btn';
     btn.setAttribute('data-id', card.id);
-    var img = document.createElement('img');
-    img.src = mediaUrl(server, poster);
-    img.alt = '';
-    btn.appendChild(img);
+    btn.appendChild(posterImg(poster));
     var span = document.createElement('span');
     span.textContent = [card.title].filter(Boolean).concat([card.id])[0];
     btn.appendChild(span);
@@ -112,19 +128,25 @@ export function initPage() {
     ({ true: renderSearch, false: renderRails })[searching]();
   }
 
+  // Render ONCE after both browse + continue-watching settle. Rendering on each
+  // callback separately tore the whole tile tree down and rebuilt it twice,
+  // aborting and re-issuing every poster request mid-flight — the cause of
+  // posters intermittently failing to load on the companion (the app renders
+  // once and never hit this). Either fetch failing degrades to an empty set.
+  function applyCatalog(b, c) {
+    state.cards = [b.content].filter(Boolean).concat([[]])[0];
+    state.labels = [b.genreLabels].filter(Boolean).concat([{}])[0];
+    state.cw = [c.content].filter(Boolean).concat([[]])[0];
+    renderTabs();
+    applyView();
+  }
+
   function loadCatalog(profile) {
     state.profile = profile;
-    loadBrowse(server, profile)
-      .then(function(b) {
-        state.cards = [b.content].filter(Boolean).concat([[]])[0];
-        state.labels = [b.genreLabels].filter(Boolean).concat([{}])[0];
-        renderTabs();
-        applyView();
-      })
-      .catch(function() { state.cards = []; renderTabs(); applyView(); });
-    loadContinueWatching(server, profile)
-      .then(function(c) { state.cw = [c.content].filter(Boolean).concat([[]])[0]; renderTabs(); applyView(); })
-      .catch(function() { state.cw = []; });
+    Promise.all([
+      loadBrowse(server, profile).catch(function() { return {}; }),
+      loadContinueWatching(server, profile).catch(function() { return {}; })
+    ]).then(function(r) { applyCatalog(r[0], r[1]); });
   }
 
   els.search.addEventListener('input', function() {
