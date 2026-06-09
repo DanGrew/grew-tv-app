@@ -98,6 +98,10 @@ test('the player Shuffle button toggles the engaged state', async ({ page }) => 
   await page.locator('.film-tile[data-id="ootb"]').click();
   await page.locator('.detail-row[data-id="ootb-01"]').click();
   await expect(page.locator('#screen-audio')).toBeVisible();
+  // Wait for load to finish (#audio-title populated) — the page's load .then
+  // calls setShuffle(shuffleParam), which would otherwise race a too-early click
+  // and reset the toggle.
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
   await expect(page.locator('#btn-shuffle')).not.toHaveClass(/on/);
   await page.locator('#btn-shuffle').click();
   await expect(page.locator('#btn-shuffle')).toHaveClass(/on/);
