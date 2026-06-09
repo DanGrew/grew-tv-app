@@ -20,11 +20,18 @@
   --dur: 0.18s;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --fs-xs: 18px;
+  --fs-sm: 22px;
+  --fs-md: 26px;
+  --fs-lg: 32px;
+  --fs-xl: 40px;
+  --fs-2xl: 52px;
+  --fs-3xl: 64px;
   --heading-ls: -0.5px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); background-attachment: fixed; background-size: cover; color: var(--text); font-family: var(--font); height: 100vh; overflow: hidden; }
-button { background: var(--surface); color: var(--text); border: 2.5px solid var(--border); border-radius: var(--radius); font-size: 18px; padding: 14px 26px; cursor: pointer; min-width: 140px; text-align: center; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease); }
+button { background: var(--surface); color: var(--text); border: 2.5px solid var(--border); border-radius: var(--radius); font-size: var(--fs-md); padding: 14px 26px; cursor: pointer; min-width: 140px; text-align: center; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease); }
 button:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 button:hover { background: var(--surface-hi); }
 #browse-main { display: flex; width: 100vw; height: 100vh; }
@@ -32,48 +39,48 @@ button:hover { background: var(--surface-hi); }
 #sidebar.collapsed { flex-basis: 56px; }
 #sidebar.collapsed .sidebar-tab { display: none; }
 #sidebar.collapsed .sidebar-toggle { text-align: center; padding: 14px 0; }
-.sidebar-toggle { width: 100%; min-width: auto; text-align: left; font-size: 22px; background: transparent; border: none; border-left: 3px solid transparent; border-radius: 0; padding: 14px 22px; color: var(--text-muted); backdrop-filter: none; -webkit-backdrop-filter: none; margin-bottom: 8px; }
+.sidebar-toggle { width: 100%; min-width: auto; text-align: left; font-size: var(--fs-lg); background: transparent; border: none; border-left: 3px solid transparent; border-radius: 0; padding: 14px 22px; color: var(--text-muted); backdrop-filter: none; -webkit-backdrop-filter: none; margin-bottom: 8px; }
 .sidebar-toggle:focus { outline: none; box-shadow: none; background: rgba(255,255,255,0.08); border-left-color: var(--focus); color: var(--focus); }
 .sidebar-toggle:hover { background: rgba(255,255,255,0.06); }
-.sidebar-tab { width: 100%; min-width: auto; text-align: left; font-size: 20px; background: transparent; border: none; border-left: 3px solid transparent; border-radius: 0; padding: 14px 22px; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.sidebar-tab { width: 100%; min-width: auto; text-align: left; font-size: var(--fs-md); background: transparent; border: none; border-left: 3px solid transparent; border-radius: 0; padding: 14px 22px; backdrop-filter: none; -webkit-backdrop-filter: none; }
 .sidebar-tab:focus { outline: none; box-shadow: none; background: rgba(255,255,255,0.08); border-left-color: var(--focus); color: var(--focus); }
 .sidebar-tab.active { background: rgba(255,255,255,0.10); border-left-color: rgba(255,255,255,0.5); color: var(--text); }
 .sidebar-tab.active:focus { border-left-color: var(--focus); color: var(--focus); }
 #rails-container { flex: 1; height: 100vh; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; padding: 44px 0 80px; }
 #sidebar::-webkit-scrollbar, #rails-container::-webkit-scrollbar, .rail-row::-webkit-scrollbar { display: none; }
-#profile-label { font-size: 16px; color: var(--text-muted); position: fixed; top: 20px; right: 32px; z-index: 5; padding: 6px 14px; border: 2px solid transparent; border-radius: var(--radius-sm); cursor: pointer; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+#profile-label { font-size: var(--fs-sm); color: var(--text-muted); position: fixed; top: 20px; right: 32px; z-index: 5; padding: 6px 14px; border: 2px solid transparent; border-radius: var(--radius-sm); cursor: pointer; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
 #profile-label:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 #profile-label:hover { color: var(--text); }
 #rails { display: flex; flex-direction: column; gap: 34px; }
-.rail-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); padding: 0 48px 14px; }
+.rail-title { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); padding: 0 48px 14px; }
 .rail-row { display: flex; gap: 16px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding: 6px 48px; scroll-padding-left: 48px; }
-.home-empty { font-size: 18px; color: var(--text-muted); text-align: center; padding: 80px 0; }
+.home-empty { font-size: var(--fs-md); color: var(--text-muted); text-align: center; padding: 80px 0; }
 .film-tile { position: relative; flex: 0 0 248px; width: 248px; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); cursor: pointer; overflow: hidden; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); }
 .film-tile:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); transform: scale(1.05); z-index: 1; }
 .film-tile:focus .tile-title { color: var(--focus); }
 .film-poster { width: 100%; aspect-ratio: 16/9; object-fit: contain; background: #000; display: block; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
-.film-poster-placeholder { width: 100%; aspect-ratio: 16/9; background: var(--surface-hi); display: flex; align-items: center; justify-content: center; font-size: 30px; color: var(--text-muted); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.film-poster-placeholder { width: 100%; aspect-ratio: 16/9; background: var(--surface-hi); display: flex; align-items: center; justify-content: center; font-size: var(--fs-xl); color: var(--text-muted); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .film-tile[data-music] { flex-basis: 200px; width: 200px; }
 .film-tile[data-music] .film-poster, .film-tile[data-music] .film-poster-placeholder { aspect-ratio: 1/1; }
-.tile-title { font-size: 15px; padding: 10px 12px 12px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur) var(--ease); }
-.tile-sub { margin-top: -8px; padding: 0 12px 10px; font-size: 12px; color: var(--text-muted); }
-.tile-cc { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px; }
+.tile-title { font-size: var(--fs-sm); padding: 10px 12px 12px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur) var(--ease); }
+.tile-sub { margin-top: -8px; padding: 0 12px 10px; font-size: var(--fs-xs); color: var(--text-muted); }
+.tile-cc { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px; }
 .tile-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,0.45); }
 .tile-progress-fill { height: 100%; background: var(--focus); }
-#btn-settings { font-size: 16px; padding: 12px 22px; min-width: auto; position: fixed; bottom: 32px; right: 32px; }
+#btn-settings { font-size: var(--fs-sm); padding: 12px 22px; min-width: auto; position: fixed; bottom: 32px; right: 32px; }
 #breadcrumb { position: fixed; top: 20px; left: 32px; z-index: 5; }
 .breadcrumb { display: flex; align-items: center; gap: 10px; }
-.crumb { font-size: 20px; color: var(--text-muted); }
+.crumb { font-size: var(--fs-md); color: var(--text-muted); }
 .crumb-current { color: var(--text); font-weight: 600; }
-.crumb-link { background: none; border: 2px solid transparent; border-radius: var(--radius-sm); padding: 4px 12px; min-width: auto; font-size: 20px; color: var(--text-muted); }
+.crumb-link { background: none; border: 2px solid transparent; border-radius: var(--radius-sm); padding: 4px 12px; min-width: auto; font-size: var(--fs-md); color: var(--text-muted); }
 .crumb-link:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
-.crumb-sep { color: var(--text-muted); font-size: 20px; }
+.crumb-sep { color: var(--text-muted); font-size: var(--fs-md); }
 #screen-settings { display: none; position: fixed; inset: 0; background: var(--bg); flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
 #screen-settings.active { display: flex; }
 #settings-table { width: 100%; max-width: 720px; padding: 0 48px; }
 .settings-row { display: flex; align-items: center; gap: 24px; padding: 22px 0; }
-.settings-label { font-size: 18px; flex: 0 0 140px; }
-.settings-status { font-size: 15px; color: var(--text-muted); flex: 1; }
+.settings-label { font-size: var(--fs-md); flex: 0 0 140px; }
+.settings-status { font-size: var(--fs-sm); color: var(--text-muted); flex: 1; }
 .settings-hr { border: none; border-top: 1px solid var(--border); margin: 0; }
 #error-msg { display: none; }
 </style>
@@ -81,8 +88,8 @@ button:hover { background: var(--surface-hi); }
 <body id="screen-browse">
 <div id="screen-settings">
   <div style="display:flex;align-items:center;gap:24px;padding:28px 48px 20px;flex-shrink:0;width:100%;max-width:720px">
-    <button id="btn-back-settings" style="font-size:16px;padding:12px 20px;min-width:auto">&#8592; Back</button>
-    <h1 style="margin:0;font-size:28px;letter-spacing:var(--heading-ls)">Settings</h1>
+    <button id="btn-back-settings" style="font-size:var(--fs-sm);padding:12px 20px;min-width:auto">&#8592; Back</button>
+    <h1 style="margin:0;font-size:var(--fs-xl);letter-spacing:var(--heading-ls)">Settings</h1>
   </div>
   <div id="settings-table">
     <hr class="settings-hr">

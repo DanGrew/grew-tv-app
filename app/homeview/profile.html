@@ -19,12 +19,19 @@
   --dur: 0.18s;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --fs-xs: 18px;
+  --fs-sm: 22px;
+  --fs-md: 26px;
+  --fs-lg: 32px;
+  --fs-xl: 40px;
+  --fs-2xl: 52px;
+  --fs-3xl: 64px;
   --heading-ls: -0.5px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); background-attachment: fixed; background-size: cover; color: var(--text); font-family: var(--font); height: 100vh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-h1 { font-size: 22px; margin-bottom: 10px; letter-spacing: var(--heading-ls); color: var(--text-muted); font-weight: 600; }
-h2 { font-size: 46px; color: var(--text); margin-bottom: 36px; font-weight: normal; letter-spacing: var(--heading-ls); }
+h1 { font-size: var(--fs-lg); margin-bottom: 10px; letter-spacing: var(--heading-ls); color: var(--text-muted); font-weight: 600; }
+h2 { font-size: var(--fs-2xl); color: var(--text); margin-bottom: 36px; font-weight: normal; letter-spacing: var(--heading-ls); }
 #profile-cards { display: flex; gap: 28px; }
 .profile-card { position: relative; width: 240px; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); overflow: hidden; cursor: pointer; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); }
 .profile-card:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); transform: translateY(-8px) scale(1.03); }
@@ -34,17 +41,17 @@ h2 { font-size: 46px; color: var(--text); margin-bottom: 36px; font-weight: norm
 .profile-photo.adults { background: linear-gradient(160deg, #834d9b, #d04ed6); }
 .profile-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .profile-photo-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 84px; }
-.profile-name { padding: 16px; font-size: 24px; text-align: center; background: linear-gradient(transparent, rgba(0,0,0,0.35)); transition: color var(--dur) var(--ease); }
-.lock-badge { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; font-size: 16px; z-index: 2; }
+.profile-name { padding: 16px; font-size: var(--fs-lg); text-align: center; background: linear-gradient(transparent, rgba(0,0,0,0.35)); transition: color var(--dur) var(--ease); }
+.lock-badge { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; font-size: var(--fs-sm); z-index: 2; }
 #pin-panel { display: none; margin-top: 24px; padding: 28px; width: 280px; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); flex-direction: column; align-items: center; gap: 20px; }
 #pin-panel.active { display: flex; }
 #pin-panel.shake { animation: shake 0.4s; }
-.pin-title { font-size: 18px; color: var(--text-muted); letter-spacing: 1px; }
+.pin-title { font-size: var(--fs-md); color: var(--text-muted); letter-spacing: 1px; }
 .pin-dots { display: flex; gap: 16px; }
 .pin-dots span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--text-muted); }
 .pin-dots span.on { background: var(--focus); border-color: var(--focus); }
 .keypad { display: grid; grid-template-columns: repeat(3, 64px); gap: 12px; }
-.key { width: 64px; height: 64px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); font-size: 26px; color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.key { width: 64px; height: 64px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); font-size: var(--fs-lg); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
 .key:focus { outline: none; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-12px); } 40%, 80% { transform: translateX(12px); } }
 #error-msg { display: none; }
