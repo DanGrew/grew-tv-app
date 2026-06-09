@@ -87,6 +87,9 @@ test('Shuffle from album detail starts the player with shuffle engaged', async (
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="albums"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();
+  // Wait for the album to load — shufflePlay no-ops until items[] is populated, so
+  // clicking before the rows render races the load and the player never opens.
+  await expect(page.locator('.detail-row')).toHaveCount(3);
   await page.locator('#btn-shuffle').click();
   await expect(page).toHaveURL(/audio\.html/);
   await expect(page.locator('#btn-shuffle.on')).toBeVisible();
