@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grew TV</title>
+<style>
+:root {
+  --bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+  --surface: rgba(255,255,255,0.06);
+  --surface-hi: rgba(255,255,255,0.11);
+  --border: rgba(255,255,255,0.13);
+  --focus: #fff;
+  --focus-glow: 0 0 0 1px rgba(255,255,255,0.6), 0 4px 24px rgba(255,255,255,0.15);
+  --text: rgba(255,255,255,0.95);
+  --text-muted: rgba(255,255,255,0.4);
+  --radius: 16px;
+  --radius-sm: 8px;
+  --dur: 0.18s;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --heading-ls: -0.5px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); background-attachment: fixed; background-size: cover; color: var(--text); font-family: var(--font); height: 100vh; overflow: hidden; }
+button { background: none; color: var(--text); border: 2px solid transparent; border-radius: var(--radius); font-size: 24px; padding: 0; cursor: pointer; text-align: center; transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease); }
+button:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
+#screen-audio { height: 100vh; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; }
+#audio-art { width: 280px; height: 280px; border-radius: 20px; background: var(--surface-hi); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); display: flex; align-items: center; justify-content: center; font-size: 120px; box-shadow: 0 16px 60px rgba(0,0,0,0.55); }
+#audio-meta { text-align: center; }
+#audio-title { font-size: 34px; font-weight: 700; letter-spacing: var(--heading-ls); }
+#audio-artist { font-size: 20px; color: var(--text-muted); margin-top: 6px; min-height: 26px; }
+#controls { position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.92)); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); padding: 42px 40px 24px; display: flex; flex-direction: column; gap: 4px; }
+.breadcrumb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.crumb { font-size: 20px; color: var(--text-muted); text-shadow: 0 2px 8px rgba(0,0,0,0.8); }
+.crumb-current { color: var(--text); font-weight: 600; }
+.crumb-link { background: none; border: 2px solid transparent; border-radius: var(--radius-sm); padding: 4px 10px; min-width: auto; font-size: 20px; color: var(--text-muted); text-shadow: 0 2px 8px rgba(0,0,0,0.8); }
+.crumb-link:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
+.crumb-sep { color: var(--text-muted); font-size: 20px; }
+#transport { display: flex; align-items: center; gap: 18px; margin-top: 14px; }
+.ctrl-btn { font-size: 24px; line-height: 1; min-width: 44px; height: 44px; color: var(--text-muted); border: none; }
+.ctrl-btn:focus { color: var(--focus); border: none; box-shadow: none; }
+.ctrl-btn.pill { font-size: 15px; font-weight: 700; letter-spacing: 1px; border: 2px solid var(--border); border-radius: 999px; min-width: auto; height: auto; padding: 6px 16px; color: var(--text); }
+.ctrl-btn.pill:focus { border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
+.ctrl-btn.pill.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
+#btn-prev.hidden, #btn-next.hidden { display: none; }
+#progress { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+#progress-fill { height: 100%; background: var(--focus); border-radius: 3px; width: 0; }
+#time-display { font-size: 14px; color: var(--text-muted); min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+.jump-popup { position: fixed; background: var(--surface); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); border: 2.5px solid var(--border); border-radius: var(--radius); padding: 18px; z-index: 100; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+.jump-title { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); text-align: center; margin-bottom: 12px; }
+.jump-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.jump-grid button { font-size: 15px; padding: 12px 8px; min-width: 62px; background: var(--surface-hi); border: 2px solid var(--border); color: var(--text); border-radius: var(--radius-sm); font-variant-numeric: tabular-nums; }
+.jump-grid button:focus { border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
+#error-msg { display: none; }
+</style>
+</head>
+<body id="screen-audio-body">
+<div id="screen-audio">
+  <audio id="audio" preload="metadata"></audio>
+  <div id="audio-art">&#128191;</div>
+  <div id="audio-meta">
+    <div id="audio-title"></div>
+    <div id="audio-artist"></div>
+  </div>
+  <div id="controls">
+    <div id="breadcrumb"></div>
+    <div id="transport">
+      <button id="btn-prev" class="ctrl-btn" aria-label="Previous">&#9198;</button>
+      <button id="btn-play-pause" class="ctrl-btn" aria-label="Play/Pause">&#9208;</button>
+      <button id="btn-next" class="ctrl-btn" aria-label="Next">&#9197;</button>
+      <button id="btn-shuffle" class="ctrl-btn pill" aria-label="Shuffle">&#128256; Shuffle</button>
+      <button id="btn-jump" class="ctrl-btn pill">Jump</button>
+      <div id="progress"><div id="progress-fill"></div></div>
+      <div id="time-display">0:00 / 0:00</div>
+    </div>
+  </div>
+</div>
+<div id="error-msg"></div>
+<script type="module">
+import { initAudioPage } from '../../ui/screens/screen-audio-page.js';
+initAudioPage();
+</script>
+</body>
+</html>

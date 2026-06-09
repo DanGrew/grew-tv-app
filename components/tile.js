@@ -19,6 +19,8 @@ export function createTile(server, card, opts) {
   tile.tabIndex = 0;
   tile.setAttribute('data-id', m.id);
   tile.setAttribute('data-kind', m.kind);
+  // Music tiles get a flag the page CSS keys square art off (FEAT-018).
+  ({ true: function() { tile.setAttribute('data-music', ''); }, false: function() {} })[String(!!m.music)]();
 
   var title = document.createElement('div');
   title.className = 'tile-title';
@@ -44,7 +46,7 @@ export function createTile(server, card, opts) {
       placeholder.style.display = 'flex';
     }
   })[String(!!src)]();
-  placeholder.textContent = '🎬';
+  placeholder.textContent = ({ true: '💿', false: '🎬' })[String(!!m.music)];
   tile.appendChild(img);
   tile.appendChild(placeholder);
   tile.appendChild(title);

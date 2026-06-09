@@ -66,6 +66,13 @@ export function loadSeries(serverUrl, id) {
   return getJson(serverUrl + '/api/series/' + encodeURIComponent(id));
 }
 
+// Album detail (FEAT-018): same resolved-items shape as /api/series, with each
+// track carrying artist / lyrics / ext. Distinct route so music has an explicit
+// entry point and the two can diverge later (TASK-129).
+export function loadAlbum(serverUrl, id) {
+  return getJson(serverUrl + '/api/album/' + encodeURIComponent(id));
+}
+
 export function loadNext(serverUrl, seriesId, videoId) {
   return getJson(serverUrl + '/api/next/' + encodeURIComponent(seriesId) + '/' + encodeURIComponent(videoId));
 }

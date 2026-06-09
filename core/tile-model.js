@@ -35,11 +35,19 @@ export function tileModel(card, ctx) {
 
   var cc = c.hasCC != null ? c.hasCC : hasVtt(card);
 
-  // Series sub-label: clip count from the v3 browse card (backend `clipCount`).
-  // Absent (video cards, or older backend without the field) -> no sub-label.
+  // Music tiles (FEAT-018): an album is a series card flagged format:"album"; a
+  // single is a video card flagged mediaType:"audio". Drives square art + the 💿
+  // placeholder + a "tracks" (not "clips") sub-label.
+  var music = (kind === 'series' && card.format === 'album') ||
+              (kind === 'video' && card.mediaType === 'audio');
+
+  // Series sub-label: clip/track count from the v3 browse card (backend
+  // `clipCount`). Absent (video cards, or older backend without the field) -> no
+  // sub-label. An album counts in "tracks".
   var sub = null;
   if (kind === 'series' && card.clipCount != null) {
-    sub = card.clipCount === 1 ? '1 clip' : card.clipCount + ' clips';
+    var noun = music ? ' tracks' : ' clips';
+    sub = card.clipCount === 1 ? '1' + (music ? ' track' : ' clip') : card.clipCount + noun;
   }
 
   return {
@@ -50,6 +58,7 @@ export function tileModel(card, ctx) {
     percent: pct,
     showBar: showBar,
     showCC: !!cc,
-    sub: sub
+    sub: sub,
+    music: music
   };
 }

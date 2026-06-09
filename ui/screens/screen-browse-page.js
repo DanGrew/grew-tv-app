@@ -5,6 +5,7 @@ import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, scanDevices } from '../../core/app-api.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
+import { cardRoute } from '../../core/home-rails.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
 // Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
@@ -92,19 +93,22 @@ export function initBrowsePage() {
   // Tell the companion the app is on Home (drives its catalog context + profile).
   wsApp.sendAppState({ screen: 'home', profile: profile });
 
-  // A video card plays directly; a series card opens its detail screen.
+  // A video card plays directly; a series card opens its detail screen. Music
+  // (FEAT-018) overrides by kind: an album series opens the album detail; an
+  // audio single plays straight in the audio player.
   var SELECT = {
+    album:  function(card) { navTo('album-detail.html', { album: card.id }); },
+    single: function(card) { navTo('audio.html', { track: card.id, from: 'browse' }); },
     video:  function(card) { navTo('video.html', { video: card.id, from: 'browse' }); },
     series: function(card) { navTo('detail.html', { series: card.id }); }
   };
 
-  // An unknown/absent kind is a no-op rather than a thrown TypeError — only
-  // 'video'/'series' route. The backend only emits those two today, so this is
-  // defensive against a future/malformed card, not a live path.
+  // cardRoute (core) gives 'album' / 'single' for music else the card's kind;
+  // [value].filter(Boolean) guards an unknown route as a no-op rather than a throw.
   function onSelect(card) {
     sessionStorage.setItem(LAST_TILE_KEY, card.id);
     sessionStorage.setItem(LAST_TAB_KEY, getActiveTab());
-    [SELECT[card.kind]].filter(Boolean).forEach(function(fn) { fn(card); });
+    [SELECT[cardRoute(card)]].filter(Boolean).forEach(function(fn) { fn(card); });
   }
 
   Promise.all([
