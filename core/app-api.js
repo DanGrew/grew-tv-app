@@ -73,6 +73,15 @@ export function loadAlbum(serverUrl, id) {
   return getJson(serverUrl + '/api/album/' + encodeURIComponent(id));
 }
 
+// Fetch a track's `.lrc` lyric sidecar (TASK-129 serves it as text/plain) by
+// bare name, resolved through the same /media/ route as posters. Resolves to the
+// raw LRC text; rejects on a missing/!ok response so the ambient screen falls
+// back to the no-lyrics art view (FEAT-018 TASK-131).
+export function loadLyrics(serverUrl, filename) {
+  return fetch(mediaUrl(serverUrl, filename), { cache: 'no-store' })
+    .then(function(r) { return r.ok ? r.text() : Promise.reject(r.status); });
+}
+
 export function loadNext(serverUrl, seriesId, videoId) {
   return getJson(serverUrl + '/api/next/' + encodeURIComponent(seriesId) + '/' + encodeURIComponent(videoId));
 }

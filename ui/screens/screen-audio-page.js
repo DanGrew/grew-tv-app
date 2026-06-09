@@ -2,7 +2,8 @@ import { getParam, getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-audio-player.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadAlbum, loadVideo, loadProgress } from '../../core/app-api.js';
+import { loadAlbum, loadVideo, loadProgress, loadLyrics, mediaUrl } from '../../core/app-api.js';
+import { parseLrc, indexAt, windowAt } from '../../core/lrc.js';
 import { isMidWatch } from '../../core/progress.js';
 import { albumOrder, shuffleOrder, neighborId, trackById } from '../../core/queue.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -21,6 +22,8 @@ var RESUME_BY_RESTART = {
 };
 function resumeStart(restart, prog) { return RESUME_BY_RESTART[!!restart + ''](prog); }
 var AUDIO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+// Ambient transport auto-hides after this idle window; any d-pad key summons it.
+var TRANSPORT_HIDE_MS = 4000;
 
 // Album payload -> {items, title}; a single -> a one-track album wrapping the
 // /api/video record. Both feed the same queue model.
@@ -45,12 +48,84 @@ export function initAudioPage() {
   var player;
   var state = { items: [], order: [], currentId: trackId, title: '' };
 
+  // ── ambient lyrics (TASK-131) ──────────────────────────────────────────────
+  // Lyrics are a page concern: the player stays playback-only. The current
+  // track's parsed cues live here; the <audio> timeupdate drives the rolling
+  // window. lastLyricIdx gates DOM writes/bumps to once per line change.
+  var audioEl = document.getElementById('audio');
+  var lyrics = [];
+  var lastLyricIdx = -2;
+
+  function setLyricMode(has) {
+    document.body.classList.toggle('lyrics-on', has);
+  }
+
+  function bumpCurrent() {
+    var el = document.getElementById('amb-cur');
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+  }
+
+  function renderLyrics() {
+    var i = indexAt(lyrics, audioEl.currentTime);
+    [i].filter(function(x) { return x !== lastLyricIdx; }).forEach(function() {
+      lastLyricIdx = i;
+      var w = windowAt(lyrics, audioEl.currentTime);
+      document.getElementById('amb-prev').textContent = w.prev;
+      document.getElementById('amb-cur').textContent = w.cur;
+      document.getElementById('amb-next').textContent = w.next;
+      bumpCurrent();
+    });
+  }
+
+  function applyLyrics(text) {
+    lyrics = parseLrc(text);
+    lastLyricIdx = -2;
+    setLyricMode(lyrics.length > 0);
+    renderLyrics();
+  }
+
+  function clearLyrics() {
+    lyrics = [];
+    lastLyricIdx = -2;
+    setLyricMode(false);
+  }
+
+  var LYRIC_SOURCE = {
+    'true':  function(rec) { loadLyrics(SERVER, rec.lyrics).then(applyLyrics).catch(clearLyrics); },
+    'false': function() { clearLyrics(); }
+  };
+  function loadTrackLyrics(rec) { LYRIC_SOURCE[(!!rec.lyrics) + ''](rec); }
+
+  // Blurred backdrop + (no-lyrics) big cover both draw the track poster.
+  function setArt(rec) {
+    [mediaUrl(SERVER, rec.poster)].filter(Boolean).forEach(function(u) {
+      document.getElementById('amb-bg').style.backgroundImage = 'url("' + u + '")';
+      document.getElementById('audio-art').style.backgroundImage = 'url("' + u + '")';
+      document.getElementById('audio-art').textContent = '';
+    });
+  }
+
+  // ── transport auto-hide ────────────────────────────────────────────────────
+  var hideTimer = null;
+  function hideTransport() { document.getElementById('controls').classList.add('controls-hidden'); }
+  function armHide() { clearTimeout(hideTimer); hideTimer = setTimeout(hideTransport, TRANSPORT_HIDE_MS); }
+  function summonTransport() {
+    document.getElementById('controls').classList.remove('controls-hidden');
+    armHide();
+  }
+
+  audioEl.addEventListener('timeupdate', renderLyrics);
+
   // Play a track id in place: resolve its full record from the album items and
   // hand it to the player. delta-driven (next/prev/ended) tracks start fresh; the
   // entry track resumes (handled at first play, below).
   function playId(id, startSec) {
     [trackById(state.items, id)].filter(Boolean).forEach(function(rec) {
       state.currentId = id;
+      setArt(rec);
+      loadTrackLyrics(rec);
       player.playTrack(rec, from, startSec);
     });
   }
@@ -73,6 +148,7 @@ export function initAudioPage() {
   function onShuffle(on) { state.order = ORDER_FOR[on + ''](state.items); }
 
   function goBackNav() {
+    clearTimeout(hideTimer);
     var STOP_NAV = {
       'detail-album': function() { navTo('album-detail.html', { album: albumId }); },
       'browse':       function() { navTo('browse.html'); }
@@ -102,9 +178,10 @@ export function initAudioPage() {
     }
   });
 
+  function onAudioKey(e) { summonTransport(); player.handleAudioKey(e); }
   var keys = {};
-  AUDIO_KEYS.forEach(function(k) { keys[k] = player.handleAudioKey; });
-  initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote });
+  AUDIO_KEYS.forEach(function(k) { keys[k] = onAudioKey; });
+  initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); armHide(); }, keys: keys, remote: player.remote });
 
   function appIntent(intent, params) {
     var EXTRA = { navigate: function() { navTo(params.page, params.params); } };

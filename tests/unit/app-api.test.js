@@ -1,8 +1,8 @@
-import { loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, loadConfig, loadSettings, saveSettings, scanDevices, mediaUrl } from '../../core/app-api.js';
+import { loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, loadConfig, loadSettings, saveSettings, scanDevices, mediaUrl, loadLyrics } from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
   var calls = [];
-  global.fetch = async (url, opts) => { calls.push({ url, opts }); return { ok: ok !== false, status: ok === false ? 500 : 200, json: async () => body }; };
+  global.fetch = async (url, opts) => { calls.push({ url, opts }); return { ok: ok !== false, status: ok === false ? 500 : 200, json: async () => body, text: async () => body }; };
   return calls;
 }
 
@@ -103,6 +103,20 @@ describe('scanDevices', () => {
     await scanDevices('http://s');
     expect(calls[0].url).toBe('http://s/scan');
     expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+});
+
+describe('loadLyrics', () => {
+  it('GETs the .lrc from /media/{name}, no-store, resolving the raw text', async () => {
+    var calls = fakeFetch('[00:06.00]hi');
+    var text = await loadLyrics('http://s', 'ootb-02.lrc');
+    expect(calls[0].url).toBe('http://s/media/ootb-02.lrc');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+    expect(text).toBe('[00:06.00]hi');
+  });
+  it('rejects on a missing/!ok response (caller falls back to no-lyrics)', async () => {
+    fakeFetch('', false);
+    await expect(loadLyrics('http://s', 'gone.lrc')).rejects.toBe(500);
   });
 });
 
