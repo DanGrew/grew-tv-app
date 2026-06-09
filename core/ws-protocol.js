@@ -10,13 +10,17 @@ export const MESSAGE_TYPES = {
 };
 
 // Companion -> app intents (FEAT-017). Extends the legacy skip intents.
+// FEAT-018 (TASK-132) adds the music pair: SHUFFLE toggles the queue order,
+// PLAY_ALBUM teleports the TV to an album (a single track reuses PLAY with id).
 export const INTENTS = {
   PLAY: 'play',
   SKIP: 'skip',
   NEXT: 'next',
   PREV: 'prev',
   SET_PROFILE: 'setProfile',
-  TOGGLE_CAPTIONS: 'toggleCaptions'
+  TOGGLE_CAPTIONS: 'toggleCaptions',
+  SHUFFLE: 'shuffle',
+  PLAY_ALBUM: 'playAlbum'
 };
 
 // Graduated relative skips: ±10s / 30s / 2m / 10m / 30m. Relative only —
@@ -72,7 +76,8 @@ export function createAppState(state) {
     durationSec: s.durationSec != null ? s.durationSec : null,
     playing: !!s.playing,
     profile: s.profile != null ? s.profile : null,
-    captionsOn: !!s.captionsOn
+    captionsOn: !!s.captionsOn,
+    shuffle: !!s.shuffle
   });
 }
 
@@ -89,6 +94,12 @@ export function createSetProfileIntent(profile) {
 }
 export function createToggleCaptionsIntent() {
   return createIntent(INTENTS.TOGGLE_CAPTIONS, {});
+}
+export function createShuffleIntent() {
+  return createIntent(INTENTS.SHUFFLE, {});
+}
+export function createPlayAlbumIntent(id) {
+  return createIntent(INTENTS.PLAY_ALBUM, { id: id != null ? id : null });
 }
 
 // Local position interpolation between heartbeats. elapsedSec is measured

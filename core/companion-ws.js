@@ -2,7 +2,8 @@ import {
   MESSAGE_TYPES, createIntent, createSnapshotRequest, isStaleContext,
   interpolatePosition,
   createPlayIntent, createSkipIntent, createNextIntent, createPrevIntent,
-  createSetProfileIntent, createToggleCaptionsIntent
+  createSetProfileIntent, createToggleCaptionsIntent,
+  createShuffleIntent, createPlayAlbumIntent
 } from './ws-protocol.js';
 
 export function connect(wsUrl, onContext, onStatus, onAppState) {
@@ -86,6 +87,8 @@ export function connect(wsUrl, onContext, onStatus, onAppState) {
     next: function() { send(createNextIntent()); },
     prev: function() { send(createPrevIntent()); },
     setProfile: function(profile) { send(createSetProfileIntent(profile)); },
-    toggleCaptions: function() { send(createToggleCaptionsIntent()); }
+    toggleCaptions: function() { send(createToggleCaptionsIntent()); },
+    shuffle: function() { send(createShuffleIntent()); },
+    playAlbum: function(id) { send(createPlayAlbumIntent(id)); }
   };
 }

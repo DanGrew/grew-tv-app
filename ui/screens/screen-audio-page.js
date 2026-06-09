@@ -183,8 +183,24 @@ export function initAudioPage() {
   AUDIO_KEYS.forEach(function(k) { keys[k] = onAudioKey; });
   initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); armHide(); }, keys: keys, remote: player.remote });
 
+  // Companion `play` carries a track id -> teleport in place within the loaded
+  // queue (a tap on the album list); no id -> resume. `playAlbum` jumps the TV to
+  // a different album. `shuffle`/`toggle`/`next`/`prev`/`skip` fall through to
+  // player.remote.
+  var PLAY_BY_ID = {
+    'true':  function(id) { playId(id, 0); },
+    'false': function() { player.remote.play(); }
+  };
+  function playIntent(p) {
+    var id = [p].filter(Boolean).map(function(x) { return x.id; }).filter(Boolean).concat([null])[0];
+    PLAY_BY_ID[(id !== null) + ''](id);
+  }
   function appIntent(intent, params) {
-    var EXTRA = { navigate: function() { navTo(params.page, params.params); } };
+    var EXTRA = {
+      navigate: function() { navTo(params.page, params.params); },
+      play: function() { playIntent(params); },
+      playAlbum: function() { navTo('audio.html', { album: params.id, from: 'browse' }); }
+    };
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
