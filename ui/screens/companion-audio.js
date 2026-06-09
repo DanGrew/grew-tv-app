@@ -27,10 +27,24 @@ export function initPage() {
     toggle: document.getElementById('c-toggle'),
     shuffle: document.getElementById('c-shuffle'),
     jump: document.getElementById('jump'),
-    tracks: document.getElementById('tracks')
+    tracks: document.getElementById('tracks'),
+    back: document.getElementById('btn-back')
   };
   var state = { snap: null, albumId: null };
   var api = {};
+
+  // Back teleports the TV to the album detail (companion follows the echoed
+  // `detail` context); a single with no album falls back to browse. Same
+  // navigate-intent path the browse/detail companions use.
+  function backTarget() {
+    return [state.albumId].filter(Boolean)
+      .map(function(id) { return { page: 'album-detail.html', params: { album: id } }; })
+      .concat([{ page: 'browse.html', params: {} }])[0];
+  }
+  function goBack() {
+    var t = backTarget();
+    api.sendIntent('navigate', { page: t.page, params: t.params });
+  }
 
   function buildJump() {
     JUMP.forEach(function(j) {
@@ -81,6 +95,7 @@ export function initPage() {
   }
 
   function renderTracks(album) {
+    els.back.textContent = '‹ ' + album.title;
     els.tracks.innerHTML = '';
     album.items.forEach(function(item) { els.tracks.appendChild(trackBtn(item)); });
     markCurrent();
@@ -115,6 +130,7 @@ export function initPage() {
     [page].filter(function(p) { return p !== 'audio'; }).forEach(function(p) { window.location.href = p + '.html'; });
   }
 
+  els.back.addEventListener('click', goBack);
   els.toggle.addEventListener('click', function() { api.sendIntent('toggle'); });
   els.shuffle.addEventListener('click', function() { api.shuffle(); });
   document.getElementById('c-prev').addEventListener('click', function() { api.prev(); });

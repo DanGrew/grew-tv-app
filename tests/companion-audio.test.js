@@ -10,14 +10,18 @@ const { installApi } = require('./fixtures/api.js');
 
 function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
+// Page name -> context_id the app echoes for it (album-detail emits 'detail').
+const CTX_FOR = { 'album-detail': 'detail' };
+
 function mockApp(page) {
   let version = 1;
+  let ctx = 'audio';
   const st = { screen: 'player', itemId: 'ootb', episodeId: 'ootb-02', positionSec: 110, durationSec: 245, playing: true, profile: 'kids', shuffle: false };
   return page.routeWebSocket(/:8766/, (ws) => {
     function pushState() { ws.send(msg('app_state', st)); }
     function pushCtx() {
       version += 1;
-      ws.send(msg('context', { version: version, context_id: 'audio', display: { id: st.episodeId, title: 'Mr. Blue Sky' } }));
+      ws.send(msg('context', { version: version, context_id: ctx, series_id: st.itemId, display: { id: st.episodeId, title: 'Mr. Blue Sky' } }));
       pushState();
     }
     ws.onMessage(function(raw) {
@@ -26,6 +30,12 @@ function mockApp(page) {
       if (m.type === 'intent' && m.payload.intent === 'shuffle') { st.shuffle = !st.shuffle; pushState(); }
       if (m.type === 'intent' && m.payload.intent === 'toggle') { st.playing = !st.playing; pushState(); }
       if (m.type === 'intent' && m.payload.intent === 'play') { st.episodeId = m.payload.params.id; pushState(); }
+      // navigate teleports the TV; the app echoes the target screen's context.
+      if (m.type === 'intent' && m.payload.intent === 'navigate') {
+        const p = m.payload.params.page.replace('.html', '');
+        ctx = CTX_FOR[p] || p;
+        pushCtx();
+      }
     });
   });
 }
@@ -69,4 +79,13 @@ test('tapping a track teleports the TV — the highlight follows the echoed snap
 
 test('a graduated skip grid is present (±10s / ±30s)', async ({ page }) => {
   await expect(page.locator('.jump-btn')).toHaveText(['-30s', '-10s', '+10s', '+30s']);
+});
+
+test('a back control returns to the album — labelled with it, teleporting the TV to the detail', async ({ page }) => {
+  // Back is labelled with the loaded album once the track list arrives.
+  await expect(page.locator('#btn-back')).toHaveText('‹ Out of the Blue');
+  await page.locator('#btn-back').click();
+  // navigate intent -> the app echoes the album-detail's `detail` context, which
+  // the companion follows off the audio screen.
+  await expect(page).toHaveURL(/companion\/detail\.html$/);
 });
