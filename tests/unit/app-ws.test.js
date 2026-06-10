@@ -122,6 +122,15 @@ describe('connectApp', () => {
     expect(MockWS.instances[0].sent.find(m => m.type === 'activate_person')).toBeFalsy();
   });
 
+  it('with skipAutoActivate, releases its lock on open instead of re-claiming the person', () => {
+    store['grew-tv-person'] = 'mom';   // stale person must NOT be re-claimed
+    connectApp('ws://host:8766', () => {}, { skipAutoActivate: true });
+    MockWS.instances[0].onopen();
+    var act = MockWS.instances[0].sent.find(m => m.type === 'activate_person');
+    expect(act).toBeTruthy();
+    expect(act.payload.person_id).toBeNull();   // release, not activate
+  });
+
   it('stamps the active person onto every app_state snapshot', () => {
     store['grew-tv-person'] = 'dad';
     var api = connectApp('ws://host:8766', () => {});
