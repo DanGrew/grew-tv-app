@@ -95,3 +95,86 @@ test('arrow keys move focus between profile cards', async ({ page }) => {
   await page.keyboard.press('ArrowLeft');
   await expect(page.locator('#btn-kids')).toBeFocused();
 });
+
+// ── FEAT-026 TASK-156: the generalized person model (N persons, ids distinct
+// from the display name + content class, per-person PIN, active-person state).
+function configRoute(page, config) {
+  return page.route('**/media/config.json', function(route) {
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(config) });
+  });
+}
+
+const ROSTER = {
+  defaultPin: '1234',
+  persons: [
+    { id: 'oliver', name: 'Oliver', profile: 'kids',   photo: null },
+    { id: 'millie', name: 'Millie', profile: 'kids',   photo: null },
+    { id: 'mom',    name: 'Mom',    profile: 'adults', photo: null, pin: '4321' }
+  ]
+};
+
+test('renders one card per configured person, ids distinct from names', async ({ page }) => {
+  await configRoute(page, ROSTER);
+  await page.reload();
+  await expect(page.locator('.profile-card')).toHaveCount(3);
+  await expect(page.locator('#btn-oliver .profile-name')).toHaveText('Oliver');
+  await expect(page.locator('#btn-millie .profile-name')).toHaveText('Millie');
+  await expect(page.locator('#btn-mom .profile-name')).toHaveText('Mom');
+});
+
+test('picking a kid person needs no PIN and sets the active person', async ({ page }) => {
+  await configRoute(page, ROSTER);
+  await page.reload();
+  await page.locator('#btn-millie').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv-person'))).toBe('millie');
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv-profile'))).toBe('kids');
+});
+
+test('only adult persons carry a lock badge', async ({ page }) => {
+  await configRoute(page, ROSTER);
+  await page.reload();
+  await expect(page.locator('#btn-mom .lock-badge')).toBeVisible();
+  await expect(page.locator('#btn-oliver .lock-badge')).toHaveCount(0);
+  await expect(page.locator('#btn-millie .lock-badge')).toHaveCount(0);
+});
+
+test("an adult person's own PIN gates it (default PIN is rejected)", async ({ page }) => {
+  await configRoute(page, ROSTER);
+  await page.reload();
+  await page.locator('#btn-mom').click();
+  // wrong (the default 1234) — Mom overrides it with 4321
+  await '1234'.split('').reduce(function(p, d) {
+    return p.then(function() { return page.locator('.key[data-key="' + d + '"]').click(); });
+  }, Promise.resolve());
+  await expect(page.locator('#screen-profile')).toBeVisible();
+  await expect(page.locator('.pin-dots span.on')).toHaveCount(0);
+  // correct — Mom's own PIN unlocks + sets the active person
+  await '4321'.split('').reduce(function(p, d) {
+    return p.then(function() { return page.locator('.key[data-key="' + d + '"]').click(); });
+  }, Promise.resolve());
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv-person'))).toBe('mom');
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv-profile'))).toBe('adults');
+});
+
+test("the active person's content class filters browse", async ({ page }) => {
+  await configRoute(page, ROSTER);
+  await page.reload();
+  await page.locator('#btn-oliver').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  // kids browse (Series landing) holds the kids Bluey rail, never the
+  // adults-only Dark Knight — the active person's class drove /api/browse.
+  await expect(page.locator('.film-tile[data-id="bluey"]')).toHaveCount(1);
+  await expect(page.locator('[data-id="dark-knight-main"]')).toHaveCount(0);
+});
+
+test('absent config falls back to generic placeholder persons and still boots', async ({ page }) => {
+  await page.route('**/media/config.json', function(route) {
+    return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+  });
+  await page.reload();
+  await expect(page.locator('.profile-card')).toHaveCount(2);
+  await page.locator('#btn-child').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+});

@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { getProfile, setProfile, getCaptions, setCaptions, initCaptions, getParam, navTo } from '../../core/state.js';
+import { getProfile, setProfile, getPerson, setPerson, getCaptions, setCaptions, initCaptions, getParam, navTo } from '../../core/state.js';
 
 describe('getProfile / setProfile', () => {
   var store;
@@ -23,6 +23,35 @@ describe('getProfile / setProfile', () => {
   it('updates profile', () => {
     setProfile('kids');
     setProfile('adults');
+    expect(getProfile()).toBe('adults');
+  });
+});
+
+// FEAT-026 TASK-156: the active person is the watch-progress key (who's
+// watching), stored separately from the content-class profile above.
+describe('getPerson / setPerson', () => {
+  var store;
+  beforeEach(() => {
+    store = {};
+    vi.stubGlobal('localStorage', {
+      getItem:    (k) => store[k] ?? null,
+      setItem:    (k, v) => { store[k] = v; },
+      removeItem: (k) => { delete store[k]; }
+    });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('returns null when not set', () => {
+    expect(getPerson()).toBe(null);
+  });
+  it('returns the active person id after setPerson', () => {
+    setPerson('oliver');
+    expect(getPerson()).toBe('oliver');
+  });
+  it('is independent of the profile key', () => {
+    setPerson('mom');
+    setProfile('adults');
+    expect(getPerson()).toBe('mom');
     expect(getProfile()).toBe('adults');
   });
 });

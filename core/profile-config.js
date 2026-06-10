@@ -1,51 +1,79 @@
-// Profiles + PIN gate config (TASK-120, FEAT-017). The media-manager serves a
-// config.json from the content root (fetched via /media/config.json) holding the
-// family's profiles and the Adults gate PIN. The gate is a deliberate SOFT block
-// for young children — deterrence, not security — so the PIN is plaintext and
-// trivially swappable; it lives on the device, never in this public repo. When
-// the file is absent or malformed the app falls back to the built-in defaults
-// below so the screen always works.
+// Persons + PIN gate config (FEAT-026 TASK-156, generalizing TASK-120). The
+// media-manager serves a config.json from the content root (fetched via
+// /media/config.json) holding the family's persons and the gate PIN. A person
+// carries identity (a stable `id` — the watch-progress key, TASK-154/155 — never
+// the display name, so renames don't orphan progress) and a fixed content class
+// (`profile`: kids|adults). Adult persons are gated behind a PIN; kids select
+// freely. The gate is a deliberate SOFT block for young children — deterrence,
+// not security — so the PIN is plaintext and trivially swappable; it lives on
+// the device, never in this public repo. When the file is absent or malformed
+// the app falls back to the generic placeholders below so the screen always
+// works (real names/PINs are authored on-Mini at deploy).
 //
-// config shape: { pin: "1234", profiles: [ { id, label, locked, photo } ] }
+// config shape: { defaultPin: "0000", persons: [ { id, name, profile, photo, pin? } ] }
+// A person's effective PIN = its own `pin` or the top-level `defaultPin`.
 
 export var PIN_LEN = 4;
-export var DEFAULT_PIN = '1234';
+export var DEFAULT_PIN = '0000';
 
-function defaultProfiles() {
+// Generic placeholders only — one adult + one kid. NO real names or PINs here.
+function defaultPersons() {
   return [
-    { id: 'kids',   label: 'Kids',   locked: false, photo: null },
-    { id: 'adults', label: 'Adults', locked: true,  photo: null }
+    { id: 'child',   name: 'Child',   profile: 'kids',   photo: null, pin: null },
+    { id: 'grownup', name: 'Grown-up', profile: 'adults', photo: null, pin: null }
   ];
 }
 
 export function defaultConfig() {
-  return { pin: DEFAULT_PIN, profiles: defaultProfiles() };
+  return { defaultPin: DEFAULT_PIN, persons: defaultPersons() };
 }
 
-function normalizeProfile(raw) {
+function normalizePerson(raw) {
   return {
     id: raw.id,
-    label: raw.label != null ? raw.label : raw.id,
-    locked: !!raw.locked,
-    photo: raw.photo != null ? raw.photo : null
+    name: raw.name != null ? raw.name : raw.id,
+    profile: raw.profile === 'adults' ? 'adults' : 'kids',
+    photo: raw.photo != null ? raw.photo : null,
+    pin: typeof raw.pin === 'string' && raw.pin.length ? raw.pin : null
   };
 }
 
 // Tolerant parse — any missing/invalid piece falls back to a default so a typo in
-// the family's config can never blank the profile screen. Profiles must be a
-// non-empty array of objects with an id; otherwise the default pair is used.
+// the family's config can never blank the picker. Persons must be a non-empty
+// array of objects with an id; otherwise the placeholder pair is used.
 export function parseConfig(raw) {
   var cfg = raw && typeof raw === 'object' ? raw : {};
-  var pin = typeof cfg.pin === 'string' && cfg.pin.length ? cfg.pin : DEFAULT_PIN;
-  var list = Array.isArray(cfg.profiles)
-    ? cfg.profiles.filter(function(p) { return p && typeof p === 'object' && p.id; })
+  var dpin = typeof cfg.defaultPin === 'string' && cfg.defaultPin.length ? cfg.defaultPin : DEFAULT_PIN;
+  var list = Array.isArray(cfg.persons)
+    ? cfg.persons.filter(function(p) { return p && typeof p === 'object' && p.id; })
     : [];
-  var profiles = list.length ? list.map(normalizeProfile) : defaultProfiles();
-  return { pin: pin, profiles: profiles };
+  var persons = list.length ? list.map(normalizePerson) : defaultPersons();
+  return { defaultPin: dpin, persons: persons };
 }
 
-export function pinMatches(config, entered) {
-  return !!config && entered === config.pin;
+// An adult person is gated; a kid person selects freely.
+export function isLocked(person) {
+  return !!person && person.profile === 'adults';
+}
+
+// A person's effective PIN = its own pin or the config default.
+export function effectivePin(config, person) {
+  return person.pin != null ? person.pin : config.defaultPin;
+}
+
+export function pinMatches(config, person, entered) {
+  return !!config && !!person && entered === effectivePin(config, person);
+}
+
+export function personById(config, id) {
+  return config.persons.filter(function(p) { return p.id === id; })[0] || null;
+}
+
+// Resolve a content class (kids|adults) to a person of that class — the bridge
+// for the companion's class-level picks until it is person-aware (TASK-158).
+// Falls back to the first person so a pick always lands somewhere.
+export function personByProfile(config, cls) {
+  return config.persons.filter(function(p) { return p.profile === cls; }).concat(config.persons)[0] || null;
 }
 
 // ── PIN entry (pure state on a digit string) ───────────────────────────────

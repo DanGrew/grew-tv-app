@@ -1,29 +1,42 @@
 import {
-  PIN_LEN, DEFAULT_PIN, defaultConfig, parseConfig, pinMatches,
+  PIN_LEN, DEFAULT_PIN, defaultConfig, parseConfig, isLocked, effectivePin,
+  pinMatches, personById, personByProfile,
   pushDigit, popDigit, isPinComplete, dotFill, keypadNav
 } from '../../core/profile-config.js';
 
 describe('defaultConfig', () => {
-  it('has the default PIN and Kids(open)/Adults(locked)', () => {
+  it('has the default PIN and one open kid + one locked adult placeholder', () => {
     var c = defaultConfig();
-    expect(c.pin).toBe(DEFAULT_PIN);
-    expect(c.profiles.map(p => p.id)).toEqual(['kids', 'adults']);
-    expect(c.profiles[0].locked).toBe(false);
-    expect(c.profiles[1].locked).toBe(true);
-    expect(c.profiles[0].photo).toBe(null);
+    expect(c.defaultPin).toBe(DEFAULT_PIN);
+    expect(c.persons.map(p => p.profile)).toEqual(['kids', 'adults']);
+    expect(isLocked(c.persons[0])).toBe(false);
+    expect(isLocked(c.persons[1])).toBe(true);
+    expect(c.persons[0].photo).toBe(null);
+    // generic placeholders only — no real names
+    expect(c.persons.map(p => p.id)).toEqual(['child', 'grownup']);
   });
 });
 
 describe('parseConfig', () => {
   it('keeps a well-formed config and coerces fields', () => {
-    var c = parseConfig({ pin: '9876', profiles: [
-      { id: 'kids', label: 'Children', locked: 0, photo: 'k.jpg' },
-      { id: 'adults', locked: 1 }
+    var c = parseConfig({ defaultPin: '9876', persons: [
+      { id: 'oliver', name: 'Oliver', profile: 'kids', photo: 'o.jpg' },
+      { id: 'mom', profile: 'adults', pin: '4321' }
     ] });
-    expect(c.pin).toBe('9876');
-    expect(c.profiles[0]).toEqual({ id: 'kids', label: 'Children', locked: false, photo: 'k.jpg' });
-    // missing label falls back to id; missing photo -> null; locked coerced to bool
-    expect(c.profiles[1]).toEqual({ id: 'adults', label: 'adults', locked: true, photo: null });
+    expect(c.defaultPin).toBe('9876');
+    expect(c.persons[0]).toEqual({ id: 'oliver', name: 'Oliver', profile: 'kids', photo: 'o.jpg', pin: null });
+    // missing name falls back to id; missing photo -> null; own pin kept
+    expect(c.persons[1]).toEqual({ id: 'mom', name: 'mom', profile: 'adults', photo: null, pin: '4321' });
+  });
+
+  it('defaults an unknown/missing profile to kids', () => {
+    expect(parseConfig({ persons: [{ id: 'x' }] }).persons[0].profile).toBe('kids');
+    expect(parseConfig({ persons: [{ id: 'x', profile: 'teens' }] }).persons[0].profile).toBe('kids');
+  });
+
+  it('drops a blank/non-string pin to null', () => {
+    expect(parseConfig({ persons: [{ id: 'x', pin: '' }] }).persons[0].pin).toBe(null);
+    expect(parseConfig({ persons: [{ id: 'x', pin: 4321 }] }).persons[0].pin).toBe(null);
   });
 
   it('falls back to defaults on null/garbage', () => {
@@ -32,26 +45,62 @@ describe('parseConfig', () => {
     expect(parseConfig({})).toEqual(defaultConfig());
   });
 
-  it('uses the default PIN when pin missing or non-string', () => {
-    expect(parseConfig({ profiles: [{ id: 'kids' }] }).pin).toBe(DEFAULT_PIN);
-    expect(parseConfig({ pin: 1234, profiles: [{ id: 'kids' }] }).pin).toBe(DEFAULT_PIN);
-    expect(parseConfig({ pin: '', profiles: [{ id: 'kids' }] }).pin).toBe(DEFAULT_PIN);
+  it('uses the default PIN when defaultPin missing or non-string', () => {
+    expect(parseConfig({ persons: [{ id: 'x' }] }).defaultPin).toBe(DEFAULT_PIN);
+    expect(parseConfig({ defaultPin: 1234, persons: [{ id: 'x' }] }).defaultPin).toBe(DEFAULT_PIN);
+    expect(parseConfig({ defaultPin: '', persons: [{ id: 'x' }] }).defaultPin).toBe(DEFAULT_PIN);
   });
 
-  it('drops profile entries without an id, and defaults when none remain', () => {
-    expect(parseConfig({ profiles: [{ label: 'x' }, { id: 'adults' }] }).profiles.map(p => p.id)).toEqual(['adults']);
-    expect(parseConfig({ profiles: [{ label: 'x' }] }).profiles).toEqual(defaultConfig().profiles);
-    expect(parseConfig({ profiles: 'bad' }).profiles).toEqual(defaultConfig().profiles);
+  it('drops person entries without an id, and defaults when none remain', () => {
+    expect(parseConfig({ persons: [{ name: 'x' }, { id: 'mom', profile: 'adults' }] }).persons.map(p => p.id)).toEqual(['mom']);
+    expect(parseConfig({ persons: [{ name: 'x' }] }).persons).toEqual(defaultConfig().persons);
+    expect(parseConfig({ persons: 'bad' }).persons).toEqual(defaultConfig().persons);
   });
 });
 
-describe('pinMatches', () => {
-  it('is true only on an exact string match', () => {
-    var c = { pin: '1234' };
-    expect(pinMatches(c, '1234')).toBe(true);
-    expect(pinMatches(c, '1235')).toBe(false);
-    expect(pinMatches(c, '12340')).toBe(false);
-    expect(pinMatches(null, '1234')).toBe(false);
+describe('isLocked', () => {
+  it('is true only for an adult person', () => {
+    expect(isLocked({ profile: 'adults' })).toBe(true);
+    expect(isLocked({ profile: 'kids' })).toBe(false);
+    expect(isLocked(null)).toBe(false);
+  });
+});
+
+describe('effectivePin / pinMatches', () => {
+  var config = { defaultPin: '0000', persons: [] };
+  var withOwn = { id: 'mom', profile: 'adults', pin: '4321' };
+  var noOwn = { id: 'dad', profile: 'adults', pin: null };
+
+  it('effectivePin is the person pin or the config default', () => {
+    expect(effectivePin(config, withOwn)).toBe('4321');
+    expect(effectivePin(config, noOwn)).toBe('0000');
+  });
+
+  it('pinMatches against the effective pin only', () => {
+    expect(pinMatches(config, withOwn, '4321')).toBe(true);
+    expect(pinMatches(config, withOwn, '0000')).toBe(false);
+    expect(pinMatches(config, noOwn, '0000')).toBe(true);
+    expect(pinMatches(config, noOwn, '4321')).toBe(false);
+    expect(pinMatches(config, null, '0000')).toBe(false);
+    expect(pinMatches(null, noOwn, '0000')).toBe(false);
+  });
+});
+
+describe('personById / personByProfile', () => {
+  var config = { defaultPin: '0', persons: [
+    { id: 'oliver', profile: 'kids' },
+    { id: 'mom', profile: 'adults' }
+  ] };
+
+  it('personById resolves by stable id, null when absent', () => {
+    expect(personById(config, 'mom').id).toBe('mom');
+    expect(personById(config, 'ghost')).toBe(null);
+  });
+
+  it('personByProfile returns the first person of a class, else the first person', () => {
+    expect(personByProfile(config, 'adults').id).toBe('mom');
+    expect(personByProfile(config, 'kids').id).toBe('oliver');
+    expect(personByProfile({ defaultPin: '0', persons: [{ id: 'oliver', profile: 'kids' }] }, 'adults').id).toBe('oliver');
   });
 });
 

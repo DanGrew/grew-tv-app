@@ -1,14 +1,15 @@
-// Companion profile picker (TASK-120, FEAT-017): mirrors the TV photo cards +
-// Adults PIN gate. Kids sends the setProfile intent straight away; Adults reveals
-// a tappable keypad and only sends the intent on the right code. The gate is
-// validated here against the same config.json the TV uses, then a setProfile
-// intent jumps both devices to Home. View-model logic lives in core/.
+// Companion person picker (FEAT-026 TASK-156, generalizing TASK-120): mirrors
+// the TV person cards + adult PIN gate. A kid person sends the setProfile intent
+// (carrying the person id) straight away; an adult person reveals a tappable
+// keypad and only sends the intent on its effective code. The gate is validated
+// here against the same config.json the TV uses, then a setProfile intent jumps
+// both devices to Home. View-model logic lives in core/.
 
 import { connect } from '../../core/companion-ws.js';
 import { screenPage } from '../../core/companion-utils.js';
 import { loadConfig, mediaUrl } from '../../core/app-api.js';
 import {
-  defaultConfig, parseConfig, pinMatches, pushDigit, popDigit, isPinComplete, dotFill
+  defaultConfig, parseConfig, isLocked, pinMatches, pushDigit, popDigit, isPinComplete, dotFill
 } from '../../core/profile-config.js';
 
 var KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'ok'];
@@ -26,6 +27,7 @@ export function initPage() {
   };
   var config = defaultConfig();
   var pinEntry = '';
+  var pinForPerson = null;
   var onProfile = false;
   var dotsEl = null;
   var keypadWrap = null;
@@ -48,7 +50,7 @@ export function initPage() {
   }
 
   function submit() {
-    ({ true: function() { pick('adults'); }, false: function() { shake(); pinEntry = ''; renderDots(); } })[pinMatches(config, pinEntry)]();
+    ({ true: function() { pick(pinForPerson.id); }, false: function() { shake(); pinEntry = ''; renderDots(); } })[pinMatches(config, pinForPerson, pinEntry)]();
   }
 
   function onDigit(d) {
@@ -60,27 +62,28 @@ export function initPage() {
   function onBack() { pinEntry = popDigit(pinEntry); renderDots(); }
   function onOk() { ({ true: submit, false: noop })[isPinComplete(pinEntry)](); }
 
-  function showKeypad(profile) {
+  function showKeypad(person) {
+    pinForPerson = person;
     pinEntry = '';
-    keypadTitle.textContent = 'Enter code — ' + profile.label;
+    keypadTitle.textContent = 'Enter code — ' + person.name;
     keypadWrap.classList.add('active');
     renderDots();
   }
 
-  function onCardTap(profile) {
-    ({ true: function() { showKeypad(profile); }, false: function() { pick(profile.id); } })[profile.locked]();
+  function onCardTap(person) {
+    ({ true: function() { showKeypad(person); }, false: function() { pick(person.id); } })[isLocked(person)]();
   }
 
-  function photoNode(profile) {
+  function photoNode(person) {
     var photo = document.createElement('div');
-    photo.className = 'cmp-photo ' + profile.id;
+    photo.className = 'cmp-photo ' + person.profile;
     var img = document.createElement('img');
     img.className = 'cmp-photo-img';
     img.alt = '';
     var ph = document.createElement('div');
     ph.className = 'cmp-photo-ph';
-    ph.textContent = [PH_EMOJI[profile.id]].filter(Boolean).concat(['👤'])[0];
-    var src = mediaUrl(server, profile.photo);
+    ph.textContent = [PH_EMOJI[person.profile]].filter(Boolean).concat(['👤'])[0];
+    var src = mediaUrl(server, person.photo);
     ({
       true: function() {
         img.src = src;
@@ -94,22 +97,22 @@ export function initPage() {
     return photo;
   }
 
-  function buildCard(profile, container) {
+  function buildCard(person, container) {
     var card = document.createElement('button');
     card.className = 'cmp-card';
-    card.setAttribute('data-id', profile.id);
-    [profile.locked].filter(Boolean).forEach(function() {
+    card.setAttribute('data-id', person.id);
+    [isLocked(person)].filter(Boolean).forEach(function() {
       var lock = document.createElement('div');
       lock.className = 'cmp-lock';
       lock.textContent = '🔒';
       card.appendChild(lock);
     });
-    card.appendChild(photoNode(profile));
+    card.appendChild(photoNode(person));
     var name = document.createElement('div');
     name.className = 'cmp-name';
-    name.textContent = profile.label;
+    name.textContent = person.name;
     card.appendChild(name);
-    card.addEventListener('click', function() { onCardTap(profile); });
+    card.addEventListener('click', function() { onCardTap(person); });
     container.appendChild(card);
   }
 
@@ -131,7 +134,7 @@ export function initPage() {
     els.actionsEl.style.flexDirection = '';
     var cards = document.createElement('div');
     cards.className = 'cmp-cards';
-    config.profiles.forEach(function(p) { buildCard(p, cards); });
+    config.persons.forEach(function(p) { buildCard(p, cards); });
     els.actionsEl.appendChild(cards);
     keypadWrap = document.createElement('div');
     keypadWrap.className = 'cmp-keypad-wrap';
