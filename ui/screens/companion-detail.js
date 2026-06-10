@@ -21,7 +21,7 @@ export function initPage() {
     actionsEl: document.getElementById('actions'),
     backBtn: document.getElementById('btn-back')
   };
-  var state = { seriesId: null, profile: null, series: null, progress: {} };
+  var state = { seriesId: null, profile: null, person: null, series: null, progress: {} };
   var api = {};
 
   els.backBtn.addEventListener('click', function() { api.sendIntent('back'); });
@@ -96,8 +96,8 @@ export function initPage() {
       .catch(function() { state.series = null; render(); });
   }
 
-  function loadCW(profile) {
-    loadContinueWatching(server, profile)
+  function loadCW() {
+    loadContinueWatching(server, state.profile, state.person)
       .then(function(c) { state.progress = progressMapFromCW([c.content].filter(Boolean).concat([[]])[0]); render(); })
       .catch(function() { state.progress = {}; render(); });
   }
@@ -119,9 +119,11 @@ export function initPage() {
     ROUTE[(page !== 'detail') + '']();
   }
 
-  // Profile drives which Continue-Watching set tints the episode bars.
+  // The active person keys which Continue-Watching set tints the episode bars
+  // (FEAT-026 TASK-158 — person rides the app_state; reloads when it changes).
   function onAppState(snap) {
-    [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(function(p) { state.profile = p; loadCW(p); });
+    state.profile = [snap.profile].filter(Boolean).concat([state.profile])[0];
+    [snap.person].filter(Boolean).filter(function(p) { return p !== state.person; }).forEach(function(p) { state.person = p; loadCW(); });
   }
 
   api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; }, onAppState);

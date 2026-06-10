@@ -23,6 +23,7 @@ export function initPage() {
     connStatus: document.getElementById('conn-status'),
     ctxLabel: document.getElementById('ctx-label'),
     ctxTitle: document.getElementById('ctx-title'),
+    screenBar: document.getElementById('screen-bar'),
     actionsEl: document.getElementById('actions')
   };
   var config = defaultConfig();
@@ -165,7 +166,32 @@ export function initPage() {
     })[page !== 'profile']();
   }
 
-  api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; });
+  // Screen chooser (FEAT-026 TASK-158): the live device list arrives over the WS.
+  // A sole screen auto-targets in companion-ws; with several, tapping a screen
+  // button targets it. Hidden when there is nothing to choose between (≤1).
+  function buildScreenBtn(d) {
+    var b = document.createElement('button');
+    b.className = 'screen-btn';
+    b.setAttribute('data-id', d.device_id);
+    b.textContent = [d.label].filter(Boolean).concat(['Screen'])[0];
+    b.addEventListener('click', function() { getApi().target(d.device_id); });
+    els.screenBar.appendChild(b);
+  }
+
+  function buildScreenList(devices) {
+    var label = document.createElement('div');
+    label.className = 'screen-bar-label';
+    label.textContent = 'Drive screen';
+    els.screenBar.appendChild(label);
+    devices.forEach(buildScreenBtn);
+  }
+
+  function onDevices(devices) {
+    els.screenBar.innerHTML = '';
+    ({ true: function() { buildScreenList(devices); }, false: noop })[devices.length > 1]();
+  }
+
+  api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; }, noop, onDevices);
   // Config may land after the picker first renders (default config) — re-render
   // so real photos/labels appear. Skips a rebuild when not on the profile view.
   loadConfig(server).then(parseConfig).then(function(cfg) {

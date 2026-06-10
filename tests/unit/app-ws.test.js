@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { connectApp } from '../../core/app-ws.js';
 
 class MockWS {
@@ -13,14 +14,23 @@ class MockWS {
 MockWS.OPEN = 1;
 MockWS.instances = [];
 
+var store;
+
 beforeEach(() => {
   MockWS.instances = [];
   global.WebSocket = MockWS;
+  store = {};
+  vi.stubGlobal('localStorage', {
+    getItem:    (k) => (k in store ? store[k] : null),
+    setItem:    (k, v) => { store[k] = String(v); },
+    removeItem: (k) => { delete store[k]; }
+  });
   vi.useFakeTimers();
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('connectApp', () => {
@@ -82,5 +92,83 @@ describe('connectApp', () => {
     MockWS.instances[1].onopen();
     var msg = MockWS.instances[1].sent.find(m => m.type === 'app_state');
     expect(msg.payload.itemId).toBe('film-7');
+  });
+
+  // FEAT-026 Phase 2 (TASK-158): durable device registration + person activation.
+  it('registers the device on open (mints + persists a device id)', () => {
+    connectApp('ws://host:8766', () => {});
+    MockWS.instances[0].onopen();
+    var reg = MockWS.instances[0].sent.find(m => m.type === 'register_device');
+    expect(reg).toBeTruthy();
+    expect(reg.payload.device_id).toBe(localStorage.getItem('grew-tv-device'));
+    expect(reg.payload.device_id).toBeTruthy();
+  });
+
+  it('activates the active person on open, after register_device', () => {
+    store['grew-tv-person'] = 'mom';
+    connectApp('ws://host:8766', () => {});
+    MockWS.instances[0].onopen();
+    var sent = MockWS.instances[0].sent.map(m => m.type);
+    expect(sent.indexOf('register_device')).toBeGreaterThanOrEqual(0);
+    expect(sent.indexOf('activate_person')).toBeGreaterThan(sent.indexOf('register_device'));
+    var act = MockWS.instances[0].sent.find(m => m.type === 'activate_person');
+    expect(act.payload.person_id).toBe('mom');
+    expect(act.payload.takeover).toBe(false);
+  });
+
+  it('does not activate a person when none is set', () => {
+    connectApp('ws://host:8766', () => {});
+    MockWS.instances[0].onopen();
+    expect(MockWS.instances[0].sent.find(m => m.type === 'activate_person')).toBeFalsy();
+  });
+
+  it('stamps the active person onto every app_state snapshot', () => {
+    store['grew-tv-person'] = 'dad';
+    var api = connectApp('ws://host:8766', () => {});
+    api.sendAppState({ screen: 'home', profile: 'adults' });
+    var msg = MockWS.instances[0].sent.find(m => m.type === 'app_state');
+    expect(msg.payload.person).toBe('dad');
+  });
+
+  it('reconnect re-registers the same device id', () => {
+    connectApp('ws://host:8766', () => {});
+    MockWS.instances[0].onopen();
+    var first = MockWS.instances[0].sent.find(m => m.type === 'register_device').payload.device_id;
+    MockWS.instances[0].close();
+    vi.advanceTimersByTime(2001);
+    MockWS.instances[1].onopen();
+    var second = MockWS.instances[1].sent.find(m => m.type === 'register_device').payload.device_id;
+    expect(second).toBe(first);
+  });
+
+  it('inbound deactivated invokes the onDeactivated callback', () => {
+    var hit = 0;
+    connectApp('ws://host:8766', () => {}, { onDeactivated: () => { hit++; } });
+    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'deactivated', payload: { person_id: 'mom' } }) });
+    expect(hit).toBe(1);
+  });
+
+  it('routes person_active / person_busy to their callbacks', () => {
+    var active = null;
+    var busy = null;
+    connectApp('ws://host:8766', () => {}, {
+      onPersonActive: (p) => { active = p; },
+      onPersonBusy: (p) => { busy = p; }
+    });
+    var ws = MockWS.instances[0];
+    ws.onmessage({ data: JSON.stringify({ type: 'person_active', payload: { person_id: 'mom', device_id: 'devA' } }) });
+    ws.onmessage({ data: JSON.stringify({ type: 'person_busy', payload: { person_id: 'mom', device_id: 'devB', label: 'Bedroom' } }) });
+    expect(active.person_id).toBe('mom');
+    expect(busy.label).toBe('Bedroom');
+  });
+
+  it('activatePerson sends activate_person with the device id + takeover flag', () => {
+    var api = connectApp('ws://host:8766', () => {});
+    MockWS.instances[0].sent.length = 0;
+    api.activatePerson('millie', true);
+    var act = MockWS.instances[0].sent.find(m => m.type === 'activate_person');
+    expect(act.payload.person_id).toBe('millie');
+    expect(act.payload.takeover).toBe(true);
+    expect(act.payload.device_id).toBe(localStorage.getItem('grew-tv-device'));
   });
 });

@@ -26,6 +26,8 @@ function mockApp(page) {
     }
     ws.onMessage(function(raw) {
       const m = JSON.parse(raw);
+      // TASK-158: the companion lists screens, auto-targets the sole one, then snapshots.
+      if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
       if (m.type === 'snapshot_request') pushCtx();
       if (m.type === 'intent' && m.payload.intent === 'shuffle') { st.shuffle = !st.shuffle; pushState(); }
       if (m.type === 'intent' && m.payload.intent === 'toggle') { st.playing = !st.playing; pushState(); }

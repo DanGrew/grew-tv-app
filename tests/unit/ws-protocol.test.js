@@ -16,6 +16,10 @@ import {
   createToggleCaptionsIntent,
   createShuffleIntent,
   createPlayAlbumIntent,
+  createRegisterDevice,
+  createActivatePerson,
+  createRegisterCompanion,
+  createListDevices,
   interpolatePosition,
   createHeartbeat
 } from '../../core/ws-protocol.js';
@@ -155,16 +159,16 @@ describe('createAppState', () => {
     expect(createAppState({}).type).toBe('app_state');
   });
 
-  it('passes through all snapshot fields (incl. FEAT-018 shuffle)', () => {
+  it('passes through all snapshot fields (incl. FEAT-018 shuffle, FEAT-026 person)', () => {
     const p = createAppState({
       screen: 'player', itemId: 'ootb', episodeId: 'ootb-02',
       positionSec: 42, durationSec: 380, playing: true,
-      profile: 'kids', captionsOn: true, shuffle: true
+      profile: 'kids', person: 'mom', captionsOn: true, shuffle: true
     }).payload;
     expect(p).toEqual({
       screen: 'player', itemId: 'ootb', episodeId: 'ootb-02',
       positionSec: 42, durationSec: 380, playing: true,
-      profile: 'kids', captionsOn: true, shuffle: true
+      profile: 'kids', person: 'mom', captionsOn: true, shuffle: true
     });
   });
 
@@ -210,6 +214,47 @@ describe('intent builders', () => {
     expect(createPlayAlbumIntent('ootb').payload.intent).toBe('playAlbum');
     expect(createPlayAlbumIntent('ootb').payload.params.id).toBe('ootb');
     expect(createPlayAlbumIntent().payload.params.id).toBeNull();
+  });
+});
+
+// FEAT-026 Phase 2 (TASK-158) — registry/relay builders.
+describe('registry builders', () => {
+  it('MESSAGE_TYPES carries the new registry/relay types', () => {
+    expect(MESSAGE_TYPES.REGISTER_DEVICE).toBe('register_device');
+    expect(MESSAGE_TYPES.ACTIVATE_PERSON).toBe('activate_person');
+    expect(MESSAGE_TYPES.REGISTER_COMPANION).toBe('register_companion');
+    expect(MESSAGE_TYPES.LIST_DEVICES).toBe('list_devices');
+    expect(MESSAGE_TYPES.PERSON_ACTIVE).toBe('person_active');
+    expect(MESSAGE_TYPES.PERSON_BUSY).toBe('person_busy');
+    expect(MESSAGE_TYPES.DEACTIVATED).toBe('deactivated');
+    expect(MESSAGE_TYPES.DEVICES).toBe('devices');
+  });
+  it('createRegisterDevice carries device_id + label', () => {
+    const m = createRegisterDevice('devA', 'Living Room');
+    expect(m.type).toBe('register_device');
+    expect(m.payload.device_id).toBe('devA');
+    expect(m.payload.label).toBe('Living Room');
+  });
+  it('createRegisterDevice defaults label to null', () => {
+    expect(createRegisterDevice('devA').payload.label).toBeNull();
+  });
+  it('createActivatePerson carries device_id, person_id, takeover', () => {
+    const m = createActivatePerson('devA', 'mom', true);
+    expect(m.type).toBe('activate_person');
+    expect(m.payload.device_id).toBe('devA');
+    expect(m.payload.person_id).toBe('mom');
+    expect(m.payload.takeover).toBe(true);
+  });
+  it('createActivatePerson coerces takeover to a boolean (default false)', () => {
+    expect(createActivatePerson('devA', 'mom').payload.takeover).toBe(false);
+  });
+  it('createRegisterCompanion carries the target device_id', () => {
+    const m = createRegisterCompanion('devA');
+    expect(m.type).toBe('register_companion');
+    expect(m.payload.device_id).toBe('devA');
+  });
+  it('createListDevices sets the list_devices type', () => {
+    expect(createListDevices().type).toBe('list_devices');
   });
 });
 

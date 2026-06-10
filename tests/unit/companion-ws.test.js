@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { connect } from '../../core/companion-ws.js';
 
 class MockWS {
@@ -13,15 +14,28 @@ class MockWS {
 MockWS.OPEN = 1;
 MockWS.instances = [];
 
+var store;
+
 beforeEach(() => {
   MockWS.instances = [];
   global.WebSocket = MockWS;
+  store = {};
+  vi.stubGlobal('localStorage', {
+    getItem:    (k) => (k in store ? store[k] : null),
+    setItem:    (k, v) => { store[k] = String(v); },
+    removeItem: (k) => { delete store[k]; }
+  });
   vi.useFakeTimers();
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
+
+function deviceMsg(devices) {
+  return { data: JSON.stringify({ type: 'devices', payload: { devices: devices } }) };
+}
 
 describe('connect', () => {
   it('creates WebSocket with given URL', () => {
@@ -29,10 +43,86 @@ describe('connect', () => {
     expect(MockWS.instances[0].url).toBe('ws://host:8766');
   });
 
-  it('sends snapshot_request on open', () => {
+  it('asks for the screen list on open (list_devices first)', () => {
     connect('ws://host:8766', () => {}, () => {});
     MockWS.instances[0].onopen();
-    expect(MockWS.instances[0].sent[0].type).toBe('snapshot_request');
+    expect(MockWS.instances[0].sent[0].type).toBe('list_devices');
+  });
+
+  // FEAT-026 Phase 2 (TASK-158): target a screen, then snapshot_request.
+  it('auto-targets a sole screen: register_companion then snapshot_request', () => {
+    connect('ws://host:8766', () => {}, () => {});
+    var ws = MockWS.instances[0];
+    ws.onopen();
+    ws.onmessage(deviceMsg([{ device_id: 'devA', label: 'Living Room', active_person: 'mom' }]));
+    var types = ws.sent.map(m => m.type);
+    var reg = ws.sent.find(m => m.type === 'register_companion');
+    expect(reg.payload.device_id).toBe('devA');
+    expect(types.indexOf('snapshot_request')).toBeGreaterThan(types.indexOf('register_companion'));
+    expect(localStorage.getItem('grew-tv-companion-target')).toBe('devA');
+  });
+
+  it('does NOT auto-target when several screens and none persisted', () => {
+    connect('ws://host:8766', () => {}, () => {});
+    var ws = MockWS.instances[0];
+    ws.onopen();
+    ws.onmessage(deviceMsg([{ device_id: 'devA' }, { device_id: 'devB' }]));
+    expect(ws.sent.find(m => m.type === 'register_companion')).toBeFalsy();
+  });
+
+  it('honours a persisted target among several screens', () => {
+    store['grew-tv-companion-target'] = 'devB';
+    connect('ws://host:8766', () => {}, () => {});
+    var ws = MockWS.instances[0];
+    ws.onopen();
+    ws.onmessage(deviceMsg([{ device_id: 'devA' }, { device_id: 'devB' }]));
+    expect(ws.sent.find(m => m.type === 'register_companion').payload.device_id).toBe('devB');
+  });
+
+  it('api.target registers + snapshot_requests the chosen screen', () => {
+    var api = connect('ws://host:8766', () => {}, () => {});
+    var ws = MockWS.instances[0];
+    ws.onopen();
+    ws.onmessage(deviceMsg([{ device_id: 'devA' }, { device_id: 'devB' }]));
+    ws.sent.length = 0;
+    api.target('devB');
+    var types = ws.sent.map(m => m.type);
+    expect(types).toContain('register_companion');
+    expect(types).toContain('snapshot_request');
+    expect(ws.sent.find(m => m.type === 'register_companion').payload.device_id).toBe('devB');
+  });
+
+  it('survives the target screen person-switch with NO re-register', () => {
+    connect('ws://host:8766', () => {}, () => {});
+    var ws = MockWS.instances[0];
+    ws.onopen();
+    ws.onmessage(deviceMsg([{ device_id: 'devA', active_person: 'mom' }]));   // auto-target + register
+    ws.sent.length = 0;
+    // The screen flips person → a pushed devices update for the SAME target.
+    ws.onmessage(deviceMsg([{ device_id: 'devA', active_person: 'dad' }]));
+    expect(ws.sent.find(m => m.type === 'register_companion')).toBeFalsy();
+  });
+
+  it('reconnect re-registers the persisted target', () => {
+    connect('ws://host:8766', () => {}, () => {});
+    var ws = MockWS.instances[0];
+    ws.onopen();
+    ws.onmessage(deviceMsg([{ device_id: 'devA' }]));   // target persisted
+    ws.onclose();
+    vi.advanceTimersByTime(2001);
+    var ws2 = MockWS.instances[1];
+    ws2.onopen();
+    ws2.onmessage(deviceMsg([{ device_id: 'devA' }]));
+    expect(ws2.sent.find(m => m.type === 'register_companion').payload.device_id).toBe('devA');
+  });
+
+  it('onDevices callback receives the live screen list', () => {
+    var seen = null;
+    connect('ws://host:8766', () => {}, () => {}, () => {}, function(d) { seen = d; });
+    var ws = MockWS.instances[0];
+    ws.onopen();
+    ws.onmessage(deviceMsg([{ device_id: 'devA', label: 'Living Room' }]));
+    expect(seen[0].label).toBe('Living Room');
   });
 
   it('calls onStatus connected on open', () => {

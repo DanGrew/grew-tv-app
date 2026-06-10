@@ -1,4 +1,32 @@
 import { loadSettings, saveSettings } from './app-api.js';
+import { uuid } from './ws-protocol.js';
+
+// Durable device identity (FEAT-026 TASK-158): WHICH screen this is, independent
+// of who is watching. Minted once and set-and-forget (like grew-tv-profile), it
+// is the companion's routing target and the key the backend addresses app_state /
+// intent to. The optional label is a device-local friendly name for the
+// companion's screen list; a generic 'Screen · {short-id}' stands in when unset.
+export function getDevice() {
+  return localStorage.getItem('grew-tv-device');
+}
+
+export function ensureDevice() {
+  var id = getDevice();
+  if (id) return id;
+  id = uuid();
+  localStorage.setItem('grew-tv-device', id);
+  return id;
+}
+
+export function getDeviceLabel() {
+  var label = localStorage.getItem('grew-tv-device-label');
+  if (label) return label;
+  return 'Screen · ' + ensureDevice().slice(0, 4);
+}
+
+export function setDeviceLabel(label) {
+  localStorage.setItem('grew-tv-device-label', label);
+}
 
 export function getProfile() {
   return localStorage.getItem('grew-tv-profile');
