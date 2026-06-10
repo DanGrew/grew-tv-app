@@ -8,6 +8,18 @@ export function setProfile(p) {
   localStorage.setItem('grew-tv-profile', p);
 }
 
+// Active person (FEAT-026 TASK-156): WHO is watching, the watch-progress key
+// (consumed by TASK-155 on every progress read/write). Distinct from the profile
+// above, which is the person's fixed content class (kids|adults). The picker sets
+// both on selection. Per-device, like the profile (FEAT-023 out-of-scope).
+export function getPerson() {
+  return localStorage.getItem('grew-tv-person');
+}
+
+export function setPerson(id) {
+  localStorage.setItem('grew-tv-person', id);
+}
+
 // Global sticky captions preference (FEAT-017, FEAT-023). The SERVER is the
 // single source of truth (state DB), so the toggle is consistent across every
 // browser/device — unlike the old per-browser localStorage 'grew-tv:captions',

@@ -1,16 +1,19 @@
-// Profile screen (TASK-120, FEAT-017): photo cards + Adults PIN gate. Photos and
-// the gate PIN come from the media-manager's config.json (loaded once, defaults
-// when absent — see core/profile-config.js). Kids is always open; a locked
-// profile opens a d-pad keypad and only enters on the right code. All view-model
-// logic (parsing, PIN state, keypad navigation) lives in core/ and is unit
-// tested; this file is the DOM + d-pad wiring only.
+// Person picker (FEAT-026 TASK-156, generalizing TASK-120's Kids/Adults cards):
+// N person cards + an adult PIN gate. Persons, photos and the gate PIN come from
+// the media-manager's config.json (loaded once, generic placeholders when absent
+// — see core/profile-config.js). Selecting a person sets the active person (the
+// watch-progress key, TASK-155) and its content class drives the kids/adults
+// browse filter. A kid person opens straight to browse; an adult person opens a
+// d-pad keypad and only enters on its effective PIN. All view-model logic
+// (parsing, PIN state, keypad navigation) lives in core/ and is unit tested; this
+// file is the DOM + d-pad wiring only.
 
-import { setProfile, navTo } from '../../core/state.js';
+import { setProfile, setPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadConfig, mediaUrl } from '../../core/app-api.js';
 import {
-  defaultConfig, parseConfig, pinMatches,
+  defaultConfig, parseConfig, isLocked, pinMatches, personById, personByProfile,
   pushDigit, popDigit, isPinComplete, dotFill, keypadNav
 } from '../../core/profile-config.js';
 
@@ -31,42 +34,43 @@ export function initProfilePage() {
   var config = defaultConfig();
   var mode = 'cards';
   var pinEntry = '';
-  var pinForId = null;
+  var pinForPerson = null;
   var keyIndex = 0;
 
   function noop() {}
 
-  function finish(id) {
-    setProfile(id);
+  function finish(person) {
+    setPerson(person.id);
+    setProfile(person.profile);
     navTo('browse.html');
   }
 
-  function selectProfile(profile) {
-    pinForId = profile.id;
-    ({ true: function() { openPin(profile); }, false: function() { finish(profile.id); } })[profile.locked]();
+  function selectPerson(person) {
+    pinForPerson = person;
+    ({ true: function() { openPin(person); }, false: function() { finish(person); } })[isLocked(person)]();
   }
 
   function focusFirstCard() {
-    [config.profiles[0]].filter(Boolean).forEach(function(p) { document.getElementById('btn-' + p.id).focus(); });
+    [config.persons[0]].filter(Boolean).forEach(function(p) { document.getElementById('btn-' + p.id).focus(); });
   }
 
   function moveCard(delta) {
-    var ids = config.profiles.map(function(p) { return 'btn-' + p.id; });
+    var ids = config.persons.map(function(p) { return 'btn-' + p.id; });
     var cur = [ids.indexOf(document.activeElement.id)].filter(function(i) { return i >= 0; }).concat([0])[0];
     var next = Math.max(0, Math.min(ids.length - 1, cur + delta));
     document.getElementById(ids[next]).focus();
   }
 
-  function photoNode(profile) {
+  function photoNode(person) {
     var photo = document.createElement('div');
-    photo.className = 'profile-photo ' + profile.id;
+    photo.className = 'profile-photo ' + person.profile;
     var img = document.createElement('img');
     img.className = 'profile-photo-img';
     img.alt = '';
     var ph = document.createElement('div');
     ph.className = 'profile-photo-ph';
-    ph.textContent = [PH_EMOJI[profile.id]].filter(Boolean).concat(['👤'])[0];
-    var src = mediaUrl(SERVER, profile.photo);
+    ph.textContent = [PH_EMOJI[person.profile]].filter(Boolean).concat(['👤'])[0];
+    var src = mediaUrl(SERVER, person.photo);
     ({
       true: function() {
         img.src = src;
@@ -80,30 +84,30 @@ export function initProfilePage() {
     return photo;
   }
 
-  function buildCard(profile) {
+  function buildCard(person) {
     var card = document.createElement('div');
     card.className = 'profile-card';
-    card.id = 'btn-' + profile.id;
+    card.id = 'btn-' + person.id;
     card.tabIndex = 0;
-    [profile.locked].filter(Boolean).forEach(function() {
+    [isLocked(person)].filter(Boolean).forEach(function() {
       var lock = document.createElement('div');
       lock.className = 'lock-badge';
       lock.textContent = '🔒';
       card.appendChild(lock);
     });
-    card.appendChild(photoNode(profile));
+    card.appendChild(photoNode(person));
     var name = document.createElement('div');
     name.className = 'profile-name';
-    name.textContent = profile.label;
+    name.textContent = person.name;
     card.appendChild(name);
-    card.addEventListener('click', function() { selectProfile(profile); });
+    card.addEventListener('click', function() { selectPerson(person); });
     cardsEl.appendChild(card);
   }
 
   function applyConfig(cfg) {
     config = cfg;
     cardsEl.innerHTML = '';
-    config.profiles.forEach(buildCard);
+    config.persons.forEach(buildCard);
     // Don't yank focus out of the keypad if the real config lands mid-entry.
     ({ true: focusFirstCard, false: noop })[mode === 'cards']();
   }
@@ -118,10 +122,10 @@ export function initProfilePage() {
     keypadEl.querySelectorAll('.key')[keyIndex].focus();
   }
 
-  function openPin(profile) {
+  function openPin(person) {
     mode = 'pin';
     pinEntry = '';
-    pinTitle.textContent = 'Enter code — ' + profile.label;
+    pinTitle.textContent = 'Enter code — ' + person.name;
     panel.classList.add('active');
     renderDots();
     focusKey(0);
@@ -130,7 +134,7 @@ export function initProfilePage() {
   function closePin() {
     mode = 'cards';
     panel.classList.remove('active');
-    [document.getElementById('btn-' + pinForId)].filter(Boolean).forEach(function(c) { c.focus(); });
+    [document.getElementById('btn-' + pinForPerson.id)].filter(Boolean).forEach(function(c) { c.focus(); });
   }
 
   function shake() {
@@ -138,7 +142,7 @@ export function initProfilePage() {
     setTimeout(function() { panel.classList.remove('shake'); }, 400);
   }
 
-  function unlock() { finish(pinForId); }
+  function unlock() { finish(pinForPerson); }
 
   function reject() {
     shake();
@@ -147,7 +151,7 @@ export function initProfilePage() {
   }
 
   function submit() {
-    ({ true: unlock, false: reject })[pinMatches(config, pinEntry)]();
+    ({ true: unlock, false: reject })[pinMatches(config, pinForPerson, pinEntry)]();
   }
 
   function onDigit(d) {
@@ -209,9 +213,9 @@ export function initProfilePage() {
 
   var wsApp = connectApp('ws://localhost:8766', function(intent, params) {
     var INTENTS = {
-      setProfile: function() { [params].filter(Boolean).map(function(p) { return p.profile; }).filter(Boolean).forEach(finish); },
-      kids: function() { finish('kids'); },
-      adults: function() { finish('adults'); }
+      setProfile: function() { [params].filter(Boolean).map(function(p) { return personById(config, p.profile); }).filter(Boolean).forEach(finish); },
+      kids: function() { [personByProfile(config, 'kids')].filter(Boolean).forEach(finish); },
+      adults: function() { [personByProfile(config, 'adults')].filter(Boolean).forEach(finish); }
     };
     [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
   });

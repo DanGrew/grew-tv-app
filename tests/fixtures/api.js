@@ -76,14 +76,17 @@ const CONTINUE = {
   adults: { profile: 'adults', content: [] }
 };
 
-// Profiles + Adults PIN gate (GET /media/config.json, TASK-120). Kids open,
-// Adults locked behind PIN 1234. Photos null -> emoji placeholder. Tests that
-// exercise photos or a different PIN override the route.
+// Persons + adult PIN gate (GET /media/config.json, FEAT-026 TASK-156). Two
+// persons whose ids happen to match their content class (allowed) so the wider
+// suite can drive the gate via #btn-kids / #btn-adults: the kid selects freely,
+// the adult is gated behind the defaultPin 1234. Photos null -> emoji
+// placeholder. Tests that exercise N persons, photos, per-person pins or absent
+// config override this route.
 const CONFIG = {
-  pin: '1234',
-  profiles: [
-    { id: 'kids',   label: 'Kids',   locked: false, photo: null },
-    { id: 'adults', label: 'Adults', locked: true,  photo: null }
+  defaultPin: '1234',
+  persons: [
+    { id: 'kids',   name: 'Kids',   profile: 'kids',   photo: null },
+    { id: 'adults', name: 'Adults', profile: 'adults', photo: null }
   ]
 };
 
