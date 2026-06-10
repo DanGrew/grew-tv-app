@@ -15,14 +15,18 @@ export function loadBrowse(serverUrl, profile) {
 // Mid-watch videos for a profile, newest first (FEAT-017). Backs the Home
 // Continue Watching rail and the companion shortcut. Backend is the source of
 // truth for progress, so this — not localStorage — drives cross-device CW.
-export function loadContinueWatching(serverUrl, profile) {
-  return getJson(serverUrl + '/api/continue-watching?profile=' + encodeURIComponent(profile));
+// The active `person` (FEAT-026 TASK-155) keys progress per person: CW reflects
+// who is watching, not the device. The backend 400s when person is absent.
+export function loadContinueWatching(serverUrl, profile, person) {
+  return getJson(serverUrl + '/api/continue-watching?profile=' + encodeURIComponent(profile) + '&person=' + encodeURIComponent(person || ''));
 }
 
 // Persist a resume position to the backend — the sole progress store (FEAT-017).
 // The legacy localStorage copy was retired in TASK-119; this is the only writer.
-export function saveProgress(serverUrl, id, positionSec, durationSec) {
-  return fetch(serverUrl + '/api/progress/' + encodeURIComponent(id), {
+// `person` (FEAT-026 TASK-155) keys the write per person — progress follows the
+// person to any screen. The backend 400s when person is absent.
+export function saveProgress(serverUrl, id, positionSec, durationSec, person) {
+  return fetch(serverUrl + '/api/progress/' + encodeURIComponent(id) + '?person=' + encodeURIComponent(person || ''), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ position_secs: positionSec, duration_secs: durationSec })
@@ -35,9 +39,11 @@ export function loadVideo(serverUrl, id) {
 
 // Backend watch progress for one video (FEAT-017 source of truth). Returns the
 // zero-state record ({position_secs:0,...}) when nothing is saved, so the player
-// resumes by default without the old localStorage resume/restart prompt.
-export function loadProgress(serverUrl, id) {
-  return getJson(serverUrl + '/api/progress/' + encodeURIComponent(id));
+// resumes by default without the old localStorage resume/restart prompt. The
+// active `person` (FEAT-026 TASK-155) keys the read per person — resume is the
+// active person's, not a global value. The backend 400s when person is absent.
+export function loadProgress(serverUrl, id, person) {
+  return getJson(serverUrl + '/api/progress/' + encodeURIComponent(id) + '?person=' + encodeURIComponent(person || ''));
 }
 
 // Profiles + Adults PIN config (TASK-120). Lives on the media-manager content

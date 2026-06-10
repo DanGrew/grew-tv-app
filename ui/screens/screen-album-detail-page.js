@@ -1,4 +1,4 @@
-import { getParam, getProfile, navTo } from '../../core/state.js';
+import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
@@ -85,7 +85,7 @@ export function initAlbumDetailPage() {
 
   Promise.all([
     loadAlbum(SERVER, albumId),
-    loadContinueWatching(SERVER, profile).catch(function() { return { content: [] }; })
+    loadContinueWatching(SERVER, profile, getPerson()).catch(function() { return { content: [] }; })
   ])
     .then(function(res) {
       state.album = res[0];

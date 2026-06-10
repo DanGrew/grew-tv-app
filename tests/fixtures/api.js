@@ -69,12 +69,13 @@ const BROWSE = {
   }
 };
 
-// Continue-watching is empty by default; tests that exercise the CW rail
-// override the route with their own payload.
-const CONTINUE = {
-  kids:   { profile: 'kids',   content: [] },
-  adults: { profile: 'adults', content: [] }
-};
+// Continue-watching + per-video progress are person-keyed and STATEFUL (FEAT-026
+// TASK-155 / TASK-154 contract): a POST to /api/progress sticks for later GET and
+// CW reads under the SAME ?person=, and a different person sees a different set —
+// so switching the active person changes which resume / CW the app shows. The
+// store is seeded per installApi() call (per test page) in installApi below.
+// Both /api/progress and /api/continue-watching 400 when ?person= is absent,
+// mirroring the backend. Tests that want fixed CW/resume still override the route.
 
 // Persons + adult PIN gate (GET /media/config.json, FEAT-026 TASK-156). Two
 // persons whose ids happen to match their content class (allowed) so the wider
@@ -90,10 +91,24 @@ const CONFIG = {
   ]
 };
 
-// Per-video watch progress (GET /api/progress/{id}). Empty by default — every
-// video reads as the zero-state record; tests that need a resume point override
-// the route. Backend is the FEAT-017 source of truth, not localStorage.
-const PROGRESS = {};
+function zeroProgress(id) {
+  return { item_id: id, position_secs: 0, duration_secs: null, completed: false, last_watched: null };
+}
+
+// Mid-watch rows for a person's store: saved, started, not yet finished — the
+// CW set (newest first by last_watched). Enriched with the video's title/poster/
+// format the way the backend joins catalog metadata onto progress rows, so the
+// Home Continue-Watching rail can render tiles. (Films only here: collection_*
+// null — series-episode CW joins are exercised by the homeview suite's override.)
+function midWatchRows(store) {
+  return Object.keys(store).map(function(id) { return store[id]; })
+    .filter(function(r) { return r.position_secs > 0 && r.position_secs < r.duration_secs; })
+    .sort(function(a, b) { return (b.last_watched || 0) - (a.last_watched || 0); })
+    .map(function(r) {
+      var v = VIDEOS[r.item_id] || {};
+      return { item_id: r.item_id, title: v.title, poster: v.poster, format: v.format, collection_id: null, collection_title: null, position_secs: r.position_secs, duration_secs: r.duration_secs, last_watched: r.last_watched };
+    });
+}
 
 function nextOf(seriesId, videoId) {
   var s = SERIES[seriesId];
@@ -114,6 +129,10 @@ async function installApi(page) {
   // Global settings (FEAT-023). Stateful per install so a POST sticks for later
   // GETs — stickiness now lives in the backend, not localStorage. Default ON.
   var settings = { captionsOn: true };
+  // Per-person progress store (FEAT-026): person id -> { itemId -> record }.
+  // Stateful across this page so a saveProgress POST drives the same person's
+  // later resume GET + CW. Different persons keep separate sets.
+  var progress = {};
   await page.route('**/api/settings', function(route) {
     var post = route.request().method() === 'POST';
     [post].filter(Boolean).forEach(function() { settings = JSON.parse(route.request().postData()); });
@@ -124,8 +143,9 @@ async function installApi(page) {
     return json(route, 200, BROWSE[profile] || { profile: profile, content: [] });
   });
   await page.route('**/api/continue-watching**', function(route) {
-    var profile = new URL(route.request().url()).searchParams.get('profile');
-    return json(route, 200, CONTINUE[profile] || { profile: profile, content: [] });
+    var person = new URL(route.request().url()).searchParams.get('person');
+    if (!person) return json(route, 400, { error: 'person required' });
+    return json(route, 200, { person: person, content: midWatchRows(progress[person] || {}) });
   });
   await page.route('**/api/video/*', function(route) {
     var v = VIDEOS[lastSegment(route.request().url(), '/api/video/')];
@@ -140,9 +160,17 @@ async function installApi(page) {
     return a ? json(route, 200, a) : json(route, 404, { error: 'not found' });
   });
   await page.route('**/api/progress/*', function(route) {
-    var id = lastSegment(route.request().url(), '/api/progress/');
-    var p = PROGRESS[id] || { item_id: id, position_secs: 0, duration_secs: null, completed: false, last_watched: null };
-    return json(route, 200, p);
+    var req = route.request();
+    var person = new URL(req.url()).searchParams.get('person');
+    if (!person) return json(route, 400, { error: 'person required' });
+    var id = lastSegment(req.url(), '/api/progress/');
+    var store = progress[person] = progress[person] || {};
+    if (req.method() === 'POST') {
+      var body = JSON.parse(req.postData());
+      store[id] = { item_id: id, position_secs: body.position_secs, duration_secs: body.duration_secs, completed: false, last_watched: Object.keys(store).length + 1 };
+      return json(route, 200, store[id]);
+    }
+    return json(route, 200, store[id] || zeroProgress(id));
   });
   await page.route('**/api/next/*/*', function(route) {
     var tail = route.request().url().split('/api/next/')[1].split('?')[0].split('/');
@@ -158,4 +186,4 @@ async function installApi(page) {
   });
 }
 
-module.exports = { VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, BROWSE, CONTINUE, PROGRESS, CONFIG, nextOf, installApi };
+module.exports = { VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, BROWSE, CONFIG, nextOf, installApi };

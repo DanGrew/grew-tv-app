@@ -1,4 +1,4 @@
-import { loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, loadConfig, loadSettings, saveSettings, scanDevices, mediaUrl, loadLyrics } from '../../core/app-api.js';
+import { loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, saveProgress, loadContinueWatching, loadConfig, loadSettings, saveSettings, scanDevices, mediaUrl, loadLyrics } from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
   var calls = [];
@@ -48,15 +48,39 @@ describe('loadNext', () => {
 });
 
 describe('loadProgress', () => {
-  it('GETs /api/progress/{id}, no-store', async () => {
+  it('GETs /api/progress/{id} keyed by the active person, no-store (FEAT-026)', async () => {
     var calls = fakeFetch({ item_id: 'a', position_secs: 90, duration_secs: 600 });
-    await loadProgress('http://s', 'a');
-    expect(calls[0].url).toBe('http://s/api/progress/a');
+    await loadProgress('http://s', 'a', 'oliver');
+    expect(calls[0].url).toBe('http://s/api/progress/a?person=oliver');
     expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('url-encodes the person id', async () => {
+    var calls = fakeFetch({ item_id: 'a', position_secs: 0 });
+    await loadProgress('http://s', 'a', 'mum & dad');
+    expect(calls[0].url).toBe('http://s/api/progress/a?person=mum%20%26%20dad');
   });
   it('resolves parsed JSON', async () => {
     fakeFetch({ item_id: 'a', position_secs: 90, duration_secs: 600 });
-    expect(await loadProgress('http://s', 'a')).toEqual({ item_id: 'a', position_secs: 90, duration_secs: 600 });
+    expect(await loadProgress('http://s', 'a', 'oliver')).toEqual({ item_id: 'a', position_secs: 90, duration_secs: 600 });
+  });
+});
+
+describe('saveProgress', () => {
+  it('POSTs /api/progress/{id} carrying the active person id (FEAT-026 regression)', async () => {
+    var calls = fakeFetch({ ok: true });
+    await saveProgress('http://s', 'a', 90, 600, 'oliver');
+    expect(calls[0].url).toBe('http://s/api/progress/a?person=oliver');
+    expect(calls[0].opts.method).toBe('POST');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ position_secs: 90, duration_secs: 600 });
+  });
+});
+
+describe('loadContinueWatching', () => {
+  it('GETs /api/continue-watching with profile AND the active person (FEAT-026)', async () => {
+    var calls = fakeFetch({ person: 'oliver', content: [] });
+    await loadContinueWatching('http://s', 'kids', 'oliver');
+    expect(calls[0].url).toBe('http://s/api/continue-watching?profile=kids&person=oliver');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
   });
 });
 
