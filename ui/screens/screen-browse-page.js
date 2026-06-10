@@ -1,4 +1,4 @@
-import { getProfile, navTo } from '../../core/state.js';
+import { getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
@@ -113,7 +113,7 @@ export function initBrowsePage() {
 
   Promise.all([
     loadBrowse(SERVER, profile),
-    loadContinueWatching(SERVER, profile).catch(function() { return { content: [] }; })
+    loadContinueWatching(SERVER, profile, getPerson()).catch(function() { return { content: [] }; })
   ])
     .then(function(res) {
       var browse = res[0];

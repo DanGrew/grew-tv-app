@@ -1,4 +1,4 @@
-import { getParam, getProfile, navTo } from '../../core/state.js';
+import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-audio-player.js';
 import { connectApp } from '../../core/app-ws.js';
@@ -215,7 +215,7 @@ export function initAudioPage() {
   var shuffleParam = !!getParam('shuffle');
   Promise.all([
     LOAD_QUEUE[(!!albumId) + ''](albumId, trackId),
-    loadProgress(SERVER, trackId).catch(function() { return { position_secs: 0, duration_secs: null }; })
+    loadProgress(SERVER, trackId, getPerson()).catch(function() { return { position_secs: 0, duration_secs: null }; })
   ])
     .then(function(res) {
       state.items = res[0].items;

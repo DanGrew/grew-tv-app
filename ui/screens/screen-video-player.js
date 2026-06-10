@@ -2,7 +2,7 @@ import { fmt } from '../../core/time.js';
 import { EVENTS, SOURCES, createEvent } from '../../core/telemetry-schema.js';
 import { mediaUrl, saveProgress } from '../../core/app-api.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
-import { getCaptions, setCaptions } from '../../core/state.js';
+import { getCaptions, setCaptions, getPerson } from '../../core/state.js';
 
 // Graduated relative skips (FEAT-017): ±10s / 30s / 2m / 10m / 30m. The Jump
 // popup is a 5-column grid: back row then forward row. No absolute seek / scrub.
@@ -423,13 +423,13 @@ export function setup(config) {
       [rec].filter(function() { return video.currentTime > 0; })
         .filter(function() { return !isNaN(video.duration); })
         .filter(function() { return now - lastBackendSave > BACKEND_SAVE_MS; })
-        .forEach(function() { lastBackendSave = now; saveProgress(server, rec.id, video.currentTime, video.duration).catch(function() {}); });
+        .forEach(function() { lastBackendSave = now; saveProgress(server, rec.id, video.currentTime, video.duration, getPerson()).catch(function() {}); });
     });
   });
 
   video.addEventListener('ended', function() {
     heartbeat.stop();
-    [currentVideo].filter(Boolean).forEach(function(rec) { saveProgress(server, rec.id, video.duration, video.duration).catch(function() {}); });
+    [currentVideo].filter(Boolean).forEach(function(rec) { saveProgress(server, rec.id, video.duration, video.duration, getPerson()).catch(function() {}); });
     emitState();
     onEnded();
   });

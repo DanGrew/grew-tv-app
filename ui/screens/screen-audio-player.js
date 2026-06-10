@@ -1,5 +1,6 @@
 import { fmt } from '../../core/time.js';
 import { mediaUrl, saveProgress } from '../../core/app-api.js';
+import { getPerson } from '../../core/state.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
 
 // FEAT-018 (TASK-130) audio player. The <audio> analogue of the FEAT-017 video
@@ -280,13 +281,13 @@ export function setup(config) {
       [rec].filter(function() { return audio.currentTime > 0; })
         .filter(function() { return !isNaN(audio.duration); })
         .filter(function() { return now - lastBackendSave > BACKEND_SAVE_MS; })
-        .forEach(function() { lastBackendSave = now; saveProgress(server, rec.id, audio.currentTime, audio.duration).catch(function() {}); });
+        .forEach(function() { lastBackendSave = now; saveProgress(server, rec.id, audio.currentTime, audio.duration, getPerson()).catch(function() {}); });
     });
   });
 
   audio.addEventListener('ended', function() {
     heartbeat.stop();
-    [currentTrack].filter(Boolean).forEach(function(rec) { saveProgress(server, rec.id, audio.duration, audio.duration).catch(function() {}); });
+    [currentTrack].filter(Boolean).forEach(function(rec) { saveProgress(server, rec.id, audio.duration, audio.duration, getPerson()).catch(function() {}); });
     emitState();
     onEnded();
   });
