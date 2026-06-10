@@ -20,6 +20,8 @@ function mockApp(page, appState) {
     }
     ws.onMessage(function(raw) {
       const m = JSON.parse(raw);
+      // TASK-158: the companion lists screens, auto-targets the sole one, then snapshots.
+      if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
       if (m.type === 'snapshot_request') push('browse');
       // BUG-007: the app turns a `navigate` intent into a teleport and echoes the
       // target screen's context back — mirror that so the companion follows.

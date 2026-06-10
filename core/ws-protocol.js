@@ -6,7 +6,16 @@ export const MESSAGE_TYPES = {
   APP_STATE: 'app_state',
   ERROR: 'error',
   PING: 'ping',
-  PONG: 'pong'
+  PONG: 'pong',
+  // FEAT-026 Phase 2 (TASK-157/158): device + person registries, addressed relay.
+  REGISTER_DEVICE: 'register_device',
+  ACTIVATE_PERSON: 'activate_person',
+  REGISTER_COMPANION: 'register_companion',
+  LIST_DEVICES: 'list_devices',
+  PERSON_ACTIVE: 'person_active',
+  PERSON_BUSY: 'person_busy',
+  DEACTIVATED: 'deactivated',
+  DEVICES: 'devices'
 };
 
 // Companion -> app intents (FEAT-017). Extends the legacy skip intents.
@@ -29,7 +38,7 @@ export const SKIP_DELTAS = [10, 30, 120, 600, 1800];
 
 export const SESSION_ID = 'grew-tv';
 
-function uuid() {
+export function uuid() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     var r = Math.random() * 16 | 0;
@@ -76,9 +85,36 @@ export function createAppState(state) {
     durationSec: s.durationSec != null ? s.durationSec : null,
     playing: !!s.playing,
     profile: s.profile != null ? s.profile : null,
+    // FEAT-026 TASK-158: the active person rides the snapshot so a targeting
+    // companion can key its Continue-Watching reads per person (closes the
+    // TASK-155 carry-forward — CW was left without ?person=).
+    person: s.person != null ? s.person : null,
     captionsOn: !!s.captionsOn,
     shuffle: !!s.shuffle
   });
+}
+
+// FEAT-026 Phase 2 (TASK-158) — registry/relay builders consumed by TASK-157.
+// A screen self-registers a durable device_id, then declares its active person;
+// a companion declares the screen it drives and can list screens to pick one.
+export function createRegisterDevice(deviceId, label) {
+  return createMessage(MESSAGE_TYPES.REGISTER_DEVICE, {
+    device_id: deviceId,
+    label: label != null ? label : null
+  });
+}
+export function createActivatePerson(deviceId, personId, takeover) {
+  return createMessage(MESSAGE_TYPES.ACTIVATE_PERSON, {
+    device_id: deviceId,
+    person_id: personId,
+    takeover: !!takeover
+  });
+}
+export function createRegisterCompanion(deviceId) {
+  return createMessage(MESSAGE_TYPES.REGISTER_COMPANION, { device_id: deviceId });
+}
+export function createListDevices() {
+  return createMessage(MESSAGE_TYPES.LIST_DEVICES, {});
 }
 
 export function createPlayIntent(id) {

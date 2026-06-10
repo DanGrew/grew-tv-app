@@ -178,3 +178,64 @@ test('absent config falls back to generic placeholder persons and still boots', 
   await page.locator('#btn-child').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
+
+// ── FEAT-026 TASK-158: the picker is the activation gate. Picking a person
+// asks the backend to lock that person to THIS device; the server verdict
+// (person_active / person_busy) drives navigation + the take-over prompt. A
+// routed WebSocket stands in for the media-manager so the verdict is scripted.
+function activeRoute(page) {
+  return page.routeWebSocket(/8766/, function(ws) {
+    ws.onMessage(function(message) {
+      var msg = JSON.parse(message);
+      [msg].filter(function(m) { return m.type === 'activate_person'; }).forEach(function(m) {
+        ws.send(JSON.stringify({ type: 'person_active', payload: { person_id: m.payload.person_id, device_id: m.payload.device_id } }));
+      });
+    });
+  });
+}
+
+function busyRoute(page) {
+  return page.routeWebSocket(/8766/, function(ws) {
+    ws.onMessage(function(message) {
+      var msg = JSON.parse(message);
+      [msg].filter(function(m) { return m.type === 'activate_person'; }).forEach(function(m) {
+        var ok = { type: 'person_active', payload: { person_id: m.payload.person_id, device_id: m.payload.device_id } };
+        var busy = { type: 'person_busy', payload: { person_id: m.payload.person_id, device_id: 'devB', label: 'Bedroom' } };
+        ws.send(JSON.stringify(m.payload.takeover ? ok : busy));
+      });
+    });
+  });
+}
+
+test('person_active from the server proceeds straight to browse', async ({ page }) => {
+  await activeRoute(page);
+  await configRoute(page, ROSTER);
+  await page.reload();
+  await page.locator('#btn-millie').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv-person'))).toBe('millie');
+});
+
+test('a person live on another screen prompts to take over, then proceeds', async ({ page }) => {
+  await busyRoute(page);
+  await configRoute(page, ROSTER);
+  await page.reload();
+  await page.locator('#btn-oliver').click();
+  await expect(page.locator('#takeover-panel')).toHaveClass(/active/);
+  await expect(page.locator('#takeover-msg')).toContainText('Bedroom');
+  // Confirm → resend with takeover:true → server acks person_active → browse.
+  await page.locator('#takeover-confirm').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+});
+
+test('cancelling the take-over prompt stays on the picker', async ({ page }) => {
+  await busyRoute(page);
+  await configRoute(page, ROSTER);
+  await page.reload();
+  await page.locator('#btn-oliver').click();
+  await expect(page.locator('#takeover-panel')).toHaveClass(/active/);
+  await page.locator('#takeover-cancel').click();
+  await expect(page.locator('#takeover-panel')).not.toHaveClass(/active/);
+  await expect(page.locator('#screen-profile')).toBeVisible();
+  await expect(page.locator('#screen-browse')).toHaveCount(0);
+});

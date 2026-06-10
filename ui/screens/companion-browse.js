@@ -26,7 +26,7 @@ export function initPage() {
     grid: document.getElementById('grid'),
     empty: document.getElementById('empty')
   };
-  var state = { profile: null, cards: [], cw: [], labels: {}, query: '', activeTab: null };
+  var state = { profile: null, person: null, cards: [], cw: [], labels: {}, query: '', activeTab: null };
   var api = {};
 
   // Breadcrumb trail (FEAT-021): Home is the root — a single inert crumb.
@@ -145,7 +145,7 @@ export function initPage() {
     state.profile = profile;
     Promise.all([
       loadBrowse(server, profile).catch(function() { return {}; }),
-      loadContinueWatching(server, profile).catch(function() { return {}; })
+      loadContinueWatching(server, profile, state.person).catch(function() { return {}; })
     ]).then(function(r) { applyCatalog(r[0], r[1]); });
   }
 
@@ -155,8 +155,11 @@ export function initPage() {
   });
 
   // Profile (and thus which catalog to show) comes from the live app snapshot;
-  // (re)load when it first arrives or changes.
+  // (re)load when it first arrives or changes. The active person rides the same
+  // snapshot (FEAT-026 TASK-158) and keys Continue-Watching per person — captured
+  // before the reload so the CW rail carries ?person= again (closes TASK-155).
   function onAppState(snap) {
+    state.person = [snap.person].filter(Boolean).concat([state.person])[0];
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(loadCatalog);
   }
 

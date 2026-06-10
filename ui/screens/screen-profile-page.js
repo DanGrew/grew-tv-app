@@ -30,19 +30,63 @@ export function initProfilePage() {
   var pinTitle = document.getElementById('pin-title');
   var keypadEl = document.getElementById('keypad');
   var dotEls = Array.prototype.slice.call(document.getElementById('pin-dots').children);
+  var takeoverPanel = document.getElementById('takeover-panel');
+  var takeoverMsg = document.getElementById('takeover-msg');
+  var confirmBtns = [document.getElementById('takeover-confirm'),
+                     document.getElementById('takeover-cancel')];
 
   var config = defaultConfig();
   var mode = 'cards';
   var pinEntry = '';
   var pinForPerson = null;
   var keyIndex = 0;
+  var confirmIndex = 0;
+  var pendingPerson = null;
+  var graceTimer = null;
+  // Offline grace: if no verdict lands (no companion server connected, e.g. a
+  // standalone TV), proceed anyway — with no live peer there is no conflict to
+  // gate on. A real person_busy from a localhost server always beats this.
+  var GRACE_MS = 600;
 
   function noop() {}
 
+  function proceed() { clearTimeout(graceTimer); navTo('browse.html'); }
+
+  // Activation-gated (FEAT-026 TASK-158): record the pick, then ask the backend
+  // to lock this person to THIS device. The server verdict drives navigation —
+  // person_active proceeds, person_busy raises the take-over prompt below.
   function finish(person) {
     setPerson(person.id);
     setProfile(person.profile);
-    navTo('browse.html');
+    pendingPerson = person;
+    graceTimer = setTimeout(proceed, GRACE_MS);
+    wsApp.activatePerson(person.id, false);
+  }
+
+  function focusConfirm(i) {
+    confirmIndex = Math.max(0, Math.min(confirmBtns.length - 1, i));
+    takeoverPanel.querySelectorAll('.takeover-btn')[confirmIndex].focus();
+  }
+
+  function openTakeover(label) {
+    clearTimeout(graceTimer);
+    mode = 'confirm';
+    takeoverMsg.textContent = 'Watching on ' + label + ' — take over?';
+    takeoverPanel.classList.add('active');
+    focusConfirm(0);
+  }
+
+  function doTakeover() {
+    takeoverPanel.classList.remove('active');
+    graceTimer = setTimeout(proceed, GRACE_MS);
+    wsApp.activatePerson(pendingPerson.id, true);
+  }
+
+  function cancelTakeover() {
+    takeoverPanel.classList.remove('active');
+    mode = 'cards';
+    pendingPerson = null;
+    focusFirstCard();
   }
 
   function selectPerson(person) {
@@ -201,6 +245,13 @@ export function initProfilePage() {
       ' ': activate,
       Backspace: onBack,
       Escape: closePin
+    },
+    confirm: {
+      ArrowLeft: function() { focusConfirm(0); },
+      ArrowRight: function() { focusConfirm(1); },
+      Enter: activate,
+      ' ': activate,
+      Escape: cancelTakeover
     }
   };
 
@@ -210,7 +261,12 @@ export function initProfilePage() {
 
   buildKeypad();
   applyConfig(config);
+  confirmBtns[0].addEventListener('click', doTakeover);
+  confirmBtns[1].addEventListener('click', cancelTakeover);
 
+  // person_active / person_busy gate finish() — only act on a user-initiated pick
+  // (pendingPerson set); the on-connect lock re-assert (pendingPerson null) is a
+  // no-op here so a stale localStorage person can't skip the picker.
   var wsApp = connectApp('ws://localhost:8766', function(intent, params) {
     var INTENTS = {
       setProfile: function() { [params].filter(Boolean).map(function(p) { return personById(config, p.profile); }).filter(Boolean).forEach(finish); },
@@ -218,6 +274,9 @@ export function initProfilePage() {
       adults: function() { [personByProfile(config, 'adults')].filter(Boolean).forEach(finish); }
     };
     [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
+  }, {
+    onPersonActive: function() { [pendingPerson].filter(Boolean).forEach(proceed); },
+    onPersonBusy: function(payload) { [pendingPerson].filter(Boolean).forEach(function() { openTakeover([payload.label].filter(Boolean).concat(['another screen'])[0]); }); }
   });
   wsApp.sendContext({ context_id: 'profile' });
 
