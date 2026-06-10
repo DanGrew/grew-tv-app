@@ -84,11 +84,22 @@ export function connectApp(wsUrl, onIntent, opts) {
   // On every (re)connect register the durable device first, re-assert the active
   // person, then replay cached context/app_state. Registration precedes state so
   // the backend can address this screen's app_state.
+  // The picker passes opts.skipAutoActivate: it RELEASES this device's person on
+  // (re)connect (activate_person with no person_id) instead of re-asserting it.
+  // Otherwise a jump-out to the picker — which reconnects with the same device id
+  // and a still-set localStorage person — would silently re-claim the person the
+  // user just left ("stayed logged in / can't get back in"). Content screens
+  // re-assert as normal so a network blip restores their lock.
+  function syncPersonOnConnect() {
+    if (o.skipAutoActivate) { send(createActivatePerson(ensureDevice(), null, false)); return; }
+    activatePerson(getPerson(), false);
+  }
+
   function doConnect() {
     ws = new WebSocket(wsUrl);
     ws.onopen    = function() {
       send(createRegisterDevice(ensureDevice(), getDeviceLabel()));
-      activatePerson(getPerson(), false);
+      syncPersonOnConnect();
       [pendingContext].filter(Boolean).forEach(function(ctx) { send({ type: 'context_push', payload: ctx }); });
       [lastAppState].filter(Boolean).forEach(function(msg) { send(msg); });
     };

@@ -275,6 +275,7 @@ export function initProfilePage() {
     };
     [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
   }, {
+    skipAutoActivate: true,
     onPersonActive: function() { [pendingPerson].filter(Boolean).forEach(proceed); },
     onPersonBusy: function(payload) { [pendingPerson].filter(Boolean).forEach(function() { openTakeover([payload.label].filter(Boolean).concat(['another screen'])[0]); }); }
   });
