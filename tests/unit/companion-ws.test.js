@@ -79,6 +79,25 @@ describe('connect', () => {
     expect(ws.sent.find(m => m.type === 'register_companion').payload.device_id).toBe('devB');
   });
 
+  // Regression (FEAT-026 mis-bind): the chosen screen's profile->browse
+  // reconnect briefly drops it from the list. The companion must WAIT, not
+  // fail over to the other (now sole) screen — the old `ids.length === 1`
+  // fallback grabbed devA here, mis-binding the companion (empty browse +
+  // intents routed to the wrong TV).
+  it('does NOT fail over to the other sole screen while its persisted target is transiently absent', () => {
+    store['grew-tv-companion-target'] = 'devB';
+    connect('ws://host:8766', () => {}, () => {});
+    var ws = MockWS.instances[0];
+    ws.onopen();
+    // devB momentarily gone (its screen is reconnecting); only devA is visible.
+    ws.onmessage(deviceMsg([{ device_id: 'devA' }]));
+    expect(ws.sent.find(m => m.type === 'register_companion')).toBeFalsy();
+    // devB returns → it re-binds to devB, never to devA.
+    ws.onmessage(deviceMsg([{ device_id: 'devA' }, { device_id: 'devB' }]));
+    var reg = ws.sent.find(m => m.type === 'register_companion');
+    expect(reg.payload.device_id).toBe('devB');
+  });
+
   it('api.target registers + snapshot_requests the chosen screen', () => {
     var api = connect('ws://host:8766', () => {}, () => {});
     var ws = MockWS.instances[0];
