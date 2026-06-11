@@ -2,6 +2,7 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
+import { wsUrl } from '../../core/server-config.js';
 import { loadSeries, loadContinueWatching } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { playNextIndex } from '../../core/series-detail.js';
@@ -32,7 +33,7 @@ export function initDetailPage() {
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
 
-  var wsApp = connectApp('ws://localhost:8766', function(intent, params) {
+  var wsApp = connectApp(wsUrl(window.location.hostname), function(intent, params) {
     var INTENTS = {
       navigate_up:   function() { detailArrow({ key: 'ArrowUp',   preventDefault: function() {} }); },
       navigate_down: function() { detailArrow({ key: 'ArrowDown', preventDefault: function() {} }); },

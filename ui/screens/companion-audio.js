@@ -1,4 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
+import { wsUrl } from '../../core/server-config.js';
 import { loadAlbum } from '../../core/app-api.js';
 import { screenPage, displayTitle } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
@@ -138,5 +139,5 @@ export function initPage() {
   buildJump();
   setInterval(renderBar, 250);
 
-  api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; }, onAppState);
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState);
 }

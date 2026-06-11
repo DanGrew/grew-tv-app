@@ -2,6 +2,7 @@ import { getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
+import { wsUrl } from '../../core/server-config.js';
 import { loadBrowse, loadContinueWatching, scanDevices } from '../../core/app-api.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
@@ -74,7 +75,7 @@ export function initBrowsePage() {
   // focused (last-watched) tile whenever the target tile wasn't on the active tab.
   var catalog = {};
 
-  var wsApp = connectApp('ws://localhost:8766', function(intent, params) {
+  var wsApp = connectApp(wsUrl(window.location.hostname), function(intent, params) {
     var INTENTS = {
       navigate_up:    function() { browseArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
       navigate_down:  function() { browseArrow({ key: 'ArrowDown',  preventDefault: function() {} }); },

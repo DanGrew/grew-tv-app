@@ -2,6 +2,7 @@ import { getParam, getProfile, getPerson, navTo, initCaptions } from '../../core
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
+import { wsUrl } from '../../core/server-config.js';
 import { loadVideo, loadNext, loadSeries, loadProgress } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -136,7 +137,7 @@ export function initVideoPage() {
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
-  wsApp = connectApp('ws://localhost:8766', appIntent);
+  wsApp = connectApp(wsUrl(window.location.hostname), appIntent);
 
   document.addEventListener('keydown', dispatchKey);
 
