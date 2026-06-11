@@ -134,6 +134,10 @@ function peopleOf(card) {
   return ['other'];
 }
 
+// A box-set is a collection of films (collectionType 'boxset', section 'films').
+// It gets its own Films rail rather than repeating inside the genre rows.
+function isBoxset(card) { return card.collectionType === 'boxset'; }
+
 function cmpStr(a, b) {
   return String(a).toLowerCase().localeCompare(String(b).toLowerCase());
 }
@@ -238,14 +242,21 @@ export function buildTabs(cards) {
 // The rails for one section tab: a leading Continue Watching rail (this section's
 // in-progress items, from cwRows) then the content rails — genre rails for
 // Series/Films, person rails for Home Movies, the Albums rail for Music.
-// genreLabels maps genre slugs to display names.
+// Box-sets (Films) are split into their own leading "Box Sets" rail and kept out
+// of the genre rows. genreLabels maps genre slugs to display names.
 export function buildTabRails(sectionId, cards, cwRows, genreLabels) {
   var all = (cards || []).map(withDurationSec);
   var byId = cardIndex(all);
   if (sectionId === 'music') return musicRails(all, cwRows, byId);
   var inTab = all.filter(function(c) { return sectionOf(c) === sectionId; });
-  var typeRails = (sectionId === 'home-movies')
-    ? groupRails(inTab, peopleOf, titleCase, 'person:')
-    : groupRails(inTab, genresOf, function(slug) { return labelFor(slug, genreLabels); }, 'genre:');
-  return continueRail(sectionId, cwRows, byId).concat(typeRails);
+  if (sectionId === 'home-movies') {
+    return continueRail(sectionId, cwRows, byId)
+      .concat(groupRails(inTab, peopleOf, titleCase, 'person:'));
+  }
+  var boxsets = inTab.filter(isBoxset);
+  var rest = inTab.filter(function(c) { return !isBoxset(c); });
+  var genreRails = groupRails(rest, genresOf, function(slug) { return labelFor(slug, genreLabels); }, 'genre:');
+  return continueRail(sectionId, cwRows, byId)
+    .concat(simpleRail('boxsets', 'Box Sets', boxsets))
+    .concat(genreRails);
 }

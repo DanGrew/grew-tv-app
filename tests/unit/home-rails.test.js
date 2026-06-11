@@ -245,24 +245,33 @@ describe('Continue Listening (collection-level, FEAT-027)', () => {
   });
 });
 
-// FEAT-027 — a film box-set is a collection (kind:'series') with section:'films'
-// (descriptor: boxset -> films). It is NOT its own section/tab: the box-set tile
-// shows in the Films tab grouped by genre, alongside the standalone films, and
-// its member films also surface individually (the `standalone` capability).
-describe('box-set grouping (FEAT-027 — section films, not its own tab)', () => {
+// FEAT-027 — a film box-set is a collection (kind:'series', collectionType
+// 'boxset') with section:'films' (descriptor: boxset -> films). It is NOT its own
+// section/tab: the box-set lives in the Films tab. It gets its OWN "Box Sets"
+// rail (leading the genre rows) and is kept OUT of the genre rails; its member
+// films still surface individually in their genre rails (the `standalone`
+// capability).
+describe('box-set grouping (FEAT-027 — own rail in Films, not its own tab)', () => {
   const WITH_BOXSET = [
     { kind: 'video',  id: 'rhod-mountain', title: 'The Cat That Looked Like Nicholas Lyndhurst', section: 'films', genres: ['comedy'] },
-    { kind: 'series', id: 'rhod-boxset',   title: 'Rhod Gilbert Live',   section: 'films', genres: ['comedy'] }
+    { kind: 'series', id: 'rhod-boxset',   title: 'Rhod Gilbert Live', collectionType: 'boxset', section: 'films', genres: ['comedy'] }
   ];
 
   it('does not add a Box Set tab — the boxset lives in Films', () => {
     expect(buildTabs(WITH_BOXSET).map(t => t.id)).toEqual(['films']);
   });
 
-  it('groups the box-set collection into the Films genre rail with the standalone film', () => {
+  it('puts box-sets in their own Box Sets rail, leading the genre rails', () => {
     const rails = buildTabRails('films', WITH_BOXSET, [], {});
-    expect(rails.map(r => r.title)).toEqual(['Comedy']);
-    expect(rails[0].items.map(c => c.id)).toEqual(['rhod-boxset', 'rhod-mountain']); // A-Z by title
+    expect(rails.map(r => r.title)).toEqual(['Box Sets', 'Comedy']);
+    expect(rails[0].id).toBe('boxsets');
+    expect(rails[0].items.map(c => c.id)).toEqual(['rhod-boxset']);
+  });
+
+  it('keeps box-sets out of the genre rails (only the standalone film remains)', () => {
+    const rails = buildTabRails('films', WITH_BOXSET, [], {});
+    const comedy = rails.find(r => r.title === 'Comedy');
+    expect(comedy.items.map(c => c.id)).toEqual(['rhod-mountain']);
   });
 
   it('routes the box-set to collection detail (kind series), the film to play', () => {
