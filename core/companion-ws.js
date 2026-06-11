@@ -48,12 +48,17 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices) {
     send(createSnapshotRequest());
   }
 
-  // Pick a target from the live list: prefer the persisted choice if it is still
-  // present, else auto-target a sole screen, else null (UI must choose).
+  // Pick a target from the live list. A persisted choice STAYS chosen: re-bind
+  // to it only when it is actually present, and otherwise wait (null) — never
+  // silently fail over to a different sole screen just because the chosen one is
+  // momentarily absent. (Its own screen's profile->browse reconnect briefly
+  // dropped it from the list; the old `ids.length === 1` fallback then grabbed
+  // the OTHER screen, mis-binding the companion — empty browse + misrouted
+  // intents, FEAT-026.) Auto-target a sole screen only when nothing is chosen.
   function autoTarget(devices) {
     var ids = devices.map(function(d) { return d.device_id; });
     var persisted = getTarget();
-    if (persisted && ids.indexOf(persisted) >= 0) return persisted;
+    if (persisted) return ids.indexOf(persisted) >= 0 ? persisted : null;
     if (ids.length === 1) return ids[0];
     return null;
   }
