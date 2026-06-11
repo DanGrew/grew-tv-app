@@ -6,6 +6,7 @@
 // both devices to Home. View-model logic lives in core/.
 
 import { connect } from '../../core/companion-ws.js';
+import { wsUrl } from '../../core/server-config.js';
 import { screenPage } from '../../core/companion-utils.js';
 import { loadConfig, mediaUrl } from '../../core/app-api.js';
 import {
@@ -191,7 +192,7 @@ export function initPage() {
     ({ true: function() { buildScreenList(devices); }, false: noop })[devices.length > 1]();
   }
 
-  api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; }, noop, onDevices);
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, noop, onDevices);
   // Config may land after the picker first renders (default config) — re-render
   // so real photos/labels appear. Skips a rebuild when not on the profile view.
   loadConfig(server).then(parseConfig).then(function(cfg) {

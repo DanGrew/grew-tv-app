@@ -2,6 +2,7 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-audio-player.js';
 import { connectApp } from '../../core/app-ws.js';
+import { wsUrl } from '../../core/server-config.js';
 import { loadAlbum, loadVideo, loadProgress, loadLyrics, mediaUrl } from '../../core/app-api.js';
 import { parseLrc, indexAt, windowAt } from '../../core/lrc.js';
 import { isMidWatch } from '../../core/progress.js';
@@ -204,7 +205,7 @@ export function initAudioPage() {
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
-  wsApp = connectApp('ws://localhost:8766', appIntent);
+  wsApp = connectApp(wsUrl(window.location.hostname), appIntent);
   wsApp.sendContext({ context_id: 'audio' });
   wsApp.sendAppState({ screen: 'player', itemId: [albumId].filter(Boolean).concat([trackId])[0], profile: profile });
 

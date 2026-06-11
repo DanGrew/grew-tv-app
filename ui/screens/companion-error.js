@@ -1,4 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
+import { wsUrl } from '../../core/server-config.js';
 import { screenPage, titleCase, displayTitle, displayLabel } from '../../core/companion-utils.js';
 
 function renderAction(action, actionsEl, sendIntent) {
@@ -46,5 +47,5 @@ export function initPage() {
     })[page !== 'error']();
   }
 
-  api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; });
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; });
 }

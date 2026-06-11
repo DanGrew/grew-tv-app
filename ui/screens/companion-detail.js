@@ -1,4 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
+import { wsUrl } from '../../core/server-config.js';
 import { loadSeries, loadContinueWatching, mediaUrl } from '../../core/app-api.js';
 import { screenPage } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
@@ -126,5 +127,5 @@ export function initPage() {
     [snap.person].filter(Boolean).filter(function(p) { return p !== state.person; }).forEach(function(p) { state.person = p; loadCW(); });
   }
 
-  api = connect('ws://' + host + ':8766', onContext, function(status) { els.connStatus.textContent = status; }, onAppState);
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState);
 }

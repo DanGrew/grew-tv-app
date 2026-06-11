@@ -1,4 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
+import { wsUrl } from '../../core/server-config.js';
 import { loadBrowse, loadContinueWatching, mediaUrl } from '../../core/app-api.js';
 import { screenPage, filterByTitle } from '../../core/companion-utils.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
@@ -175,5 +176,5 @@ export function initPage() {
   function switchProfile() { api.sendIntent('navigate', switchProfileTarget()); }
   document.getElementById('switch-profile').addEventListener('click', switchProfile);
 
-  api = connect('ws://' + host + ':8766', onContext, function(s) { els.connStatus.textContent = s; }, onAppState);
+  api = connect(wsUrl(host), onContext, function(s) { els.connStatus.textContent = s; }, onAppState);
 }
