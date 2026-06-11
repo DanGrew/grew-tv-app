@@ -28,14 +28,15 @@ const SERIES = {
   }
 };
 
-// FEAT-018 albums: a series row format:"album"; items[].episode is the track
-// number. /api/album/{id} resolves to this shape (same as /api/series).
-// Browse cards for the music tab (FEAT-018). Kept out of the default BROWSE so
-// the existing video-only tests still see exactly Series/Films/Home Movies; the
-// music e2e overrides /api/browse to append these.
+// FEAT-018 albums: items[].episode is the track number. /api/album/{id} resolves
+// to this shape (same as /api/series).
+// Browse cards for the Music tab (FEAT-027): a series card with section:"music".
+// A track is never a standalone browse card (a single is a 1-track album), so
+// there is no audio-single card here. Kept out of the default BROWSE so the
+// video-only tests still see exactly Series/Films/Home Movies; the music e2e
+// overrides /api/browse to append these.
 const MUSIC_CARDS = [
-  { kind: 'series', id: 'ootb',          title: 'Out of the Blue', poster: 'ootb.jpg', type: null, format: 'album', artist: 'ELO',  clipCount: 3 },
-  { kind: 'video',  id: 'dancing-queen', title: 'Dancing Queen',   poster: 'dq.jpg',   type: null, format: null,    mediaType: 'audio', artist: 'ABBA', duration: 230 }
+  { kind: 'series', id: 'ootb', title: 'Out of the Blue', poster: 'ootb.jpg', type: null, section: 'music', artist: 'ELO', clipCount: 3 }
 ];
 
 const ALBUMS = {
@@ -54,17 +55,17 @@ const BROWSE = {
     profile: 'kids',
     genreLabels: { animation: 'Animation', comedy: 'Comedy' },
     content: [
-      { kind: 'video',  id: 'toy-story-main',    title: 'Toy Story',    poster: 'toy-story.jpg', duration: 4860, type: 'animation', format: 'film',       genres: ['animation', 'comedy'], people: null },
-      { kind: 'video',  id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg',      duration: 6000, type: 'animation', format: 'film',       genres: null,                    people: null },
-      { kind: 'series', id: 'bluey',             title: 'Bluey',        poster: 'bluey.jpg',                     type: 'animation', format: 'tv-series',  genres: ['animation'],           people: null },
-      { kind: 'video',  id: 'millie-walk',       title: 'Millie Walk',  poster: 'millie.jpg',    duration: 30,   type: 'home',      format: 'home-movie', genres: null,                    people: ['millie'] }
+      { kind: 'video',  id: 'toy-story-main',    title: 'Toy Story',    poster: 'toy-story.jpg', duration: 4860, type: 'animation', section: 'films',       genres: ['animation', 'comedy'], people: null },
+      { kind: 'video',  id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg',      duration: 6000, type: 'animation', section: 'films',       genres: null,                    people: null },
+      { kind: 'series', id: 'bluey',             title: 'Bluey',        poster: 'bluey.jpg',                     type: 'animation', section: 'series',      genres: ['animation'],           people: null },
+      { kind: 'video',  id: 'millie-walk',       title: 'Millie Walk',  poster: 'millie.jpg',    duration: 30,   type: 'home',      section: 'home-movies', genres: null,                    people: ['millie'] }
     ]
   },
   adults: {
     profile: 'adults',
     genreLabels: {},
     content: [
-      { kind: 'video', id: 'dark-knight-main', title: 'The Dark Knight', poster: 'dk.jpg', duration: 9120, type: 'action', format: 'film', genres: ['action'], people: null }
+      { kind: 'video', id: 'dark-knight-main', title: 'The Dark Knight', poster: 'dk.jpg', duration: 9120, type: 'action', section: 'films', genres: ['action'], people: null }
     ]
   }
 };
@@ -96,17 +97,19 @@ function zeroProgress(id) {
 }
 
 // Mid-watch rows for a person's store: saved, started, not yet finished — the
-// CW set (newest first by last_watched). Enriched with the video's title/poster/
-// format the way the backend joins catalog metadata onto progress rows, so the
-// Home Continue-Watching rail can render tiles. (Films only here: collection_*
-// null — series-episode CW joins are exercised by the homeview suite's override.)
+// CW set (newest first by last_watched). Enriched with the video's title/poster
+// the way the backend joins catalog metadata onto progress rows, so the Home
+// Continue-Watching rail can render tiles. No `format`/`section` on the row
+// (FEAT-027): the app borrows the section from the matching browse card. (Films
+// only here: collection_* null — series-episode CW joins are exercised by the
+// homeview suite's override.)
 function midWatchRows(store) {
   return Object.keys(store).map(function(id) { return store[id]; })
     .filter(function(r) { return r.position_secs > 0 && r.position_secs < r.duration_secs; })
     .sort(function(a, b) { return (b.last_watched || 0) - (a.last_watched || 0); })
     .map(function(r) {
       var v = VIDEOS[r.item_id] || {};
-      return { item_id: r.item_id, title: v.title, poster: v.poster, format: v.format, collection_id: null, collection_title: null, position_secs: r.position_secs, duration_secs: r.duration_secs, last_watched: r.last_watched };
+      return { item_id: r.item_id, title: v.title, poster: v.poster, collection_id: null, collection_title: null, position_secs: r.position_secs, duration_secs: r.duration_secs, last_watched: r.last_watched };
     });
 }
 

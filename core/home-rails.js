@@ -35,86 +35,67 @@ export function buildRails(cards, progress) {
 }
 
 // ---------------------------------------------------------------------------
-// FEAT-020 — content-type tabs + per-type rails (TASK-138/139). The browse
-// screen is a content-type sidebar (Series / Films / Home Movies); selecting a
-// tab swaps the rail area to that type's rails. Series/Films group by genre
-// (genres[], falling back to [type]); Home Movies group by person (people[]).
+// FEAT-027 (TASK-163) — the app is TYPE-AGNOSTIC. content-types.json is the
+// single source of truth; the backend stamps a derived `section` on every
+// /api/browse card (TASK-162) and the app groups by it. No `format`/`mediaType`
+// or type enum lives here anymore: adding a content type is one backend
+// descriptor row, the app needs no change and cannot drift out of sync.
 //
-// TASK-150: Continue Watching is no longer its own tab. Instead each content-type
-// tab leads with a Continue Watching rail of *that type's* in-progress items,
-// built straight from the /api/continue-watching rows (which carry title, poster,
-// duration, `format` and the owning `collection_*`) — no browse-card join, so an
-// in-progress series **episode** surfaces (it is never a browse card). All
-// grouping/ordering is pure and unit-tested here so app + companion render
-// identically. (TASK-137 supplies genres[]/people[]/genreLabels via /api/browse;
-// TASK-149 supplies format + collection on the CW rows.)
+// The browse screen is a section sidebar (Series / Films / Home Movies /
+// Albums); selecting a tab swaps the rail area to that section's rails.
+// Series/Films group by genre (genres[], falling back to [type]); Home Movies
+// group by person (people[]); the Music section lists albums. Each section tab
+// leads with a Continue Watching rail of that section's in-progress items.
+//
+// SECTION_TITLE/SECTION_ORDER are pure presentation — a section's tab label and
+// fixed display order — NOT type routing. Sections (server-supplied):
+// 'series' | 'films' | 'home-movies' | 'music'.
 
-// A card's content-type tab. Series cards are always the Series tab; a video's
-// tab comes from its `format`. An unknown/absent video format falls back to
-// Films so no card is ever dropped from the browse.
-var FORMAT_TAB = {
-  'film': 'films',
-  'tv-series': 'series',
-  'home-movie': 'home-movies',
-  'home-video': 'home-movies'
-};
-
-var TAB_TITLE = {
+var SECTION_TITLE = {
   'series': 'Series',
   'films': 'Films',
   'home-movies': 'Home Movies',
-  'albums': 'Albums'
+  'music': 'Albums'
 };
 
 // Fixed display order; which tabs actually appear is data-driven (below).
-// Albums (FEAT-018 music) is the 5th content-type tab, after the video tabs.
-var TAB_ORDER = ['series', 'films', 'home-movies', 'albums'];
+var SECTION_ORDER = ['series', 'films', 'home-movies', 'music'];
 
-function isVideo(card) { return (card.kind || 'video') === 'video'; }
+// A card's section. The backend stamps it on every browse card; fall back to
+// Films so an unstamped (legacy/typo) card is shown rather than silently dropped.
+function sectionOf(card) { return card.section || 'films'; }
 
-// Music cards (FEAT-018): an album is a series card flagged format:"album"; a
-// standalone single is a video card flagged mediaType:"audio". `format` is NULL
-// on audio rows (TASK-129), so we route on these two flags, never on format.
-export function isAlbumCard(card) { return card.kind === 'series' && card.format === 'album'; }
-export function isAudioSingleCard(card) { return isVideo(card) && card.mediaType === 'audio'; }
-function isMusicCard(card) { return isAlbumCard(card) || isAudioSingleCard(card); }
-
-// Where selecting a browse card navigates: an album opens album detail, an audio
-// single plays straight in the audio player, otherwise the card's own kind
-// ('video' plays, 'series' opens series detail). Pure so the browse screen stays
-// DOM-only (no-pure-fn-outside-core).
+// Where selecting a browse card navigates: a music card (album/playlist) opens
+// album detail; otherwise the card's own kind ('video' plays, 'series' opens
+// collection detail). Routes on the server `section`, never a type enum. Pure so
+// the browse screen stays DOM-only (no-pure-fn-outside-core).
 export function cardRoute(card) {
-  if (isAlbumCard(card)) return 'album';
-  if (isAudioSingleCard(card)) return 'single';
+  if (card.section === 'music') return 'album';
   return card.kind || 'video';
 }
 
-// A card's content-type tab. Music cards (albums + audio singles) go to the
-// Albums tab; otherwise a series is the Series tab and a video's tab comes from
-// its format (unknown -> Films, so no card is ever dropped).
-function tabOf(card) {
-  if (isMusicCard(card)) return 'albums';
-  if (!isVideo(card)) return 'series';
-  return FORMAT_TAB[card.format] || 'films';
+// Index browse cards by id -> card, so a continue-watching row (which carries no
+// `section`) can borrow its section from the browse card it belongs to: a bound
+// item (episode/track) from its owning collection, a standalone (film/home-movie)
+// from its own card. Keeps the app from re-deriving a type from the row.
+function cardIndex(cards) {
+  var byId = {};
+  (cards || []).forEach(function(c) { byId[c.id] = c; });
+  return byId;
 }
 
-// id-set + lookup of the music in this browse payload, so a Continue-Watching
-// row can be classed as music app-side (the CW endpoint carries no mediaType):
-// a row is music when its owning collection is a known album, or the row itself
-// is a known audio single.
-function musicSets(cards) {
-  var albumById = {};
-  var audioById = {};
-  (cards || []).forEach(function(c) {
-    if (isAlbumCard(c)) albumById[c.id] = c;
-    if (isAudioSingleCard(c)) audioById[c.id] = c;
-  });
-  return { albumById: albumById, audioById: audioById };
+// The browse card a CW row maps to: its owning collection when set (episode ->
+// series, track -> album), else the item's own standalone card (film/home-movie).
+// null when neither is on the browse page (so the row belongs to no visible tab).
+function rowCard(row, byId) {
+  if (row.collection_id && byId[row.collection_id]) return byId[row.collection_id];
+  return byId[row.item_id] || null;
 }
 
-function isMusicRow(row, sets) {
-  if (row.collection_id && sets.albumById[row.collection_id]) return true;
-  return !!sets.audioById[row.item_id];
+// A CW row's section, via its browse card (above). Unknown -> null.
+function rowSection(row, byId) {
+  var card = rowCard(row, byId);
+  return card ? sectionOf(card) : null;
 }
 
 // Clamp an index into [0, len-1] (empty -> 0). Shared with the UI focus model.
@@ -178,10 +159,6 @@ function groupRails(cards, keyer, labeler, prefix) {
     .sort(function(a, b) { return cmpStr(a.title, b.title); });
 }
 
-// A continue-watching row's tab — the same format map as browse cards. CW rows
-// (from /api/continue-watching, TASK-149) already carry `format` + collection.
-function cwTabOf(row) { return FORMAT_TAB[row.format] || 'films'; }
-
 // A CW row -> a video tile card. The label prefixes the owning collection when
 // present ("Bluey · Daddy Putdown" for an episode; bare title for a standalone
 // film / home movie). Generic by design: a future audio track reads
@@ -196,42 +173,36 @@ function cwCard(row) {
     id: row.item_id,
     title: label,
     poster: row.poster,
-    durationSec: row.duration_secs,
-    format: row.format
+    durationSec: row.duration_secs
   };
 }
 
-// The Continue Watching rail for one (video) tab: the CW rows whose content-type
-// maps to this tab, kept in the backend's newest-first order (not re-sorted).
-// Music rows are excluded here so an in-progress track never leaks into Films
-// (its NULL format would otherwise fall through to the Films tab). Omitted when
-// this tab has nothing in progress.
-function continueRail(tabId, cwRows, sets) {
+// The Continue Watching rail for one (video) section: the CW rows whose section
+// is this tab's, kept in the backend's newest-first order (not re-sorted). The
+// section is borrowed from each row's browse card (rowSection), so a music row
+// never matches a video section — an in-progress track can't leak into Films.
+// Omitted when this tab has nothing in progress.
+function continueRail(sectionId, cwRows, byId) {
   var items = (cwRows || [])
-    .filter(function(r) { return !isMusicRow(r, sets); })
-    .filter(function(r) { return cwTabOf(r) === tabId; })
+    .filter(function(r) { return rowSection(r, byId) === sectionId; })
     .map(cwCard);
   return [{ id: 'continue', title: 'Continue Watching', items: items }]
     .filter(function(rail) { return rail.items.length > 0; });
 }
 
-// The Albums tab's lead rail: "Continue Listening", collection-level. An
-// in-progress album track rolls up to a single album tile (the album browse
-// card), one per album, in the backend's newest-first order — because a future
-// cross-album playlist puts a track in many collections, so resume is anchored
-// at the album, not the track. An in-progress standalone single (no collection)
-// keeps its own track tile. Omitted when nothing music is in progress.
-function continueListeningRail(cwRows, sets) {
+// The Music section's lead rail: "Continue Listening", collection-level. An
+// in-progress track rolls up to its album tile (the album browse card), one per
+// album, in the backend's newest-first order — because a future cross-album
+// playlist puts a track in many collections, so resume is anchored at the album,
+// not the track. Omitted when nothing music is in progress.
+function continueListeningRail(cwRows, byId) {
   var seen = {};
   var items = [];
   (cwRows || []).forEach(function(row) {
-    var album = row.collection_id ? sets.albumById[row.collection_id] : null;
-    if (album) {
-      if (!seen[album.id]) { seen[album.id] = true; items.push(album); }
-    } else if (sets.audioById[row.item_id]) {
-      // The single's own browse card -> carries mediaType (routes to the audio
-      // player) + duration (mid-listen bar).
-      items.push(sets.audioById[row.item_id]);
+    var card = rowCard(row, byId);
+    if (card && sectionOf(card) === 'music' && !seen[card.id]) {
+      seen[card.id] = true;
+      items.push(card);
     }
   });
   return [{ id: 'continue', title: 'Continue Listening', items: items }]
@@ -243,38 +214,38 @@ function simpleRail(id, title, cards) {
   return cards.length ? [{ id: id, title: title, items: sortItems(cards) }] : [];
 }
 
-// The Albums tab's rails: Continue Listening (lead), then Albums, then Singles
-// (when any standalone audio singles exist). Square-art tiles are CSS; the rail
-// shape is identical to the video tabs so the browse screen renders it as-is.
-function albumTabRails(cards, cwRows, sets) {
-  var albums = cards.filter(isAlbumCard);
-  var singles = cards.filter(isAudioSingleCard);
-  return continueListeningRail(cwRows, sets)
-    .concat(simpleRail('albums', 'Albums', albums))
-    .concat(simpleRail('singles', 'Singles', singles));
+// The Music section's rails: Continue Listening (lead), then an Albums rail of
+// the album/playlist cards. (No Singles rail — a standalone song is a 1-track
+// album; FEAT-027.) Square-art tiles are CSS; the rail shape is identical to the
+// video tabs so the browse screen renders it as-is.
+function musicRails(cards, cwRows, byId) {
+  var albums = cards.filter(function(c) { return sectionOf(c) === 'music'; });
+  return continueListeningRail(cwRows, byId)
+    .concat(simpleRail('albums', 'Albums', albums));
 }
 
-// The sidebar tabs to show: a tab per content-type that has browse content.
-// (Continue Watching is no longer a tab — it is a rail inside each tab.)
+// The sidebar tabs to show: a tab per section that has browse content, in fixed
+// display order. (Continue Watching is no longer a tab — it is a rail inside each
+// tab.)
 export function buildTabs(cards) {
-  var all = (cards || []).map(withDurationSec);
   var present = {};
-  all.forEach(function(c) { present[tabOf(c)] = true; });
-  return TAB_ORDER
+  (cards || []).forEach(function(c) { present[sectionOf(c)] = true; });
+  return SECTION_ORDER
     .filter(function(id) { return present[id]; })
-    .map(function(id) { return { id: id, title: TAB_TITLE[id] }; });
+    .map(function(id) { return { id: id, title: SECTION_TITLE[id] }; });
 }
 
-// The rails for one tab: a leading Continue Watching rail (this tab's in-progress
-// items, from cwRows) then the content rails — genre rails for Series/Films,
-// person rails for Home Movies. genreLabels maps genre slugs to display names.
-export function buildTabRails(tabId, cards, cwRows, genreLabels) {
+// The rails for one section tab: a leading Continue Watching rail (this section's
+// in-progress items, from cwRows) then the content rails — genre rails for
+// Series/Films, person rails for Home Movies, the Albums rail for Music.
+// genreLabels maps genre slugs to display names.
+export function buildTabRails(sectionId, cards, cwRows, genreLabels) {
   var all = (cards || []).map(withDurationSec);
-  var sets = musicSets(all);
-  if (tabId === 'albums') return albumTabRails(all, cwRows, sets);
-  var inTab = all.filter(function(c) { return tabOf(c) === tabId; });
-  var typeRails = (tabId === 'home-movies')
+  var byId = cardIndex(all);
+  if (sectionId === 'music') return musicRails(all, cwRows, byId);
+  var inTab = all.filter(function(c) { return sectionOf(c) === sectionId; });
+  var typeRails = (sectionId === 'home-movies')
     ? groupRails(inTab, peopleOf, titleCase, 'person:')
     : groupRails(inTab, genresOf, function(slug) { return labelFor(slug, genreLabels); }, 'genre:');
-  return continueRail(tabId, cwRows, sets).concat(typeRails);
+  return continueRail(sectionId, cwRows, byId).concat(typeRails);
 }

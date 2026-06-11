@@ -35,11 +35,10 @@ export function tileModel(card, ctx) {
 
   var cc = c.hasCC != null ? c.hasCC : hasVtt(card);
 
-  // Music tiles (FEAT-018): an album is a series card flagged format:"album"; a
-  // single is a video card flagged mediaType:"audio". Drives square art + the 💿
-  // placeholder + a "tracks" (not "clips") sub-label.
-  var music = (kind === 'series' && card.format === 'album') ||
-              (kind === 'video' && card.mediaType === 'audio');
+  // Music tiles (FEAT-027): a card whose server-derived `section` is 'music' (an
+  // album/playlist). Drives square art + the 💿 placeholder + a "tracks" (not
+  // "clips") sub-label. Type-agnostic — no `format`/`mediaType` enum.
+  var music = card.section === 'music';
 
   // Series sub-label: clip/track count from the v3 browse card (backend
   // `clipCount`). Absent (video cards, or older backend without the field) -> no
