@@ -70,6 +70,30 @@ describe('tileModel — sub-label (clip count)', () => {
   });
 });
 
+describe('tileModel — music (FEAT-027)', () => {
+  it('flags a music card by section and counts in "tracks"', () => {
+    const m = tileModel({ kind: 'series', id: 'ootb', section: 'music', clipCount: 3 }, {});
+    expect(m.music).toBe(true);
+    expect(m.sub).toBe('3 tracks');
+  });
+
+  it('singular track', () => {
+    expect(tileModel({ kind: 'series', id: 's', section: 'music', clipCount: 1 }, {}).sub).toBe('1 track');
+  });
+
+  it('a non-music section is not flagged music (counts in "clips")', () => {
+    const m = tileModel({ kind: 'series', id: 'bluey', section: 'series', clipCount: 3 }, {});
+    expect(m.music).toBe(false);
+    expect(m.sub).toBe('3 clips');
+  });
+
+  it('routes on section only — the old format/mediaType enum no longer flags music', () => {
+    // Fails on the pre-163 code, which read format:"album" / mediaType:"audio".
+    expect(tileModel({ kind: 'series', id: 'x', format: 'album', clipCount: 2 }, {}).music).toBe(false);
+    expect(tileModel({ kind: 'video', id: 'y', mediaType: 'audio' }, {}).music).toBe(false);
+  });
+});
+
 describe('tileModel — defaults', () => {
   it('defaults kind to video and title/poster safely', () => {
     const m = tileModel({ id: 'x' }, {});

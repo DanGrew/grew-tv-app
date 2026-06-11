@@ -1,12 +1,14 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 
-// FEAT-018 (TASK-130) — music browse + album detail + <audio> player + shuffle.
-// The Albums tab, Continue Listening rollup and routing are exercised end-to-end
-// against the fixture album ("Out of the Blue", 3 tracks) + a single ("Dancing
-// Queen"). Host-agnostic: backend derives from the page origin (BUG-009). Music
-// browse cards are injected here (not in the shared fixture) so the video-only
-// tests keep seeing exactly Series/Films/Home Movies.
+// FEAT-018/FEAT-027 — music browse + album detail + <audio> player + shuffle.
+// The Music tab (titled "Albums"), Continue Listening rollup and routing are
+// exercised end-to-end against the fixture album ("Out of the Blue", 3 tracks).
+// FEAT-027: the app is type-agnostic — it groups by the server `section`, and a
+// track is never a standalone browse card (no Singles rail). Host-agnostic:
+// backend derives from the page origin (BUG-009). Music browse cards are injected
+// here (not the shared fixture) so the video-only tests keep seeing exactly
+// Series/Films/Home Movies.
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
@@ -22,29 +24,25 @@ async function enterKids(page) {
   await expect(page.locator('#screen-browse')).toBeVisible();
 }
 
-test('an Albums tab appears after the video tabs, only when music is present', async ({ page }) => {
+test('a Music tab (titled Albums) appears after the video tabs, only when music is present', async ({ page }) => {
   await enterKids(page);
   await expect(page.locator('.sidebar-tab')).toHaveText(['Series', 'Films', 'Home Movies', 'Albums']);
 });
 
-test('Albums tab shows an Albums rail + a Singles rail with square (music) tiles', async ({ page }) => {
+test('Music tab shows a single Albums rail with square (music) tiles, no Singles rail', async ({ page }) => {
   await enterKids(page);
-  await page.locator('.sidebar-tab[data-tab="albums"]').click();
-  await expect(page.locator('.rail-title')).toHaveText(['Albums', 'Singles']);
-  // Album = series card flagged music (square art via data-music); "3 tracks" sub.
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await expect(page.locator('.rail-title')).toHaveText(['Albums']);
+  // Album = series card with section "music" (square art via data-music); "3 tracks" sub.
   const album = page.locator('.rail-row[data-rail="albums"] .film-tile[data-id="ootb"]');
   await expect(album).toHaveCount(1);
   await expect(album).toHaveAttribute('data-music', '');
   await expect(album.locator('.tile-sub')).toHaveText('3 tracks');
-  // Single = video card flagged mediaType audio.
-  const single = page.locator('.rail-row[data-rail="singles"] .film-tile[data-id="dancing-queen"]');
-  await expect(single).toHaveCount(1);
-  await expect(single).toHaveAttribute('data-music', '');
 });
 
-test('albums route to the album detail (not series detail); singles play straight away', async ({ page }) => {
+test('albums route to the album detail (not series detail)', async ({ page }) => {
   await enterKids(page);
-  await page.locator('.sidebar-tab[data-tab="albums"]').click();
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();
   await expect(page).toHaveURL(/album-detail\.html/);
   await expect(page.locator('#detail-title')).toHaveText('Out of the Blue');
@@ -57,7 +55,7 @@ test('albums route to the album detail (not series detail); singles play straigh
 
 test('selecting a track plays it in the <audio> player from {id}.m4a', async ({ page }) => {
   await enterKids(page);
-  await page.locator('.sidebar-tab[data-tab="albums"]').click();
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();
   await page.locator('.detail-row[data-id="ootb-02"]').click();
   await expect(page).toHaveURL(/audio\.html/);
@@ -71,21 +69,9 @@ test('selecting a track plays it in the <audio> player from {id}.m4a', async ({ 
   await expect(page.locator('#btn-next')).toBeVisible();
 });
 
-test('a standalone single plays directly with prev/next hidden (queue of one)', async ({ page }) => {
-  await enterKids(page);
-  await page.locator('.sidebar-tab[data-tab="albums"]').click();
-  await page.locator('.film-tile[data-id="dancing-queen"]').click();
-  await expect(page).toHaveURL(/audio\.html/);
-  await expect(page.locator('#audio-title')).toHaveText('Dancing Queen');
-  const src = await page.locator('#audio').getAttribute('src');
-  expect(src).toContain('/media/dancing-queen.m4a');
-  await expect(page.locator('#btn-prev')).toBeHidden();
-  await expect(page.locator('#btn-next')).toBeHidden();
-});
-
 test('Shuffle from album detail starts the player with shuffle engaged', async ({ page }) => {
   await enterKids(page);
-  await page.locator('.sidebar-tab[data-tab="albums"]').click();
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();
   // Wait for the album to load — shufflePlay no-ops until items[] is populated, so
   // clicking before the rows render races the load and the player never opens.
@@ -97,7 +83,7 @@ test('Shuffle from album detail starts the player with shuffle engaged', async (
 
 test('the player Shuffle button toggles the engaged state', async ({ page }) => {
   await enterKids(page);
-  await page.locator('.sidebar-tab[data-tab="albums"]').click();
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();
   await page.locator('.detail-row[data-id="ootb-01"]').click();
   await expect(page.locator('#screen-audio')).toBeVisible();
@@ -121,7 +107,7 @@ test('Continue Listening rolls in-progress tracks up to ONE album tile, leading 
     ] })
   }));
   await enterKids(page);
-  await page.locator('.sidebar-tab[data-tab="albums"]').click();
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
   await expect(page.locator('.rail-title').first()).toHaveText('Continue Listening');
   const cl = page.locator('.rail-row[data-rail="continue"]');
   // Two in-progress tracks of one album -> a SINGLE album tile (rollup), opening detail.

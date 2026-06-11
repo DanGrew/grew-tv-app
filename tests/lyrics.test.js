@@ -31,17 +31,9 @@ test.beforeEach(async ({ page }) => {
 async function openTrack(page, albumId, trackId) {
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
-  await page.locator('.sidebar-tab[data-tab="albums"]').click();
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="' + albumId + '"]').click();
   await page.locator('.detail-row[data-id="' + trackId + '"]').click();
-  await expect(page.locator('#screen-audio')).toBeVisible();
-}
-
-async function openSingle(page, id) {
-  await page.locator('#btn-kids').click();
-  await expect(page.locator('#screen-browse')).toBeVisible();
-  await page.locator('.sidebar-tab[data-tab="albums"]').click();
-  await page.locator('.film-tile[data-id="' + id + '"]').click();
   await expect(page.locator('#screen-audio')).toBeVisible();
 }
 
@@ -71,8 +63,8 @@ test('a track with an .lrc shows the rolling current ±1 window, advancing with 
 });
 
 test('a track with no .lrc falls back to the big-cover art view, no lyric pane', async ({ page }) => {
-  await openSingle(page, 'dancing-queen');
-  await expect(page.locator('#audio-title')).toHaveText('Dancing Queen');
+  await openTrack(page, 'ootb', 'ootb-01');   // Turn to Stone — no .lrc sidecar
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
   await expect(page.locator('body')).not.toHaveClass(/lyrics-on/);
   await expect(page.locator('#audio-art')).toBeVisible();
   await expect(page.locator('#amb-lyrics')).toBeHidden();

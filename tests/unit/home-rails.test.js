@@ -58,14 +58,16 @@ describe('buildRails', () => {
   });
 });
 
-// FEAT-020 — content-type tabs + per-type rails (TASK-138/139).
+// FEAT-027 (TASK-163) — the app is type-agnostic. Browse cards carry a
+// server-derived `section` ('series'|'films'|'home-movies'|'music'); the app
+// groups by it and holds no `format`/`itemType`/`collectionType` enum.
 const TYPED = [
-  { kind: 'video',  id: 'toy-story',  title: 'Toy Story',  format: 'film',       genres: ['animation', 'comedy'] },
-  { kind: 'video',  id: 'nemo',       title: 'Finding Nemo', format: 'film',     type: 'animation' },             // no genres -> fallback [type]
-  { kind: 'series', id: 'bluey',      title: 'Bluey',      format: 'tv-series',  genres: ['animation'] },
-  { kind: 'video',  id: 'm-walk',     title: 'Millie Walk', format: 'home-movie', people: ['millie', 'ollie'] },
-  { kind: 'video',  id: 'm-park',     title: 'At The Park', format: 'home-movie', people: ['millie'] },
-  { kind: 'video',  id: 'orphan',     title: 'Orphan Clip', format: 'home-movie' }                                // no people -> Other
+  { kind: 'video',  id: 'toy-story',  title: 'Toy Story',  section: 'films',       genres: ['animation', 'comedy'] },
+  { kind: 'video',  id: 'nemo',       title: 'Finding Nemo', section: 'films',     type: 'animation' },             // no genres -> fallback [type]
+  { kind: 'series', id: 'bluey',      title: 'Bluey',      section: 'series',  genres: ['animation'] },
+  { kind: 'video',  id: 'm-walk',     title: 'Millie Walk', section: 'home-movies', people: ['millie', 'ollie'] },
+  { kind: 'video',  id: 'm-park',     title: 'At The Park', section: 'home-movies', people: ['millie'] },
+  { kind: 'video',  id: 'orphan',     title: 'Orphan Clip', section: 'home-movies' }                                // no people -> Other
 ];
 
 describe('clampIndex', () => {
@@ -78,7 +80,7 @@ describe('clampIndex', () => {
 });
 
 describe('buildTabs', () => {
-  it('shows a tab per content-type present, fixed order, no Continue tab (TASK-150)', () => {
+  it('shows a tab per section present, fixed order, no Continue tab (TASK-150)', () => {
     expect(buildTabs(TYPED).map(t => t.id)).toEqual(['series', 'films', 'home-movies']);
   });
 
@@ -94,12 +96,13 @@ describe('buildTabs', () => {
   });
 });
 
-// TASK-149 /api/continue-watching row shape: carries format + the owning
-// collection (series for an episode; null for a standalone film/home movie).
+// /api/continue-watching row shape: carries the owning collection (series for an
+// episode, album for a track; null for a standalone film/home movie) but NO
+// section/format — the app borrows the section from the row's browse card.
 const CW = [
-  { item_id: 'toy-story', title: 'Toy Story', poster: 't.jpg', position_secs: 100, duration_secs: 600, format: 'film', collection_id: null, collection_title: null },
-  { item_id: 'm-walk', title: 'Millie Walk', poster: 'm.jpg', position_secs: 5, duration_secs: 30, format: 'home-movie', collection_id: null, collection_title: null },
-  { item_id: 'bluey-s1e01', title: 'Daddy Putdown', poster: 'b.jpg', position_secs: 200, duration_secs: 420, format: 'tv-series', collection_id: 'bluey', collection_title: 'Bluey' }
+  { item_id: 'toy-story', title: 'Toy Story', poster: 't.jpg', position_secs: 100, duration_secs: 600, collection_id: null, collection_title: null },
+  { item_id: 'm-walk', title: 'Millie Walk', poster: 'm.jpg', position_secs: 5, duration_secs: 30, collection_id: null, collection_title: null },
+  { item_id: 'bluey-s1e01', title: 'Daddy Putdown', poster: 'b.jpg', position_secs: 200, duration_secs: 420, collection_id: 'bluey', collection_title: 'Bluey' }
 ];
 
 describe('buildTabRails', () => {
@@ -111,7 +114,7 @@ describe('buildTabRails', () => {
   });
 
   it('applies genreLabels overrides, else title-cases the slug', () => {
-    const labelled = [{ kind: 'video', id: 'x', title: 'X', format: 'film', genres: ['rom-com'] }];
+    const labelled = [{ kind: 'video', id: 'x', title: 'X', section: 'films', genres: ['rom-com'] }];
     expect(buildTabRails('films', labelled, [], { 'rom-com': 'Rom-Com' })[0].title).toBe('Rom-Com');
     expect(buildTabRails('films', labelled, [], {})[0].title).toBe('Rom Com');
   });
@@ -136,8 +139,10 @@ describe('buildTabRails', () => {
     expect(TYPED[0].durationSec).toBeUndefined();
   });
 
-  // TASK-150 — per-tab Continue Watching rail, built from the CW rows.
-  it('prepends a Continue Watching rail of only this tab’s in-progress items', () => {
+  // TASK-150 — per-section Continue Watching rail, built from the CW rows. A
+  // row's section is borrowed from its browse card (the item's own, or its
+  // collection's), so episodes/tracks land in the right tab with no app type enum.
+  it('prepends a Continue Watching rail of only this section’s in-progress items', () => {
     const films = buildTabRails('films', TYPED, CW, {});
     expect(films[0].id).toBe('continue');
     expect(films[0].title).toBe('Continue Watching');
@@ -152,99 +157,106 @@ describe('buildTabRails', () => {
     const rails = buildTabRails('series', TYPED, CW, {});
     expect(rails.map(r => r.id)).toEqual(['continue', 'genre:animation']); // CW rail leads, genre rail follows
     const cw = rails[0];
-    expect(cw.items.map(c => c.id)).toEqual(['bluey-s1e01']);   // the episode id, not 'bluey'
+    expect(cw.items.map(c => c.id)).toEqual(['bluey-s1e01']);   // the episode id, not 'bluey' (via collection_id join)
     expect(cw.items[0].title).toBe('Bluey · Daddy Putdown');
     expect(cw.items[0].kind).toBe('video');                    // selecting plays the episode
     expect(cw.items[0].durationSec).toBe(420);                 // for the progress bar
   });
 
   it('keeps the backend newest-first CW order (does not re-sort A-Z)', () => {
-    const cw = [
-      { item_id: 'film-b', title: 'B', position_secs: 10, duration_secs: 100, format: 'film', collection_title: null },
-      { item_id: 'film-a', title: 'A', position_secs: 10, duration_secs: 100, format: 'film', collection_title: null }
+    const cards = [
+      { kind: 'video', id: 'film-a', title: 'A', section: 'films' },
+      { kind: 'video', id: 'film-b', title: 'B', section: 'films' }
     ];
-    const films = buildTabRails('films', [], cw, {});
+    const cw = [
+      { item_id: 'film-b', title: 'B', position_secs: 10, duration_secs: 100, collection_id: null, collection_title: null },
+      { item_id: 'film-a', title: 'A', position_secs: 10, duration_secs: 100, collection_id: null, collection_title: null }
+    ];
+    const films = buildTabRails('films', cards, cw, {});
     expect(films[0].items.map(c => c.id)).toEqual(['film-b', 'film-a']);
   });
 
-  it('omits the Continue Watching rail when this tab has nothing in progress', () => {
+  it('omits the Continue Watching rail when this section has nothing in progress', () => {
     expect(buildTabRails('films', TYPED, [], {}).every(r => r.id !== 'continue')).toBe(true);
     expect(buildTabRails('films', TYPED, null, {}).every(r => r.id !== 'continue')).toBe(true);
   });
 });
 
-// FEAT-018 (TASK-130) — music: an Albums tab; albums = series cards
-// format:"album"; standalone singles = video cards mediaType:"audio". `format`
-// is NULL on audio rows, so routing is by these flags + collection membership.
+// FEAT-027 — music: a Music section (tab titled "Albums"); albums/playlists are
+// series cards with section:"music". A track is never a standalone browse card
+// (a single is a 1-track album), so there is no audio-single card and no Singles
+// rail. Routing/grouping is by `section`, never `format`/`mediaType`.
 const MUSIC = [
-  { kind: 'video',  id: 'toy-story', title: 'Toy Story', format: 'film', genres: ['animation'] },
-  { kind: 'series', id: 'ootb',      title: 'Out of the Blue', format: 'album', artist: 'ELO' },
-  { kind: 'series', id: 'rumours',   title: 'Rumours',         format: 'album', artist: 'Fleetwood Mac' },
-  { kind: 'video',  id: 'dancing-queen', title: 'Dancing Queen', mediaType: 'audio', artist: 'ABBA' }
+  { kind: 'video',  id: 'toy-story', title: 'Toy Story', section: 'films', genres: ['animation'] },
+  { kind: 'series', id: 'ootb',      title: 'Out of the Blue', section: 'music', artist: 'ELO' },
+  { kind: 'series', id: 'rumours',   title: 'Rumours',         section: 'music', artist: 'Fleetwood Mac' }
 ];
 
-describe('music tab routing (FEAT-018)', () => {
-  it('adds an Albums tab when albums or singles are present, after the video tabs', () => {
-    // MUSIC has a film + albums + a single (no tv-series), so: Films then Albums.
-    expect(buildTabs(MUSIC).map(t => t.id)).toEqual(['films', 'albums']);
-    expect(Object.fromEntries(buildTabs(MUSIC).map(t => [t.id, t.title]))['albums']).toBe('Albums');
+describe('music section routing (FEAT-027)', () => {
+  it('adds a Music tab (titled Albums) when music is present, after the video tabs', () => {
+    expect(buildTabs(MUSIC).map(t => t.id)).toEqual(['films', 'music']);
+    expect(Object.fromEntries(buildTabs(MUSIC).map(t => [t.id, t.title]))['music']).toBe('Albums');
   });
 
-  it('keeps album series off the Series tab (an album series isn’t a series-tab card)', () => {
-    const withSeries = MUSIC.concat([{ kind: 'series', id: 'bluey', title: 'Bluey', format: 'tv-series', genres: ['animation'] }]);
-    expect(buildTabs(withSeries).map(t => t.id)).toEqual(['series', 'films', 'albums']);
+  it('keeps album cards off the Series tab (an album isn’t a series-tab card)', () => {
+    const withSeries = MUSIC.concat([{ kind: 'series', id: 'bluey', title: 'Bluey', section: 'series', genres: ['animation'] }]);
+    expect(buildTabs(withSeries).map(t => t.id)).toEqual(['series', 'films', 'music']);
     expect(buildTabRails('series', withSeries, [], {}).some(r => r.items.some(c => c.id === 'ootb'))).toBe(false);
   });
 
-  it('keeps audio singles out of the Films tab', () => {
-    expect(buildTabRails('films', MUSIC, [], {}).some(r => r.items.some(c => c.id === 'dancing-queen'))).toBe(false);
+  it('keeps album cards out of the Films tab', () => {
+    expect(buildTabRails('films', MUSIC, [], {}).some(r => r.items.some(c => c.id === 'ootb'))).toBe(false);
   });
 
-  it('Albums tab -> Albums rail (A-Z) + Singles rail', () => {
-    const rails = buildTabRails('albums', MUSIC, [], {});
-    expect(rails.map(r => r.id)).toEqual(['albums', 'singles']);
+  it('Music tab -> a single Albums rail (A-Z), no Singles rail', () => {
+    const rails = buildTabRails('music', MUSIC, [], {});
+    expect(rails.map(r => r.id)).toEqual(['albums']);
     expect(rails[0].items.map(c => c.id)).toEqual(['ootb', 'rumours']); // A-Z: Out of the Blue, Rumours
-    expect(rails[1].items.map(c => c.id)).toEqual(['dancing-queen']);
   });
 });
 
-// Album track CW rows carry the album as their collection (NULL format); a
-// single's CW row is the single itself.
+// Album track CW rows carry the album as their collection (no format/section);
+// the app borrows section 'music' from the album browse card.
 const MUSIC_CW = [
-  { item_id: 'ootb-02', title: 'Mr. Blue Sky', position_secs: 110, duration_secs: 245, format: null, collection_id: 'ootb', collection_title: 'Out of the Blue' },
-  { item_id: 'ootb-05', title: 'Wild West Hero', position_secs: 30, duration_secs: 300, format: null, collection_id: 'ootb', collection_title: 'Out of the Blue' },
-  { item_id: 'dancing-queen', title: 'Dancing Queen', position_secs: 40, duration_secs: 230, format: null, collection_id: null, collection_title: null },
-  { item_id: 'toy-story', title: 'Toy Story', position_secs: 100, duration_secs: 600, format: 'film', collection_id: null, collection_title: null }
+  { item_id: 'ootb-02', title: 'Mr. Blue Sky', position_secs: 110, duration_secs: 245, collection_id: 'ootb', collection_title: 'Out of the Blue' },
+  { item_id: 'ootb-05', title: 'Wild West Hero', position_secs: 30, duration_secs: 300, collection_id: 'ootb', collection_title: 'Out of the Blue' },
+  { item_id: 'toy-story', title: 'Toy Story', position_secs: 100, duration_secs: 600, collection_id: null, collection_title: null }
 ];
 
-describe('Continue Listening (collection-level, FEAT-018)', () => {
+describe('Continue Listening (collection-level, FEAT-027)', () => {
   it('rolls in-progress album tracks up to ONE album tile, not per track', () => {
-    const rails = buildTabRails('albums', MUSIC, MUSIC_CW, {});
+    const rails = buildTabRails('music', MUSIC, MUSIC_CW, {});
     expect(rails[0].id).toBe('continue');
     expect(rails[0].title).toBe('Continue Listening');
-    // ootb has two in-progress tracks -> a single album tile; single keeps its own.
-    expect(rails[0].items.map(c => c.id)).toEqual(['ootb', 'dancing-queen']);
+    // ootb has two in-progress tracks -> a single album tile (rollup); the film row excluded.
+    expect(rails[0].items.map(c => c.id)).toEqual(['ootb']);
     expect(rails[0].items[0].kind).toBe('series'); // album tile opens album detail
   });
 
   it('excludes music rows from the video tabs Continue Watching (no track leaks into Films)', () => {
     const films = buildTabRails('films', MUSIC, MUSIC_CW, {});
     expect(films[0].id).toBe('continue');
-    expect(films[0].items.map(c => c.id)).toEqual(['toy-story']); // only the film, no track/single
+    expect(films[0].items.map(c => c.id)).toEqual(['toy-story']); // only the film, no track
   });
 
   it('omits Continue Listening when nothing music is in progress', () => {
-    const rails = buildTabRails('albums', MUSIC, [{ item_id: 'toy-story', position_secs: 100, duration_secs: 600, format: 'film', collection_id: null }], {});
+    const rails = buildTabRails('music', MUSIC, [{ item_id: 'toy-story', position_secs: 100, duration_secs: 600, collection_id: null }], {});
     expect(rails.every(r => r.id !== 'continue')).toBe(true);
   });
 });
 
-describe('cardRoute (browse navigation, FEAT-018)', () => {
-  it('routes albums, singles, then falls back to kind', () => {
-    expect(cardRoute({ kind: 'series', format: 'album' })).toBe('album');
-    expect(cardRoute({ kind: 'video', mediaType: 'audio' })).toBe('single');
-    expect(cardRoute({ kind: 'video', format: 'film' })).toBe('video');
-    expect(cardRoute({ kind: 'series', format: 'tv-series' })).toBe('series');
+describe('cardRoute (browse navigation, FEAT-027)', () => {
+  it('routes a music card to album, else falls back to kind', () => {
+    expect(cardRoute({ kind: 'series', section: 'music' })).toBe('album');
+    expect(cardRoute({ kind: 'video', section: 'films' })).toBe('video');
+    expect(cardRoute({ kind: 'series', section: 'series' })).toBe('series');
     expect(cardRoute({ id: 'x' })).toBe('video'); // no kind -> video
+  });
+
+  it('routes on section only — the old format/mediaType enum no longer drives it', () => {
+    // Proves the type-agnostic switch: a card with the legacy format but no
+    // section routes by kind, NOT to 'album' (fails on the pre-163 code).
+    expect(cardRoute({ kind: 'series', format: 'album' })).toBe('series');
+    expect(cardRoute({ kind: 'video', mediaType: 'audio' })).toBe('video');
   });
 });

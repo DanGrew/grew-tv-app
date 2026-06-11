@@ -95,16 +95,15 @@ export function initBrowsePage() {
   wsApp.sendAppState({ screen: 'home', profile: profile });
 
   // A video card plays directly; a series card opens its detail screen. Music
-  // (FEAT-018) overrides by kind: an album series opens the album detail; an
-  // audio single plays straight in the audio player.
+  // (FEAT-027) routes by section: a 'music' card (album/playlist) opens the album
+  // detail.
   var SELECT = {
     album:  function(card) { navTo('album-detail.html', { album: card.id }); },
-    single: function(card) { navTo('audio.html', { track: card.id, from: 'browse' }); },
     video:  function(card) { navTo('video.html', { video: card.id, from: 'browse' }); },
     series: function(card) { navTo('detail.html', { series: card.id }); }
   };
 
-  // cardRoute (core) gives 'album' / 'single' for music else the card's kind;
+  // cardRoute (core) gives 'album' for a music card else the card's kind;
   // [value].filter(Boolean) guards an unknown route as a no-op rather than a throw.
   function onSelect(card) {
     sessionStorage.setItem(LAST_TILE_KEY, card.id);

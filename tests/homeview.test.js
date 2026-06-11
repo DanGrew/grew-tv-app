@@ -176,8 +176,8 @@ test('onSelect ignores an unknown card kind without throwing (BUG-009)', async (
   await page.routeWebSocket(/:8766/, function(ws) { appWs = ws; });
   await page.route('**/api/browse**', function(route) {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ profile: 'kids', content: [
-      { kind: 'video', id: 'toy-story-main', title: 'Toy Story', poster: 'toy-story.jpg', duration: 4860, type: 'animation', format: 'film', genres: ['comedy'], people: null },
-      { kind: 'mystery', id: 'weird-x', title: 'Weird', poster: 'weird-x.jpg', type: 'animation', format: 'film', genres: null, people: null }
+      { kind: 'video', id: 'toy-story-main', title: 'Toy Story', poster: 'toy-story.jpg', duration: 4860, type: 'animation', section: 'films', genres: ['comedy'], people: null },
+      { kind: 'mystery', id: 'weird-x', title: 'Weird', poster: 'weird-x.jpg', type: 'animation', section: 'films', genres: null, people: null }
     ] }) });
   });
   await page.locator('#btn-kids').click();
