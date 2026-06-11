@@ -4,6 +4,7 @@ import { loadAlbum } from '../../core/app-api.js';
 import { screenPage, displayTitle } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
+import { mountScreenBar } from './companion-screen-bar.js';
 
 // Companion audio context (FEAT-018 TASK-132). The music analogue of
 // companion-video: live transport (play/pause, prev/next track, graduated skip,
@@ -33,6 +34,10 @@ export function initPage() {
   };
   var state = { snap: null, albumId: null };
   var api = {};
+  var updateBar = null;
+  function noop() {}
+  function getApi() { return api; }
+  function onDevices(devices) { updateBar(devices); }
 
   // Back teleports the TV to the album detail (companion follows the echoed
   // `detail` context); a single with no album falls back to browse. Same
@@ -139,5 +144,6 @@ export function initPage() {
   buildJump();
   setInterval(renderBar, 250);
 
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState);
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices);
+  updateBar = mountScreenBar(getApi, noop);
 }

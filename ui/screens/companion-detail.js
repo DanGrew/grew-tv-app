@@ -6,6 +6,7 @@ import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
+import { mountScreenBar } from './companion-screen-bar.js';
 
 // Companion series context (TASK-118): the episode list with per-episode
 // progress + a Play-next button, fetched straight from the backend (catalog +
@@ -24,6 +25,10 @@ export function initPage() {
   };
   var state = { seriesId: null, profile: null, person: null, series: null, progress: {} };
   var api = {};
+  var updateBar = null;
+  function noop() {}
+  function getApi() { return api; }
+  function onDevices(devices) { updateBar(devices); }
 
   els.backBtn.addEventListener('click', function() { api.sendIntent('back'); });
 
@@ -127,5 +132,6 @@ export function initPage() {
     [snap.person].filter(Boolean).filter(function(p) { return p !== state.person; }).forEach(function(p) { state.person = p; loadCW(); });
   }
 
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState);
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices);
+  updateBar = mountScreenBar(getApi, noop);
 }
