@@ -6,6 +6,7 @@ import { buildTabs, buildTabRails } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
+import { mountScreenBar } from './companion-screen-bar.js';
 
 // Companion Home (TASK-117 + FEAT-020/TASK-139): a content-type tab strip
 // (Continue / Series / Films / Home Movies) mirroring the app, each tab showing
@@ -29,6 +30,19 @@ export function initPage() {
   };
   var state = { profile: null, person: null, cards: [], cw: [], labels: {}, query: '', activeTab: null };
   var api = {};
+  var updateBar = null;
+  function getApi() { return api; }
+  function onDevices(devices) { updateBar(devices); }
+
+  // While the companion targets no live screen, hide the (empty) browse content
+  // and let the screen chooser take over — never a blank grid (TASK-179 A2,
+  // BUG-013). It returns the moment a screen is (re)bound.
+  function setBound(bound) {
+    var disp = ({ true: '', false: 'none' })[bound];
+    els.search.style.display = disp;
+    els.tabs.style.display = disp;
+    document.getElementById('scroll').style.display = disp;
+  }
 
   // Breadcrumb trail (FEAT-021): Home is the root — a single inert crumb.
   function noNav() {}
@@ -176,5 +190,6 @@ export function initPage() {
   function switchProfile() { api.sendIntent('navigate', switchProfileTarget()); }
   document.getElementById('switch-profile').addEventListener('click', switchProfile);
 
-  api = connect(wsUrl(host), onContext, function(s) { els.connStatus.textContent = s; }, onAppState);
+  api = connect(wsUrl(host), onContext, function(s) { els.connStatus.textContent = s; }, onAppState, onDevices);
+  updateBar = mountScreenBar(getApi, setBound);
 }

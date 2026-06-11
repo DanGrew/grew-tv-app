@@ -111,6 +111,37 @@ describe('connect', () => {
     expect(ws.sent.find(m => m.type === 'register_companion').payload.device_id).toBe('devB');
   });
 
+  // TASK-179: the screen chooser reads the live target to show the current
+  // screen. Null before any (auto)target, the device id once bound.
+  it('currentTarget() reflects the live target', () => {
+    var api = connect('ws://host:8766', () => {}, () => {});
+    var ws = MockWS.instances[0];
+    ws.onopen();
+    expect(api.currentTarget()).toBe(null);
+    ws.onmessage(deviceMsg([{ device_id: 'devA' }]));   // sole screen auto-targets
+    expect(api.currentTarget()).toBe('devA');
+    api.target('devA');
+    expect(api.currentTarget()).toBe('devA');
+  });
+
+  // TASK-179 A3: re-targeting a different screen is a DEVICE-plane move — it must
+  // emit register_companion (+ snapshot_request) ONLY. No person-plane traffic
+  // (activate_person / setProfile), so the previously-driven app keeps running
+  // untouched.
+  it('re-target emits register_companion + snapshot_request ONLY — no person switch', () => {
+    store['grew-tv-companion-target'] = 'devA';
+    var api = connect('ws://host:8766', () => {}, () => {});
+    var ws = MockWS.instances[0];
+    ws.onopen();
+    ws.onmessage(deviceMsg([{ device_id: 'devA' }, { device_id: 'devB' }]));   // bound to devA
+    ws.sent.length = 0;
+    api.target('devB');   // re-target to devB
+    var types = ws.sent.map(m => m.type);
+    expect(types).toEqual(['register_companion', 'snapshot_request']);
+    expect(types).not.toContain('activate_person');
+    expect(ws.sent.find(m => m.payload && m.payload.intent === 'setProfile')).toBeFalsy();
+  });
+
   it('survives the target screen person-switch with NO re-register', () => {
     connect('ws://host:8766', () => {}, () => {});
     var ws = MockWS.instances[0];

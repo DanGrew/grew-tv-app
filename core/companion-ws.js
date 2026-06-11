@@ -65,12 +65,15 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices) {
 
   function onDevicesMsg(devices) {
     lastDevices = devices;
-    [onDevices].filter(Boolean).forEach(function(fn) { fn(devices); });
     var pick = autoTarget(devices);
     // Register only when the pick changes our target — a pushed devices update
     // for an unchanged target (e.g. the screen flipped person) must NOT
     // re-register, so the companion rides the switch with no drop.
     if (pick && pick !== targeted) registerFor(pick);
+    // Notify the UI AFTER (auto)targeting so the screen chooser reads the freshly
+    // bound `targeted` and renders the current screen, not a transient "pick a
+    // screen" for a sole screen it is about to auto-target (TASK-179).
+    [onDevices].filter(Boolean).forEach(function(fn) { fn(devices); });
   }
 
   function applyContext(p) {
@@ -129,6 +132,7 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices) {
     position: position,
     appState: function() { return lastAppState; },
     devices: function() { return lastDevices; },
+    currentTarget: function() { return targeted; },
     target: registerFor,
     play: function(id) { send(createPlayIntent(id)); },
     skip: function(deltaSec) { send(createSkipIntent(deltaSec)); },

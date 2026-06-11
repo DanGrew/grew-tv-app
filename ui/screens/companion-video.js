@@ -6,6 +6,7 @@ import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
+import { mountScreenBar } from './companion-screen-bar.js';
 
 // Companion player transport (FEAT-017). Read-only progress bar interpolated
 // locally between 1 Hz app_state snapshots; graduated discrete jumps + prev/next
@@ -32,6 +33,10 @@ export function initPage() {
   };
   var state = { snap: null, nextKey: null, loadedSeriesId: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '' } };
   var api = {};
+  var updateBar = null;
+  function noop() {}
+  function getApi() { return api; }
+  function onDevices(devices) { updateBar(devices); }
 
   // Breadcrumb trail (FEAT-021): Home > Series > Episode (film: Home > Title).
   // Ancestor crumbs send the `navigate` intent — the app teleports the TV and
@@ -124,5 +129,6 @@ export function initPage() {
   buildJump();
   setInterval(renderBar, 250);
 
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState);
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices);
+  updateBar = mountScreenBar(getApi, noop);
 }
