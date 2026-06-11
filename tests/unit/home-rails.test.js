@@ -245,6 +245,32 @@ describe('Continue Listening (collection-level, FEAT-027)', () => {
   });
 });
 
+// FEAT-027 — a film box-set is a collection (kind:'series') with section:'films'
+// (descriptor: boxset -> films). It is NOT its own section/tab: the box-set tile
+// shows in the Films tab grouped by genre, alongside the standalone films, and
+// its member films also surface individually (the `standalone` capability).
+describe('box-set grouping (FEAT-027 — section films, not its own tab)', () => {
+  const WITH_BOXSET = [
+    { kind: 'video',  id: 'rhod-mountain', title: 'The Cat That Looked Like Nicholas Lyndhurst', section: 'films', genres: ['comedy'] },
+    { kind: 'series', id: 'rhod-boxset',   title: 'Rhod Gilbert Live',   section: 'films', genres: ['comedy'] }
+  ];
+
+  it('does not add a Box Set tab — the boxset lives in Films', () => {
+    expect(buildTabs(WITH_BOXSET).map(t => t.id)).toEqual(['films']);
+  });
+
+  it('groups the box-set collection into the Films genre rail with the standalone film', () => {
+    const rails = buildTabRails('films', WITH_BOXSET, [], {});
+    expect(rails.map(r => r.title)).toEqual(['Comedy']);
+    expect(rails[0].items.map(c => c.id)).toEqual(['rhod-boxset', 'rhod-mountain']); // A-Z by title
+  });
+
+  it('routes the box-set to collection detail (kind series), the film to play', () => {
+    expect(cardRoute({ kind: 'series', section: 'films' })).toBe('series');
+    expect(cardRoute({ kind: 'video', section: 'films' })).toBe('video');
+  });
+});
+
 describe('cardRoute (browse navigation, FEAT-027)', () => {
   it('routes a music card to album, else falls back to kind', () => {
     expect(cardRoute({ kind: 'series', section: 'music' })).toBe('album');
