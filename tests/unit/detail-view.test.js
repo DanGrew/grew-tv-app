@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resumeOf, episodeLabel, durationMarkup, progressBarMarkup } from '../../core/detail-view.js';
+import { resumeOf, episodeLabel, durationMarkup, progressBarMarkup, typeLabel, collectionMetaLine, detailTagMarkup } from '../../core/detail-view.js';
 
 describe('resumeOf', () => {
   it('returns 0 when no entry', () => {
@@ -40,5 +40,49 @@ describe('progressBarMarkup', () => {
   });
   it('is empty when not mid-watch', () => {
     expect(progressBarMarkup(false, 40, 'ep-progress')).toBe('');
+  });
+});
+
+describe('typeLabel', () => {
+  it('maps a known type to a friendly label', () => {
+    expect(typeLabel('animation')).toBe('Cartoons');
+    expect(typeLabel('home')).toBe('Home videos');
+  });
+  it('falls back to the raw type when unmapped', () => {
+    expect(typeLabel('documentary')).toBe('documentary');
+  });
+  it('is empty for an absent type', () => {
+    expect(typeLabel(null)).toBe('');
+    expect(typeLabel(undefined)).toBe('');
+  });
+});
+
+describe('collectionMetaLine', () => {
+  it('joins the type label and a pluralised clip count', () => {
+    expect(collectionMetaLine({ type: 'home', items: [1, 2, 3, 4, 5, 6] })).toBe('Home videos · 6 clips');
+  });
+  it('uses the singular for a single clip', () => {
+    expect(collectionMetaLine({ type: 'animation', items: [1] })).toBe('Cartoons · 1 clip');
+  });
+  it('drops the type segment when the type is absent', () => {
+    expect(collectionMetaLine({ items: [1, 2, 3] })).toBe('3 clips');
+  });
+  it('handles a missing items array', () => {
+    expect(collectionMetaLine({ type: 'home' })).toBe('Home videos · 0 clips');
+  });
+});
+
+describe('detailTagMarkup', () => {
+  it('renders a RESUME tag with the time left when mid-watch', () => {
+    expect(detailTagMarkup(true, 70, false)).toBe('<div class="detail-tag">RESUME · 1:10 left</div>');
+  });
+  it('RESUME wins over NEXT', () => {
+    expect(detailTagMarkup(true, 70, true)).toBe('<div class="detail-tag">RESUME · 1:10 left</div>');
+  });
+  it('renders a NEXT tag for the play-next row', () => {
+    expect(detailTagMarkup(false, 0, true)).toBe('<div class="detail-tag">NEXT</div>');
+  });
+  it('is empty for a plain row', () => {
+    expect(detailTagMarkup(false, 0, false)).toBe('');
   });
 });

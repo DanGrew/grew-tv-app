@@ -5,7 +5,8 @@ import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadSeries, loadContinueWatching } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
-import { playNextIndex } from '../../core/series-detail.js';
+import { primaryAction, playNextLabel } from '../../core/series-detail.js';
+import { collectionMetaLine } from '../../core/detail-view.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
@@ -25,9 +26,11 @@ export function initDetailPage() {
   function play(item, mode) { navTo('video.html', PLAY_PARAMS[mode](item.video.id)); }
   function onPlayItem(item, i, mode) { play(item, mode); }
 
-  // Header action: the episode after the most-recently-played one (wraps).
+  // Header action: continue the most-recent episode while it is still mid-watch,
+  // otherwise the next one (wraps at the series end). Resume mode replays from the
+  // backend position — the mid-watch point for continue, 0 for a fresh episode.
   function playNext() {
-    var idx = playNextIndex(state.series.items, state.progress);
+    var idx = primaryAction(state.series.items, state.progress).index;
     [state.series.items[idx]].filter(Boolean).forEach(function(item) { play(item, 'resume'); });
   }
 
@@ -77,6 +80,8 @@ export function initDetailPage() {
       state.series = res[0];
       state.progress = progressMapFromCW(res[1].content);
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: seriesId, seriesTitle: state.series.title }));
+      document.getElementById('detail-meta').textContent = collectionMetaLine(state.series);
+      document.getElementById('btn-play-next').textContent = '▶ ' + playNextLabel(state.series.items, state.progress);
       buildDetailList(SERVER, state.series, state.progress, onPlayItem);
       focusFirstDetailRow();
     })

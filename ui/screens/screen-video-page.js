@@ -5,6 +5,7 @@ import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadVideo, loadNext, loadSeries, loadProgress } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
+import { upNextParts } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
@@ -38,7 +39,8 @@ export function initVideoPage() {
 
   // Breadcrumb trail (FEAT-021): a film is Home > Title; a series episode is
   // Home > Series > Episode, so the series crumb needs the series title (fetched;
-  // graceful fallback to 'Series' when /api/series is unavailable).
+  // graceful fallback to 'Series' when /api/series is unavailable). The trail's
+  // leaf carries the video title, so the player needs no separate big title.
   function mountCrumbs(videoTitle, seriesTitle) {
     mountBreadcrumb('breadcrumb', buildCrumbs('video', { seriesId: seriesId, seriesTitle: seriesTitle, videoTitle: videoTitle }));
   }
@@ -87,11 +89,13 @@ export function initVideoPage() {
     });
   }
 
-  // Prime the overlay's "Up next" line from the next episode's title.
+  // Prime the inline up-next line: the next episode's title, or "Start again" at
+  // the wrapping end of a series (upNextParts handles both). Series only — a
+  // standalone film has no up-next.
   function showUpNextLine() {
     [seriesId].filter(Boolean).forEach(function() {
       loadNext(SERVER, seriesId, videoId)
-        .then(function(d) { [d.next].filter(Boolean).forEach(function(n) { player.setUpNext(n.video.title); }); })
+        .then(function(d) { var p = upNextParts(d.next); player.setUpNext(p.prefix, p.label); })
         .catch(function() {});
     });
   }

@@ -536,3 +536,13 @@ test('Up next countdown is cancellable and returns to detail', async ({ page }) 
   await page.locator('#btn-upnext-cancel').click();
   await expect(page).toHaveURL(/detail\.html/);
 });
+
+test('player up-next line names the next episode (TASK-136)', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#video-upnext')).toHaveText('Up next: The Weekend');
+});
+
+test('player up-next reads "Start again" at the end of a series (TASK-136)', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?video=bluey-s1e03&series=bluey&from=detail');
+  await expect(page.locator('#video-upnext')).toHaveText('Start again');
+});
