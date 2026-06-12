@@ -11,6 +11,7 @@
 //   detail    -> { seriesId, seriesTitle }
 //   video     -> { seriesId, seriesTitle, videoTitle }   (seriesId absent => film)
 //   rail-grid -> { sectionId, sectionTitle, railTitle }  (FEAT-028 / TASK-167)
+//   artist    -> { artistName }                          (FEAT-029)
 
 var HOME_PAGE = 'browse.html';
 var DETAIL_PAGE = 'detail.html';
@@ -54,11 +55,22 @@ function railGridCrumbs(ctx) {
   return [home(), sectionLink(ctx), leaf(ctx.railTitle)];
 }
 
+// FEAT-029 artist drill-down: Home › Albums (the Music tab) › Artist. The Albums
+// crumb returns to the browse page on the music tab (browse honours ?tab=).
+function albumsLink() {
+  return link('Albums', HOME_PAGE, { tab: 'music' });
+}
+
+function artistCrumbs(ctx) {
+  return [home(), albumsLink(), leaf(ctx.artistName)];
+}
+
 var BUILDERS = {
   browse: browseCrumbs,
   detail: detailCrumbs,
   video: videoCrumbs,
-  'rail-grid': railGridCrumbs
+  'rail-grid': railGridCrumbs,
+  artist: artistCrumbs
 };
 
 // Build the crumb trail for a screen + context. Unknown screen -> [] so a caller

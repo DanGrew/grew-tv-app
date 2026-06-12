@@ -103,6 +103,7 @@ export function initBrowsePage() {
   // from a tile, not the series detail. A standalone film has no `series`; navTo
   // drops the undefined param so it stays seriesless.
   var SELECT = {
+    artist: function(card) { navTo('artist.html', { artist: card.artist }); },
     album:  function(card) { navTo('album-detail.html', { album: card.id }); },
     video:  function(card) { navTo('video.html', { video: card.id, from: 'browse', series: card.series }); },
     series: function(card) { navTo('detail.html', { series: card.id }); }

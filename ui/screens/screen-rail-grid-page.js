@@ -27,6 +27,7 @@ export function initRailGridPage() {
   // A CW episode tile carries `series` (its owning collection) so the player can
   // run Next/Prev from a tile launch (BUG-005); a film has none and navTo drops it.
   var SELECT = {
+    artist: function(card) { navTo('artist.html', { artist: card.artist }); },
     album:  function(card) { navTo('album-detail.html', { album: card.id }); },
     video:  function(card) { navTo('video.html', { video: card.id, from: 'grid', series: card.series }); },
     series: function(card) { navTo('detail.html', { series: card.id }); }

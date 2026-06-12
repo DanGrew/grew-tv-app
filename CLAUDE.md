@@ -161,9 +161,34 @@ Run the relevant e2e locally too (CI-only otherwise):
 
 **Companion (`companion/`):** must be served over HTTP — ES modules require it.
 
+**After app work in a worktree, surface the run command.** When you finish a
+change on a worktree branch, END your summary with the exact command for the
+user to run it locally against THAT worktree — `media-manager.py` with
+`--app-dir <app-worktree-path>` (the user can't `git checkout` your worktree
+branch, so point the server at the path instead):
+```bash
+python3 media-manager/core/media-manager.py \
+  --app-dir /Users/dan/dan-grew-repos/<your-app-worktree-dir> \
+  --content-root ~/rips
+```
+Run from the `grew-tv` repo root. Default ports 8765/8766 collide with the user's
+live instance — note they must stop that first. Then the app URL:
+`http://localhost:8765/app/homeview/profile.html`.
+
+**If the change ALSO touches the backend in a `grew-tv` worktree, run
+`media-manager.py` from THAT worktree, not primary.** `media-manager.py` is the
+backend — running primary `grew-tv` serves the old backend, so a co-dependent
+backend change (new API field, etc.) won't be exercised. Point the script at the
+backend worktree by absolute path:
+```bash
+python3 /Users/dan/dan-grew-repos/<your-grew-tv-worktree-dir>/media-manager/core/media-manager.py \
+  --app-dir /Users/dan/dan-grew-repos/<your-app-worktree-dir> \
+  --content-root ~/rips
+```
+
 Preferred — use `media-manager.py` from the `grew-tv` repo (serves app + WebSocket server together):
 ```bash
-python installation/media-manager.py --app-dir <path-to-grew-tv-app> --volumes-dir <path-to-volumes>
+python3 media-manager/core/media-manager.py --app-dir <path-to-grew-tv-app> --content-root ~/rips
 # Companion at http://localhost:8765/companion/
 # WebSocket at ws://localhost:8766
 ```

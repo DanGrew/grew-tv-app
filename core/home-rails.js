@@ -66,11 +66,14 @@ var SECTION_ORDER = ['series', 'films', 'home-movies', 'music'];
 // Films so an unstamped (legacy/typo) card is shown rather than silently dropped.
 function sectionOf(card) { return card.section || 'films'; }
 
-// Where selecting a browse card navigates: a music card (album/playlist) opens
-// album detail; otherwise the card's own kind ('video' plays, 'series' opens
-// collection detail). Routes on the server `section`, never a type enum. Pure so
-// the browse screen stays DOM-only (no-pure-fn-outside-core).
+// Where selecting a browse card navigates: an artist tile (FEAT-029, synthesised
+// for the Music tab's Artists rail) opens the artist drill-down; a music card
+// (album/playlist) opens album detail; otherwise the card's own kind ('video'
+// plays, 'series' opens collection detail). Routes on `kind`/server `section`,
+// never a type enum. Pure so the browse screen stays DOM-only
+// (no-pure-fn-outside-core).
 export function cardRoute(card) {
+  if (card.kind === 'artist') return 'artist';
   if (card.section === 'music') return 'album';
   return card.kind || 'video';
 }
@@ -218,13 +221,64 @@ function simpleRail(id, title, cards) {
   return cards.length ? [{ id: id, title: title, items: sortItems(cards) }] : [];
 }
 
-// The Music section's rails: Continue Listening (lead), then an Albums rail of
-// the album/playlist cards. (No Singles rail — a standalone song is a 1-track
-// album; FEAT-027.) Square-art tiles are CSS; the rail shape is identical to the
-// video tabs so the browse screen renders it as-is.
+// FEAT-029 — the Music section's Artists rail. One tile per distinct album
+// artist, square art borrowed from that artist's first album (A-Z by title),
+// labelled "N album(s)". kind:'artist' routes the tile to the artist drill-down
+// (cardRoute); section:'music' gives it the same square art as an album tile.
+// Albums with no `artist` are omitted here (they still appear in the Albums
+// rail). Sorted A-Z by artist name.
+function artistTiles(cards) {
+  var albums = cards.filter(function(c) { return sectionOf(c) === 'music' && c.artist; });
+  var byArtist = {};
+  albums.forEach(function(c) { byArtist[c.artist] = (byArtist[c.artist] || []).concat([c]); });
+  return Object.keys(byArtist)
+    .map(function(name) {
+      var list = sortItems(byArtist[name]);
+      var n = list.length;
+      return {
+        kind: 'artist', id: 'artist:' + name, artist: name, title: name,
+        poster: list[0].poster || null, section: 'music',
+        subLabel: n === 1 ? '1 album' : n + ' albums'
+      };
+    })
+    .sort(function(a, b) { return cmpStr(a.title, b.title); });
+}
+
+// An album's release year as a number, from the browse card's tags.year
+// (backend exposes it on the album card). null when absent/unparseable — the
+// live app sees no year until the backend is redeployed, so those fall back to
+// title order below rather than throwing.
+function albumYear(card) {
+  var tags = card.tags || {};
+  var y = parseInt(tags.year, 10);
+  return isNaN(y) ? null : y;
+}
+
+// The albums of one artist for the artist drill-down page (FEAT-029), newest
+// first by release year, then A-Z by title (yearless albums sort last). Pure so
+// the page stays DOM-only (no-pure-fn-outside-core).
+export function albumsByArtist(cards, artist) {
+  var all = (cards || []).map(withDurationSec);
+  var mine = all.filter(function(c) { return sectionOf(c) === 'music' && c.artist === artist; });
+  return mine.slice().sort(function(a, b) {
+    var ya = albumYear(a);
+    var yb = albumYear(b);
+    if (ya === yb) return cmpStr(a.title || '', b.title || '');
+    if (ya === null) return 1;
+    if (yb === null) return -1;
+    return yb - ya;
+  });
+}
+
+// The Music section's rails: Continue Listening (lead), then an Artists rail
+// (FEAT-029) of one tile per artist, then an Albums rail of the album/playlist
+// cards. (No Singles rail — a standalone song is a 1-track album; FEAT-027.)
+// Square-art tiles are CSS; the rail shape is identical to the video tabs so the
+// browse screen renders it as-is.
 function musicRails(cards, cwRows, byId) {
   var albums = cards.filter(function(c) { return sectionOf(c) === 'music'; });
   return continueListeningRail(cwRows, byId)
+    .concat(simpleRail('artists', 'Artists', artistTiles(cards)))
     .concat(simpleRail('albums', 'Albums', albums));
 }
 
