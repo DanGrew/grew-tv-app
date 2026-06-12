@@ -8,8 +8,9 @@
 //   otherwise        -> a clickable ancestor that navigates to page?params.
 //
 // ctx fields by screen:
-//   detail -> { seriesId, seriesTitle }
-//   video  -> { seriesId, seriesTitle, videoTitle }   (seriesId absent => film)
+//   detail    -> { seriesId, seriesTitle }
+//   video     -> { seriesId, seriesTitle, videoTitle }   (seriesId absent => film)
+//   rail-grid -> { sectionId, sectionTitle, railTitle }  (FEAT-028 / TASK-167)
 
 var HOME_PAGE = 'browse.html';
 var DETAIL_PAGE = 'detail.html';
@@ -43,10 +44,21 @@ function videoCrumbs(ctx) {
   return [home(), leaf(ctx.videoTitle)];
 }
 
+// The section crumb returns to the browse page on that section's tab (browse
+// honours ?tab=); the rail is the current (leaf) level.
+function sectionLink(ctx) {
+  return link(ctx.sectionTitle, HOME_PAGE, { tab: ctx.sectionId });
+}
+
+function railGridCrumbs(ctx) {
+  return [home(), sectionLink(ctx), leaf(ctx.railTitle)];
+}
+
 var BUILDERS = {
   browse: browseCrumbs,
   detail: detailCrumbs,
-  video: videoCrumbs
+  video: videoCrumbs,
+  'rail-grid': railGridCrumbs
 };
 
 // Build the crumb trail for a screen + context. Unknown screen -> [] so a caller

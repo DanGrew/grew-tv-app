@@ -1,4 +1,4 @@
-import { getProfile, getPerson, navTo } from '../../core/state.js';
+import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
@@ -124,7 +124,10 @@ export function initBrowsePage() {
       // browse catalog doesn't already hold (films keep their full browse card).
       cw.forEach(function(r) { catalog[r.item_id] = [catalog[r.item_id]].filter(Boolean).concat([{ kind: 'video', id: r.item_id }])[0]; });
       var labels = [browse.genreLabels].filter(Boolean).concat([{}])[0];
-      renderBrowse(SERVER, browse.content, cw, labels, profile, onSelect, sessionStorage.getItem(LAST_TAB_KEY));
+      // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) wins
+      // over the last-visited tab; renderBrowse falls back when neither matches.
+      var initialTab = [getParam('tab')].filter(Boolean).concat([sessionStorage.getItem(LAST_TAB_KEY)]).filter(Boolean)[0];
+      renderBrowse(SERVER, browse.content, cw, labels, profile, onSelect, initialTab);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
     })
     .catch(function() { navTo('error.html'); });

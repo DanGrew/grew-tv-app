@@ -29,6 +29,14 @@ describe('buildCrumbs', () => {
     expect(crumbs[1]).toMatchObject({ label: 'Toy Story', current: true });
   });
 
+  it('rail-grid is Home > Section (clickable, ?tab=) > Rail leaf (FEAT-028)', () => {
+    var crumbs = buildCrumbs('rail-grid', { sectionId: 'series', sectionTitle: 'Series', railTitle: 'Preschool' });
+    expect(crumbs).toHaveLength(3);
+    expect(crumbs[0]).toMatchObject({ label: 'Home', page: 'browse.html', current: false });
+    expect(crumbs[1]).toMatchObject({ label: 'Series', page: 'browse.html', params: { tab: 'series' }, current: false });
+    expect(crumbs[2]).toMatchObject({ label: 'Preschool', current: true });
+  });
+
   it('unknown screen yields an empty trail', () => {
     expect(buildCrumbs('mystery')).toEqual([]);
   });
