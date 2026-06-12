@@ -44,8 +44,9 @@ export function buildRails(cards, progress) {
 // The browse screen is a section sidebar (Series / Films / Home Movies /
 // Albums); selecting a tab swaps the rail area to that section's rails.
 // Series/Films group by genre (genres[], falling back to [type]); Home Movies
-// group by person (people[]); the Music section lists albums. Each section tab
-// leads with a Continue Watching rail of that section's in-progress items.
+// splits into Collections + Videos by card kind (TASK-183); the Music section
+// lists albums. Each section tab leads with a Continue Watching rail of that
+// section's in-progress items.
 //
 // SECTION_TITLE/SECTION_ORDER are pure presentation — a section's tab label and
 // fixed display order — NOT type routing. Sections (server-supplied):
@@ -124,13 +125,6 @@ function labelFor(slug, labels) {
 function genresOf(card) {
   if (Array.isArray(card.genres) && card.genres.length) return card.genres;
   if (card.type) return [card.type];
-  return ['other'];
-}
-
-// People a card belongs to: explicit people[], else ['other'] (the catch-all
-// rail for home movies with nobody tagged).
-function peopleOf(card) {
-  if (Array.isArray(card.people) && card.people.length) return card.people;
   return ['other'];
 }
 
@@ -245,11 +239,11 @@ export function buildTabs(cards) {
 // own leading "Box Sets" rail and kept out of the genre rows. genreLabels maps
 // genre slugs to display names.
 //
-// Home Movies (TASK-183, FEAT-025) augments the person rails with two structural
-// rails: Continue Watching -> Collections (kind:'series') -> person rails ->
-// Videos (standalone kind:'video', last). A card can appear in both a structural
-// rail and a person rail (augment, not replace); each structural rail is A-Z and
-// omitted when empty.
+// Home Movies (TASK-183, FEAT-025) is two structural rails, split on the card's
+// own `kind`: Continue Watching -> Collections (kind:'series') -> Videos
+// (standalone kind:'video'). Each structural rail is A-Z and omitted when empty.
+// (No person rails — home content carries no people tags, so they collapsed to a
+// single "Other" dump; dropped per owner feedback 2026-06-12.)
 export function buildTabRails(sectionId, cards, cwRows, genreLabels) {
   var all = (cards || []).map(withDurationSec);
   var byId = cardIndex(all);
@@ -260,7 +254,6 @@ export function buildTabRails(sectionId, cards, cwRows, genreLabels) {
     var standalones = inTab.filter(function(c) { return (c.kind || 'video') === 'video'; });
     return continueRail(sectionId, cwRows, byId)
       .concat(simpleRail('collections', 'Collections', collections))
-      .concat(groupRails(inTab, peopleOf, titleCase, 'person:'))
       .concat(simpleRail('videos', 'Videos', standalones));
   }
   var boxsets = inTab.filter(isBoxset);
