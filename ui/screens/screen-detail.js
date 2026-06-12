@@ -2,7 +2,7 @@ import { registerScreen } from '../../core/screen-registry.js';
 import { mediaUrl } from '../../core/app-api.js';
 import { percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, durationMarkup, progressBarMarkup, detailTagMarkup } from '../../core/detail-view.js';
-import { playNextIndex } from '../../core/series-detail.js';
+import { primaryAction } from '../../core/series-detail.js';
 
 var DETAIL_ARROW_DELTA = { ArrowUp: -1, ArrowDown: 1 };
 var PLAY_KEYS = { Enter: true, ' ': true };
@@ -169,7 +169,9 @@ export function buildDetailList(server, series, progress, onPlayItem) {
   var list = document.getElementById('detail-list');
   list.innerHTML = '';
   var ctx = { lastSeason: null };
-  var nextIdx = playNextIndex(series.items, progress);
+  // Tag the row the header action will play. A 'continue' row is mid-watch, so it
+  // renders RESUME (detailTagMarkup prefers it); 'next'/'again' rows get NEXT.
+  var nextIdx = primaryAction(series.items, progress).index;
   series.items.forEach(function(item, i) {
     maybeSeasonHeader(list, item, ctx);
     list.appendChild(buildRow(server, series, progress, onPlayItem, item, i, i === nextIdx));

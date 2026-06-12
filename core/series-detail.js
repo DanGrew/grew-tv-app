@@ -6,6 +6,8 @@
 // items:    ordered series refs [{ video: { id, durationSec? }, ... }]
 // progress: { id: { resumePositionSec, lastPlayed } } (from /api/continue-watching)
 
+import { isMidWatch } from './progress.js';
+
 function lastPlayedTs(v) {
   if (typeof v === 'number') return v;
   return v ? Date.parse(v) || 0 : 0;
@@ -35,22 +37,46 @@ export function playNextIndex(items, progress) {
   return (last + 1) % its.length;
 }
 
-// "(N)" episode-number suffix for the Play-next label, blank when a membership
+// "(N)" episode-number suffix for the header label, blank when a membership
 // carries no number (e.g. an unnumbered home-movies collection).
 function episodeSuffix(item) {
   return [item.episode].filter(function(e) { return e != null; })
     .map(function(e) { return ' (' + e + ')'; }).concat([''])[0];
 }
 
-// Label for the detail Play-next action (FEAT-017). "Start again" once the final
-// episode is the most-recently-played (the series wraps last->first); otherwise
-// the next episode's quoted title + number. Bare "Play next" for no items.
-export function playNextLabel(items, progress) {
+// The detail header's primary action (FEAT-017 / TASK-136), as { kind, index }:
+//   continue — the most-recent episode is still mid-watch -> resume IT
+//   next     — that episode is finished (or none watched) -> the following one
+//   again    — the finished episode was the last -> wrap to the first
+//   none     — empty collection
+// 'continue' takes priority so a partly-watched episode is never skipped.
+export function primaryAction(items, progress) {
   var its = items || [];
-  if (its.length === 0) return 'Play next';
-  if (lastPlayedIndex(its, progress) === its.length - 1) return 'Start again';
-  var item = its[playNextIndex(its, progress)];
-  return 'Play next — "' + item.video.title + '"' + episodeSuffix(item);
+  var p = progress || {};
+  if (its.length === 0) return { kind: 'none', index: -1 };
+  var last = lastPlayedIndex(its, p);
+  if (last < 0) return { kind: 'next', index: 0 };
+  var lastItem = its[last];
+  var entry = p[lastItem.video.id];
+  var resume = entry ? entry.resumePositionSec : 0;
+  if (isMidWatch(resume, lastItem.video.duration)) return { kind: 'continue', index: last };
+  if (last === its.length - 1) return { kind: 'again', index: 0 };
+  return { kind: 'next', index: (last + 1) % its.length };
+}
+
+var ACTION_LABEL = {
+  none:     function() { return 'Play next'; },
+  again:    function() { return 'Start again'; },
+  continue: function(item) { return 'Continue — "' + item.video.title + '"' + episodeSuffix(item); },
+  next:     function(item) { return 'Play next — "' + item.video.title + '"' + episodeSuffix(item); }
+};
+
+// Label for the detail header action — matches what primaryAction() will play:
+// "Continue — …" for a mid-watch episode, "Play next — …" for a fresh one,
+// "Start again" at the series end, bare "Play next" for an empty collection.
+export function playNextLabel(items, progress) {
+  var act = primaryAction(items, progress);
+  return ACTION_LABEL[act.kind]((items || [])[act.index]);
 }
 
 // Inline player up-next line parts. A resolved next episode -> "Up next: " + its
@@ -58,26 +84,4 @@ export function playNextLabel(items, progress) {
 export function upNextParts(next) {
   if (next) return { prefix: 'Up next: ', label: next.video.title };
   return { prefix: '', label: 'Start again' };
-}
-
-// Episode number for a video within a resolved /api/series record (null when the
-// video is not a member, or the membership carries no number).
-export function episodeNumOf(series, videoId) {
-  var its = (series && series.items) || [];
-  var item = its.filter(function(it) { return it.video.id === videoId; })[0];
-  return item ? item.episode : null;
-}
-
-// The player's episode label: the episode's own title, else "Episode {N}" (the
-// data is mixed — some episodes are named, some only numbered).
-export function episodeText(title, episodeNum) {
-  return [title].filter(Boolean).concat(['Episode ' + episodeNum])[0];
-}
-
-// Player big title: "{series} · {episode}" within a series; the bare episode
-// text (a standalone film's own title) when there is no series.
-export function playerTitle(seriesTitle, episode) {
-  return [seriesTitle].filter(Boolean)
-    .map(function(s) { return s + ' · ' + episode; })
-    .concat([episode])[0];
 }

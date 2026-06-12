@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lastPlayedIndex, playNextIndex, playNextLabel, upNextParts, episodeNumOf, episodeText, playerTitle } from '../../core/series-detail.js';
+import { lastPlayedIndex, playNextIndex, playNextLabel, primaryAction, upNextParts } from '../../core/series-detail.js';
 
 function items(ids) { return ids.map(function(id) { return { video: { id: id, durationSec: 600 } }; }); }
 
@@ -45,22 +45,43 @@ describe('playNextIndex', () => {
   });
 });
 
-// Numbered episodes carrying titles, for the label helpers.
+// Numbered episodes carrying titles + a duration, for the label/action helpers.
 function eps(specs) {
-  return specs.map(function(s) { return { episode: s.n, video: { id: s.id, title: s.title } }; });
+  return specs.map(function(s) { return { episode: s.n, video: { id: s.id, title: s.title, duration: 600 } }; });
 }
 
-describe('playNextLabel', () => {
-  var list = eps([{ n: 1, id: 'a', title: 'First Steps' }, { n: 2, id: 'b', title: 'Garden Walk' }, { n: 3, id: 'c', title: 'Breakie Grab' }]);
+var LIST = eps([{ n: 1, id: 'a', title: 'First Steps' }, { n: 2, id: 'b', title: 'Garden Walk' }, { n: 3, id: 'c', title: 'Breakie Grab' }]);
 
+describe('primaryAction', () => {
+  it('is the first episode (next) with no history', () => {
+    expect(primaryAction(LIST, {})).toEqual({ kind: 'next', index: 0 });
+  });
+  it('advances to the following episode once the last-played one is finished', () => {
+    expect(primaryAction(LIST, { a: { resumePositionSec: 0, lastPlayed: 5000 } })).toEqual({ kind: 'next', index: 1 });
+  });
+  it('continues the most-recent episode while it is mid-watch', () => {
+    expect(primaryAction(LIST, { b: { resumePositionSec: 120, lastPlayed: 5000 } })).toEqual({ kind: 'continue', index: 1 });
+  });
+  it('wraps to the first episode once the final one is finished', () => {
+    expect(primaryAction(LIST, { c: { resumePositionSec: 0, lastPlayed: 5000 } })).toEqual({ kind: 'again', index: 0 });
+  });
+  it('is none for an empty collection', () => {
+    expect(primaryAction([], {})).toEqual({ kind: 'none', index: -1 });
+  });
+});
+
+describe('playNextLabel', () => {
   it('names the first episode with no history', () => {
-    expect(playNextLabel(list, {})).toBe('Play next — "First Steps" (1)');
+    expect(playNextLabel(LIST, {})).toBe('Play next — "First Steps" (1)');
   });
-  it('names the episode after the last-played one', () => {
-    expect(playNextLabel(list, { a: { lastPlayed: 5000 } })).toBe('Play next — "Garden Walk" (2)');
+  it('names the next episode once the last-played one is finished', () => {
+    expect(playNextLabel(LIST, { a: { resumePositionSec: 0, lastPlayed: 5000 } })).toBe('Play next — "Garden Walk" (2)');
   });
-  it('reads "Start again" once the final episode is the last-played', () => {
-    expect(playNextLabel(list, { c: { lastPlayed: 5000 } })).toBe('Start again');
+  it('reads "Continue" while the most-recent episode is mid-watch', () => {
+    expect(playNextLabel(LIST, { b: { resumePositionSec: 120, lastPlayed: 5000 } })).toBe('Continue — "Garden Walk" (2)');
+  });
+  it('reads "Start again" once the final episode is finished', () => {
+    expect(playNextLabel(LIST, { c: { resumePositionSec: 0, lastPlayed: 5000 } })).toBe('Start again');
   });
   it('omits the number when a membership carries none', () => {
     var unnumbered = [{ video: { id: 'x', title: 'Bath Time' } }, { video: { id: 'y', title: 'Nap' } }];
@@ -77,35 +98,5 @@ describe('upNextParts', () => {
   });
   it('reads "Start again" at the wrapping end of a series', () => {
     expect(upNextParts(null)).toEqual({ prefix: '', label: 'Start again' });
-  });
-});
-
-describe('episodeNumOf', () => {
-  var series = { items: eps([{ n: 1, id: 'a', title: 'A' }, { n: 2, id: 'b', title: 'B' }]) };
-  it('finds the episode number for a member', () => {
-    expect(episodeNumOf(series, 'b')).toBe(2);
-  });
-  it('is null for a non-member or absent series', () => {
-    expect(episodeNumOf(series, 'z')).toBe(null);
-    expect(episodeNumOf(null, 'a')).toBe(null);
-  });
-});
-
-describe('episodeText', () => {
-  it('uses the episode title when present', () => {
-    expect(episodeText('Camping', 4)).toBe('Camping');
-  });
-  it('falls back to "Episode {N}" when the title is empty', () => {
-    expect(episodeText('', 3)).toBe('Episode 3');
-    expect(episodeText(null, 3)).toBe('Episode 3');
-  });
-});
-
-describe('playerTitle', () => {
-  it('joins series and episode for an episode', () => {
-    expect(playerTitle('Bluey', 'Camping')).toBe('Bluey · Camping');
-  });
-  it('is the bare title for a standalone film (no series)', () => {
-    expect(playerTitle(null, 'Toy Story')).toBe('Toy Story');
   });
 });

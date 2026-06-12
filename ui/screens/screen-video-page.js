@@ -5,7 +5,7 @@ import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadVideo, loadNext, loadSeries, loadProgress } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
-import { episodeNumOf, episodeText, playerTitle, upNextParts } from '../../core/series-detail.js';
+import { upNextParts } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
@@ -37,29 +37,20 @@ export function initVideoPage() {
 
   function goTo(id) { navTo('video.html', { video: id, series: seriesId, from: from }); }
 
-  // Breadcrumb trail (FEAT-021) + player big title (TASK-136): a film is
-  // Home > Title with a bare title; a series episode is Home > Series > Episode
-  // with a "{series} · {episode}" title, so both need the series title (fetched;
-  // graceful fallback to 'Series' when /api/series is unavailable).
+  // Breadcrumb trail (FEAT-021): a film is Home > Title; a series episode is
+  // Home > Series > Episode, so the series crumb needs the series title (fetched;
+  // graceful fallback to 'Series' when /api/series is unavailable). The trail's
+  // leaf carries the video title, so the player needs no separate big title.
   function mountCrumbs(videoTitle, seriesTitle) {
     mountBreadcrumb('breadcrumb', buildCrumbs('video', { seriesId: seriesId, seriesTitle: seriesTitle, videoTitle: videoTitle }));
   }
   var CRUMB_BUILD = {
     'true': function(videoTitle) {
       loadSeries(SERVER, seriesId)
-        .then(function(s) {
-          mountCrumbs(videoTitle, s.title);
-          player.setTitle(playerTitle(s.title, episodeText(videoTitle, episodeNumOf(s, videoId))));
-        })
-        .catch(function() {
-          mountCrumbs(videoTitle, 'Series');
-          player.setTitle(playerTitle('Series', videoTitle));
-        });
+        .then(function(s) { mountCrumbs(videoTitle, s.title); })
+        .catch(function() { mountCrumbs(videoTitle, 'Series'); });
     },
-    'false': function(videoTitle) {
-      mountCrumbs(videoTitle, null);
-      player.setTitle(playerTitle(null, videoTitle));
-    }
+    'false': function(videoTitle) { mountCrumbs(videoTitle, null); }
   };
   function buildVideoCrumbs(videoTitle) { CRUMB_BUILD[!!seriesId + ''](videoTitle); }
 

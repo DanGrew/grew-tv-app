@@ -237,12 +237,6 @@ export function setup(config) {
     el.appendChild(b);
   }
 
-  // Player big title — "{series} · {episode}" / bare film title. The page sets
-  // it once the series context resolves (series-detail.playerTitle).
-  function setTitle(text) {
-    document.getElementById('film-title-video').textContent = text;
-  }
-
   function clearUpNext() {
     [upnextTimer].filter(Boolean).forEach(function() { clearInterval(upnextTimer); upnextTimer = null; });
     document.getElementById('upnext-overlay').classList.add('hidden');
@@ -390,7 +384,6 @@ export function setup(config) {
     document.getElementById('video-upnext').textContent = '';
     video.src       = mediaUrl(server, record.id + '.mp4');
     setSubtitleTrack(record);
-    document.getElementById('film-title-video').textContent = record.title;
     onIntent('play', { title: record.title });
     startPlayback(startSec);
   }
@@ -475,5 +468,5 @@ export function setup(config) {
   document.getElementById('btn-upnext-cancel').addEventListener('click', cancelUpNext);
   document.getElementById('screen-video').addEventListener('click', showControls);
 
-  return { playVideo, handleVideoKey, openJumpPopup, showControls, setUpNext, setTitle, startUpNext, setSeriesMode, currentVideoDisplay, stop: stopPlayback, remote };
+  return { playVideo, handleVideoKey, openJumpPopup, showControls, setUpNext, startUpNext, setSeriesMode, currentVideoDisplay, stop: stopPlayback, remote };
 }
