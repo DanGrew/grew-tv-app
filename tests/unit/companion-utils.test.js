@@ -1,4 +1,22 @@
-import { screenPage, titleCase, skipLabel, displayTitle, displayLabel, getContentBasePath, filterByTitle, seriesIdFromSnap } from '../../core/companion-utils.js';
+import { screenPage, titleCase, skipLabel, displayTitle, displayLabel, getContentBasePath, filterByTitle, seriesIdFromSnap, tileHint } from '../../core/companion-utils.js';
+
+describe('tileHint', () => {
+  it('returns the rounded resume percent for a mid-watch item', () => {
+    expect(tileHint({ bluey: { resumePositionSec: 168 } }, { id: 'bluey', durationSec: 420 })).toBe('40%');
+  });
+  it('is blank for an item with no progress entry', () => {
+    expect(tileHint({}, { id: 'bluey', durationSec: 420 })).toBe('');
+  });
+  it('is blank for a fresh (zero-position) item', () => {
+    expect(tileHint({ bluey: { resumePositionSec: 0 } }, { id: 'bluey', durationSec: 420 })).toBe('');
+  });
+  it('is blank for a finished item (not mid-watch)', () => {
+    expect(tileHint({ bluey: { resumePositionSec: 420 } }, { id: 'bluey', durationSec: 420 })).toBe('');
+  });
+  it('tolerates a null map and a duration-less card', () => {
+    expect(tileHint(null, { id: 'x' })).toBe('');
+  });
+});
 
 describe('seriesIdFromSnap', () => {
   it('returns the series id for an episode (itemId !== episodeId)', () => {
