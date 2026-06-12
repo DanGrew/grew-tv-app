@@ -50,6 +50,18 @@ test('mid-watch episode row shows a progress bar and a Restart control', async (
   await expect(row.locator('.detail-restart')).toBeVisible();
 });
 
+test('mid-watch episode row carries a RESUME tag with the time left (TASK-136)', async ({ page }) => {
+  await page.route('**/api/continue-watching**', cwRoute(MID_WATCH));
+  await openBluey(page);
+  await expect(page.locator(`.detail-row[data-id="${EP1}"] .detail-tag`)).toHaveText('RESUME · 3:40 left');
+});
+
+test('header action reads "Continue" for a mid-watch episode (TASK-136)', async ({ page }) => {
+  await page.route('**/api/continue-watching**', cwRoute(MID_WATCH));
+  await openBluey(page);
+  await expect(page.locator('#btn-play-next')).toContainText('Continue — "Daddy Putdown" (1)');
+});
+
 test('fresh episode row has no progress bar or Restart control', async ({ page }) => {
   await openBluey(page);
   const row = page.locator('.detail-row[data-id="bluey-s1e02"]');

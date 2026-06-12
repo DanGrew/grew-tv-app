@@ -225,12 +225,15 @@ export function setup(config) {
     Backspace:  function() { stopPlayback(); }
   };
 
-  // ── autoplay "Up next" countdown overlay (true 100% end, series only) ──────
-  function setUpNext(title) {
+  // ── inline up-next line under the title (FEAT-017) ─────────────────────────
+  // prefix is the muted lead ("Up next: " mid-series, "" at the wrapping end);
+  // label is the emphasised episode title (or "Start again"). The page resolves
+  // both from the next-episode lookup (series-detail.upNextParts).
+  function setUpNext(prefix, label) {
     var el = document.getElementById('video-upnext');
-    el.textContent = 'Up next: ';
+    el.textContent = prefix;
     var b = document.createElement('b');
-    b.textContent = title;
+    b.textContent = label;
     el.appendChild(b);
   }
 
@@ -381,7 +384,6 @@ export function setup(config) {
     document.getElementById('video-upnext').textContent = '';
     video.src       = mediaUrl(server, record.id + '.mp4');
     setSubtitleTrack(record);
-    document.getElementById('film-title-video').textContent = record.title;
     onIntent('play', { title: record.title });
     startPlayback(startSec);
   }

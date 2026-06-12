@@ -125,13 +125,13 @@ describe('buildTabRails', () => {
     expect(rails[0].items.map(c => c.id)).toEqual(['bluey']);
   });
 
-  it('Home Movies -> one rail per person + an Other rail for the untagged', () => {
+  it('Home Movies -> Collections + Videos only, NO person rails (TASK-183)', () => {
     const rails = buildTabRails('home-movies', TYPED, [], {});
-    expect(rails.map(r => r.title)).toEqual(['Millie', 'Ollie', 'Other']); // A-Z incl Other
-    const byTitle = Object.fromEntries(rails.map(r => [r.title, r.items.map(c => c.id)]));
-    expect(byTitle['Millie']).toEqual(['m-park', 'm-walk']);     // both, A-Z by title (At The Park, Millie Walk)
-    expect(byTitle['Ollie']).toEqual(['m-walk']);
-    expect(byTitle['Other']).toEqual(['orphan']);
+    // TYPED home-movies are all standalone (no kind:'series') -> only a Videos
+    // rail; no person rails (home content carries no people tags).
+    expect(rails.map(r => r.title)).toEqual(['Videos']);
+    expect(rails.some(r => r.id.startsWith('person:'))).toBe(false);
+    expect(rails[0].items.map(c => c.id)).toEqual(['m-park', 'm-walk', 'orphan']); // A-Z by title
   });
 
   it('does not mutate input cards', () => {
@@ -295,5 +295,50 @@ describe('cardRoute (browse navigation, FEAT-027)', () => {
     // section routes by kind, NOT to 'album' (fails on the pre-163 code).
     expect(cardRoute({ kind: 'series', format: 'album' })).toBe('series');
     expect(cardRoute({ kind: 'video', mediaType: 'audio' })).toBe('video');
+  });
+});
+
+// TASK-183 (FEAT-025 surviving slice) — the Home Movies tab augments the person
+// rails with two structural rails: Collections (kind:'series') and Videos
+// (standalone kind:'video', last). Type-agnostic — split on card `kind`, never a
+// format/mediaType enum. These assertions fail on the pre-183 person-rails-only
+// branch (no 'collections'/'videos' rail, wrong order).
+describe('Home Movies structural rails (TASK-183)', () => {
+  // Two home-movie collections, two standalone clips, mixed person tags.
+  const HOME = [
+    { kind: 'series', id: 'holidays',  title: 'Holidays',  section: 'home-movies', people: ['millie'] },
+    { kind: 'series', id: 'birthdays', title: 'Birthdays', section: 'home-movies' },
+    { kind: 'video',  id: 'm-walk',    title: 'Millie Walk', section: 'home-movies', people: ['millie'] },
+    { kind: 'video',  id: 'park',      title: 'At The Park', section: 'home-movies' }
+  ];
+
+  it('adds a Collections rail of the kind:series cards, A-Z by title', () => {
+    const rails = buildTabRails('home-movies', HOME, [], {});
+    const collections = rails.find(r => r.id === 'collections');
+    expect(collections).toBeTruthy();
+    expect(collections.title).toBe('Collections');
+    expect(collections.items.map(c => c.id)).toEqual(['birthdays', 'holidays']); // A-Z
+  });
+
+  it('adds a Videos rail of the standalone kind:video cards, A-Z by title', () => {
+    const rails = buildTabRails('home-movies', HOME, [], {});
+    const videos = rails.find(r => r.id === 'videos');
+    expect(videos).toBeTruthy();
+    expect(videos.title).toBe('Videos');
+    expect(videos.items.map(c => c.id)).toEqual(['park', 'm-walk']); // At The Park, Millie Walk
+  });
+
+  it('orders rails Continue → Collections → Videos, with NO person rails', () => {
+    const cw = [{ item_id: 'm-walk', title: 'Millie Walk', poster: 'm.jpg', position_secs: 5, duration_secs: 30, collection_id: null, collection_title: null }];
+    const ids = buildTabRails('home-movies', HOME, cw, {}).map(r => r.id);
+    expect(ids).toEqual(['continue', 'collections', 'videos']);
+    expect(ids.some(id => id.startsWith('person:'))).toBe(false);
+  });
+
+  it('omits an empty structural rail', () => {
+    const noCollections = [{ kind: 'video', id: 'v', title: 'V', section: 'home-movies' }];
+    expect(buildTabRails('home-movies', noCollections, [], {}).some(r => r.id === 'collections')).toBe(false);
+    const noVideos = [{ kind: 'series', id: 's', title: 'S', section: 'home-movies' }];
+    expect(buildTabRails('home-movies', noVideos, [], {}).some(r => r.id === 'videos')).toBe(false);
   });
 });
