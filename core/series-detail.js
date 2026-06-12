@@ -34,3 +34,12 @@ export function playNextIndex(items, progress) {
   if (last < 0) return 0;
   return (last + 1) % its.length;
 }
+
+// The series' first item — where the player's Next / auto-advance wraps to after
+// the last episode (BUG-005: loop last->first, no stop). null when the series has
+// no items.
+export function firstItem(items) {
+  var its = items || [];
+  if (its.length === 0) return null;
+  return its[0];
+}

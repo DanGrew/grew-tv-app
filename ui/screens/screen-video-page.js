@@ -4,6 +4,7 @@ import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadVideo, loadNext, loadSeries, loadProgress } from '../../core/app-api.js';
+import { firstItem } from '../../core/series-detail.js';
 import { isMidWatch } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
@@ -52,18 +53,27 @@ export function initVideoPage() {
   };
   function buildVideoCrumbs(videoTitle) { CRUMB_BUILD[!!seriesId + ''](videoTitle); }
 
-  // Resolve the next episode, then act on it; no next (end of series) -> stop.
+  // Wrap to the series' first episode (BUG-005: loop last->first, never stop).
+  function wrapToFirst(action) {
+    loadSeries(SERVER, seriesId)
+      .then(function(s) { [firstItem(s.items)].filter(Boolean).forEach(function(n) { action(n); }); })
+      .catch(function() { player.stop(); });
+  }
+
+  // Resolve the next episode, then act on it; at the end of the series, wrap
+  // round to the first episode (BUG-005) rather than stopping.
   function loadNextThen(action) {
     loadNext(SERVER, seriesId, videoId)
       .then(function(d) {
         [d.next].filter(Boolean).forEach(function(n) { action(n); });
-        [!d.next].filter(Boolean).forEach(function() { player.stop(); });
+        [!d.next].filter(Boolean).forEach(function() { wrapToFirst(action); });
       })
       .catch(function() { player.stop(); });
   }
 
   // Autoplay at true 100% end: within a series, 5s "Up next" countdown then
-  // advance (wraps); a standalone video (or end of series) returns to origin.
+  // advance — wrapping last->first at the end of the series (BUG-005); a
+  // standalone video returns to origin.
   function advanceAuto() {
     [seriesId].filter(Boolean).forEach(function() { loadNextThen(function(n) { player.startUpNext(n.video.title, function() { goTo(n.video.id); }); }); });
     [!seriesId].filter(Boolean).forEach(function() { player.stop(); });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lastPlayedIndex, playNextIndex } from '../../core/series-detail.js';
+import { lastPlayedIndex, playNextIndex, firstItem } from '../../core/series-detail.js';
 
 function items(ids) { return ids.map(function(id) { return { video: { id: id, durationSec: 600 } }; }); }
 
@@ -42,5 +42,15 @@ describe('playNextIndex', () => {
   });
   it('returns -1 for an empty list', () => {
     expect(playNextIndex([], {})).toBe(-1);
+  });
+});
+
+describe('firstItem (BUG-005 wrap target)', () => {
+  it('returns the first item — where Next/auto-advance wraps after the last episode', () => {
+    expect(firstItem(items(['a', 'b', 'c'])).video.id).toBe('a');
+  });
+  it('returns null for an empty or absent list', () => {
+    expect(firstItem([])).toBeNull();
+    expect(firstItem(null)).toBeNull();
   });
 });

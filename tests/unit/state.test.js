@@ -159,4 +159,21 @@ describe('navTo', () => {
     navTo('video.html', { film: 'abc', item: '2' });
     expect(loc.href).toBe('video.html?film=abc&item=2');
   });
+  it('drops null/undefined params instead of serializing them (BUG-005)', () => {
+    var loc = { href: '' };
+    vi.stubGlobal('location', loc);
+    // A standalone film passes series:undefined; it must NOT become series=undefined
+    // (which getParam would read back as the truthy string "undefined").
+    navTo('video.html', { video: 'toy-story-main', from: 'browse', series: undefined });
+    expect(loc.href).toBe('video.html?video=toy-story-main&from=browse');
+    loc.href = '';
+    navTo('video.html', { video: 'bluey-s1e01', series: null });
+    expect(loc.href).toBe('video.html?video=bluey-s1e01');
+  });
+  it('keeps an empty-string param value', () => {
+    var loc = { href: '' };
+    vi.stubGlobal('location', loc);
+    navTo('browse.html', { tab: '' });
+    expect(loc.href).toBe('browse.html?tab=');
+  });
 });

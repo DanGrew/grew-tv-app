@@ -168,6 +168,11 @@ function groupRails(cards, keyer, labeler, prefix) {
 // film / home movie). Generic by design: a future audio track reads
 // "Album · Track" with no rail change. kind:'video' so selecting plays the
 // item_id (the episode itself, not its series).
+//
+// `series` carries the owning collection id (BUG-005): an episode opened from
+// this tile must launch the player WITH its series context, or Next/Prev are
+// dead (the player reads series only from the URL). null for a standalone
+// film/home-movie, which navTo then drops so it stays seriesless.
 function cwCard(row) {
   var label = row.collection_title
     ? row.collection_title + ' · ' + (row.title || '')
@@ -177,7 +182,8 @@ function cwCard(row) {
     id: row.item_id,
     title: label,
     poster: row.poster,
-    durationSec: row.duration_secs
+    durationSec: row.duration_secs,
+    series: row.collection_id
   };
 }
 

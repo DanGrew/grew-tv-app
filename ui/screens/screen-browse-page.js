@@ -97,9 +97,14 @@ export function initBrowsePage() {
   // A video card plays directly; a series card opens its detail screen. Music
   // (FEAT-027) routes by section: a 'music' card (album/playlist) opens the album
   // detail.
+  // A video card carries `series` (its owning collection) when it is a series
+  // episode — a Continue Watching tile (BUG-005). Threading it lets the player
+  // resolve series context and run Next/Prev even though the episode was opened
+  // from a tile, not the series detail. A standalone film has no `series`; navTo
+  // drops the undefined param so it stays seriesless.
   var SELECT = {
     album:  function(card) { navTo('album-detail.html', { album: card.id }); },
-    video:  function(card) { navTo('video.html', { video: card.id, from: 'browse' }); },
+    video:  function(card) { navTo('video.html', { video: card.id, from: 'browse', series: card.series }); },
     series: function(card) { navTo('detail.html', { series: card.id }); }
   };
 
@@ -122,7 +127,7 @@ export function initBrowsePage() {
       // Register CW items so a companion `select` on an in-progress tile resolves —
       // episodes are not browse cards, so add a minimal video card for any id the
       // browse catalog doesn't already hold (films keep their full browse card).
-      cw.forEach(function(r) { catalog[r.item_id] = [catalog[r.item_id]].filter(Boolean).concat([{ kind: 'video', id: r.item_id }])[0]; });
+      cw.forEach(function(r) { catalog[r.item_id] = [catalog[r.item_id]].filter(Boolean).concat([{ kind: 'video', id: r.item_id, series: r.collection_id }])[0]; });
       var labels = [browse.genreLabels].filter(Boolean).concat([{}])[0];
       // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) wins
       // over the last-visited tab; renderBrowse falls back when neither matches.

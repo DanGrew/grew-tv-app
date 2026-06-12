@@ -330,6 +330,36 @@ test('series Next button advances to the next episode immediately', async ({ pag
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
 });
 
+// BUG-005: an episode opened from a Continue Watching tile (not via the series
+// detail) used to launch with no series context, so Next/Prev were dead. The CW
+// tile now carries its owning series so the player can advance from a tile launch.
+test('Next works on an episode opened from a Continue Watching tile (BUG-005)', async ({ page }) => {
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ person: 'kids', content: [
+      { item_id: 'bluey-s1e01', title: 'Daddy Putdown', poster: 'bluey.jpg', position_secs: 200, duration_secs: 420, last_watched: '2026-06-06T00:00:00Z', collection_id: 'bluey', collection_title: 'Bluey' }
+    ] })
+  }));
+  await page.locator('#btn-kids').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  await page.locator('.rail-row[data-rail="continue"] .film-tile[data-id="bluey-s1e01"]').click();
+  // Launched WITH series context threaded from the tile (the bug: this was absent).
+  await expect(page).toHaveURL(/video\.html\?.*series=bluey/);
+  await expect(page.locator('#screen-video')).toBeVisible();
+  // Series transport is live (not a seriesless standalone) and Next advances.
+  await expect(page.locator('#btn-next')).not.toHaveClass(/hidden/);
+  await page.locator('#btn-next').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
+});
+
+// BUG-005 decision: Next at the last episode loops back to the first (no stop).
+test('Next loops last->first at the end of the series (BUG-005)', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?video=bluey-s1e03&series=bluey&from=detail');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await page.locator('#btn-next').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/);
+});
+
 test('series Prev button steps back in order (wraps)', async ({ page }) => {
   await goToSeriesEpisode(page);
   await page.locator('#btn-prev').click();
