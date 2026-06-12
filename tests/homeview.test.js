@@ -35,11 +35,14 @@ test('selecting the Films tab swaps in genre rails (A-Z), a film in each matchin
   await expect(page.locator('.rail-row[data-rail="genre:comedy"] .film-tile[data-id="toy-story-main"]')).toHaveCount(1);
 });
 
-test('Home Movies tab shows person rails', async ({ page }) => {
+test('Home Movies tab shows Collections + Videos structural rails, no person rails (TASK-183)', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
-  await expect(page.locator('.rail-title')).toHaveText(['Millie']);
-  await expect(page.locator('.rail-row[data-rail="person:millie"] .film-tile[data-id="millie-walk"]')).toHaveCount(1);
+  // millie-walk is a standalone home movie -> the Videos rail only (no series
+  // collection in the fixture, no person rails).
+  await expect(page.locator('.rail-title')).toHaveText(['Videos']);
+  await expect(page.locator('.rail-row[data-rail="videos"] .film-tile[data-id="millie-walk"]')).toHaveCount(1);
+  await expect(page.locator('.rail-row[data-rail^="person:"]')).toHaveCount(0);
 });
 
 test('each content-type tab leads with a Continue Watching rail of its in-progress items (TASK-150)', async ({ page }) => {
