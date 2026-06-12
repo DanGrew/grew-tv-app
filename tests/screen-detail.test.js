@@ -142,14 +142,19 @@ test('series video shows Up next countdown then advances on end', async ({ page 
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/, { timeout: 8000 });
 });
 
-test('last episode end returns to detail (no next)', async ({ page }) => {
+test('last episode end loops back to the first (BUG-005)', async ({ page }) => {
   await openDetail(page);
   await page.locator('.detail-row').nth(2).focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e03/);
+  // BUG-005 decision: at the end of the series Next/auto-advance wrap to the
+  // first episode (no stop, no return-to-detail). The Up next countdown shows
+  // the first episode, then it plays.
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
-  await expect(page.locator('#screen-detail')).toBeVisible();
+  await expect(page.locator('#upnext-overlay')).toBeVisible();
+  await expect(page.locator('#upnext-text')).toContainText('Daddy Putdown');
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/, { timeout: 8000 });
 });
 
 test('Escape on browse does not crash or navigate away', async ({ page }) => {

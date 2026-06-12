@@ -37,6 +37,15 @@ export function playNextIndex(items, progress) {
   return (last + 1) % its.length;
 }
 
+// The series' first item — where the player's Next / auto-advance wraps to after
+// the last episode (BUG-005: loop last->first, no stop). null when the series has
+// no items.
+export function firstItem(items) {
+  var its = items || [];
+  if (its.length === 0) return null;
+  return its[0];
+}
+
 // "(N)" episode-number suffix for the header label, blank when a membership
 // carries no number (e.g. an unnumbered home-movies collection).
 function episodeSuffix(item) {

@@ -24,9 +24,11 @@ export function initRailGridPage() {
 
   // A video card plays; a series opens its detail; a music card opens album
   // detail. cardRoute (core) picks by the server `section`, never a type enum.
+  // A CW episode tile carries `series` (its owning collection) so the player can
+  // run Next/Prev from a tile launch (BUG-005); a film has none and navTo drops it.
   var SELECT = {
     album:  function(card) { navTo('album-detail.html', { album: card.id }); },
-    video:  function(card) { navTo('video.html', { video: card.id, from: 'grid' }); },
+    video:  function(card) { navTo('video.html', { video: card.id, from: 'grid', series: card.series }); },
     series: function(card) { navTo('detail.html', { series: card.id }); }
   };
   function onSelect(card) {
@@ -82,7 +84,7 @@ export function initRailGridPage() {
       var cw = [res[1].content].filter(Boolean).concat([[]])[0];
       var cards = [browse.content].filter(Boolean).concat([[]])[0];
       cards.forEach(function(c) { catalog[c.id] = c; });
-      cw.forEach(function(r) { catalog[r.item_id] = [catalog[r.item_id]].filter(Boolean).concat([{ kind: 'video', id: r.item_id }])[0]; });
+      cw.forEach(function(r) { catalog[r.item_id] = [catalog[r.item_id]].filter(Boolean).concat([{ kind: 'video', id: r.item_id, series: r.collection_id }])[0]; });
       var labels = [browse.genreLabels].filter(Boolean).concat([{}])[0];
       var rails = buildTabRails(section, cards, cw, labels);
       var rail = [rails.filter(function(r) { return r.id === railId; })[0]].filter(Boolean).concat([{ title: '', items: [] }])[0];

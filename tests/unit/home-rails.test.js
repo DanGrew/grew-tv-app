@@ -147,6 +147,7 @@ describe('buildTabRails', () => {
     expect(films[0].id).toBe('continue');
     expect(films[0].title).toBe('Continue Watching');
     expect(films[0].items.map(c => c.id)).toEqual(['toy-story']); // film only; m-walk + episode excluded
+    expect(films[0].items[0].series).toBeNull();                  // a standalone film carries no owning series (BUG-005)
 
     const home = buildTabRails('home-movies', TYPED, CW, {});
     expect(home[0].id).toBe('continue');
@@ -161,6 +162,7 @@ describe('buildTabRails', () => {
     expect(cw.items[0].title).toBe('Bluey · Daddy Putdown');
     expect(cw.items[0].kind).toBe('video');                    // selecting plays the episode
     expect(cw.items[0].durationSec).toBe(420);                 // for the progress bar
+    expect(cw.items[0].series).toBe('bluey');                  // owning series threaded so a tile launch keeps Next/Prev (BUG-005)
   });
 
   it('keeps the backend newest-first CW order (does not re-sort A-Z)', () => {

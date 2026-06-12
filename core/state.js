@@ -95,7 +95,11 @@ export function getParam(key) {
 }
 
 export function navTo(page, params) {
-  var keys = Object.keys(params || {});
-  var qs = keys.map(function(k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
+  var p = params || {};
+  // Drop null/undefined values so an absent optional param (e.g. a film's
+  // missing `series`, BUG-005) is omitted rather than serialized as the literal
+  // string "null"/"undefined" — which getParam would then read back as truthy.
+  var keys = Object.keys(p).filter(function(k) { return p[k] != null; });
+  var qs = keys.map(function(k) { return encodeURIComponent(k) + '=' + encodeURIComponent(p[k]); }).join('&');
   location.href = [page, qs].filter(Boolean).join('?');
 }
