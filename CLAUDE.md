@@ -100,6 +100,16 @@ npm run test:unit   # vitest — unit tests for core/ (run locally)
 npm test            # playwright e2e — CI only; pre-push skips it
 ```
 
+**Running e2e from a secondary worktree — use your own port.** The Playwright
+`webServer` is a `python3 -m http.server 3456` with `reuseExistingServer` on
+(non-CI). If another worktree/session already has a server on `:3456`, your run
+**reuses it** — and that server serves the *other* worktree's files, so your
+tests (and any screenshots) silently exercise the wrong branch's code, often
+still "passing". Two worktrees running e2e at once both hit the one `:3456`
+tree. When a concurrent session may be testing, run e2e/screenshots from one
+worktree at a time, or stand up your own `python3 -m http.server <port>` in your
+worktree root and `page.goto('http://localhost:<port>/…')` with absolute URLs.
+
 ## Pre-push Hook
 
 Runs automatically on `git push`. Checks in order:
