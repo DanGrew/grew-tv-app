@@ -34,6 +34,8 @@ button { background: var(--surface); color: var(--text); border: 2.5px solid var
 button:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 button:hover { background: var(--surface-hi); }
 #detail-title { font-size: var(--fs-2xl); letter-spacing: var(--heading-ls); flex-shrink: 0; }
+#detail-meta { font-size: var(--fs-sm); color: var(--text-muted); }
+.detail-tag { font-size: var(--fs-xs); color: var(--focus); letter-spacing: 1px; margin-top: 6px; }
 .detail-header-poster { width: 200px; aspect-ratio: 16/9; object-fit: contain; background: #000; border: 2.5px solid var(--border); border-radius: var(--radius); flex-shrink: 0; }
 .detail-header-placeholder { width: 200px; aspect-ratio: 16/9; background: var(--surface-hi); border: 2.5px solid var(--border); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: var(--fs-xl); color: var(--text-muted); flex-shrink: 0; }
 #detail-list { flex: 1; overflow-y: auto; padding: 0 48px 48px; }
@@ -66,7 +68,10 @@ button:hover { background: var(--surface-hi); }
   <button id="btn-back-detail" style="font-size:var(--fs-sm);padding:12px 20px;min-width:auto">&#8592; Back</button>
   <img id="detail-header-poster" class="detail-header-poster" alt="" style="display:none">
   <div id="detail-header-placeholder" class="detail-header-placeholder" style="display:none">&#127916;</div>
-  <div id="detail-title" style="padding:0;font-size:var(--fs-2xl);flex:1"></div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+    <div id="detail-title" style="padding:0;font-size:var(--fs-2xl)"></div>
+    <div id="detail-meta"></div>
+  </div>
   <button id="btn-play-next">&#9654; Play next</button>
 </div>
 <div id="detail-list"></div>

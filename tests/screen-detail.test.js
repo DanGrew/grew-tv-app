@@ -37,6 +37,21 @@ test('detail renders all series items as rows', async ({ page }) => {
   await expect(page.locator('.detail-row')).toHaveCount(3);
 });
 
+test('detail meta line shows the type label and clip count (TASK-136)', async ({ page }) => {
+  await openDetail(page);
+  await expect(page.locator('#detail-meta')).toHaveText('Cartoons · 3 clips');
+});
+
+test('Play next button names the next episode (TASK-136)', async ({ page }) => {
+  await openDetail(page);
+  await expect(page.locator('#btn-play-next')).toContainText('Play next — "Daddy Putdown" (1)');
+});
+
+test('the play-next row carries a NEXT tag (TASK-136)', async ({ page }) => {
+  await openDetail(page);
+  await expect(page.locator('.detail-row[data-id="bluey-s1e01"] .detail-tag')).toHaveText('NEXT');
+});
+
 test('detail header shows the series poster art (TASK-121)', async ({ page }) => {
   await openDetail(page);
   await expect(page.locator('#detail-header-poster')).toHaveAttribute('src', /bluey\.jpg$/);

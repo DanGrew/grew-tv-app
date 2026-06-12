@@ -5,6 +5,7 @@ import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadVideo, loadNext, loadSeries, loadProgress } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
+import { episodeNumOf, episodeText, playerTitle, upNextParts } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
@@ -36,8 +37,9 @@ export function initVideoPage() {
 
   function goTo(id) { navTo('video.html', { video: id, series: seriesId, from: from }); }
 
-  // Breadcrumb trail (FEAT-021): a film is Home > Title; a series episode is
-  // Home > Series > Episode, so the series crumb needs the series title (fetched;
+  // Breadcrumb trail (FEAT-021) + player big title (TASK-136): a film is
+  // Home > Title with a bare title; a series episode is Home > Series > Episode
+  // with a "{series} · {episode}" title, so both need the series title (fetched;
   // graceful fallback to 'Series' when /api/series is unavailable).
   function mountCrumbs(videoTitle, seriesTitle) {
     mountBreadcrumb('breadcrumb', buildCrumbs('video', { seriesId: seriesId, seriesTitle: seriesTitle, videoTitle: videoTitle }));
@@ -45,10 +47,19 @@ export function initVideoPage() {
   var CRUMB_BUILD = {
     'true': function(videoTitle) {
       loadSeries(SERVER, seriesId)
-        .then(function(s) { mountCrumbs(videoTitle, s.title); })
-        .catch(function() { mountCrumbs(videoTitle, 'Series'); });
+        .then(function(s) {
+          mountCrumbs(videoTitle, s.title);
+          player.setTitle(playerTitle(s.title, episodeText(videoTitle, episodeNumOf(s, videoId))));
+        })
+        .catch(function() {
+          mountCrumbs(videoTitle, 'Series');
+          player.setTitle(playerTitle('Series', videoTitle));
+        });
     },
-    'false': function(videoTitle) { mountCrumbs(videoTitle, null); }
+    'false': function(videoTitle) {
+      mountCrumbs(videoTitle, null);
+      player.setTitle(playerTitle(null, videoTitle));
+    }
   };
   function buildVideoCrumbs(videoTitle) { CRUMB_BUILD[!!seriesId + ''](videoTitle); }
 
@@ -87,11 +98,13 @@ export function initVideoPage() {
     });
   }
 
-  // Prime the overlay's "Up next" line from the next episode's title.
+  // Prime the inline up-next line: the next episode's title, or "Start again" at
+  // the wrapping end of a series (upNextParts handles both). Series only — a
+  // standalone film has no up-next.
   function showUpNextLine() {
     [seriesId].filter(Boolean).forEach(function() {
       loadNext(SERVER, seriesId, videoId)
-        .then(function(d) { [d.next].filter(Boolean).forEach(function(n) { player.setUpNext(n.video.title); }); })
+        .then(function(d) { var p = upNextParts(d.next); player.setUpNext(p.prefix, p.label); })
         .catch(function() {});
     });
   }

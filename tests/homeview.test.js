@@ -536,3 +536,23 @@ test('Up next countdown is cancellable and returns to detail', async ({ page }) 
   await page.locator('#btn-upnext-cancel').click();
   await expect(page).toHaveURL(/detail\.html/);
 });
+
+test('series player big title carries the series context (TASK-136)', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#film-title-video')).toHaveText('Bluey · Daddy Putdown');
+});
+
+test('standalone film player title is the bare film name (TASK-136)', async ({ page }) => {
+  await goToVideoScreen(page);
+  await expect(page.locator('#film-title-video')).toHaveText('Toy Story');
+});
+
+test('player up-next line names the next episode (TASK-136)', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#video-upnext')).toHaveText('Up next: The Weekend');
+});
+
+test('player up-next reads "Start again" at the end of a series (TASK-136)', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?video=bluey-s1e03&series=bluey&from=detail');
+  await expect(page.locator('#video-upnext')).toHaveText('Start again');
+});

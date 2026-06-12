@@ -1,7 +1,8 @@
 import { registerScreen } from '../../core/screen-registry.js';
 import { mediaUrl } from '../../core/app-api.js';
 import { percent, isMidWatch } from '../../core/progress.js';
-import { resumeOf, episodeLabel, durationMarkup, progressBarMarkup } from '../../core/detail-view.js';
+import { resumeOf, episodeLabel, durationMarkup, progressBarMarkup, detailTagMarkup } from '../../core/detail-view.js';
+import { playNextIndex } from '../../core/series-detail.js';
 
 var DETAIL_ARROW_DELTA = { ArrowUp: -1, ArrowDown: 1 };
 var PLAY_KEYS = { Enter: true, ' ': true };
@@ -108,7 +109,7 @@ function bindRow(row, available, onPlayItem, item, i) {
   });
 }
 
-function buildRow(server, series, progress, onPlayItem, item, i) {
+function buildRow(server, series, progress, onPlayItem, item, i, isNext) {
   var video = item.video;
   var available = video.available !== false;
   var avConfig = AVAILABLE_ROW[available + ''];
@@ -126,7 +127,8 @@ function buildRow(server, series, progress, onPlayItem, item, i) {
   var thumbHtml = thumbMarkup(mediaUrl(server, posterName));
   row.innerHTML = thumbHtml +
     '<div class="detail-info"><div class="detail-label">' + episodeLabel(item) + '</div>' +
-    durationMarkup(video.duration) + progressBarMarkup(mid, percent(resume, video.duration), 'detail-progress') + '</div>';
+    durationMarkup(video.duration) + detailTagMarkup(mid, video.duration - resume, isNext) +
+    progressBarMarkup(mid, percent(resume, video.duration), 'detail-progress') + '</div>';
 
   appendRestart(row, mid, onPlayItem, item, i);
   bindRow(row, available, onPlayItem, item, i);
@@ -167,9 +169,10 @@ export function buildDetailList(server, series, progress, onPlayItem) {
   var list = document.getElementById('detail-list');
   list.innerHTML = '';
   var ctx = { lastSeason: null };
+  var nextIdx = playNextIndex(series.items, progress);
   series.items.forEach(function(item, i) {
     maybeSeasonHeader(list, item, ctx);
-    list.appendChild(buildRow(server, series, progress, onPlayItem, item, i));
+    list.appendChild(buildRow(server, series, progress, onPlayItem, item, i, i === nextIdx));
   });
 }
 

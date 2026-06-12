@@ -5,7 +5,8 @@ import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadSeries, loadContinueWatching } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
-import { playNextIndex } from '../../core/series-detail.js';
+import { playNextIndex, playNextLabel } from '../../core/series-detail.js';
+import { collectionMetaLine } from '../../core/detail-view.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
@@ -77,6 +78,8 @@ export function initDetailPage() {
       state.series = res[0];
       state.progress = progressMapFromCW(res[1].content);
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: seriesId, seriesTitle: state.series.title }));
+      document.getElementById('detail-meta').textContent = collectionMetaLine(state.series);
+      document.getElementById('btn-play-next').textContent = '▶ ' + playNextLabel(state.series.items, state.progress);
       buildDetailList(SERVER, state.series, state.progress, onPlayItem);
       focusFirstDetailRow();
     })
