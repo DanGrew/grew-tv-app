@@ -219,9 +219,9 @@ describe('music section routing (FEAT-027)', () => {
 // distinct album artist (square art borrowed from their first album), routing to
 // the artist page; albumsByArtist powers that page's filtered album grid.
 const ARTIST_MUSIC = [
-  { kind: 'series', id: 'ootb',    title: 'Out of the Blue', poster: 'ootb.jpg',    section: 'music', artist: 'ELO' },
-  { kind: 'series', id: 'time',    title: 'Time',            poster: 'time.jpg',    section: 'music', artist: 'ELO' },
-  { kind: 'series', id: 'arrival', title: 'Arrival',         poster: 'arrival.jpg', section: 'music', artist: 'ABBA' },
+  { kind: 'series', id: 'ootb',    title: 'Out of the Blue', poster: 'ootb.jpg',    section: 'music', artist: 'ELO',  tags: { year: '1977' } },
+  { kind: 'series', id: 'time',    title: 'Time',            poster: 'time.jpg',    section: 'music', artist: 'ELO',  tags: { year: '1981' } },
+  { kind: 'series', id: 'arrival', title: 'Arrival',         poster: 'arrival.jpg', section: 'music', artist: 'ABBA', tags: { year: '1976' } },
   { kind: 'series', id: 'untagged', title: 'Mix Tape',       poster: 'mix.jpg',     section: 'music' }
 ];
 
@@ -250,10 +250,21 @@ describe('Artists rail + drill-down (FEAT-029)', () => {
     expect(cardRoute({ kind: 'artist', section: 'music', artist: 'ELO' })).toBe('artist');
   });
 
-  it('albumsByArtist returns one artist’s albums A-Z by title', () => {
-    expect(albumsByArtist(ARTIST_MUSIC, 'ELO').map(c => c.id)).toEqual(['ootb', 'time']);
+  it('albumsByArtist returns one artist’s albums newest-first by year', () => {
+    expect(albumsByArtist(ARTIST_MUSIC, 'ELO').map(c => c.id)).toEqual(['time', 'ootb']); // 1981, 1977
     expect(albumsByArtist(ARTIST_MUSIC, 'ABBA').map(c => c.id)).toEqual(['arrival']);
     expect(albumsByArtist(ARTIST_MUSIC, 'Nobody')).toEqual([]);
+  });
+
+  it('albumsByArtist sorts yearless albums last, then A-Z by title', () => {
+    const mixed = [
+      { kind: 'series', id: 'a-2000', title: 'Beta',  section: 'music', artist: 'X', tags: { year: '2000' } },
+      { kind: 'series', id: 'b-none', title: 'Zed',   section: 'music', artist: 'X' },
+      { kind: 'series', id: 'c-1990', title: 'Alpha', section: 'music', artist: 'X', tags: { year: '1990' } },
+      { kind: 'series', id: 'd-none', title: 'Acme',  section: 'music', artist: 'X' }
+    ];
+    // 2000, 1990, then the two yearless A-Z (Acme, Zed).
+    expect(albumsByArtist(mixed, 'X').map(c => c.id)).toEqual(['a-2000', 'c-1990', 'd-none', 'b-none']);
   });
 });
 

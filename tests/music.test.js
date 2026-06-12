@@ -58,10 +58,11 @@ test('selecting an artist drills into a grid of just that artist’s albums; an 
   await page.locator('.film-tile[data-id="artist:ELO"]').click();
   await expect(page).toHaveURL(/artist\.html/);
   await expect(page.locator('#grid-title')).toHaveText('ELO');
-  // ELO's two albums, A-Z; ABBA's Arrival is absent.
+  // ELO's two albums, newest first by year (Time 1981 before Out of the Blue 1977);
+  // ABBA's Arrival is absent.
   const tiles = page.locator('#rail-grid .film-tile');
   await expect(tiles).toHaveCount(2);
-  await expect(tiles.locator('.tile-title')).toHaveText(['Out of the Blue', 'Time']);
+  await expect(tiles.locator('.tile-title')).toHaveText(['Time', 'Out of the Blue']);
   await expect(page.locator('#rail-grid .film-tile[data-id="abba-arrival"]')).toHaveCount(0);
   // Breadcrumb: Home › Albums › ELO.
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('ELO');

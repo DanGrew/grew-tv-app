@@ -238,11 +238,30 @@ function artistTiles(cards) {
     .sort(function(a, b) { return cmpStr(a.title, b.title); });
 }
 
-// The albums of one artist (A-Z by title), for the artist drill-down page
-// (FEAT-029). Pure so the page stays DOM-only (no-pure-fn-outside-core).
+// An album's release year as a number, from the browse card's tags.year
+// (backend exposes it on the album card). null when absent/unparseable — the
+// live app sees no year until the backend is redeployed, so those fall back to
+// title order below rather than throwing.
+function albumYear(card) {
+  var tags = card.tags || {};
+  var y = parseInt(tags.year, 10);
+  return isNaN(y) ? null : y;
+}
+
+// The albums of one artist for the artist drill-down page (FEAT-029), newest
+// first by release year, then A-Z by title (yearless albums sort last). Pure so
+// the page stays DOM-only (no-pure-fn-outside-core).
 export function albumsByArtist(cards, artist) {
   var all = (cards || []).map(withDurationSec);
-  return sortItems(all.filter(function(c) { return sectionOf(c) === 'music' && c.artist === artist; }));
+  var mine = all.filter(function(c) { return sectionOf(c) === 'music' && c.artist === artist; });
+  return mine.slice().sort(function(a, b) {
+    var ya = albumYear(a);
+    var yb = albumYear(b);
+    if (ya === yb) return cmpStr(a.title || '', b.title || '');
+    if (ya === null) return 1;
+    if (yb === null) return -1;
+    return yb - ya;
+  });
 }
 
 // The Music section's rails: Continue Listening (lead), then an Artists rail
