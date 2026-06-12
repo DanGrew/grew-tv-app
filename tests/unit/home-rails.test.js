@@ -125,9 +125,11 @@ describe('buildTabRails', () => {
     expect(rails[0].items.map(c => c.id)).toEqual(['bluey']);
   });
 
-  it('Home Movies -> one rail per person + an Other rail for the untagged', () => {
+  it('Home Movies -> one rail per person + an Other rail for the untagged (kept under TASK-183 augment)', () => {
     const rails = buildTabRails('home-movies', TYPED, [], {});
-    expect(rails.map(r => r.title)).toEqual(['Millie', 'Ollie', 'Other']); // A-Z incl Other
+    // TYPED home-movies are all standalone (no kind:'series') -> no Collections
+    // rail; a trailing Videos rail (TASK-183) follows the person rails.
+    expect(rails.map(r => r.title)).toEqual(['Millie', 'Ollie', 'Other', 'Videos']); // person rails A-Z, then Videos last
     const byTitle = Object.fromEntries(rails.map(r => [r.title, r.items.map(c => c.id)]));
     expect(byTitle['Millie']).toEqual(['m-park', 'm-walk']);     // both, A-Z by title (At The Park, Millie Walk)
     expect(byTitle['Ollie']).toEqual(['m-walk']);
@@ -293,5 +295,62 @@ describe('cardRoute (browse navigation, FEAT-027)', () => {
     // section routes by kind, NOT to 'album' (fails on the pre-163 code).
     expect(cardRoute({ kind: 'series', format: 'album' })).toBe('series');
     expect(cardRoute({ kind: 'video', mediaType: 'audio' })).toBe('video');
+  });
+});
+
+// TASK-183 (FEAT-025 surviving slice) — the Home Movies tab augments the person
+// rails with two structural rails: Collections (kind:'series') and Videos
+// (standalone kind:'video', last). Type-agnostic — split on card `kind`, never a
+// format/mediaType enum. These assertions fail on the pre-183 person-rails-only
+// branch (no 'collections'/'videos' rail, wrong order).
+describe('Home Movies structural rails (TASK-183)', () => {
+  // Two home-movie collections, two standalone clips, mixed person tags.
+  const HOME = [
+    { kind: 'series', id: 'holidays',  title: 'Holidays',  section: 'home-movies', people: ['millie'] },
+    { kind: 'series', id: 'birthdays', title: 'Birthdays', section: 'home-movies' },
+    { kind: 'video',  id: 'm-walk',    title: 'Millie Walk', section: 'home-movies', people: ['millie'] },
+    { kind: 'video',  id: 'park',      title: 'At The Park', section: 'home-movies' }
+  ];
+
+  it('adds a Collections rail of the kind:series cards, A-Z by title', () => {
+    const rails = buildTabRails('home-movies', HOME, [], {});
+    const collections = rails.find(r => r.id === 'collections');
+    expect(collections).toBeTruthy();
+    expect(collections.title).toBe('Collections');
+    expect(collections.items.map(c => c.id)).toEqual(['birthdays', 'holidays']); // A-Z
+  });
+
+  it('adds a Videos rail of the standalone kind:video cards, A-Z by title', () => {
+    const rails = buildTabRails('home-movies', HOME, [], {});
+    const videos = rails.find(r => r.id === 'videos');
+    expect(videos).toBeTruthy();
+    expect(videos.title).toBe('Videos');
+    expect(videos.items.map(c => c.id)).toEqual(['park', 'm-walk']); // At The Park, Millie Walk
+  });
+
+  it('orders rails Continue → Collections → person rails → Videos (Videos last)', () => {
+    const cw = [{ item_id: 'm-walk', title: 'Millie Walk', poster: 'm.jpg', position_secs: 5, duration_secs: 30, collection_id: null, collection_title: null }];
+    const ids = buildTabRails('home-movies', HOME, cw, {}).map(r => r.id);
+    expect(ids[0]).toBe('continue');
+    expect(ids[1]).toBe('collections');
+    expect(ids[ids.length - 1]).toBe('videos');
+    const collectionsAt = ids.indexOf('collections');
+    const videosAt = ids.indexOf('videos');
+    const personIdxs = ids.map((id, i) => id.startsWith('person:') ? i : -1).filter(i => i >= 0);
+    expect(personIdxs.length).toBeGreaterThan(0);                 // augment, not replace
+    expect(Math.min(...personIdxs)).toBeGreaterThan(collectionsAt); // Collections before person rails
+    expect(Math.max(...personIdxs)).toBeLessThan(videosAt);         // Videos after person rails
+  });
+
+  it('keeps the person rails (augment, not replace)', () => {
+    const titles = buildTabRails('home-movies', HOME, [], {}).map(r => r.title);
+    expect(titles).toContain('Millie'); // person rail still present
+  });
+
+  it('omits an empty structural rail', () => {
+    const noCollections = [{ kind: 'video', id: 'v', title: 'V', section: 'home-movies' }];
+    expect(buildTabRails('home-movies', noCollections, [], {}).some(r => r.id === 'collections')).toBe(false);
+    const noVideos = [{ kind: 'series', id: 's', title: 'S', section: 'home-movies' }];
+    expect(buildTabRails('home-movies', noVideos, [], {}).some(r => r.id === 'videos')).toBe(false);
   });
 });

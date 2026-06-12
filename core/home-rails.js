@@ -241,17 +241,27 @@ export function buildTabs(cards) {
 
 // The rails for one section tab: a leading Continue Watching rail (this section's
 // in-progress items, from cwRows) then the content rails — genre rails for
-// Series/Films, person rails for Home Movies, the Albums rail for Music.
-// Box-sets (Films) are split into their own leading "Box Sets" rail and kept out
-// of the genre rows. genreLabels maps genre slugs to display names.
+// Series/Films, the Albums rail for Music. Box-sets (Films) are split into their
+// own leading "Box Sets" rail and kept out of the genre rows. genreLabels maps
+// genre slugs to display names.
+//
+// Home Movies (TASK-183, FEAT-025) augments the person rails with two structural
+// rails: Continue Watching -> Collections (kind:'series') -> person rails ->
+// Videos (standalone kind:'video', last). A card can appear in both a structural
+// rail and a person rail (augment, not replace); each structural rail is A-Z and
+// omitted when empty.
 export function buildTabRails(sectionId, cards, cwRows, genreLabels) {
   var all = (cards || []).map(withDurationSec);
   var byId = cardIndex(all);
   if (sectionId === 'music') return musicRails(all, cwRows, byId);
   var inTab = all.filter(function(c) { return sectionOf(c) === sectionId; });
   if (sectionId === 'home-movies') {
+    var collections = inTab.filter(function(c) { return c.kind === 'series'; });
+    var standalones = inTab.filter(function(c) { return (c.kind || 'video') === 'video'; });
     return continueRail(sectionId, cwRows, byId)
-      .concat(groupRails(inTab, peopleOf, titleCase, 'person:'));
+      .concat(simpleRail('collections', 'Collections', collections))
+      .concat(groupRails(inTab, peopleOf, titleCase, 'person:'))
+      .concat(simpleRail('videos', 'Videos', standalones));
   }
   var boxsets = inTab.filter(isBoxset);
   var rest = inTab.filter(function(c) { return !isBoxset(c); });
