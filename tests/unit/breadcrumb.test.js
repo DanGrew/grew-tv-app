@@ -37,6 +37,14 @@ describe('buildCrumbs', () => {
     expect(crumbs[2]).toMatchObject({ label: 'Preschool', current: true });
   });
 
+  it('artist is Home > Albums (clickable, ?tab=music) > Artist leaf (FEAT-029)', () => {
+    var crumbs = buildCrumbs('artist', { artistName: 'ELO' });
+    expect(crumbs).toHaveLength(3);
+    expect(crumbs[0]).toMatchObject({ label: 'Home', page: 'browse.html', current: false });
+    expect(crumbs[1]).toMatchObject({ label: 'Albums', page: 'browse.html', params: { tab: 'music' }, current: false });
+    expect(crumbs[2]).toMatchObject({ label: 'ELO', current: true });
+  });
+
   it('unknown screen yields an empty trail', () => {
     expect(buildCrumbs('mystery')).toEqual([]);
   });

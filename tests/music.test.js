@@ -29,15 +29,58 @@ test('a Music tab (titled Albums) appears after the video tabs, only when music 
   await expect(page.locator('.sidebar-tab')).toHaveText(['Series', 'Films', 'Home Movies', 'Albums']);
 });
 
-test('Music tab shows a single Albums rail with square (music) tiles, no Singles rail', async ({ page }) => {
+test('Music tab shows an Artists rail then an Albums rail with square (music) tiles, no Singles rail', async ({ page }) => {
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="music"]').click();
-  await expect(page.locator('.rail-title')).toHaveText(['Albums']);
+  await expect(page.locator('.rail-title')).toHaveText(['Artists', 'Albums']);
   // Album = series card with section "music" (square art via data-music); "3 tracks" sub.
   const album = page.locator('.rail-row[data-rail="albums"] .film-tile[data-id="ootb"]');
   await expect(album).toHaveCount(1);
   await expect(album).toHaveAttribute('data-music', '');
   await expect(album.locator('.tile-sub')).toHaveText('3 tracks');
+});
+
+test('Artists rail has one square tile per artist (A-Z), labelled with the album count (FEAT-029)', async ({ page }) => {
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  const tiles = page.locator('.rail-row[data-rail="artists"] .film-tile');
+  await expect(tiles).toHaveCount(2); // ABBA, ELO
+  await expect(tiles.locator('.tile-title')).toHaveText(['ABBA', 'ELO']); // A-Z
+  const elo = page.locator('.rail-row[data-rail="artists"] .film-tile[data-id="artist:ELO"]');
+  await expect(elo).toHaveAttribute('data-music', ''); // square art
+  await expect(elo.locator('.tile-sub')).toHaveText('2 albums');
+  await expect(page.locator('.film-tile[data-id="artist:ABBA"] .tile-sub')).toHaveText('1 album');
+});
+
+test('selecting an artist drills into a grid of just that artist’s albums; an album opens its detail', async ({ page }) => {
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="artist:ELO"]').click();
+  await expect(page).toHaveURL(/artist\.html/);
+  await expect(page.locator('#grid-title')).toHaveText('ELO');
+  // ELO's two albums, A-Z; ABBA's Arrival is absent.
+  const tiles = page.locator('#rail-grid .film-tile');
+  await expect(tiles).toHaveCount(2);
+  await expect(tiles.locator('.tile-title')).toHaveText(['Out of the Blue', 'Time']);
+  await expect(page.locator('#rail-grid .film-tile[data-id="abba-arrival"]')).toHaveCount(0);
+  // Breadcrumb: Home › Albums › ELO.
+  await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('ELO');
+  await page.locator('#rail-grid .film-tile[data-id="ootb"]').click();
+  await expect(page).toHaveURL(/album-detail\.html/);
+  await expect(page.locator('#detail-title')).toHaveText('Out of the Blue');
+});
+
+test('Back from an artist page returns to the Music tab', async ({ page }) => {
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="artist:ELO"]').click();
+  await expect(page).toHaveURL(/artist\.html/);
+  // Wait for the page module to register its key handlers (the grid render is the
+  // ready signal) before the Backspace, else it races the navigation.
+  await expect(page.locator('#grid-title')).toHaveText('ELO');
+  await page.keyboard.press('Backspace');
+  await expect(page).toHaveURL(/tab=music/);
+  await expect(page.locator('.rail-row[data-rail="artists"]')).toBeVisible();
 });
 
 test('albums route to the album detail (not series detail)', async ({ page }) => {

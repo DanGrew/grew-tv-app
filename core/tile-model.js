@@ -40,11 +40,12 @@ export function tileModel(card, ctx) {
   // "clips") sub-label. Type-agnostic — no `format`/`mediaType` enum.
   var music = card.section === 'music';
 
-  // Series sub-label: clip/track count from the v3 browse card (backend
+  // Sub-label: an explicit `subLabel` wins (FEAT-029 artist tiles carry their own
+  // "N albums"); else a series' clip/track count from the v3 browse card (backend
   // `clipCount`). Absent (video cards, or older backend without the field) -> no
   // sub-label. An album counts in "tracks".
-  var sub = null;
-  if (kind === 'series' && card.clipCount != null) {
+  var sub = card.subLabel || null;
+  if (!sub && kind === 'series' && card.clipCount != null) {
     var noun = music ? ' tracks' : ' clips';
     sub = card.clipCount === 1 ? '1' + (music ? ' track' : ' clip') : card.clipCount + noun;
   }

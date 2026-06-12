@@ -1,4 +1,4 @@
-import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, albumsByArtist } from '../../core/home-rails.js';
 
 const cards = [
   { kind: 'video', id: 'film-a', title: 'A', duration: 600 },
@@ -208,10 +208,52 @@ describe('music section routing (FEAT-027)', () => {
     expect(buildTabRails('films', MUSIC, [], {}).some(r => r.items.some(c => c.id === 'ootb'))).toBe(false);
   });
 
-  it('Music tab -> a single Albums rail (A-Z), no Singles rail', () => {
+  it('Music tab -> an Artists rail then an Albums rail (A-Z), no Singles rail', () => {
     const rails = buildTabRails('music', MUSIC, [], {});
-    expect(rails.map(r => r.id)).toEqual(['albums']);
-    expect(rails[0].items.map(c => c.id)).toEqual(['ootb', 'rumours']); // A-Z: Out of the Blue, Rumours
+    expect(rails.map(r => r.id)).toEqual(['artists', 'albums']);
+    expect(rails[1].items.map(c => c.id)).toEqual(['ootb', 'rumours']); // A-Z: Out of the Blue, Rumours
+  });
+});
+
+// FEAT-029 — the Music tab's Artists rail + the artist drill-down. One tile per
+// distinct album artist (square art borrowed from their first album), routing to
+// the artist page; albumsByArtist powers that page's filtered album grid.
+const ARTIST_MUSIC = [
+  { kind: 'series', id: 'ootb',    title: 'Out of the Blue', poster: 'ootb.jpg',    section: 'music', artist: 'ELO' },
+  { kind: 'series', id: 'time',    title: 'Time',            poster: 'time.jpg',    section: 'music', artist: 'ELO' },
+  { kind: 'series', id: 'arrival', title: 'Arrival',         poster: 'arrival.jpg', section: 'music', artist: 'ABBA' },
+  { kind: 'series', id: 'untagged', title: 'Mix Tape',       poster: 'mix.jpg',     section: 'music' }
+];
+
+describe('Artists rail + drill-down (FEAT-029)', () => {
+  it('builds one tile per distinct artist, A-Z, with square art and an "N albums" label', () => {
+    const artists = buildTabRails('music', ARTIST_MUSIC, [], {}).find(r => r.id === 'artists');
+    expect(artists.items.map(c => c.title)).toEqual(['ABBA', 'ELO']); // A-Z
+    const elo = artists.items.find(c => c.artist === 'ELO');
+    expect(elo.kind).toBe('artist');
+    expect(elo.id).toBe('artist:ELO');
+    expect(elo.section).toBe('music'); // square art
+    expect(elo.subLabel).toBe('2 albums');
+    expect(elo.poster).toBe('ootb.jpg'); // first album A-Z (Out of the Blue < Time)
+    expect(artists.items.find(c => c.artist === 'ABBA').subLabel).toBe('1 album');
+  });
+
+  it('omits albums with no artist from the Artists rail (they stay in the Albums rail)', () => {
+    const rails = buildTabRails('music', ARTIST_MUSIC, [], {});
+    const artists = rails.find(r => r.id === 'artists');
+    const albums = rails.find(r => r.id === 'albums');
+    expect(artists.items.some(c => c.artist == null)).toBe(false);
+    expect(albums.items.map(c => c.id)).toContain('untagged');
+  });
+
+  it('an artist tile routes to the artist drill-down (not album detail)', () => {
+    expect(cardRoute({ kind: 'artist', section: 'music', artist: 'ELO' })).toBe('artist');
+  });
+
+  it('albumsByArtist returns one artist’s albums A-Z by title', () => {
+    expect(albumsByArtist(ARTIST_MUSIC, 'ELO').map(c => c.id)).toEqual(['ootb', 'time']);
+    expect(albumsByArtist(ARTIST_MUSIC, 'ABBA').map(c => c.id)).toEqual(['arrival']);
+    expect(albumsByArtist(ARTIST_MUSIC, 'Nobody')).toEqual([]);
   });
 });
 

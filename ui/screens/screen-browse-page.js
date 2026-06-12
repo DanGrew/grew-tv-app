@@ -98,6 +98,7 @@ export function initBrowsePage() {
   // (FEAT-027) routes by section: a 'music' card (album/playlist) opens the album
   // detail.
   var SELECT = {
+    artist: function(card) { navTo('artist.html', { artist: card.artist }); },
     album:  function(card) { navTo('album-detail.html', { album: card.id }); },
     video:  function(card) { navTo('video.html', { video: card.id, from: 'browse' }); },
     series: function(card) { navTo('detail.html', { series: card.id }); }

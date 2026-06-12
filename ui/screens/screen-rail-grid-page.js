@@ -25,6 +25,7 @@ export function initRailGridPage() {
   // A video card plays; a series opens its detail; a music card opens album
   // detail. cardRoute (core) picks by the server `section`, never a type enum.
   var SELECT = {
+    artist: function(card) { navTo('artist.html', { artist: card.artist }); },
     album:  function(card) { navTo('album-detail.html', { album: card.id }); },
     video:  function(card) { navTo('video.html', { video: card.id, from: 'grid' }); },
     series: function(card) { navTo('detail.html', { series: card.id }); }

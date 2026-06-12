@@ -35,8 +35,14 @@ const SERIES = {
 // there is no audio-single card here. Kept out of the default BROWSE so the
 // video-only tests still see exactly Series/Films/Home Movies; the music e2e
 // overrides /api/browse to append these.
+// Three albums across two artists (ELO x2, ABBA x1) so the FEAT-029 Artists rail
+// shows multiple tiles and the artist drill-down can be filtered. Only `ootb`
+// has a resolvable /api/album detail (ALBUMS below); the others exist to populate
+// the Artists/Albums rails and the drill-down grid.
 const MUSIC_CARDS = [
-  { kind: 'series', id: 'ootb', title: 'Out of the Blue', poster: 'ootb.jpg', type: null, section: 'music', artist: 'ELO', clipCount: 3 }
+  { kind: 'series', id: 'ootb',         title: 'Out of the Blue', poster: 'ootb.jpg',    type: null, section: 'music', artist: 'ELO',  clipCount: 3 },
+  { kind: 'series', id: 'elo-time',     title: 'Time',            poster: 'time.jpg',    type: null, section: 'music', artist: 'ELO',  clipCount: 2 },
+  { kind: 'series', id: 'abba-arrival', title: 'Arrival',         poster: 'arrival.jpg', type: null, section: 'music', artist: 'ABBA', clipCount: 2 }
 ];
 
 const ALBUMS = {

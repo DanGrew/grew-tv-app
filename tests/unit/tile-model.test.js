@@ -81,6 +81,15 @@ describe('tileModel — music (FEAT-027)', () => {
     expect(tileModel({ kind: 'series', id: 's', section: 'music', clipCount: 1 }, {}).sub).toBe('1 track');
   });
 
+  it('an explicit subLabel wins over clipCount (FEAT-029 artist tile carries "N albums")', () => {
+    const artist = tileModel({ kind: 'artist', id: 'artist:ELO', section: 'music', subLabel: '2 albums' }, {});
+    expect(artist.sub).toBe('2 albums');
+    expect(artist.music).toBe(true); // square art, like an album tile
+    expect(artist.showBar).toBe(false); // an artist tile is never mid-watch
+    // subLabel also overrides a clipCount if both are present.
+    expect(tileModel({ kind: 'series', id: 's', section: 'music', clipCount: 3, subLabel: '5 albums' }, {}).sub).toBe('5 albums');
+  });
+
   it('a non-music section is not flagged music (counts in "clips")', () => {
     const m = tileModel({ kind: 'series', id: 'bluey', section: 'series', clipCount: 3 }, {});
     expect(m.music).toBe(false);
