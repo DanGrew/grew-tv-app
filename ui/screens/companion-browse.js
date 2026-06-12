@@ -1,159 +1,232 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadBrowse, loadContinueWatching, mediaUrl } from '../../core/app-api.js';
-import { screenPage, filterByTitle } from '../../core/companion-utils.js';
+import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
+import { screenPage, filterByTitle, tileHint } from '../../core/companion-utils.js';
+import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 
-// Companion Home (TASK-117 + FEAT-020/TASK-139): a content-type tab strip
-// (Continue / Series / Films / Home Movies) mirroring the app, each tab showing
-// that type's rails — genre rails for Series/Films, person rails for Home
-// Movies, the resume feed for Continue — built from the SAME shared
-// core/home-rails helpers so app and companion group/order identically. Search
-// spans the full catalog (flat grid) and takes over while typing. Tapping a
-// tile sends `select`, teleporting the TV.
+// FEAT-028 / TASK-168 — companion drill-down browse (replaces the flat
+// FEAT-020/TASK-139 tab + all-rails + flat-search layout). The companion walks
+// four levels — Sections -> Rails -> Grid -> Item — one at a time, TV-led: every
+// tap funnels through navigate(), which BOTH emits the existing FEAT-017
+// `navigate` intent (the app teleports the TV + echoes context — no new
+// protocol) AND optimistically applies the matching local drill, so the view
+// re-renders now and never waits a LAN round-trip per tap. The section + rail
+// chip rows persist as the breadcrumb (chips = trail); tapping a different chip
+// is a sideways jump, Back collapses exactly one level. Tiles are bare text
+// labels — zero <img>, so ~0 image requests (posters live on the TV, fixing the
+// poster-concurrency "half-loaded" issue). Section + rail chip lists come from
+// the SAME shared core/home-rails helpers the app groups by, so the two surfaces
+// never drift. L4 (item detail/transport) is the existing companion screen,
+// reached when the app echoes the item context after a tile `select`.
+
+// Which rows + Back show at each level. Sections is the root (no Back).
+var LEVEL_VIEW = {
+  sections: { rails: 'none', grid: 'none', back: 'none' },
+  rails:    { rails: '',     grid: 'none', back: '' },
+  grid:     { rails: '',     grid: '',     back: '' }
+};
+
+// A picked section opens its rails; no section is the root sections level.
+var SECTION_LEVEL = { true: 'rails', false: 'sections' };
+
+// Contexts whose screen lives INSIDE this drill page (companion stays put);
+// anything else is a real page change the companion follows.
+var DRILL_CTX = { browse: true, 'rail-grid': true };
+
 export function initPage() {
   var host = window.location.hostname;
   var server = 'http://' + host + ':8765';
   var els = {
     connStatus: document.getElementById('conn-status'),
     search: document.getElementById('search'),
-    tabs: document.getElementById('tabs'),
-    railsSection: document.getElementById('rails-section'),
-    rails: document.getElementById('rails'),
-    searchSection: document.getElementById('search-section'),
-    grid: document.getElementById('grid'),
-    empty: document.getElementById('empty')
+    drill: document.getElementById('drill'),
+    sectionsRow: document.getElementById('sections-row'),
+    railsWrap: document.getElementById('rails-wrap'),
+    railsRow: document.getElementById('rails-row'),
+    gridWrap: document.getElementById('grid-wrap'),
+    gridCount: document.getElementById('grid-count'),
+    txtgrid: document.getElementById('txtgrid'),
+    back: document.getElementById('btn-back')
   };
-  var state = { profile: null, person: null, cards: [], cw: [], labels: {}, query: '', activeTab: null };
+  var state = {
+    profile: null, person: null,
+    cards: [], cw: [], labels: {}, progress: {},
+    query: '', level: 'sections', section: null, rail: null
+  };
   var api = {};
   var updateBar = null;
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
 
-  // While the companion targets no live screen, hide the (empty) browse content
-  // and let the screen chooser take over — never a blank grid (TASK-179 A2,
-  // BUG-013). It returns the moment a screen is (re)bound.
-  function setBound(bound) {
-    var disp = ({ true: '', false: 'none' })[bound];
-    els.search.style.display = disp;
-    els.tabs.style.display = disp;
-    document.getElementById('scroll').style.display = disp;
-  }
-
-  // Breadcrumb trail (FEAT-021): Home is the root — a single inert crumb.
-  function noNav() {}
-  mountCompanionBreadcrumb('breadcrumb', buildCrumbs('browse'), noNav);
-
-  function tap(card) { api.sendIntent('select', { id: card.id }); }
-
-  // Poster <img> with a load-failure fallback: a missing/abortive poster hides
-  // the image instead of showing a broken icon (matches the app's tile.js and
-  // companion-profile). loading="lazy" keeps off-screen rail posters from all
-  // firing at once and saturating the browser's per-origin connection cap.
-  function posterImg(poster) {
-    var img = document.createElement('img');
-    img.alt = '';
-    img.loading = 'lazy';
-    var src = mediaUrl(server, poster);
-    ({
-      true: function() {
-        img.src = src;
-        img.addEventListener('error', function() { img.style.display = 'none'; });
-      },
-      false: function() { img.style.display = 'none'; }
-    })[String(!!src)]();
-    return img;
-  }
-
-  function tile(card, poster) {
-    var btn = document.createElement('button');
-    btn.className = 'tile-btn';
-    btn.setAttribute('data-id', card.id);
-    btn.appendChild(posterImg(poster));
-    var span = document.createElement('span');
-    span.textContent = [card.title].filter(Boolean).concat([card.id])[0];
-    btn.appendChild(span);
-    btn.addEventListener('click', function() { tap(card); });
-    return btn;
-  }
-
-  function railRow(rail) {
-    var section = document.createElement('div');
-    section.className = 'c-rail';
-    var h = document.createElement('div');
-    h.className = 'section-title';
-    h.textContent = rail.title;
-    section.appendChild(h);
-    var row = document.createElement('div');
-    row.className = 'c-rail-row';
-    row.setAttribute('data-rail', rail.id);
-    rail.items.forEach(function(card) { row.appendChild(tile(card, card.poster)); });
-    section.appendChild(row);
-    return section;
-  }
-
-  function renderRails() {
-    els.rails.innerHTML = '';
-    var rails = buildTabRails(state.activeTab, state.cards, state.cw, state.labels);
-    rails.forEach(function(rail) { els.rails.appendChild(railRow(rail)); });
-  }
-
-  function markTab() {
-    Array.from(els.tabs.children).forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === state.activeTab); });
-  }
-
-  function selectTab(id) {
-    state.activeTab = id;
-    markTab();
-    renderRails();
-  }
-
-  function tabButton(tab) {
+  function chip(text) {
     var b = document.createElement('button');
-    b.className = 'c-tab';
-    b.setAttribute('data-tab', tab.id);
-    b.textContent = tab.title;
-    b.addEventListener('click', function() { selectTab(tab.id); });
+    b.className = 'chip';
+    b.textContent = text;
     return b;
   }
 
-  function renderTabs() {
-    els.tabs.innerHTML = '';
-    var tabs = buildTabs(state.cards);
-    tabs.forEach(function(t) { els.tabs.appendChild(tabButton(t)); });
-    selectTab([tabs[0]].filter(Boolean).map(function(t) { return t.id; }).concat(['films'])[0]);
+  function sectionChip(s) {
+    var c = chip(s.title);
+    c.setAttribute('data-section', s.id);
+    c.classList.toggle('active', s.id === state.section);
+    // Other sections dim once one is active (mockup L2/L3 breadcrumb styling).
+    c.classList.toggle('dim', [state.section].filter(Boolean).filter(function(other) { return other !== s.id; }).length > 0);
+    c.addEventListener('click', function() { selectSection(s.id); });
+    return c;
   }
 
-  function renderSearch() {
-    els.grid.innerHTML = '';
-    var shown = filterByTitle(state.cards, state.query);
-    els.empty.style.display = ({ true: 'none', false: 'block' })[shown.length > 0];
-    shown.forEach(function(card) { els.grid.appendChild(tile(card, card.poster)); });
+  function railChip(r) {
+    var c = chip(r.title);
+    c.setAttribute('data-rail', r.id);
+    c.classList.toggle('active', r.id === state.rail);
+    c.addEventListener('click', function() { selectRail(r.id); });
+    return c;
   }
 
-  // Search takes over the view while typing; otherwise the tab strip + rails.
-  function applyView() {
-    var searching = !!state.query.trim();
-    els.searchSection.style.display = ({ true: 'block', false: 'none' })[searching];
-    els.railsSection.style.display = ({ true: 'none', false: 'block' })[searching];
-    ({ true: renderSearch, false: renderRails })[searching]();
+  function railList() { return buildTabRails(state.section, state.cards, state.cw, state.labels); }
+
+  // The picked rail (its tiles), or an empty stand-in so callers stay branch-free.
+  function activeRail() {
+    return [railList().filter(function(r) { return r.id === state.rail; })[0]]
+      .filter(Boolean).concat([{ title: '', items: [] }])[0];
   }
 
-  // Render ONCE after both browse + continue-watching settle. Rendering on each
-  // callback separately tore the whole tile tree down and rebuilt it twice,
-  // aborting and re-issuing every poster request mid-flight — the cause of
-  // posters intermittently failing to load on the companion (the app renders
-  // once and never hit this). Either fetch failing degrades to an empty set.
+  // Bare text-label tile: title + an optional resume-percent badge, no poster.
+  function txtTile(card) {
+    var hint = tileHint(state.progress, card);
+    var el = document.createElement('button');
+    el.className = 'ph-txt';
+    el.setAttribute('data-id', card.id);
+    el.classList.toggle('prog', Boolean(hint));
+    var nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = [card.title].filter(Boolean).concat([card.id])[0];
+    el.appendChild(nm);
+    [hint].filter(Boolean).forEach(function(h) {
+      var b = document.createElement('span');
+      b.className = 'pct';
+      b.textContent = h;
+      el.appendChild(b);
+    });
+    el.addEventListener('click', function() { openItem(card); });
+    return el;
+  }
+
+  function renderSections() {
+    els.sectionsRow.innerHTML = '';
+    filterByTitle(buildTabs(state.cards), state.query).forEach(function(s) { els.sectionsRow.appendChild(sectionChip(s)); });
+  }
+
+  function renderRails() {
+    els.railsRow.innerHTML = '';
+    filterByTitle(railList(), state.query).forEach(function(r) { els.railsRow.appendChild(railChip(r)); });
+  }
+
+  function renderGrid() {
+    els.txtgrid.innerHTML = '';
+    var items = filterByTitle(activeRail().items, state.query);
+    els.gridCount.textContent = items.length + ' items';
+    items.forEach(function(c) { els.txtgrid.appendChild(txtTile(c)); });
+  }
+
+  function sectionTitle() {
+    return [buildTabs(state.cards).filter(function(t) { return t.id === state.section; })[0]]
+      .filter(Boolean).map(function(t) { return t.title; }).concat([state.section])[0];
+  }
+
+  function railTitle() { return [activeRail().title].filter(Boolean).concat([''])[0]; }
+
+  // The FEAT-021 trail, per level: Home (sections) -> Home > Section (rails) ->
+  // Home > Section > Rail (grid). Reuses core/breadcrumb.js so it styles + wires
+  // for free (a crumb tap routes back through navigate()).
+  function crumbModel() {
+    var ctx = { sectionId: state.section, sectionTitle: sectionTitle(), railTitle: railTitle() };
+    var BY_LEVEL = {
+      sections: function() { return buildCrumbs('browse'); },
+      rails:    function() { return buildCrumbs('detail', { seriesTitle: sectionTitle() }); },
+      grid:     function() { return buildCrumbs('rail-grid', ctx); }
+    };
+    return BY_LEVEL[state.level]();
+  }
+
+  function applyLevel() {
+    var v = LEVEL_VIEW[state.level];
+    els.railsWrap.style.display = v.rails;
+    els.gridWrap.style.display = v.grid;
+    els.back.style.display = v.back;
+  }
+
+  function render() {
+    applyLevel();
+    renderSections();
+    renderRails();
+    renderGrid();
+    mountCompanionBreadcrumb('breadcrumb', crumbModel(), navigate);
+  }
+
+  // The single funnel for every drill move: emit the FEAT-017 `navigate` intent
+  // (drives + mirrors the TV) AND optimistically apply the matching local drill,
+  // so the companion re-renders now and never blocks on the LAN echo.
+  function navigate(page, params) {
+    api.sendIntent('navigate', { page: page, params: params });
+    localApply(page, params);
+  }
+
+  function applyDrill(tab) {
+    state.section = [tab].filter(Boolean).concat([null])[0];
+    state.rail = null;
+    state.level = SECTION_LEVEL[Boolean(tab)];
+    render();
+  }
+
+  function applyGrid(section, rail) {
+    state.section = section;
+    state.rail = rail;
+    state.level = 'grid';
+    render();
+  }
+
+  function localApply(page, params) {
+    var TARGET = {
+      'browse.html':    function() { applyDrill(params.tab); },
+      'rail-grid.html': function() { applyGrid(params.section, params.rail); }
+    };
+    [TARGET[page]].filter(Boolean).forEach(function(fn) { fn(); });
+  }
+
+  function selectSection(id) { navigate('browse.html', { tab: id }); }
+  function selectRail(id) { navigate('rail-grid.html', { section: state.section, rail: id }); }
+
+  // Tapping a tile sends `select`; the app's rail-grid page routes it to the
+  // item's detail/player and echoes the new context, which onContext follows to
+  // the existing companion L4 screen (no redesign).
+  function openItem(card) { api.sendIntent('select', { id: card.id }); }
+
+  // Back collapses exactly one level: grid -> its section's rails, rails -> the
+  // root sections. Each step drives the TV through the same navigate() funnel.
+  function back() {
+    var BACK = {
+      grid:  function() { navigate('browse.html', { tab: state.section }); },
+      rails: function() { navigate('browse.html', {}); }
+    };
+    [BACK[state.level]].filter(Boolean).forEach(function(fn) { fn(); });
+  }
+  els.back.addEventListener('click', back);
+
+  // Render ONCE after both browse + continue-watching settle (the FEAT-020
+  // double-render request storm is moot here — text-only — but a single render
+  // keeps the optimistic level intact when reconcile drilled ahead of the load).
   function applyCatalog(b, c) {
     state.cards = [b.content].filter(Boolean).concat([[]])[0];
     state.labels = [b.genreLabels].filter(Boolean).concat([{}])[0];
     state.cw = [c.content].filter(Boolean).concat([[]])[0];
-    renderTabs();
-    applyView();
+    state.progress = progressMapFromCW(state.cw);
+    render();
   }
 
   function loadCatalog(profile) {
@@ -166,27 +239,47 @@ export function initPage() {
 
   els.search.addEventListener('input', function() {
     state.query = els.search.value;
-    applyView();
+    render();
   });
 
-  // Profile (and thus which catalog to show) comes from the live app snapshot;
-  // (re)load when it first arrives or changes. The active person rides the same
-  // snapshot (FEAT-026 TASK-158) and keys Continue-Watching per person — captured
-  // before the reload so the CW rail carries ?person= again (closes TASK-155).
+  // While the companion targets no live screen, hide the drill content and let
+  // the screen chooser take over — never a blank page (TASK-179 A2, BUG-013).
+  function setBound(bound) {
+    var disp = ({ true: '', false: 'none' })[bound];
+    els.search.style.display = disp;
+    els.drill.style.display = disp;
+  }
+
+  // Optimistic-nav reconcile: adopt the app's deep position from its echoed
+  // app_state ONLY before the user has drilled locally (fresh load / reconnect
+  // while the TV sits on a rail-grid). Once drilling, the companion is the driver
+  // and wins, so a late echo can't clobber an in-flight tap.
+  function reconcile(snap) {
+    [snap].filter(function(s) { return s.screen === 'rail-grid'; })
+      .filter(function() { return state.level === 'sections'; })
+      .filter(function(s) { return Boolean(s.section); })
+      .forEach(function(s) { applyGrid(s.section, s.rail); });
+  }
+
+  // Profile (and thus which catalog) rides the live app snapshot; (re)load when
+  // it first arrives or changes. The active person rides the same snapshot
+  // (FEAT-026 TASK-158) and keys Continue-Watching per person.
   function onAppState(snap) {
     state.person = [snap.person].filter(Boolean).concat([state.person])[0];
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(loadCatalog);
+    reconcile(snap);
   }
 
-  // Legacy context routing still switches the companion between page files.
+  // Item/leaf contexts (detail/video/audio/profile) are real companion page
+  // changes; browse + rail-grid both live on this drill page, so stay put.
   function onContext(payload) {
     var page = screenPage(payload.context_id);
-    [page].filter(function(p) { return p !== 'browse'; }).forEach(function(p) { window.location.href = p + '.html'; });
+    [page].filter(function(p) { return !DRILL_CTX[p]; }).forEach(function(p) { window.location.href = p + '.html'; });
   }
 
   // BUG-007: Switch profile drives the TV back to the picker via the same
-  // `navigate` intent the breadcrumb crumbs use — the app teleports and echoes
-  // the `profile` context back, which onContext above then follows. One path.
+  // `navigate` intent the breadcrumb uses; the app teleports and echoes a
+  // `profile` context, which onContext follows. One path.
   function switchProfile() { api.sendIntent('navigate', switchProfileTarget()); }
   document.getElementById('switch-profile').addEventListener('click', switchProfile);
 

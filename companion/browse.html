@@ -11,6 +11,7 @@
   --surface-hi: rgba(255,255,255,0.11);
   --border: rgba(255,255,255,0.13);
   --focus: #fff;
+  --focus-glow: 0 0 0 1px rgba(255,255,255,0.6), 0 4px 24px rgba(255,255,255,0.15);
   --text: rgba(255,255,255,0.95);
   --text-muted: rgba(255,255,255,0.4);
   --radius: 16px;
@@ -25,23 +26,27 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 #conn-status { font-size: 13px; font-family: monospace; color: var(--text-muted); text-align: center; height: 16px; flex-shrink: 0; }
 #search { width: 100%; flex-shrink: 0; font-size: 17px; padding: 12px 14px; border-radius: 8px; border: none; border-bottom: 2px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text); }
 #search:focus { outline: none; border-bottom-color: var(--focus); }
-#scroll { flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; display: flex; flex-direction: column; gap: 16px; }
-#scroll::-webkit-scrollbar, #tabs::-webkit-scrollbar, .c-rail-row::-webkit-scrollbar { display: none; }
-.section-title { font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-#tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; flex-shrink: 0; border-bottom: 1px solid var(--border); }
-.c-tab { flex: 0 0 auto; font-size: 15px; padding: 14px 16px 12px; border: none; border-bottom: 2px solid transparent; background: none; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease); }
-.c-tab.active { color: var(--focus); border-bottom-color: var(--focus); }
-#rails-section { display: flex; flex-direction: column; gap: 16px; }
-.c-rail { display: flex; flex-direction: column; gap: 8px; }
-.c-rail-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding-bottom: 4px; }
-.c-rail-row .tile-btn { width: 130px; flex-shrink: 0; }
-#search-section { display: none; }
-#grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-#empty { display: none; color: var(--text-muted); font-size: 16px; text-align: center; padding: 40px 0; }
-.tile-btn { display: flex; flex-direction: column; background: var(--surface); border: 2px solid transparent; border-radius: 4px; overflow: hidden; cursor: pointer; padding: 0; color: var(--text); width: 100%; touch-action: manipulation; transition: border-color var(--dur) var(--ease); }
-.tile-btn img { width: 100%; height: 120px; object-fit: contain; background: #000; flex-shrink: 0; }
-.tile-btn span { color: var(--text); font-size: 14px; padding: 8px; text-align: left; }
-.tile-btn:active { border-color: var(--focus); }
+#drill { flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; display: flex; flex-direction: column; gap: 14px; }
+#drill::-webkit-scrollbar, .chip-row::-webkit-scrollbar, #txtgrid::-webkit-scrollbar { display: none; }
+.ph-section { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.5px; }
+.chip-row { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding-bottom: 2px; flex-shrink: 0; }
+.chip { white-space: nowrap; background: var(--surface-hi); border: 2px solid var(--border); border-radius: 999px; padding: 9px 15px; font-size: 14px; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease); }
+.chip.active { color: var(--focus); border-color: var(--focus); box-shadow: var(--focus-glow); }
+.chip.dim { opacity: 0.5; }
+.chip:active, .chip:focus { outline: none; color: var(--focus); border-color: var(--focus); }
+#rails-wrap, #grid-wrap { display: flex; flex-direction: column; gap: 8px; }
+#grid-count { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+#txtgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.ph-txt { background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 12px 11px; font-size: 14px; min-height: 48px; display: flex; align-items: center; gap: 7px; color: var(--text); font-family: inherit; cursor: pointer; text-align: left; touch-action: manipulation; transition: border-color var(--dur) var(--ease); }
+.ph-txt .nm { flex: 1; line-height: 1.2; }
+.ph-txt .pct { font-size: 11px; color: var(--focus); }
+.ph-txt.prog { border-color: var(--focus); }
+.ph-txt:active, .ph-txt:focus { outline: none; border-color: var(--focus); }
+#btn-back { align-self: flex-start; flex-shrink: 0; font-size: 14px; padding: 9px 16px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#btn-back:active, #btn-back:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+#switch-profile { flex: 0 0 auto; font-size: 13px; padding: 8px 14px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#switch-profile:active, #switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #breadcrumb { flex-shrink: 0; }
 .breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .crumb { font-size: 13px; }
@@ -50,10 +55,6 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 .crumb-link { background: none; border: none; padding: 2px 4px; margin: 0; color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); touch-action: manipulation; transition: color var(--dur) var(--ease); }
 .crumb-link:active { color: var(--focus); }
 .crumb-link:focus { outline: 1px solid var(--focus); }
-#topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
-#switch-profile { flex: 0 0 auto; font-size: 13px; padding: 8px 14px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
-#switch-profile:active { border-color: var(--focus); color: var(--focus); }
-#switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #screen-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; flex-shrink: 0; }
 #screen-bar:empty { display: none; }
 .screen-bar-label { width: 100%; font-size: 12px; color: var(--text-muted); text-align: center; text-transform: uppercase; letter-spacing: 1px; }
@@ -72,15 +73,19 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
   <div id="breadcrumb"></div>
   <button id="switch-profile" type="button">👤 Switch profile</button>
 </div>
-<input id="search" type="search" placeholder="Search titles…" autocomplete="off">
-<div id="tabs"></div>
-<div id="scroll">
-  <div id="rails-section"><div id="rails"></div></div>
-  <div id="search-section">
-    <div class="section-title">Results</div>
-    <div id="grid"></div>
-    <div id="empty">No matches</div>
+<input id="search" type="search" placeholder="Filter…" autocomplete="off">
+<div id="drill">
+  <div class="ph-section">Sections</div>
+  <div id="sections-row" class="chip-row"></div>
+  <div id="rails-wrap">
+    <div class="ph-section">Rails</div>
+    <div id="rails-row" class="chip-row"></div>
   </div>
+  <div id="grid-wrap">
+    <div id="grid-count"></div>
+    <div id="txtgrid"></div>
+  </div>
+  <button id="btn-back" type="button">‹ Back</button>
 </div>
 <script type="module">
 import { initPage } from '../ui/screens/companion-browse.js';

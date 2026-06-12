@@ -1,5 +1,19 @@
+import { isMidWatch, percent } from './progress.js';
+
 export function screenPage(contextId) {
   return contextId;
+}
+
+// FEAT-028 (TASK-168): the L3 text tile's optional resume hint. A mid-watch item
+// shows its rounded percent (e.g. "40%"); a fresh or finished item shows nothing.
+// Pure so the companion grid stays DOM-only (no-pure-fn-outside-core) and "which
+// tiles flag progress" is provable without a browser. progressMap is keyed by
+// item id -> { resumePositionSec } (core/progress.js progressMapFromCW).
+export function tileHint(progressMap, card) {
+  var entry = (progressMap || {})[card.id];
+  var resume = entry ? (entry.resumePositionSec || 0) : 0;
+  if (!isMidWatch(resume, card.durationSec)) return '';
+  return Math.round(percent(resume, card.durationSec)) + '%';
 }
 
 export function titleCase(str) {

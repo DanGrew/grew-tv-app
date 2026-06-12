@@ -55,7 +55,7 @@ test('>1 screen, none chosen → renders the chooser, not an empty grid (BUG-013
   await expect(page.locator('#screen-bar .screen-btn')).toHaveCount(2);
   await expect(page.locator('#screen-bar .screen-btn[data-id="tv-a"]')).toHaveText('Living Room');
   // ...and the (would-be empty) browse content is suppressed — no blank grid.
-  await expect(page.locator('.c-tab')).toHaveCount(0);
+  await expect(page.locator('#sections-row .chip')).toHaveCount(0);
   await expect(page.locator('#search')).toBeHidden();
   // Never auto-registered against either screen.
   expect(types(received)).not.toContain('register_companion');
@@ -76,7 +76,7 @@ test('picking a screen re-targets (register_companion + snapshot_request) and re
   expect(types(received)).toContain('snapshot_request');
 
   // The screen's pushed state renders the browse content.
-  await expect(page.locator('.c-tab')).toHaveText(['Series', 'Films', 'Home Movies']);
+  await expect(page.locator('#sections-row .chip')).toHaveText(['Series', 'Films', 'Home Movies']);
   await expect(page.locator('#search')).toBeVisible();
   // The bar collapses to a current-screen pill naming the bound screen.
   await expect(page.locator('#screen-bar .screen-current')).toContainText('Living Room');
@@ -87,7 +87,7 @@ test('re-targeting another screen is a device-plane MOVE — no activate_person 
   await mockApp(page, received);
   await page.goto('/companion/browse.html');
   await page.locator('#screen-bar .screen-btn[data-id="tv-a"]').click();
-  await expect(page.locator('.c-tab').first()).toBeVisible();
+  await expect(page.locator('#sections-row .chip').first()).toBeVisible();
 
   received.length = 0;
   // Open the chooser pill and hop to the other screen.
