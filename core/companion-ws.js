@@ -1,7 +1,7 @@
 import {
   MESSAGE_TYPES, createIntent, createSnapshotRequest, isStaleContext,
   interpolatePosition,
-  createListDevices, createRegisterCompanion,
+  createListDevices, createRegisterCompanion, createActivatePerson,
   createPlayIntent, createSkipIntent, createNextIntent, createPrevIntent,
   createSetProfileIntent, createToggleCaptionsIntent,
   createShuffleIntent, createPlayAlbumIntent
@@ -13,7 +13,8 @@ import {
 // when the TV flips person. The chosen target persists per device.
 var TARGET_KEY = 'grew-tv-companion-target';
 
-export function connect(wsUrl, onContext, onStatus, onAppState, onDevices) {
+export function connect(wsUrl, onContext, onStatus, onAppState, onDevices, opts) {
+  var o = opts != null ? opts : {};
   var ws = null;
   var currentVersion = -1;
   var lastPingTime = Date.now();
@@ -93,6 +94,18 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices) {
         appStateAt = Date.now();
         [onAppState].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
       },
+      // FEAT-026 person-plane verdicts for a companion-initiated person pick. The
+      // backend replies to whoever SENT activate_person (it reads device_id from
+      // the payload, not the socket), so when the companion activates a person on
+      // its target screen the busy/active verdict lands HERE — letting the
+      // companion raise its OWN take-over prompt instead of the verdict (and panel)
+      // surfacing on the TV the user isn't looking at.
+      person_active: function() {
+        [o.onPersonActive].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
+      },
+      person_busy: function() {
+        [o.onPersonBusy].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
+      },
       ping: function() {
         lastPingTime = Date.now();
         send({ type: MESSAGE_TYPES.PONG });
@@ -134,6 +147,10 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices) {
     devices: function() { return lastDevices; },
     currentTarget: function() { return targeted; },
     target: registerFor,
+    // Lock a person to the targeted screen and gate on the backend verdict
+    // (onPersonActive / onPersonBusy). device_id is the companion's target, so
+    // the verdict returns to this companion — the take-over prompt shows here.
+    activatePerson: function(personId, takeover) { send(createActivatePerson(targeted, personId, takeover)); },
     play: function(id) { send(createPlayIntent(id)); },
     skip: function(deltaSec) { send(createSkipIntent(deltaSec)); },
     next: function() { send(createNextIntent()); },
