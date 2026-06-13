@@ -222,7 +222,21 @@ schema defined in the `grew-tv` private repo.
 
 ## Git and GitHub
 
-**Branching:** Feature branches off `main`. Naming: `<topic>/<descriptor>` — e.g. `feat/task-012-resume-screen`.
+**All dev happens in a `git worktree`, never on a branch in the primary checkout.**
+The primary checkout (`/Users/dan/dan-grew-repos/grew-tv-app`) is shared by
+concurrent Claude sessions and the user's live `--app-dir` server, and it stays
+on `main`. For ANY change — feature, fix, doc — create a dedicated worktree off
+`origin/main` and work there:
+```bash
+git worktree add ../grew-tv-app-<topic>-wt origin/main -b <topic>/<descriptor>
+```
+Do NOT `git checkout -b`/branch-switch the primary tree. (A worktree pins HEAD
+per directory, so a stash/checkout slip can't silently drop your commit onto
+`main` in the shared tree — that exact failure happened once on the old
+"plain branch in primary" convention.) A fresh worktree has no `node_modules` —
+symlink the primary's for gate runs, but `rm` it before `git add -A` so the
+ignore miss (`node_modules/` with a slash) doesn't commit the symlink.
+**Branching:** off `main`. Naming: `<topic>/<descriptor>` — e.g. `feat/task-012-resume-screen`.
 **PRs:** Always draft (`--draft`), one per logical unit. Merge target: `main`.
 **Deploy:** no GitHub Pages. The app ships by updating the clone media-manager serves from (`--app-dir`, `~/grew-tv/repos/grew-tv-app` on the Mini) — pull `main` there + restart/reload. `setup-mac-mini.sh` clones it.
 
