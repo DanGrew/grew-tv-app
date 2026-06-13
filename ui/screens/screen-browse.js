@@ -202,7 +202,12 @@ function tabButton(tab) {
   btn.setAttribute('data-tab', tab.id);
   btn.textContent = tab.title;
   btn.addEventListener('focus', function() { selectTab(tab.id); });
-  btn.addEventListener('click', function() { focusFirstTile(); });
+  // Click must switch the rail itself, not lean on the focus handler: macOS
+  // Safari / iOS WebKit do NOT focus a <button> on click, so the focus event
+  // never fires there and the tab silently didn't change. Chrome/Android focus
+  // on click and masked it. selectTab is idempotent, so the focus+click double
+  // call on Chrome is harmless.
+  btn.addEventListener('click', function() { selectTab(tab.id); focusFirstTile(); });
   return btn;
 }
 

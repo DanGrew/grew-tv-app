@@ -26,11 +26,16 @@ export function initPage() {
     ctxLabel: document.getElementById('ctx-label'),
     ctxTitle: document.getElementById('ctx-title'),
     screenBar: document.getElementById('screen-bar'),
-    actionsEl: document.getElementById('actions')
+    actionsEl: document.getElementById('actions'),
+    takeoverOverlay: document.getElementById('takeover-overlay'),
+    takeoverMsg: document.getElementById('takeover-msg'),
+    takeoverConfirm: document.getElementById('takeover-confirm'),
+    takeoverCancel: document.getElementById('takeover-cancel')
   };
   var config = defaultConfig();
   var pinEntry = '';
   var pinForPerson = null;
+  var pendingId = null;
   var onProfile = false;
   var dotsEl = null;
   var keypadWrap = null;
@@ -40,7 +45,29 @@ export function initPage() {
 
   function noop() {}
 
-  function pick(id) { getApi().setProfile(id); }
+  // Lock the person to the targeted screen FIRST and gate on the backend verdict
+  // (onPersonActive / onPersonBusy). Only on success do we send the setProfile
+  // intent that teleports the TV — so a busy person raises the take-over prompt
+  // HERE on the companion, not on the TV the user isn't holding.
+  function pick(id) { pendingId = id; getApi().activatePerson(id, false); }
+
+  // Person secured on the target screen → drive the TV to that person's Home; the
+  // app echoes a new context which onContext follows to the matching companion page.
+  function navigateTv() { getApi().setProfile(pendingId); }
+
+  function closeTakeover() { els.takeoverOverlay.classList.remove('active'); }
+
+  function openTakeover(label) {
+    els.takeoverMsg.textContent = 'Watching on ' + label + ' — take over?';
+    els.takeoverOverlay.classList.add('active');
+  }
+
+  // Verdicts only act on a live, user-initiated pick (pendingId set).
+  function onPersonActive() { [pendingId].filter(Boolean).forEach(function() { closeTakeover(); navigateTv(); }); }
+  function onPersonBusy(payload) { [pendingId].filter(Boolean).forEach(function() { openTakeover([payload.label].filter(Boolean).concat(['another screen'])[0]); }); }
+
+  function confirmTakeover() { closeTakeover(); getApi().activatePerson(pendingId, true); }
+  function cancelTakeover() { closeTakeover(); pendingId = null; }
 
   function shake() {
     keypadWrap.classList.add('shake');
@@ -200,7 +227,11 @@ export function initPage() {
     ({ true: function() { buildScreenList(devices); }, false: noop })[devices.length > 1]();
   }
 
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, noop, onDevices);
+  els.takeoverConfirm.addEventListener('click', confirmTakeover);
+  els.takeoverCancel.addEventListener('click', cancelTakeover);
+
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, noop, onDevices,
+    { onPersonActive: onPersonActive, onPersonBusy: onPersonBusy });
   // Config may land after the picker first renders (default config) — re-render
   // so real photos/labels appear. Skips a rebuild when not on the profile view.
   loadConfig(server).then(parseConfig).then(function(cfg) {

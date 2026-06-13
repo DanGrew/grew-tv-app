@@ -35,6 +35,22 @@ test('selecting the Films tab swaps in genre rails (A-Z), a film in each matchin
   await expect(page.locator('.rail-row[data-rail="genre:comedy"] .film-tile[data-id="toy-story-main"]')).toHaveCount(1);
 });
 
+// Regression (Safari/iOS WebKit): macOS Safari and iOS do NOT give a <button>
+// keyboard focus when it is clicked, so the tab's `focus`-driven selectTab never
+// fired and the rail silently stayed put. dispatchEvent('click') reproduces that
+// here — it runs the click handler WITHOUT the focus that Playwright's real
+// .click() triggers (Chrome/Android focus on click and masked the bug). Pre-fix
+// this assertion failed: the rail stayed on Series (only ['Animation']).
+test('Films tab switches the rail on a focus-less click (Safari/iOS WebKit)', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  await expect(page.locator('.sidebar-tab[data-tab="series"]')).toHaveClass(/active/);
+  await page.locator('.sidebar-tab[data-tab="films"]').dispatchEvent('click');
+  await expect(page.locator('.sidebar-tab[data-tab="films"]')).toHaveClass(/active/);
+  await expect(page.locator('.rail-title')).toHaveText(['Animation', 'Comedy']);
+  await expect(page.locator('.rail-row[data-rail="genre:comedy"] .film-tile[data-id="toy-story-main"]')).toHaveCount(1);
+});
+
 test('Home Movies tab shows Collections + Videos structural rails, no person rails (TASK-183)', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
