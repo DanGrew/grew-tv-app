@@ -66,12 +66,15 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
 #upnext-text b { color: var(--focus); }
 #upnext-count { font-size: var(--fs-sm); color: var(--text-muted); }
 #btn-upnext-cancel { font-size: var(--fs-sm); padding: 12px 26px; border: 2px solid var(--border); }
+#sound-prompt { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: var(--text); font-size: var(--fs-sm); padding: 12px 28px; border-radius: var(--radius); z-index: 250; pointer-events: none; }
+#sound-prompt.hidden { display: none; }
 #error-msg { display: none; }
 </style>
 </head>
 <body>
 <div id="screen-video">
   <video id="video" preload="metadata"></video>
+  <div id="sound-prompt" class="hidden">🔊 Tap for sound</div>
   <div id="controls">
     <div id="breadcrumb"></div>
     <div id="video-upnext"></div>

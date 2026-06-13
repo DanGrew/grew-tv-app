@@ -296,13 +296,29 @@ export function setup(config) {
     STATE_HANDLERS[stateKey()](e);
   }
 
+  // iOS/Safari block play()-with-sound without a user gesture in THIS document,
+  // and selecting a video is a full page navigation, so the browse tap does not
+  // carry over — the catch below falls back to muted. Show a prompt and unmute
+  // on the first real gesture here; iOS "sticky activation" then lets later
+  // episodes autoplay with sound, so this only fires for the first video. On
+  // desktop/TV the reject never happens, so the prompt never shows.
+  function unmuteForSound() {
+    video.muted = false;
+    document.getElementById('sound-prompt').classList.add('hidden');
+  }
+  function promptForSound() {
+    document.getElementById('sound-prompt').classList.remove('hidden');
+    document.addEventListener('pointerdown', unmuteForSound, { once: true });
+    document.addEventListener('keydown', unmuteForSound, { once: true });
+  }
+
   function startPlayback(seekTo) {
     document.getElementById('screen-video').style.display = '';
     onIntent('video');
     acquireWakeLock();
     video.muted = false;
     var doPlay = function() {
-      video.play().catch(function() { video.muted = true; video.play().catch(function() {}); });
+      video.play().catch(function() { video.muted = true; video.play().catch(function() {}); promptForSound(); });
       showControls();
     };
     [seekTo].filter(function(t) { return t > 0; }).forEach(function(t) {
