@@ -27,6 +27,11 @@ function getAllHtml(dir) {
   return results;
 }
 
+function getAppAndCompanionHtml() {
+  return getAllHtml(path.join(ROOT, 'app'))
+    .concat(getAllHtml(path.join(ROOT, 'companion')));
+}
+
 function read(file) { return fs.readFileSync(file, 'utf8'); }
 
 function extractStyleBlocks(html) {
@@ -41,7 +46,7 @@ let violations = [];
 let scanned = [];
 
 if (rule === 'tv-focus-rings') {
-  getAllHtml(path.join(ROOT, 'app')).forEach(file => {
+  getAppAndCompanionHtml().forEach(file => {
     const rel = path.relative(ROOT, file).replace(/\\/g, '/');
     scanned.push(rel);
     const html = read(file);
@@ -63,7 +68,7 @@ if (rule === 'tv-min-font-size') {
   // authority and uses 10-15px labels; matching it takes priority over the
   // old 10ft-legibility floor. 10px keeps a sane guard against typos.
   const MIN_PX = 10;
-  getAllHtml(path.join(ROOT, 'app')).forEach(file => {
+  getAppAndCompanionHtml().forEach(file => {
     const rel = path.relative(ROOT, file).replace(/\\/g, '/');
     scanned.push(rel);
     const html = read(file);
@@ -83,6 +88,13 @@ if (rule === 'tv-min-font-size') {
 }
 
 if (rule === 'tv-no-blank-screen') {
+  // app/ only — NOT companion/. This rule guards against a blank kiosk screen
+  // by requiring a static error element, which is the app's blank-state model.
+  // The companion (phone remote) guards blank-state differently: a static
+  // #conn-status line ("connecting…") that always renders, plus WS onerror +
+  // per-fetch .catch fallbacks that degrade to empty/connection-state rather
+  // than a void. Applying the error-element check to companion would be
+  // rule-for-rule's-sake. (focus-rings + min-font DO extend to companion.)
   getAllHtml(path.join(ROOT, 'app')).forEach(file => {
     const rel = path.relative(ROOT, file).replace(/\\/g, '/');
     scanned.push(rel);
