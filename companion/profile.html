@@ -54,6 +54,14 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .screen-btn { padding: 10px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 15px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .screen-btn:active { border-color: var(--focus); color: var(--focus); }
 .screen-btn.on { border-color: var(--focus); color: var(--focus); }
+.takeover-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 10; padding: 24px; }
+.takeover-overlay.active { display: flex; }
+.takeover-box { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 18px; padding: 24px; border: 2px solid var(--border); border-radius: var(--radius); background: #16213e; text-align: center; }
+.takeover-msg { font-size: 18px; color: var(--text); }
+.takeover-btns { display: flex; gap: 12px; }
+.takeover-btn { flex: 1; padding: 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-hi); color: var(--text); font-size: 17px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.takeover-btn:active { border-color: var(--focus); color: var(--focus); }
+.takeover-btn.primary { background: linear-gradient(160deg, #834d9b, #d04ed6); border-color: transparent; }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
 </style>
 </head>
@@ -63,6 +71,15 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 <div id="ctx-title"></div>
 <div id="screen-bar"></div>
 <div id="actions"></div>
+<div id="takeover-overlay" class="takeover-overlay">
+<div class="takeover-box">
+<div id="takeover-msg" class="takeover-msg"></div>
+<div class="takeover-btns">
+<button id="takeover-cancel" class="takeover-btn">Cancel</button>
+<button id="takeover-confirm" class="takeover-btn primary">Take over</button>
+</div>
+</div>
+</div>
 <script type="module">
 import { initPage } from '../ui/screens/companion-profile.js';
 initPage();

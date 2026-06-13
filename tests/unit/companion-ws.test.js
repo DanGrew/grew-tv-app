@@ -294,4 +294,36 @@ describe('connect', () => {
     api.sendIntent('select', { id: 'film-1' });
     expect(MockWS.instances[0].sent[before].payload.params).toEqual({ id: 'film-1' });
   });
+
+  // Companion-initiated take-over (the fix): a companion that activates a person
+  // on its target screen receives the busy/active verdict HERE, so it can raise
+  // its own take-over prompt instead of the verdict surfacing only on the TV.
+  it('calls opts.onPersonBusy for a person_busy verdict', () => {
+    var busy = [];
+    connect('ws://host:8766', () => {}, () => {}, () => {}, () => {}, { onPersonBusy: (p) => busy.push(p) });
+    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'person_busy', payload: { person_id: 'mom', device_id: 'devB', label: 'Living Room' } }) });
+    expect(busy).toHaveLength(1);
+    expect(busy[0].label).toBe('Living Room');
+  });
+
+  it('calls opts.onPersonActive for a person_active verdict', () => {
+    var active = [];
+    connect('ws://host:8766', () => {}, () => {}, () => {}, () => {}, { onPersonActive: (p) => active.push(p) });
+    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'person_active', payload: { person_id: 'mom' } }) });
+    expect(active).toHaveLength(1);
+    expect(active[0].person_id).toBe('mom');
+  });
+
+  it('api.activatePerson sends activate_person for the targeted screen', () => {
+    var api = connect('ws://host:8766', () => {}, () => {});
+    var ws = MockWS.instances[0];
+    ws.onopen();
+    ws.onmessage(deviceMsg([{ device_id: 'devA' }]));   // sole screen auto-targets
+    ws.sent.length = 0;
+    api.activatePerson('mom', true);
+    var msg = ws.sent.find(m => m.type === 'activate_person');
+    expect(msg.payload.device_id).toBe('devA');
+    expect(msg.payload.person_id).toBe('mom');
+    expect(msg.payload.takeover).toBe(true);
+  });
 });
