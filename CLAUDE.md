@@ -2,17 +2,18 @@
 
 ## Project
 
-grew-tv-app — public GitHub Pages web app for the Grew family home video system. Browse and play personal DVD collection served from a local file server (localhost:8080) running on a Mac Mini or equivalent device.
+grew-tv-app — browse + play web app for the Grew family home video system. Static files (HTML/JS/CSS) **served by the media-manager backend** (in the `grew-tv` repo) over the LAN — the same server also serves the API and the media. Not GitHub Pages; not a separate file server.
 
-**Live URL:** `https://dangrew.github.io/grew-tv-app/`
+**How it's served:** media-manager runs `--app-dir <clone-of-this-repo>` (default `~/grew-tv/repos/grew-tv-app` on the Mini) and serves the app, `/api/*`, and `/media/*` all from one origin on `:8765`. The app derives `serverUrl` from its own origin (TASK-133/134) and fetches `/api/*` same-origin — no hardcoded host or port.
 
 ## Architecture
 
 ```
-TV (HDMI) ← Mac Mini running Chrome in kiosk mode
-                → loads this GitHub Pages app
-                → fetches videos from http://localhost:8080
-                   (Ruby file server serving USB drive)
+TV (HDMI) ← 2014 Mac Mini (client) running Chrome in kiosk mode
+                → loads this app from the server Mini's LAN address
+Apple Silicon Mac Mini (server, wired) runs media-manager on :8765
+                → serves the app (--app-dir), /api/*, and /media/* from one origin
+                → media files live locally at ~/grew-tv/media
 ```
 
 ## Layer Structure
@@ -157,7 +158,7 @@ Run the relevant e2e locally too (CI-only otherwise):
 
 ## Local Dev
 
-**App (`app/homeview/index.html`):** open directly in browser. Fetches `http://localhost:8080/manifest.json`.
+**App (`app/homeview/index.html`):** don't open via `file://` — it derives `serverUrl` from its origin and fetches `/api/*` same-origin, so it must be served by media-manager (see the `--app-dir` command below).
 
 **Companion (`companion/`):** must be served over HTTP — ES modules require it.
 
@@ -209,20 +210,21 @@ python3 -m http.server 3000   # then open http://localhost:3000/companion/
 ```
 Do NOT run server from inside `companion/` — module imports (`../ui/screens/`) will 404.
 
-Mock the content server (separate port):
-```bash
-python3 -m http.server 8080   # run from a directory containing manifest.json
-```
+To run the app **with real content**, use media-manager `--app-dir` (the
+`--app-dir` command above) — a plain `http.server` can't serve the `/api/*`
+endpoints the app fetches, so it's UI-only.
 
 ## Content
 
-App fetches content from `http://localhost:8080/manifest.json`. Content schema defined in `grew-tv` private repo.
+App fetches content from media-manager's `/api/*` endpoints, same-origin
+(`serverUrl` is derived from the page origin — no hardcoded host/port). Content
+schema defined in the `grew-tv` private repo.
 
 ## Git and GitHub
 
 **Branching:** Feature branches off `main`. Naming: `<topic>/<descriptor>` — e.g. `feat/task-012-resume-screen`.
 **PRs:** Always draft (`--draft`), one per logical unit. Merge target: `main`.
-**GitHub Pages:** served from `main` branch root.
+**Deploy:** no GitHub Pages. The app ships by updating the clone media-manager serves from (`--app-dir`, `~/grew-tv/repos/grew-tv-app` on the Mini) — pull `main` there + restart/reload. `setup-mac-mini.sh` clones it.
 
 ## Tooling
 
