@@ -61,9 +61,12 @@ h2 { font-size: var(--fs-2xl); color: var(--text); margin-bottom: 36px; font-wei
 .takeover-btn { padding: 14px 28px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); font-size: var(--fs-md); color: var(--text); cursor: pointer; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
 .takeover-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 #error-msg { display: none; }
+#device-id-tag { position: fixed; top: 24px; right: 28px; display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; font-size: var(--fs-xs); color: var(--text-muted); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); }
+#device-swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
 </style>
 </head>
 <body id="screen-profile">
+<div id="device-id-tag" title="This screen"><span id="device-swatch"></span><span id="device-name"></span></div>
 <h1>Grew TV</h1>
 <h2>Who's watching?</h2>
 <div id="profile-cards"></div>

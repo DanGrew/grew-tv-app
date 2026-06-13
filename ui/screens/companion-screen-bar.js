@@ -27,12 +27,27 @@ export function mountScreenBar(getApi, onBound) {
     return h;
   }
 
+  function swatchEl(colour) {
+    var s = document.createElement('span');
+    s.className = 'screen-swatch';
+    s.style.backgroundColor = colour;
+    return s;
+  }
+
+  function labelEl(text) {
+    var s = document.createElement('span');
+    s.className = 'screen-btn-label';
+    s.textContent = text;
+    return s;
+  }
+
   function deviceBtn(d, current) {
     var b = document.createElement('button');
     b.className = 'screen-btn';
     b.setAttribute('data-id', d.device_id);
     b.classList.toggle('on', d.device_id === current);
-    b.textContent = screenLabel(d);
+    b.appendChild(swatchEl(d.colour));
+    b.appendChild(labelEl(screenLabel(d)));
     b.addEventListener('click', function() { pick(d.device_id); });
     return b;
   }
@@ -49,7 +64,8 @@ export function mountScreenBar(getApi, onBound) {
     var b = document.createElement('button');
     b.className = 'screen-current';
     b.setAttribute('data-open', String(open.v));
-    b.textContent = '▣ ' + state.currentLabel + ' ▾';
+    b.appendChild(swatchEl(state.currentColour));
+    b.appendChild(labelEl(state.currentLabel + ' ▾'));
     b.addEventListener('click', toggleOpen);
     return b;
   }

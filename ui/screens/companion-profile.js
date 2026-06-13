@@ -8,6 +8,7 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { screenPage } from '../../core/companion-utils.js';
+import { screenColour, screenLabel } from '../../core/screen-chooser.js';
 import { loadConfig, mediaUrl } from '../../core/app-api.js';
 import {
   defaultConfig, parseConfig, isLocked, pinMatches, pushDigit, popDigit, isPinComplete, dotFill
@@ -201,7 +202,14 @@ export function initPage() {
     var b = document.createElement('button');
     b.className = 'screen-btn';
     b.setAttribute('data-id', d.device_id);
-    b.textContent = [d.label].filter(Boolean).concat(['Screen'])[0];
+    var sw = document.createElement('span');
+    sw.className = 'screen-swatch';
+    sw.style.backgroundColor = screenColour(d);
+    b.appendChild(sw);
+    var label = document.createElement('span');
+    label.className = 'screen-btn-label';
+    label.textContent = screenLabel(d);
+    b.appendChild(label);
     b.addEventListener('click', function() { getApi().target(d.device_id); });
     els.screenBar.appendChild(b);
   }
