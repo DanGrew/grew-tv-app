@@ -61,6 +61,31 @@ test('>1 screen, none chosen → renders the chooser, not an empty grid (BUG-013
   expect(types(received)).not.toContain('register_companion');
 });
 
+test('each screen button carries its derived colour swatch; distinct screens differ (TASK-178)', async ({ page }) => {
+  const received = [];
+  await mockApp(page, received);
+  await page.goto('/companion/browse.html');
+  await expect(page.locator('#screen-bar .screen-btn')).toHaveCount(2);
+
+  // device_id → deterministic palette colour: tv-a #42a5f5, tv-b #ffee58.
+  await expect(page.locator('#screen-bar .screen-btn[data-id="tv-a"] .screen-swatch'))
+    .toHaveCSS('background-color', 'rgb(66, 165, 245)');
+  await expect(page.locator('#screen-bar .screen-btn[data-id="tv-b"] .screen-swatch'))
+    .toHaveCSS('background-color', 'rgb(255, 238, 88)');
+  // label still shown alongside the swatch (the unambiguous backstop).
+  await expect(page.locator('#screen-bar .screen-btn[data-id="tv-a"]')).toContainText('Living Room');
+});
+
+test('the bound current-screen pill shows that screen colour (TASK-178)', async ({ page }) => {
+  const received = [];
+  await mockApp(page, received);
+  await page.goto('/companion/browse.html');
+  await page.locator('#screen-bar .screen-btn[data-id="tv-a"]').click();
+  await expect(page.locator('#screen-bar .screen-current')).toContainText('Living Room');
+  await expect(page.locator('#screen-bar .screen-current .screen-swatch'))
+    .toHaveCSS('background-color', 'rgb(66, 165, 245)');
+});
+
 test('picking a screen re-targets (register_companion + snapshot_request) and renders its state', async ({ page }) => {
   const received = [];
   await mockApp(page, received);

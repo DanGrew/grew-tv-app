@@ -1,4 +1,5 @@
-import { screenLabel, chooserState, chooserMode } from '../../core/screen-chooser.js';
+import { screenLabel, screenColour, chooserState, chooserMode } from '../../core/screen-chooser.js';
+import { deviceColour } from '../../core/device-colour.js';
 
 describe('screenLabel', () => {
   it('uses the device label', () => {
@@ -12,6 +13,15 @@ describe('screenLabel', () => {
   });
 });
 
+describe('screenColour', () => {
+  it('derives a colour from the device_id', () => {
+    expect(screenColour({ device_id: 'a' })).toBe(deviceColour('a'));
+  });
+  it('falls back to the deviceColour fallback for a null device', () => {
+    expect(screenColour(null)).toBe(deviceColour(null));
+  });
+});
+
 describe('chooserState', () => {
   var devs = [{ device_id: 'a', label: 'A' }, { device_id: 'b', label: 'B' }];
 
@@ -20,6 +30,19 @@ describe('chooserState', () => {
     expect(s.bound).toBe(true);
     expect(s.current.device_id).toBe('b');
     expect(s.currentLabel).toBe('B');
+  });
+
+  it('stamps each device with its derived colour', () => {
+    var s = chooserState(devs, 'b');
+    s.devices.forEach(function(d) { expect(d.colour).toBe(deviceColour(d.device_id)); });
+  });
+
+  it('exposes the bound screen colour as currentColour', () => {
+    expect(chooserState(devs, 'b').currentColour).toBe(deviceColour('b'));
+  });
+
+  it('currentColour falls back when unbound', () => {
+    expect(chooserState(devs, null).currentColour).toBe(deviceColour(null));
   });
 
   it('is UNBOUND when no target (>1 screen, none chosen)', () => {

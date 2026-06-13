@@ -13,6 +13,16 @@ test('shows photo cards for Kids and Adults with names', async ({ page }) => {
   await expect(page.locator('#btn-adults .profile-name')).toHaveText('Adults');
 });
 
+test('shows this screen colour identity swatch + label on load (TASK-178)', async ({ page }) => {
+  await expect(page.locator('#device-id-tag')).toBeVisible();
+  // Swatch is painted from the device_id-derived colour (a real rgb, not blank).
+  const bg = await page.locator('#device-swatch').evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(bg).toMatch(/^rgb\(\d+, \d+, \d+\)$/);
+  expect(bg).not.toBe('rgba(0, 0, 0, 0)');
+  // Falls back to the generic 'Screen · {short-id}' label when none is set.
+  await expect(page.locator('#device-name')).toContainText('Screen');
+});
+
 test('only the Adults card has a lock badge', async ({ page }) => {
   await expect(page.locator('#btn-adults .lock-badge')).toBeVisible();
   await expect(page.locator('#btn-kids .lock-badge')).toHaveCount(0);
