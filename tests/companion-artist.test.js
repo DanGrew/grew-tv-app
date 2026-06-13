@@ -1,0 +1,74 @@
+const { test, expect } = require('@playwright/test');
+const { installApi, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+
+// FEAT-029 follow-up — the companion artist context: mirrors the TV's artist
+// drill-down (one artist's album grid). Before this page existed the companion
+// navigated to /companion/artist.html on the app's `context_id:'artist'` push
+// and got a raw 404 error JSON (the bug this fixes). The app side is mocked over
+// the WS; the album catalog is backend state from /api/browse (MUSIC_CARDS: ELO
+// x2, ABBA x1). The mock echoes a `select` intent back as the album-detail
+// context, exactly the app↔companion teleport contract.
+
+function msg(type, payload) { return JSON.stringify({ type, payload }); }
+
+const CTX_FOR = { 'album-detail': 'detail' };
+
+function mockApp(page) {
+  let version = 1;
+  let ctx = 'artist';
+  const st = { screen: 'artist', artist: 'ELO', profile: 'kids' };
+  return page.routeWebSocket(/:8766/, (ws) => {
+    function pushState() { ws.send(msg('app_state', st)); }
+    function pushCtx() {
+      version += 1;
+      ws.send(msg('context', { version: version, context_id: ctx, artist: st.artist }));
+      pushState();
+    }
+    ws.onMessage(function(raw) {
+      const m = JSON.parse(raw);
+      if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+      if (m.type === 'snapshot_request') pushCtx();
+      // select teleports the TV to album detail; the app echoes its `detail` context.
+      if (m.type === 'intent' && m.payload.intent === 'select') { ctx = 'detail'; pushCtx(); }
+      if (m.type === 'intent' && m.payload.intent === 'navigate') {
+        const p = m.payload.params.page.replace('.html', '');
+        ctx = CTX_FOR[p] || p;
+        pushCtx();
+      }
+    });
+  });
+}
+
+test.beforeEach(async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/browse**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS) })
+  }));
+  await mockApp(page);
+  await page.goto('/companion/artist.html');
+});
+
+test('renders the artist name and label from the live context', async ({ page }) => {
+  await expect(page.locator('#ctx-label')).toHaveText('Artist');
+  await expect(page.locator('#ctx-title')).toHaveText('ELO');
+});
+
+test('lists only this artist’s albums (ELO x2), not the other artist', async ({ page }) => {
+  await expect(page.locator('.ph-txt')).toHaveCount(2);
+  await expect(page.locator('.ph-txt[data-id="ootb"] .nm')).toHaveText('Out of the Blue');
+  await expect(page.locator('.ph-txt[data-id="elo-time"] .nm')).toHaveText('Time');
+  await expect(page.locator('.ph-txt[data-id="abba-arrival"]')).toHaveCount(0);
+});
+
+test('tapping an album teleports the TV — the companion follows to the album detail', async ({ page }) => {
+  await page.locator('.ph-txt[data-id="ootb"]').click();
+  await expect(page).toHaveURL(/companion\/detail\.html$/);
+});
+
+test('the breadcrumb Albums crumb teleports the TV back to the Music tab', async ({ page }) => {
+  await expect(page.locator('#breadcrumb .crumb-link')).toHaveCount(2);
+  await page.locator('#breadcrumb .crumb-link').last().click();
+  await expect(page).toHaveURL(/companion\/browse\.html$/);
+});
