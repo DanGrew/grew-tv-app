@@ -61,8 +61,9 @@ async function run() {
     result.messages.forEach(msg => { if (msg.ruleId === 'complexity') addViolation(rel, msg); });
   });
 
-  // app/**/*.html inline <script> blocks
-  const htmlFiles = getAllFiles(path.join(ROOT, 'app'), '.html');
+  // app/**/*.html + companion/**/*.html inline <script> blocks
+  const htmlFiles = getAllFiles(path.join(ROOT, 'app'), '.html')
+    .concat(getAllFiles(path.join(ROOT, 'companion'), '.html'));
   for (const htmlFile of htmlFiles) {
     const rel = path.relative(ROOT, htmlFile).replace(/\\/g, '/');
     const blocks = extractInlineScripts(fs.readFileSync(htmlFile, 'utf8'));
