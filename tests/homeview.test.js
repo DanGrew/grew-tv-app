@@ -595,3 +595,25 @@ test('player up-next reads "Start again" at the end of a series (TASK-136)', asy
   await page.goto('/app/homeview/video.html?video=bluey-s1e03&series=bluey&from=detail');
   await expect(page.locator('#video-upnext')).toHaveText('Start again');
 });
+
+// Regression (iOS/Safari audio): WebKit blocks play()-with-sound without a user
+// gesture in the video document, so the player fell back to muted and never
+// recovered (no sound on iPad). chromium does not enforce that policy, so we
+// stub play() to reject while unmuted — mimicking iOS — and assert the prompt
+// shows + the first gesture unmutes. Pre-fix there was no prompt and no unmute.
+test('iOS: blocked play-with-sound shows a sound prompt that a gesture clears (autoplay policy)', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.HTMLMediaElement.prototype.play = function () {
+      return this.muted ? Promise.resolve() : Promise.reject(new DOMException('blocked', 'NotAllowedError'));
+    };
+  });
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  // Sound blocked -> muted fallback + visible prompt.
+  await expect(page.locator('#sound-prompt')).toBeVisible();
+  await expect(page.locator('#video')).toHaveJSProperty('muted', true);
+  // First real gesture in this document unmutes and dismisses the prompt.
+  await page.locator('#screen-video').dispatchEvent('pointerdown');
+  await expect(page.locator('#video')).toHaveJSProperty('muted', false);
+  await expect(page.locator('#sound-prompt')).toHaveClass(/hidden/);
+});
