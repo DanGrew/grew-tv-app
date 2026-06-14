@@ -162,30 +162,43 @@ Run the relevant e2e locally too (CI-only otherwise):
 
 **Companion (`companion/`):** must be served over HTTP — ES modules require it.
 
-**After app work in a worktree, surface the run command.** When you finish a
-change on a worktree branch, END your summary with the exact command for the
-user to run it locally against THAT worktree — `media-manager.py` with
-`--app-dir <app-worktree-path>` (the user can't `git checkout` your worktree
-branch, so point the server at the path instead):
-```bash
-python3 media-manager/core/media-manager.py \
-  --app-dir /Users/dan/dan-grew-repos/<your-app-worktree-dir> \
-  --content-root ~/rips
-```
-Run from the `grew-tv` repo root. Default ports 8765/8766 collide with the user's
-live instance — note they must stop that first. Then the app URL:
-`http://localhost:8765/app/homeview/profile.html`.
+**After app work in a worktree, surface ONE run command that works against your
+worktree(s) — never tell the user to pull, switch, or run `main`.** END your
+summary with a single copy-paste `media-manager.py` invocation using ABSOLUTE
+worktree paths (the user can't `git checkout` your branch — point the server at
+the path). Pick the backend path by one rule:
 
-**If the change ALSO touches the backend in a `grew-tv` worktree, run
-`media-manager.py` from THAT worktree, not primary.** `media-manager.py` is the
-backend — running primary `grew-tv` serves the old backend, so a co-dependent
-backend change (new API field, etc.) won't be exercised. Point the script at the
-backend worktree by absolute path:
+- **App-only task** (no backend change this session) → run `media-manager.py`
+  from the **primary `grew-tv`** checkout. `--app-dir` = your app worktree.
+- **Cross-repo task** (you also changed the backend in a `grew-tv` worktree —
+  whether or not that PR is merged yet) → run `media-manager.py` from the
+  **backend worktree** by absolute path, so the new API field/route is actually
+  served. `--app-dir` = your app worktree.
+
 ```bash
+# cross-repo: backend worktree serves, app worktree is the UI
 python3 /Users/dan/dan-grew-repos/<your-grew-tv-worktree-dir>/media-manager/core/media-manager.py \
-  --app-dir /Users/dan/dan-grew-repos/<your-app-worktree-dir> \
-  --content-root ~/rips
+  --app-dir         /Users/dan/dan-grew-repos/<your-app-worktree-dir> \
+  --manifest-dir    ~/dan-grew-repos/grew-tv-state/manifests \
+  --content-root    ~/rips \
+  --state-repo-dir  /tmp/grew-state
 ```
+
+Always pass all four flags (this exact shape):
+- `--app-dir <app-worktree>` — serve the UI under test.
+- `--manifest-dir ~/dan-grew-repos/grew-tv-state/manifests` — the real catalog
+  (the defaults point at the Mini's `~/grew-tv/...`, which is empty on the dev
+  mac → no content, no repro).
+- `--content-root ~/rips` — the media files.
+- `--state-repo-dir /tmp/grew-state` — a THROWAWAY state checkout so the boot
+  progress round-trip can't pollute the user's real `grew-tv-state`.
+
+NEVER hand the user a `git pull`/`git checkout`/"run from primary on updated
+main" step. If the backend lives in a worktree, serve from that worktree — even
+after it merges, because primary may be stale. Always note: stop the live
+:8765/:8766 server first; then the app URL is
+`http://localhost:8765/app/homeview/profile.html` (companion at
+`http://localhost:8765/companion/`).
 
 Preferred — use `media-manager.py` from the `grew-tv` repo (serves app + WebSocket server together):
 ```bash
