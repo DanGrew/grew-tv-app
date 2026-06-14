@@ -178,15 +178,27 @@ the path). Pick the backend path by one rule:
 ```bash
 # cross-repo: backend worktree serves, app worktree is the UI
 python3 /Users/dan/dan-grew-repos/<your-grew-tv-worktree-dir>/media-manager/core/media-manager.py \
-  --app-dir /Users/dan/dan-grew-repos/<your-app-worktree-dir> \
-  --content-root ~/rips
+  --app-dir         /Users/dan/dan-grew-repos/<your-app-worktree-dir> \
+  --manifest-dir    ~/dan-grew-repos/grew-tv-state/manifests \
+  --content-root    ~/rips \
+  --state-repo-dir  /tmp/grew-state
 ```
+
+Always pass all four flags (this exact shape):
+- `--app-dir <app-worktree>` — serve the UI under test.
+- `--manifest-dir ~/dan-grew-repos/grew-tv-state/manifests` — the real catalog
+  (the defaults point at the Mini's `~/grew-tv/...`, which is empty on the dev
+  mac → no content, no repro).
+- `--content-root ~/rips` — the media files.
+- `--state-repo-dir /tmp/grew-state` — a THROWAWAY state checkout so the boot
+  progress round-trip can't pollute the user's real `grew-tv-state`.
 
 NEVER hand the user a `git pull`/`git checkout`/"run from primary on updated
 main" step. If the backend lives in a worktree, serve from that worktree — even
 after it merges, because primary may be stale. Always note: stop the live
 :8765/:8766 server first; then the app URL is
-`http://localhost:8765/app/homeview/profile.html`.
+`http://localhost:8765/app/homeview/profile.html` (companion at
+`http://localhost:8765/companion/`).
 
 Preferred — use `media-manager.py` from the `grew-tv` repo (serves app + WebSocket server together):
 ```bash
