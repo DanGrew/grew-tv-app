@@ -297,6 +297,18 @@ test('ArrowUp from the top tab reaches the collapse toggle; Enter collapses the 
   await expect(page.locator('#sidebar')).not.toHaveClass(/collapsed/);
 });
 
+test('collapsing the sidebar hides the Home breadcrumb so it cannot straddle the narrowed bar', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await expect(page.locator('#breadcrumb')).toBeVisible();
+  await page.locator('.sidebar-tab[data-tab="series"]').focus();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#sidebar')).toHaveClass(/collapsed/);
+  await expect(page.locator('#breadcrumb')).toBeHidden();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#breadcrumb')).toBeVisible();
+});
+
 test('from the toggle, ArrowDown returns to the first tab and ArrowUp reaches the profile control', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await page.locator('.sidebar-tab[data-tab="series"]').focus();
