@@ -39,8 +39,10 @@ const SERIES = {
 // shows multiple tiles and the artist drill-down can be filtered. Only `ootb`
 // has a resolvable /api/album detail (ALBUMS below); the others exist to populate
 // the Artists/Albums rails and the drill-down grid.
+// `hasLyrics` (backend MAX(v.lyrics IS NOT NULL) over members) drives the Lyrics
+// badge — ootb has a track with an .lrc (ootb-02), the others have none.
 const MUSIC_CARDS = [
-  { kind: 'series', id: 'ootb',         title: 'Out of the Blue', poster: 'ootb.jpg',    type: null, section: 'music', artist: 'ELO',  clipCount: 3, tags: { year: '1977' } },
+  { kind: 'series', id: 'ootb',         title: 'Out of the Blue', poster: 'ootb.jpg',    type: null, section: 'music', artist: 'ELO',  clipCount: 3, tags: { year: '1977' }, hasLyrics: true },
   { kind: 'series', id: 'elo-time',     title: 'Time',            poster: 'time.jpg',    type: null, section: 'music', artist: 'ELO',  clipCount: 2, tags: { year: '1981' } },
   { kind: 'series', id: 'abba-arrival', title: 'Arrival',         poster: 'arrival.jpg', type: null, section: 'music', artist: 'ABBA', clipCount: 2, tags: { year: '1976' } }
 ];
@@ -137,14 +139,16 @@ function lastSegment(url, marker) {
 async function installApi(page) {
   // Global settings (FEAT-023). Stateful per install so a POST sticks for later
   // GETs — stickiness now lives in the backend, not localStorage. Default ON.
-  var settings = { captionsOn: true };
+  // A POST is a partial patch (captionsOn and/or lyricsOn), merged like the
+  // real backend.
+  var settings = { captionsOn: true, lyricsOn: true };
   // Per-person progress store (FEAT-026): person id -> { itemId -> record }.
   // Stateful across this page so a saveProgress POST drives the same person's
   // later resume GET + CW. Different persons keep separate sets.
   var progress = {};
   await page.route('**/api/settings', function(route) {
     var post = route.request().method() === 'POST';
-    [post].filter(Boolean).forEach(function() { settings = JSON.parse(route.request().postData()); });
+    [post].filter(Boolean).forEach(function() { settings = Object.assign({}, settings, JSON.parse(route.request().postData())); });
     return json(route, 200, settings);
   });
   await page.route('**/api/browse**', function(route) {

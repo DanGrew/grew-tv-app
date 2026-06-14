@@ -18,7 +18,7 @@ var JUMP_DEFAULT = 4;            // +10s, the most common forward skip
 var QUICK_SKIP   = 10;          // d-pad left/right one-press skip
 var BACKEND_SAVE_MS = 5000;
 
-var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-shuffle', 'btn-jump'];
+var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-shuffle', 'btn-lyrics', 'btn-jump'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 // {id}.{ext}: ext defaults to mp4 only as a guard — audio records carry m4a/mp3.
 var EXT_OF = { 'true': function(r) { return r.ext; }, 'false': function() { return 'mp4'; } };
@@ -31,6 +31,7 @@ export function setup(config) {
   var onNext   = [config.onNext  ].filter(Boolean).concat([function() {}])[0];
   var onPrev   = [config.onPrev  ].filter(Boolean).concat([function() {}])[0];
   var onShuffle = [config.onShuffle].filter(Boolean).concat([function() {}])[0];
+  var onLyrics  = [config.onLyrics ].filter(Boolean).concat([function() {}])[0];
   var onIntent = [config.onIntent].filter(Boolean).concat([function() {}])[0];
   var emitSnapshot = [config.emitState ].filter(Boolean).concat([function() {}])[0];
   var appContext   = [config.appContext].filter(Boolean).concat([function() { return {}; }])[0];
@@ -40,6 +41,7 @@ export function setup(config) {
   var lastBackendSave = 0;
   var jumpPopup       = null;
   var shuffleOn       = false;
+  var lyricsOn        = true;          // ambient lyrics shown by default
   var _currentDisplay = {};
 
   var AUDIO_TOGGLE = {
@@ -259,6 +261,18 @@ export function setup(config) {
     onShuffle(shuffleOn);
   }
 
+  // Lyrics toggle: reflect on the pill (on = ambient lyrics enabled) and tell the
+  // page to show/hide the lyric layer. Default on; the page only shows lyrics for
+  // a track that actually has an .lrc.
+  function setLyrics(on) {
+    lyricsOn = !!on;
+    document.getElementById('btn-lyrics').classList.toggle('on', lyricsOn);
+  }
+  function toggleLyrics() {
+    setLyrics(!lyricsOn);
+    onLyrics(lyricsOn);
+  }
+
   var remote = {};
   remote.left   = function() { handleAudioKey({ key: 'ArrowLeft',  preventDefault: function() {} }); };
   remote.right  = function() { handleAudioKey({ key: 'ArrowRight', preventDefault: function() {} }); };
@@ -272,6 +286,7 @@ export function setup(config) {
   remote.next     = function() { onNext(); };
   remote.prev     = function() { onPrev(); };
   remote.shuffle  = function() { toggleShuffle(); };
+  remote.lyrics   = function() { toggleLyrics(); };
   remote.skip     = function(params) { executeSkip([params].filter(Boolean).map(function(p) { return p.deltaSec; }).filter(Boolean).concat([0])[0]); };
 
   audio.addEventListener('timeupdate', function() {
@@ -307,7 +322,8 @@ export function setup(config) {
   document.getElementById('btn-prev').addEventListener('click', function() { onPrev(); });
   document.getElementById('btn-next').addEventListener('click', function() { onNext(); });
   document.getElementById('btn-shuffle').addEventListener('click', toggleShuffle);
+  document.getElementById('btn-lyrics').addEventListener('click', toggleLyrics);
   document.getElementById('btn-jump').addEventListener('click', openJumpPopup);
 
-  return { playTrack, handleAudioKey, setQueueMode, setShuffle, currentTrackDisplay, stop: stopPlayback, remote };
+  return { playTrack, handleAudioKey, setQueueMode, setShuffle, setLyrics, currentTrackDisplay, stop: stopPlayback, remote };
 }
