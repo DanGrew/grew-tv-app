@@ -34,6 +34,8 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 .transport button:active { background: var(--surface-hi); border-color: var(--focus); color: var(--focus); }
 .transport .cc { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
 .transport .cc.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
+.reset-btn { width: 100%; margin-top: 12px; padding: 14px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--surface); color: var(--text-muted); font-size: 16px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.reset-btn.confirm { border-color: #ffce6b; color: #ffce6b; }
 .jump { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .jump-btn { padding: 12px 4px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface-hi); color: var(--text); font-size: 13px; cursor: pointer; touch-action: manipulation; font-variant-numeric: tabular-nums; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .jump-btn:active { background: var(--surface-hi); border-color: var(--focus); color: var(--focus); }
@@ -76,6 +78,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 </div>
 <div class="jump" id="jump"></div>
 <div id="upnext" class="bignext"></div>
+<button id="c-reset" class="reset-btn" aria-label="Reset progress">Reset progress</button>
 <script type="module">
 import { initPage } from '../ui/screens/companion-video.js';
 initPage();

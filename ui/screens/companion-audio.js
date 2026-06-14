@@ -30,7 +30,8 @@ export function initPage() {
     shuffle: document.getElementById('c-shuffle'),
     jump: document.getElementById('jump'),
     tracks: document.getElementById('tracks'),
-    back: document.getElementById('btn-back')
+    back: document.getElementById('btn-back'),
+    reset: document.getElementById('c-reset')
   };
   var state = { snap: null, albumId: null };
   var api = {};
@@ -136,11 +137,38 @@ export function initPage() {
     [page].filter(function(p) { return p !== 'audio'; }).forEach(function(p) { window.location.href = p + '.html'; });
   }
 
+  // Reset progress (TASK-142): two-tap confirm then send the `reset` intent — the
+  // TV player clears this track's progress and exits; the companion follows the
+  // echoed context. Auto-disarms after 4s so an armed button never sticks.
+  var resetArmed = false;
+  var resetTimer = null;
+  function disarmReset() {
+    resetArmed = false;
+    els.reset.classList.remove('confirm');
+    els.reset.textContent = 'Reset progress';
+  }
+  function armReset() {
+    resetArmed = true;
+    els.reset.classList.add('confirm');
+    els.reset.textContent = 'Reset progress?';
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(disarmReset, 4000);
+  }
+  function fireReset() {
+    clearTimeout(resetTimer);
+    disarmReset();
+    api.sendIntent('reset');
+  }
+  function onResetTap() {
+    ({ 'false': armReset, 'true': fireReset })[String(resetArmed)]();
+  }
+
   els.back.addEventListener('click', goBack);
   els.toggle.addEventListener('click', function() { api.sendIntent('toggle'); });
   els.shuffle.addEventListener('click', function() { api.shuffle(); });
   document.getElementById('c-prev').addEventListener('click', function() { api.prev(); });
   document.getElementById('c-next').addEventListener('click', function() { api.next(); });
+  els.reset.addEventListener('click', onResetTap);
   buildJump();
   setInterval(renderBar, 250);
 

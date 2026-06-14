@@ -315,6 +315,7 @@ export function setup(config) {
   remote.shuffle  = function() { toggleShuffle(); };
   remote.lyrics   = function() { toggleLyrics(); };
   remote.skip     = function(params) { executeSkip([params].filter(Boolean).map(function(p) { return p.deltaSec; }).filter(Boolean).concat([0])[0]); };
+  remote.reset    = function() { resetAndExit(); };   // companion Reset intent (TASK-142)
 
   audio.addEventListener('timeupdate', function() {
     [audio.duration].filter(Boolean).forEach(updateProgress);
