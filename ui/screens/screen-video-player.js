@@ -1,6 +1,6 @@
 import { fmt } from '../../core/time.js';
 import { EVENTS, SOURCES, createEvent } from '../../core/telemetry-schema.js';
-import { mediaUrl, saveProgress } from '../../core/app-api.js';
+import { mediaUrl, saveProgress, resetProgress } from '../../core/app-api.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
 import { getCaptions, setCaptions, getPerson } from '../../core/state.js';
 
@@ -15,7 +15,7 @@ var UPNEXT_SECS  = 5;            // autoplay "Up next" countdown
 var BACKEND_SAVE_MS = 5000;
 
 // Transport focus order; CC is skipped while hidden (no .vtt for this video).
-var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-jump', 'btn-cc'];
+var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-jump', 'btn-cc', 'btn-reset'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 var CC_MODE       = { 'true': 'showing', 'false': 'hidden' };
 
@@ -349,6 +349,34 @@ export function setup(config) {
     onStop(rp);
   }
 
+  // Reset progress (TASK-142): wipe this video's backend progress for the active
+  // person, then leave. Pause first so the throttled timeupdate save stops firing
+  // (stopPlayback itself never saves), so the DELETE is the last write — no race
+  // where a stray save re-creates the row we just cleared.
+  function resetAndExit() {
+    video.pause();
+    [currentVideo].filter(Boolean).forEach(function(rec) {
+      resetProgress(server, rec.id, getPerson()).catch(function() {});
+    });
+    stopPlayback();
+  }
+
+  // Two-press confirm guards a mis-tap (the spec's anti-accident step): first
+  // press arms (label -> "Reset?"), second resets + exits; blurring disarms.
+  function fireReset(btn) {
+    ({
+      'false': function() { btn.classList.add('confirm'); btn.textContent = 'Reset?'; btn.setAttribute('data-armed', '1'); },
+      'true':  function() { resetAndExit(); }
+    })[String(btn.getAttribute('data-armed') === '1')]();
+  }
+
+  function disarmReset() {
+    var btn = document.getElementById('btn-reset');
+    btn.classList.remove('confirm');
+    btn.textContent = 'Reset';
+    btn.removeAttribute('data-armed');
+  }
+
   function ccVisible() {
     return !document.getElementById('btn-cc').classList.contains('hidden');
   }
@@ -481,6 +509,8 @@ export function setup(config) {
   document.getElementById('btn-next').addEventListener('click', function() { onNext(); });
   document.getElementById('btn-jump').addEventListener('click', openJumpPopup);
   document.getElementById('btn-cc').addEventListener('click', toggleSubtitles);
+  document.getElementById('btn-reset').addEventListener('click', function() { fireReset(document.getElementById('btn-reset')); });
+  document.getElementById('btn-reset').addEventListener('blur', disarmReset);
   document.getElementById('btn-upnext-cancel').addEventListener('click', cancelUpNext);
   document.getElementById('screen-video').addEventListener('click', showControls);
 
