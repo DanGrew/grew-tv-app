@@ -13,8 +13,8 @@ test('shows photo cards for Kids and Adults with names', async ({ page }) => {
   await expect(page.locator('#btn-adults .profile-name')).toHaveText('Adults');
 });
 
-test('shows this screen colour identity swatch + label on load (TASK-178)', async ({ page }) => {
-  await expect(page.locator('#device-id-tag')).toBeVisible();
+test('shows this screen colour identity swatch + label on load (TASK-178/197)', async ({ page }) => {
+  await expect(page.locator('#device-badge')).toBeVisible();
   // Swatch is painted from the device_id-derived colour (a real rgb, not blank).
   const bg = await page.locator('#device-swatch').evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(bg).toMatch(/^rgb\(\d+, \d+, \d+\)$/);

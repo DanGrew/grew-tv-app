@@ -8,8 +8,7 @@
 // (parsing, PIN state, keypad navigation) lives in core/ and is unit tested; this
 // file is the DOM + d-pad wiring only.
 
-import { setProfile, setPerson, navTo, ensureDevice, getDeviceLabel } from '../../core/state.js';
-import { deviceColour } from '../../core/device-colour.js';
+import { setProfile, setPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
@@ -37,11 +36,6 @@ export function initProfilePage() {
   var takeoverMsg = document.getElementById('takeover-msg');
   var confirmBtns = [document.getElementById('takeover-confirm'),
                      document.getElementById('takeover-cancel')];
-
-  // This screen's own colour identity (TASK-178) — derived from its device_id so
-  // it matches the swatch the companion shows for this screen.
-  document.getElementById('device-swatch').style.backgroundColor = deviceColour(ensureDevice());
-  document.getElementById('device-name').textContent = getDeviceLabel();
 
   var config = defaultConfig();
   var mode = 'cards';
