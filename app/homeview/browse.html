@@ -48,7 +48,8 @@ button:hover { background: var(--surface-hi); }
 .sidebar-tab.active:focus { border-left-color: var(--focus); color: var(--focus); }
 #rails-container { flex: 1; height: 100vh; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; padding: 44px 0 80px; }
 #sidebar::-webkit-scrollbar, #rails-container::-webkit-scrollbar, .rail-row::-webkit-scrollbar { display: none; }
-#profile-label { font-size: var(--fs-sm); color: var(--text-muted); position: fixed; top: 20px; right: 32px; z-index: 5; padding: 6px 14px; border: 2px solid transparent; border-radius: var(--radius-sm); cursor: pointer; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+#top-bar { position: fixed; top: 20px; right: 32px; z-index: 5; display: flex; align-items: center; gap: 14px; }
+#profile-label { font-size: var(--fs-sm); color: var(--text-muted); padding: 6px 14px; border: 2px solid transparent; border-radius: var(--radius-sm); cursor: pointer; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
 #profile-label:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 #profile-label:hover { color: var(--text); }
 #rails { display: flex; flex-direction: column; gap: 34px; }
@@ -85,7 +86,7 @@ body.sidebar-collapsed #breadcrumb { display: none; }
 .settings-label { font-size: var(--fs-md); flex: 0 0 140px; }
 .settings-status { font-size: var(--fs-sm); color: var(--text-muted); flex: 1; }
 .settings-hr { border: none; border-top: 1px solid var(--border); margin: 0; }
-#device-badge { position: fixed; bottom: 24px; left: 24px; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; font-size: var(--fs-xs); color: var(--text-muted); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); pointer-events: none; }
+#device-badge { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; font-size: var(--fs-xs); color: var(--text-muted); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); pointer-events: none; }
 #device-swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
 #error-msg { display: none; }
 </style>
@@ -107,13 +108,12 @@ body.sidebar-collapsed #breadcrumb { display: none; }
   </div>
 </div>
 <div id="breadcrumb"></div>
-<div id="profile-label" tabindex="0" role="button" aria-label="Switch profile"></div>
+<div id="top-bar"><div id="device-badge" title="This screen"></div><div id="profile-label" tabindex="0" role="button" aria-label="Switch profile"></div></div>
 <div id="browse-main">
   <nav id="sidebar"></nav>
   <div id="rails-container"><div id="rails"></div></div>
 </div>
 <button id="btn-settings" tabindex="0">&#9881;</button>
-<div id="device-badge" title="This screen"></div>
 <div id="error-msg"></div>
 <script type="module">
 import { initBrowsePage } from '../../ui/screens/screen-browse-page.js';
