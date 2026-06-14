@@ -67,6 +67,69 @@ test('fresh episode row has no progress bar or Restart control', async ({ page }
   const row = page.locator('.detail-row[data-id="bluey-s1e02"]');
   await expect(row.locator('.detail-progress')).toHaveCount(0);
   await expect(row.locator('.detail-restart')).toHaveCount(0);
+  await expect(row.locator('.detail-reset')).toHaveCount(0);
+});
+
+test('mid-watch row shows a Reset control next to Restart (TASK-142)', async ({ page }) => {
+  await page.route('**/api/continue-watching**', cwRoute(MID_WATCH));
+  await openBluey(page);
+  await expect(page.locator(`.detail-row[data-id="${EP1}"] .detail-reset`)).toBeVisible();
+});
+
+test('Reset needs two presses: first arms, second clears progress (TASK-142)', async ({ page }) => {
+  // CW reports the episode mid-watch until the reset DELETE fires (browse AND
+  // detail both fetch CW, so a call-counter is wrong — gate on the delete). After
+  // the DELETE the refresh re-pulls CW empty, so the row re-renders unwatched.
+  let deleted = false;
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: deleted ? [] : MID_WATCH })
+  }));
+  let deleteMethod = null;
+  await page.route('**/api/progress/**', route => {
+    deleteMethod = route.request().method();
+    deleted = true;
+    route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ item_id: EP1, position_secs: 0, duration_secs: null, completed: false, last_watched: null })
+    });
+  });
+  await openBluey(page);
+  const reset = page.locator(`.detail-row[data-id="${EP1}"] .detail-reset`);
+  // First press arms the confirm — no DELETE yet.
+  await reset.click();
+  await expect(reset).toHaveText('Reset?');
+  expect(deleteMethod).toBeNull();
+  // Second press fires the DELETE and the row clears.
+  await reset.click();
+  expect(deleteMethod).toBe('DELETE');
+  const row = page.locator(`.detail-row[data-id="${EP1}"]`);
+  await expect(row.locator('.detail-progress')).toHaveCount(0);
+  await expect(row.locator('.detail-restart')).toHaveCount(0);
+  await expect(row.locator('.detail-reset')).toHaveCount(0);
+});
+
+test('blurring an armed Reset disarms it (TASK-142)', async ({ page }) => {
+  await page.route('**/api/continue-watching**', cwRoute(MID_WATCH));
+  await openBluey(page);
+  const reset = page.locator(`.detail-row[data-id="${EP1}"] .detail-reset`);
+  await reset.click();
+  await expect(reset).toHaveText('Reset?');
+  await page.locator('#btn-play-next').focus();
+  await expect(reset).toHaveText('Reset');
+});
+
+test('ArrowRight steps row → Restart → Reset (TASK-142)', async ({ page }) => {
+  await page.route('**/api/continue-watching**', cwRoute(MID_WATCH));
+  await openBluey(page);
+  const row = page.locator(`.detail-row[data-id="${EP1}"]`);
+  await row.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(row.locator('.detail-restart')).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(row.locator('.detail-reset')).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(row.locator('.detail-restart')).toBeFocused();
 });
 
 test('Restart control on a mid-watch row plays the episode', async ({ page }) => {

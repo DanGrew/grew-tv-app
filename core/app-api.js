@@ -33,6 +33,16 @@ export function saveProgress(serverUrl, id, positionSec, durationSec, person) {
   });
 }
 
+// Wipe the backend watch progress for one video, for the active person
+// (TASK-142). Single-video reset — DELETEs the per-person progress row so the
+// resume bar / RESUME tag clear. Idempotent server-side; the backend 400s when
+// person is absent. `person` (FEAT-026) keys the delete to the active viewer.
+export function resetProgress(serverUrl, id, person) {
+  return fetch(serverUrl + '/api/progress/' + encodeURIComponent(id) + '?person=' + encodeURIComponent(person || ''), {
+    method: 'DELETE'
+  });
+}
+
 export function loadVideo(serverUrl, id) {
   return getJson(serverUrl + '/api/video/' + encodeURIComponent(id));
 }

@@ -15,7 +15,7 @@ var AVAILABLE_ROW = {
 // Per-render context for the detail screen: the series + progress + the active
 // season chip (TASK-123). null activeSeason = no season chips (legacy single
 // list). Reset on each buildDetailList.
-var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, seasons: [], activeSeason: null };
+var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, onReset: function() {}, seasons: [], activeSeason: null };
 
 // Up/Down move between vertical stops: clickable breadcrumb crumbs (top), then
 // the header Play-next action, the shuffle button, the active season chip, then
@@ -55,25 +55,36 @@ function chipSibling(el, delta) {
   [chips[i + delta]].filter(Boolean).filter(function() { return i > -1; }).forEach(function(c) { c.focus(); });
 }
 
-// Right steps from a row onto its Restart control, or from a season chip to the
-// next chip.
+// The horizontal stops within a row: the row itself, then its secondary controls
+// (Restart, then Reset) in DOM order. Empty for a non-row element (e.g. a season
+// chip), so the row-horizontal move no-ops there and chipSibling handles chips.
+function rowHStops(el) {
+  return [el.closest('.detail-row')].filter(Boolean).map(function(r) {
+    return [r].concat(Array.from(r.querySelectorAll('.detail-restart, .detail-reset')));
+  }).concat([[]])[0];
+}
+
+function moveHoriz(el, delta) {
+  var stops = rowHStops(el);
+  var i = stops.indexOf(el);
+  [stops[i + delta]].filter(Boolean).filter(function() { return i > -1; }).forEach(function(t) { t.focus(); });
+}
+
+// Right/Left step sideways through a row's controls (row -> Restart -> Reset),
+// or between season chips. Each move targets one group: rowHStops is empty for a
+// chip and chipSibling is a no-op off a chip, so calling both is safe.
 export function detailRight(e) {
   e.preventDefault();
   var el = document.activeElement;
-  [el].filter(function(r) { return r.classList.contains('detail-row'); })
-    .map(function(r) { return r.querySelector('.detail-restart'); })
-    .filter(Boolean)
-    .forEach(function(btn) { btn.focus(); });
+  moveHoriz(el, 1);
   chipSibling(el, 1);
 }
 
 export function detailLeft(e) {
   e.preventDefault();
-  var active = document.activeElement;
-  [active.closest('.detail-row')].filter(Boolean)
-    .filter(function() { return active.classList.contains('detail-restart'); })
-    .forEach(function(r) { r.focus(); });
-  chipSibling(active, -1);
+  var el = document.activeElement;
+  moveHoriz(el, -1);
+  chipSibling(el, -1);
 }
 
 // Default focus lands on Play-next (not the breadcrumb): the crumbs are a stop
@@ -129,6 +140,40 @@ function appendRestart(row, mid, onPlayItem, item, i) {
   });
 }
 
+// Reset clears the backend watch progress for this row's video — the "mark
+// unwatched" action (TASK-142), distinct from Restart (replays from 0 without
+// forgetting). Two-press confirm: the first activation arms (label -> "Reset?"),
+// the second fires onReset; blurring the control disarms it.
+function fireReset(btn, onReset, item, i) {
+  ({
+    'false': function() { btn.classList.add('confirm'); btn.textContent = 'Reset?'; btn.setAttribute('data-armed', '1'); },
+    'true':  function() { onReset(item, i); }
+  })[String(btn.getAttribute('data-armed') === '1')]();
+}
+
+function disarmReset(btn) {
+  btn.classList.remove('confirm');
+  btn.textContent = 'Reset';
+  btn.removeAttribute('data-armed');
+}
+
+// Present only on a mid-watch row (a fresh row has nothing to forget). Mirrors
+// appendRestart; stopPropagation so it never also triggers the row's resume.
+function appendReset(row, mid, onReset, item, i) {
+  [mid].filter(Boolean).forEach(function() {
+    var btn = document.createElement('button');
+    btn.className = 'detail-reset';
+    btn.tabIndex = 0;
+    btn.textContent = 'Reset';
+    btn.addEventListener('click', function(e) { e.stopPropagation(); fireReset(btn, onReset, item, i); });
+    btn.addEventListener('keydown', function(e) {
+      [e.key].filter(function(k) { return PLAY_KEYS[k]; }).forEach(function() { e.preventDefault(); e.stopPropagation(); fireReset(btn, onReset, item, i); });
+    });
+    btn.addEventListener('blur', function() { disarmReset(btn); });
+    row.appendChild(btn);
+  });
+}
+
 function bindRow(row, available, onPlayItem, item, i) {
   [row].filter(function() { return available; }).forEach(function(r) {
     r.addEventListener('click', function() { onPlayItem(item, i, 'resume'); });
@@ -138,7 +183,7 @@ function bindRow(row, available, onPlayItem, item, i) {
   });
 }
 
-function buildRow(server, series, progress, onPlayItem, item, i, isNext) {
+function buildRow(server, series, progress, onPlayItem, onReset, item, i, isNext) {
   var video = item.video;
   var available = video.available !== false;
   var avConfig = AVAILABLE_ROW[available + ''];
@@ -160,6 +205,7 @@ function buildRow(server, series, progress, onPlayItem, item, i, isNext) {
     progressBarMarkup(mid, percent(resume, video.duration), 'detail-progress') + '</div>';
 
   appendRestart(row, mid, onPlayItem, item, i);
+  appendReset(row, mid, onReset, item, i);
   bindRow(row, available, onPlayItem, item, i);
   return row;
 }
@@ -245,7 +291,7 @@ function renderList() {
   var nextIdx = primaryAction(state.series.items, state.progress).index;
   visibleItems(state.series.items, state.activeSeason).forEach(function(e) {
     maybeSeasonHeaderFor(list, e.item, ctx);
-    list.appendChild(buildRow(state.server, state.series, state.progress, state.onPlayItem, e.item, e.idx, e.idx === nextIdx));
+    list.appendChild(buildRow(state.server, state.series, state.progress, state.onPlayItem, state.onReset, e.item, e.idx, e.idx === nextIdx));
   });
 }
 
@@ -253,12 +299,14 @@ function renderList() {
 // items:[{season?, episode?, video:<full record>}]}. progress: id ->
 // {resumePositionSec, lastPlayed} from /api/continue-watching (backend is the
 // source of truth — no localStorage). onPlayItem(item, i, mode) where mode is
-// 'resume' (row default) or 'restart'. With seasons[] the header carries a season
-// chip row that filters the list + swaps the poster (TASK-123); without it the
-// legacy single list + inline dividers render unchanged.
-export function buildDetailList(server, series, progress, onPlayItem) {
+// 'resume' (row default) or 'restart'. onReset(item, i) clears that video's
+// backend progress (TASK-142) — the caller does the DELETE + re-render. With
+// seasons[] the header carries a season chip row that filters the list + swaps
+// the poster (TASK-123); without it the legacy single list renders unchanged.
+export function buildDetailList(server, series, progress, onPlayItem, onReset) {
   state = {
     server: server, series: series, progress: progress, onPlayItem: onPlayItem,
+    onReset: [onReset].filter(Boolean).concat([function() {}])[0],
     seasons: seasonsOf(series),
     activeSeason: defaultSeason(series.items, progress, seasonsOf(series))
   };

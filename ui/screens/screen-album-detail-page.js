@@ -3,7 +3,7 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadAlbum, loadContinueWatching } from '../../core/app-api.js';
+import { loadAlbum, loadContinueWatching, resetProgress } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { playNextIndex } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -30,6 +30,24 @@ export function initAlbumDetailPage() {
   };
   function play(item, mode) { navTo('audio.html', PLAY_PARAMS[mode](item.video.id)); }
   function onPlayItem(item, i, mode) { play(item, mode); }
+
+  // Reset (TASK-142): clear this track's backend progress, then re-pull
+  // Continue-Watching and re-render so its resume bar clears. Re-focus the row.
+  function focusRow(id) {
+    [document.querySelector('.detail-row[data-id="' + id + '"]')].filter(Boolean).forEach(function(r) { r.focus(); });
+  }
+  function rerender(focusId, content) {
+    state.progress = progressMapFromCW(content);
+    buildDetailList(SERVER, state.album, state.progress, onPlayItem, onResetItem);
+    focusRow(focusId);
+  }
+  function refreshProgress(focusId) {
+    loadContinueWatching(SERVER, profile, getPerson()).catch(function() { return { content: [] }; })
+      .then(function(cw) { rerender(focusId, cw.content); });
+  }
+  function onResetItem(item) {
+    resetProgress(SERVER, item.video.id, getPerson()).then(function() { refreshProgress(item.video.id); });
+  }
 
   // Header Play: the track after the most-recently-played one (wraps), resumed.
   function playFromResume() {
@@ -92,7 +110,7 @@ export function initAlbumDetailPage() {
       state.album = res[0];
       state.progress = progressMapFromCW(res[1].content);
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: albumId, seriesTitle: state.album.title }));
-      buildDetailList(SERVER, state.album, state.progress, onPlayItem);
+      buildDetailList(SERVER, state.album, state.progress, onPlayItem, onResetItem);
       focusFirstDetailRow();
     })
     .catch(function() { navTo('error.html'); });

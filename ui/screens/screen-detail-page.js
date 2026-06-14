@@ -3,7 +3,7 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadSeries, loadContinueWatching } from '../../core/app-api.js';
+import { loadSeries, loadContinueWatching, resetProgress } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { primaryAction, playNextLabel } from '../../core/series-detail.js';
 import { collectionMetaLine } from '../../core/detail-view.js';
@@ -25,6 +25,26 @@ export function initDetailPage() {
   };
   function play(item, mode) { navTo('video.html', PLAY_PARAMS[mode](item.video.id)); }
   function onPlayItem(item, i, mode) { play(item, mode); }
+
+  // Reset (TASK-142): wipe this episode's backend progress, then re-pull
+  // Continue-Watching and re-render so its resume bar / RESUME tag clear. Re-focus
+  // the same row after the rebuild so the d-pad position is kept.
+  function focusRow(id) {
+    [document.querySelector('.detail-row[data-id="' + id + '"]')].filter(Boolean).forEach(function(r) { r.focus(); });
+  }
+  function rerender(focusId, content) {
+    state.progress = progressMapFromCW(content);
+    document.getElementById('btn-play-next').textContent = '▶ ' + playNextLabel(state.series.items, state.progress);
+    buildDetailList(SERVER, state.series, state.progress, onPlayItem, onResetItem);
+    focusRow(focusId);
+  }
+  function refreshProgress(focusId) {
+    loadContinueWatching(SERVER, profile, getPerson()).catch(function() { return { content: [] }; })
+      .then(function(cw) { rerender(focusId, cw.content); });
+  }
+  function onResetItem(item) {
+    resetProgress(SERVER, item.video.id, getPerson()).then(function() { refreshProgress(item.video.id); });
+  }
 
   // Header action: continue the most-recent episode while it is still mid-watch,
   // otherwise the next one (wraps at the series end). Resume mode replays from the
@@ -82,7 +102,7 @@ export function initDetailPage() {
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: seriesId, seriesTitle: state.series.title }));
       document.getElementById('detail-meta').textContent = collectionMetaLine(state.series);
       document.getElementById('btn-play-next').textContent = '▶ ' + playNextLabel(state.series.items, state.progress);
-      buildDetailList(SERVER, state.series, state.progress, onPlayItem);
+      buildDetailList(SERVER, state.series, state.progress, onPlayItem, onResetItem);
       focusFirstDetailRow();
     })
     .catch(function() { navTo('error.html'); });
