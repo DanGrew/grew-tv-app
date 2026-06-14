@@ -18,6 +18,7 @@ import {
   defaultConfig, parseConfig, isLocked, pinMatches, personById, personByProfile,
   pushDigit, popDigit, isPinComplete, dotFill, keypadNav
 } from '../../core/profile-config.js';
+import { groupRows, gridNav } from '../../core/profile-rows.js';
 
 // Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
 var SERVER = window.location.origin;
@@ -101,15 +102,16 @@ export function initProfilePage() {
     ({ true: function() { openPin(person); }, false: function() { finish(person); } })[isLocked(person)]();
   }
 
+  function focusCard(id) { document.getElementById('btn-' + id).focus(); }
+
   function focusFirstCard() {
-    [config.persons[0]].filter(Boolean).forEach(function(p) { document.getElementById('btn-' + p.id).focus(); });
+    groupRows(config.persons).slice(0, 1).map(function(row) { return row[0].id; }).forEach(focusCard);
   }
 
-  function moveCard(delta) {
-    var ids = config.persons.map(function(p) { return 'btn-' + p.id; });
-    var cur = [ids.indexOf(document.activeElement.id)].filter(function(i) { return i >= 0; }).concat([0])[0];
-    var next = Math.max(0, Math.min(ids.length - 1, cur + delta));
-    document.getElementById(ids[next]).focus();
+  // d-pad across the two-row grid (kids row over adults row). Left/Right walk a
+  // row, Up/Down change rows — the index math + column clamp live in core.
+  function moveFocus(key) {
+    focusCard(gridNav(groupRows(config.persons), document.activeElement.id.replace('btn-', ''), key));
   }
 
   function photoNode(person) {
@@ -152,13 +154,21 @@ export function initProfilePage() {
     name.textContent = person.name;
     card.appendChild(name);
     card.addEventListener('click', function() { selectPerson(person); });
-    cardsEl.appendChild(card);
+    return card;
+  }
+
+  // One flex row per class (kids then adults) inside the column container.
+  function buildRow(persons) {
+    var row = document.createElement('div');
+    row.className = 'profile-row';
+    persons.map(buildCard).forEach(function(card) { row.appendChild(card); });
+    cardsEl.appendChild(row);
   }
 
   function applyConfig(cfg) {
     config = cfg;
     cardsEl.innerHTML = '';
-    config.persons.forEach(buildCard);
+    groupRows(config.persons).forEach(buildRow);
     // Don't yank focus out of the keypad if the real config lands mid-entry.
     ({ true: focusFirstCard, false: noop })[mode === 'cards']();
   }
@@ -238,8 +248,10 @@ export function initProfilePage() {
 
   var KEYMAP = {
     cards: {
-      ArrowLeft: function() { moveCard(-1); },
-      ArrowRight: function() { moveCard(1); },
+      ArrowLeft: function() { moveFocus('ArrowLeft'); },
+      ArrowRight: function() { moveFocus('ArrowRight'); },
+      ArrowUp: function() { moveFocus('ArrowUp'); },
+      ArrowDown: function() { moveFocus('ArrowDown'); },
       Enter: activate,
       ' ': activate
     },
