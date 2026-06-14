@@ -16,6 +16,49 @@
 export var PIN_LEN = 4;
 export var DEFAULT_PIN = '0000';
 
+// Built-in Guest person (FEAT-034). An always-present kids-class person for
+// visitors: it sees kids content only (its `profile` drives the same browse
+// filter as any kid) and is never locked, so it needs no PIN. Synthesised here
+// so every install has a Guest card without editing config.json. A config.json
+// person with id 'guest' overrides its name/photo/emoji (but never its class —
+// Guest is always kids, always open). The emoji is the FEAT-033 card glyph;
+// it's inert data until that lands, harmless before.
+export var GUEST_ID = 'guest';
+var GUEST_EMOJI = '👋';
+
+function guestPerson() {
+  return { id: GUEST_ID, name: 'Guest', profile: 'kids', photo: null, pin: null, emoji: GUEST_EMOJI };
+}
+
+// A Guest authored in config.json may override name/photo/emoji; its class is
+// forced to kids and its pin to null so Guest can never become PIN-gated.
+function mergeGuest(authored) {
+  var base = guestPerson();
+  return {
+    id: GUEST_ID,
+    name: authored && authored.name != null ? authored.name : base.name,
+    profile: 'kids',
+    photo: authored && authored.photo != null ? authored.photo : base.photo,
+    pin: null,
+    emoji: authored && authored.emoji != null ? authored.emoji : base.emoji
+  };
+}
+
+// Guarantee exactly one Guest, always last so the family's own persons stay
+// first (and keep initial picker focus). An authored guest is folded in via
+// mergeGuest; otherwise the built-in is appended.
+function withGuest(persons) {
+  var authored = persons.filter(function(p) { return p.id === GUEST_ID; })[0] || null;
+  var rest = persons.filter(function(p) { return p.id !== GUEST_ID; });
+  return rest.concat([mergeGuest(authored)]);
+}
+
+// The built-in Guest, identified by its stable id (TASK-196 hangs the
+// no-progress guard off this predicate).
+export function isGuest(person) {
+  return !!person && person.id === GUEST_ID;
+}
+
 // Generic placeholders only — one adult + one kid. NO real names or PINs here.
 function defaultPersons() {
   return [
@@ -25,7 +68,7 @@ function defaultPersons() {
 }
 
 export function defaultConfig() {
-  return { defaultPin: DEFAULT_PIN, persons: defaultPersons() };
+  return { defaultPin: DEFAULT_PIN, persons: withGuest(defaultPersons()) };
 }
 
 function normalizePerson(raw) {
@@ -48,7 +91,7 @@ export function parseConfig(raw) {
     ? cfg.persons.filter(function(p) { return p && typeof p === 'object' && p.id; })
     : [];
   var persons = list.length ? list.map(normalizePerson) : defaultPersons();
-  return { defaultPin: dpin, persons: persons };
+  return { defaultPin: dpin, persons: withGuest(persons) };
 }
 
 // An adult person is gated; a kid person selects freely.

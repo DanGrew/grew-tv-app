@@ -64,6 +64,18 @@ test('picking a person activates it on the targeted screen FIRST (gated), not a 
   expect(act.payload.takeover).toBe(false);
 });
 
+// FEAT-034 TASK-195: the companion mirror shows the same synthesised Guest card,
+// and tapping it activates person 'guest' on the targeted screen (no PIN).
+test('shows the built-in Guest card and activates person guest on tap', async ({ page }) => {
+  await expect(page.locator('.cmp-card[data-id="guest"]')).toBeVisible();
+  await expect(page.locator('.cmp-card[data-id="guest"] .cmp-lock')).toHaveCount(0);
+  await page.locator('.cmp-card[data-id="guest"]').click();
+  await expect.poll(() => sent.filter(function(m) { return m.type === 'activate_person'; }).length).toBeGreaterThan(0);
+  const act = sent.find(function(m) { return m.type === 'activate_person'; });
+  expect(act.payload.person_id).toBe('guest');
+  expect(act.payload.takeover).toBe(false);
+});
+
 test('a person live on another screen raises the take-over prompt ON THE COMPANION', async ({ page }) => {
   await page.locator('.cmp-card[data-id="oliver"]').click();
   await expect(page.locator('#takeover-overlay')).toHaveClass(/active/);

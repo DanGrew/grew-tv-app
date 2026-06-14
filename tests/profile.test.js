@@ -7,10 +7,23 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('#screen-profile')).toBeVisible();
 });
 
-test('shows photo cards for Kids and Adults with names', async ({ page }) => {
-  await expect(page.locator('.profile-card')).toHaveCount(2);
+test('shows photo cards for Kids and Adults with names, plus the built-in Guest (last)', async ({ page }) => {
+  await expect(page.locator('.profile-card')).toHaveCount(3);
   await expect(page.locator('#btn-kids .profile-name')).toHaveText('Kids');
   await expect(page.locator('#btn-adults .profile-name')).toHaveText('Adults');
+  // FEAT-034 TASK-195: Guest is synthesised, always present, rendered last.
+  await expect(page.locator('.profile-card').last().locator('.profile-name')).toHaveText('Guest');
+});
+
+// FEAT-034 TASK-195: the always-present Guest card — kids-class, never locked,
+// no PIN — selecting it sets person='guest' and opens straight to browse.
+test('Guest card is present, unlocked, and selects with no PIN', async ({ page }) => {
+  await expect(page.locator('#btn-guest .profile-name')).toHaveText('Guest');
+  await expect(page.locator('#btn-guest .lock-badge')).toHaveCount(0);
+  await page.locator('#btn-guest').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv-person'))).toBe('guest');
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv-profile'))).toBe('kids');
 });
 
 test('shows this screen colour identity swatch + label on load (TASK-178)', async ({ page }) => {
@@ -126,10 +139,12 @@ const ROSTER = {
 test('renders one card per configured person, ids distinct from names', async ({ page }) => {
   await configRoute(page, ROSTER);
   await page.reload();
-  await expect(page.locator('.profile-card')).toHaveCount(3);
+  // three configured persons + the always-present Guest
+  await expect(page.locator('.profile-card')).toHaveCount(4);
   await expect(page.locator('#btn-oliver .profile-name')).toHaveText('Oliver');
   await expect(page.locator('#btn-millie .profile-name')).toHaveText('Millie');
   await expect(page.locator('#btn-mom .profile-name')).toHaveText('Mom');
+  await expect(page.locator('#btn-guest .profile-name')).toHaveText('Guest');
 });
 
 test('picking a kid person needs no PIN and sets the active person', async ({ page }) => {
@@ -184,7 +199,9 @@ test('absent config falls back to generic placeholder persons and still boots', 
     return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
   });
   await page.reload();
-  await expect(page.locator('.profile-card')).toHaveCount(2);
+  // two generic placeholders + the always-present Guest
+  await expect(page.locator('.profile-card')).toHaveCount(3);
+  await expect(page.locator('#btn-guest')).toBeVisible();
   await page.locator('#btn-child').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
 });

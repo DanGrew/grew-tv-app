@@ -1,19 +1,67 @@
 import {
-  PIN_LEN, DEFAULT_PIN, defaultConfig, parseConfig, isLocked, effectivePin,
+  PIN_LEN, DEFAULT_PIN, GUEST_ID, defaultConfig, parseConfig, isLocked, isGuest, effectivePin,
   pinMatches, personById, personByProfile,
   pushDigit, popDigit, isPinComplete, dotFill, keypadNav
 } from '../../core/profile-config.js';
 
 describe('defaultConfig', () => {
-  it('has the default PIN and one open kid + one locked adult placeholder', () => {
+  it('has the default PIN and one open kid + one locked adult placeholder (then Guest)', () => {
     var c = defaultConfig();
     expect(c.defaultPin).toBe(DEFAULT_PIN);
-    expect(c.persons.map(p => p.profile)).toEqual(['kids', 'adults']);
+    expect(c.persons.map(p => p.profile)).toEqual(['kids', 'adults', 'kids']);
     expect(isLocked(c.persons[0])).toBe(false);
     expect(isLocked(c.persons[1])).toBe(true);
     expect(c.persons[0].photo).toBe(null);
-    // generic placeholders only — no real names
-    expect(c.persons.map(p => p.id)).toEqual(['child', 'grownup']);
+    // generic placeholders only — no real names — plus the always-present Guest, last
+    expect(c.persons.map(p => p.id)).toEqual(['child', 'grownup', GUEST_ID]);
+  });
+});
+
+// FEAT-034 TASK-195 — Guest is a synthesised, always-present kids-class person.
+describe('built-in Guest', () => {
+  it('appends an always-present Guest, last, kids-class and never locked', () => {
+    var c = parseConfig({ persons: [{ id: 'oliver', profile: 'kids' }, { id: 'mom', profile: 'adults' }] });
+    var guest = c.persons[c.persons.length - 1];
+    expect(c.persons.map(p => p.id)).toEqual(['oliver', 'mom', GUEST_ID]);
+    expect(guest).toEqual({ id: 'guest', name: 'Guest', profile: 'kids', photo: null, pin: null, emoji: '👋' });
+    expect(isLocked(guest)).toBe(false);
+    expect(isGuest(guest)).toBe(true);
+  });
+
+  it('is present even with no configured persons (default placeholders)', () => {
+    expect(parseConfig({}).persons.map(p => p.id)).toEqual(['child', 'grownup', GUEST_ID]);
+    expect(parseConfig(null).persons.some(p => p.id === GUEST_ID)).toBe(true);
+  });
+
+  it('lets a config-authored guest override name/photo but never its class or lock', () => {
+    var c = parseConfig({ persons: [
+      { id: 'guest', name: 'Visitor', profile: 'adults', photo: 'g.jpg', pin: '0000' }
+    ] });
+    // exactly one guest, still last, still kids + open despite the adult/pin in config
+    expect(c.persons.filter(p => p.id === GUEST_ID)).toHaveLength(1);
+    expect(c.persons[c.persons.length - 1]).toEqual(
+      { id: 'guest', name: 'Visitor', profile: 'kids', photo: 'g.jpg', pin: null, emoji: '👋' });
+    expect(isLocked(c.persons[c.persons.length - 1])).toBe(false);
+  });
+
+  // Emoji override composes with FEAT-033: mergeGuest already reads authored.emoji,
+  // so once TASK-192 adds the emoji passthrough to normalizePerson a config emoji
+  // flows through with no change here. Until then Guest keeps the default glyph.
+  it('keeps the default emoji until FEAT-033 normalizePerson passthrough lands', () => {
+    var c = parseConfig({ persons: [{ id: 'guest', emoji: '🛸' }] });
+    expect(c.persons[c.persons.length - 1].emoji).toBe('👋');
+  });
+
+  it('personById resolves the synthesised guest', () => {
+    expect(personById(parseConfig({ persons: [{ id: 'mom', profile: 'adults' }] }), 'guest').name).toBe('Guest');
+  });
+});
+
+describe('isGuest', () => {
+  it('is true only for the guest id', () => {
+    expect(isGuest({ id: 'guest' })).toBe(true);
+    expect(isGuest({ id: 'mom' })).toBe(false);
+    expect(isGuest(null)).toBe(false);
   });
 });
 
@@ -52,7 +100,7 @@ describe('parseConfig', () => {
   });
 
   it('drops person entries without an id, and defaults when none remain', () => {
-    expect(parseConfig({ persons: [{ name: 'x' }, { id: 'mom', profile: 'adults' }] }).persons.map(p => p.id)).toEqual(['mom']);
+    expect(parseConfig({ persons: [{ name: 'x' }, { id: 'mom', profile: 'adults' }] }).persons.map(p => p.id)).toEqual(['mom', 'guest']);
     expect(parseConfig({ persons: [{ name: 'x' }] }).persons).toEqual(defaultConfig().persons);
     expect(parseConfig({ persons: 'bad' }).persons).toEqual(defaultConfig().persons);
   });
