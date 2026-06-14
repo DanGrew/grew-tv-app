@@ -3,6 +3,7 @@ import { mediaUrl } from '../../core/app-api.js';
 import { percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, durationMarkup, progressBarMarkup, detailTagMarkup } from '../../core/detail-view.js';
 import { primaryAction } from '../../core/series-detail.js';
+import { seasonsOf, seasonLabel, chipClass, visibleItems, defaultSeason, seasonPosterOf, posterCandidates } from '../../core/seasons.js';
 
 var DETAIL_ARROW_DELTA = { ArrowUp: -1, ArrowDown: 1 };
 var PLAY_KEYS = { Enter: true, ' ': true };
@@ -11,9 +12,15 @@ var AVAILABLE_ROW = {
   'false': { className: 'detail-row unavailable', tabIndex: -1 }
 };
 
+// Per-render context for the detail screen: the series + progress + the active
+// season chip (TASK-123). null activeSeason = no season chips (legacy single
+// list). Reset on each buildDetailList.
+var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, seasons: [], activeSeason: null };
+
 // Up/Down move between vertical stops: clickable breadcrumb crumbs (top), then
-// the header Play-next action, then every available episode row. A focused
-// per-row Restart control counts as its row.
+// the header Play-next action, the shuffle button, the active season chip, then
+// every available episode row. A focused per-row Restart control counts as its
+// row; Left/Right move sideways onto it (or between season chips).
 function crumbStops() {
   return Array.from(document.querySelectorAll('#breadcrumb .crumb-link'));
 }
@@ -22,6 +29,7 @@ function verticalStops() {
   return crumbStops()
     .concat([document.getElementById('btn-play-next')].filter(Boolean))
     .concat(Array.from(document.querySelectorAll('#btn-shuffle:not(.hidden)')))
+    .concat(Array.from(document.querySelectorAll('.season-chip.active')))
     .concat(Array.from(document.querySelectorAll('.detail-row:not(.unavailable)')));
 }
 
@@ -38,14 +46,25 @@ export function detailArrow(e) {
   [stops[idx + delta]].filter(Boolean).filter(function() { return idx > -1; }).forEach(function(s) { s.focus(); });
 }
 
-// Right steps from a row onto its Restart control; Left steps back to the row.
+// Focus the next/previous season chip (a horizontal group). Focusing it fires
+// its `focus` handler -> the season is picked. Guards non-chip elements (indexOf
+// -1) and the ends of the row.
+function chipSibling(el, delta) {
+  var chips = Array.from(document.querySelectorAll('.season-chip'));
+  var i = chips.indexOf(el);
+  [chips[i + delta]].filter(Boolean).filter(function() { return i > -1; }).forEach(function(c) { c.focus(); });
+}
+
+// Right steps from a row onto its Restart control, or from a season chip to the
+// next chip.
 export function detailRight(e) {
   e.preventDefault();
-  var row = document.activeElement;
-  [row].filter(function(r) { return r.classList.contains('detail-row'); })
+  var el = document.activeElement;
+  [el].filter(function(r) { return r.classList.contains('detail-row'); })
     .map(function(r) { return r.querySelector('.detail-restart'); })
     .filter(Boolean)
     .forEach(function(btn) { btn.focus(); });
+  chipSibling(el, 1);
 }
 
 export function detailLeft(e) {
@@ -54,6 +73,7 @@ export function detailLeft(e) {
   [active.closest('.detail-row')].filter(Boolean)
     .filter(function() { return active.classList.contains('detail-restart'); })
     .forEach(function(r) { r.focus(); });
+  chipSibling(active, -1);
 }
 
 // Default focus lands on Play-next (not the breadcrumb): the crumbs are a stop
@@ -74,6 +94,15 @@ function maybeSeasonHeader(list, item, ctx) {
     .filter(function(s) { return s != null; })
     .filter(function(s) { return s !== ctx.lastSeason; })
     .forEach(function(s) { seasonHeader(list, s); ctx.lastSeason = s; });
+}
+
+// Inline "Season N" dividers belong to the legacy single-list mode only — when
+// the season chips drive the list (activeSeason set) the chip IS the label.
+function maybeSeasonHeaderFor(list, item, ctx) {
+  ({
+    true:  function() { maybeSeasonHeader(list, item, ctx); },
+    false: function() {}
+  })[String(state.activeSeason === null)]();
 }
 
 function thumbMarkup(src) {
@@ -135,47 +164,108 @@ function buildRow(server, series, progress, onPlayItem, item, i, isNext) {
   return row;
 }
 
-// Series header poster: real art when get_series carries one, else the 🎬
-// placeholder. Same per-element graceful fallback as the tile/episode thumbs —
-// an onerror swap covers a poster ref whose file is missing on the server.
-function setHeaderPoster(server, series) {
-  var img = document.getElementById('detail-header-poster');
-  var ph = document.getElementById('detail-header-placeholder');
-  var src = mediaUrl(server, series.poster);
+function showImg(img, ph) { img.style.display = 'block'; ph.style.display = 'none'; }
+function showPlaceholder(img, ph) { img.style.display = 'none'; ph.style.display = 'flex'; }
+
+// Header poster with a graceful fallback chain: the active season's art, then the
+// series art, then the 🎬 placeholder. `cands` is the ordered list of present
+// poster URLs (TASK-122/123); each 404 shifts to the next, an empty list shows
+// the placeholder up front. Same idea as the per-element tile/episode fallback.
+function applyPoster(img, ph, cands) {
+  img.onerror = function() {
+    cands.shift();
+    ({
+      true:  function() { showPlaceholder(img, ph); },
+      false: function() { img.src = cands[0]; }
+    })[String(cands.length === 0)]();
+  };
   ({
-    true: function() {
-      img.src = src;
-      img.style.display = 'block';
-      ph.style.display = 'none';
-      img.addEventListener('error', function() {
-        img.style.display = 'none';
-        ph.style.display = 'flex';
-      });
-    },
-    false: function() {
-      img.style.display = 'none';
-      ph.style.display = 'flex';
-    }
-  })[String(!!src)]();
+    true:  function() { showPlaceholder(img, ph); },
+    false: function() { showImg(img, ph); img.src = cands[0]; }
+  })[String(cands.length === 0)]();
 }
 
-// series: v3 /api/series record {title, poster, items:[{season?, episode?,
-// video:<full record>}]}. progress: id -> {resumePositionSec, lastPlayed} from
-// /api/continue-watching (backend is the source of truth — no localStorage).
-// onPlayItem(item, i, mode) where mode is 'resume' (row default) or 'restart'.
-export function buildDetailList(server, series, progress, onPlayItem) {
-  document.getElementById('detail-title').textContent = series.title;
-  setHeaderPoster(server, series);
+function renderHeaderPoster() {
+  var img = document.getElementById('detail-header-poster');
+  var ph = document.getElementById('detail-header-placeholder');
+  var seasonPoster = seasonPosterOf(state.seasons, state.activeSeason);
+  applyPoster(img, ph, posterCandidates(state.server, seasonPoster, state.series.poster));
+}
+
+function makeChip(s) {
+  var btn = document.createElement('button');
+  btn.className = chipClass(s.season, state.activeSeason);
+  btn.tabIndex = 0;
+  btn.textContent = seasonLabel(s.season);
+  btn.setAttribute('data-season', s.season);
+  btn.addEventListener('focus', function() { pickSeason(s.season); });
+  return btn;
+}
+
+function setChipBoxVisible(box, n) {
+  ({
+    true:  function() { box.style.display = 'none'; },
+    false: function() { box.style.display = 'flex'; }
+  })[String(n === 0)]();
+}
+
+// buildDetailList is shared with the album-detail page, whose HTML has no
+// #season-chips (albums never have seasons) — no-op when the container is absent.
+function renderChips() {
+  [document.getElementById('season-chips')].filter(Boolean).forEach(function(box) {
+    box.innerHTML = '';
+    state.seasons.forEach(function(s) { box.appendChild(makeChip(s)); });
+    setChipBoxVisible(box, state.seasons.length);
+  });
+}
+
+function updateChipActive() {
+  Array.from(document.querySelectorAll('.season-chip')).forEach(function(btn) {
+    btn.className = chipClass(Number(btn.getAttribute('data-season')), state.activeSeason);
+  });
+}
+
+// A chip gained focus (d-pad or click): make it the active season and re-flow the
+// header poster + episode list. Chips are NOT rebuilt, so focus stays put.
+function pickSeason(season) {
+  state.activeSeason = season;
+  updateChipActive();
+  renderHeaderPoster();
+  renderList();
+}
+
+function renderList() {
   var list = document.getElementById('detail-list');
   list.innerHTML = '';
   var ctx = { lastSeason: null };
   // Tag the row the header action will play. A 'continue' row is mid-watch, so it
   // renders RESUME (detailTagMarkup prefers it); 'next'/'again' rows get NEXT.
-  var nextIdx = primaryAction(series.items, progress).index;
-  series.items.forEach(function(item, i) {
-    maybeSeasonHeader(list, item, ctx);
-    list.appendChild(buildRow(server, series, progress, onPlayItem, item, i, i === nextIdx));
+  // nextIdx indexes the FULL items[]; visibleItems carries each item's original
+  // index, so a filtered season still tags the right row.
+  var nextIdx = primaryAction(state.series.items, state.progress).index;
+  visibleItems(state.series.items, state.activeSeason).forEach(function(e) {
+    maybeSeasonHeaderFor(list, e.item, ctx);
+    list.appendChild(buildRow(state.server, state.series, state.progress, state.onPlayItem, e.item, e.idx, e.idx === nextIdx));
   });
+}
+
+// series: v3 /api/series record {title, poster, seasons:[{season,poster}],
+// items:[{season?, episode?, video:<full record>}]}. progress: id ->
+// {resumePositionSec, lastPlayed} from /api/continue-watching (backend is the
+// source of truth — no localStorage). onPlayItem(item, i, mode) where mode is
+// 'resume' (row default) or 'restart'. With seasons[] the header carries a season
+// chip row that filters the list + swaps the poster (TASK-123); without it the
+// legacy single list + inline dividers render unchanged.
+export function buildDetailList(server, series, progress, onPlayItem) {
+  state = {
+    server: server, series: series, progress: progress, onPlayItem: onPlayItem,
+    seasons: seasonsOf(series),
+    activeSeason: defaultSeason(series.items, progress, seasonsOf(series))
+  };
+  document.getElementById('detail-title').textContent = series.title;
+  renderChips();
+  renderHeaderPoster();
+  renderList();
 }
 
 export function setup(onBack) {

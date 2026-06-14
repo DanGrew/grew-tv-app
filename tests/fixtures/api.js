@@ -14,7 +14,12 @@ const VIDEOS = {
   'ootb-01':          { id: 'ootb-01',          title: 'Turn to Stone',    profile: 'kids',   duration: 227,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
   'ootb-02':          { id: 'ootb-02',          title: 'Mr. Blue Sky',     profile: 'kids',   duration: 245,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  lyrics: 'ootb-02.lrc', available: true },
   'ootb-03':          { id: 'ootb-03',          title: 'Sweet Talkin Woman',profile: 'kids',  duration: 228,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
-  'dancing-queen':    { id: 'dancing-queen',    title: 'Dancing Queen',    profile: 'kids',   duration: 230,  poster: 'dq.jpg',        subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ABBA', available: true }
+  'dancing-queen':    { id: 'dancing-queen',    title: 'Dancing Queen',    profile: 'kids',   duration: 230,  poster: 'dq.jpg',        subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ABBA', available: true },
+  // TASK-123: a multi-season series for the season-selector tests. Not on any
+  // browse rail (opened by direct nav) so it can't disturb the rail-count suites.
+  'ib-s1e1':          { id: 'ib-s1e1',          title: 'First Day',        profile: 'kids',   duration: 1500, poster: 'ib-s1e1.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true },
+  'ib-s1e2':          { id: 'ib-s1e2',          title: 'Bunk Off',         profile: 'kids',   duration: 1500, poster: 'ib-s1e2.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true },
+  'ib-s2e1':          { id: 'ib-s2e1',          title: 'The Field Trip',   profile: 'kids',   duration: 1500, poster: 'ib-s2e1.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true }
 };
 
 const SERIES = {
@@ -24,6 +29,21 @@ const SERIES = {
       { season: 1, episode: 1, video: VIDEOS['bluey-s1e01'] },
       { season: 1, episode: 2, video: VIDEOS['bluey-s1e02'] },
       { season: 1, episode: 3, video: VIDEOS['bluey-s1e03'] }
+    ]
+  },
+  // TASK-122/123: carries seasons[] (per-season poster art) so /api/series drives
+  // the season chip selector. Two seasons; bluey above stays seasons-less so the
+  // legacy single-list + inline-divider path is still covered.
+  inbetweeners: {
+    id: 'inbetweeners', title: 'The Inbetweeners', profile: 'kids', poster: 'ib.jpg', type: 'comedy', format: 'tv-series', tags: { year: '2008' },
+    seasons: [
+      { season: 1, poster: 'ib-s1.jpg' },
+      { season: 2, poster: 'ib-s2.jpg' }
+    ],
+    items: [
+      { season: 1, episode: 1, video: VIDEOS['ib-s1e1'] },
+      { season: 1, episode: 2, video: VIDEOS['ib-s1e2'] },
+      { season: 2, episode: 1, video: VIDEOS['ib-s2e1'] }
     ]
   }
 };

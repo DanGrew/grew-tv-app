@@ -5,6 +5,7 @@ import { screenPage } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
+import { seasonsOf, hasSeasonChips, chipClass, seasonLabel, visibleItems, defaultSeason } from '../../core/seasons.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 
@@ -23,7 +24,7 @@ export function initPage() {
     actionsEl: document.getElementById('actions'),
     backBtn: document.getElementById('btn-back')
   };
-  var state = { seriesId: null, profile: null, person: null, series: null, progress: {} };
+  var state = { seriesId: null, profile: null, person: null, series: null, progress: {}, activeSeason: null };
   var api = {};
   var updateBar = null;
   function noop() {}
@@ -81,9 +82,36 @@ export function initPage() {
     return btn;
   }
 
+  // Season chips (TASK-123): mirror the app's season selector. Tapping a chip
+  // re-renders the list filtered to that season (companion is touch — a full
+  // re-render is fine, no focus to preserve). A series with no seasons[] keeps
+  // the flat episode list.
+  function pickSeason(season) { state.activeSeason = season; render(); }
+
+  function seasonChip(s) {
+    var btn = document.createElement('button');
+    btn.className = chipClass(s.season, state.activeSeason);
+    btn.setAttribute('data-season', s.season);
+    btn.textContent = seasonLabel(s.season);
+    btn.addEventListener('click', function() { pickSeason(s.season); });
+    return btn;
+  }
+
+  function appendChipRow() {
+    var row = document.createElement('div');
+    row.className = 'season-chips';
+    seasonsOf(state.series).forEach(function(s) { row.appendChild(seasonChip(s)); });
+    els.actionsEl.appendChild(row);
+  }
+
+  function renderSeasonChips() {
+    ({ 'true': appendChipRow, 'false': noop })[hasSeasonChips(state.series) + '']();
+  }
+
   function renderSeries() {
     els.actionsEl.appendChild(playNextBtn());
-    state.series.items.forEach(function(item) { els.actionsEl.appendChild(episodeBtn(item)); });
+    renderSeasonChips();
+    visibleItems(state.series.items, state.activeSeason).forEach(function(e) { els.actionsEl.appendChild(episodeBtn(e.item)); });
   }
 
   function renderNoContent() {
@@ -98,7 +126,7 @@ export function initPage() {
 
   function loadSeriesData(seriesId) {
     loadSeries(server, seriesId)
-      .then(function(s) { state.series = s; els.ctxTitle.textContent = s.title; mountCrumbs(s.title); render(); })
+      .then(function(s) { state.series = s; state.activeSeason = defaultSeason(s.items, state.progress, seasonsOf(s)); els.ctxTitle.textContent = s.title; mountCrumbs(s.title); render(); })
       .catch(function() { state.series = null; render(); });
   }
 
