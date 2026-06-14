@@ -1,5 +1,6 @@
 // Shared tile/card (TASK-116). One focusable card — 16:9 poster + title, an
-// optional mid-watch progress bar (0 < resume < 100%), an optional CC badge —
+// optional mid-watch progress bar (0 < resume < 100%), an optional CC badge, a
+// music tile's optional Lyrics badge —
 // reused by Home rails, series-detail rows and the companion grid (117-120).
 // All display logic lives in core/tile-model.js; this file only builds DOM.
 
@@ -63,6 +64,13 @@ export function createTile(server, card, opts) {
     cc.className = 'tile-cc';
     cc.textContent = 'CC';
     tile.appendChild(cc);
+  });
+
+  [m.showLyrics].filter(Boolean).forEach(function() {
+    var ly = document.createElement('div');
+    ly.className = 'tile-lyrics';
+    ly.textContent = 'Lyrics';
+    tile.appendChild(ly);
   });
 
   [m.showBar].filter(Boolean).forEach(function() {

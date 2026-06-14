@@ -39,8 +39,10 @@ const SERIES = {
 // shows multiple tiles and the artist drill-down can be filtered. Only `ootb`
 // has a resolvable /api/album detail (ALBUMS below); the others exist to populate
 // the Artists/Albums rails and the drill-down grid.
+// `hasLyrics` (backend MAX(v.lyrics IS NOT NULL) over members) drives the Lyrics
+// badge — ootb has a track with an .lrc (ootb-02), the others have none.
 const MUSIC_CARDS = [
-  { kind: 'series', id: 'ootb',         title: 'Out of the Blue', poster: 'ootb.jpg',    type: null, section: 'music', artist: 'ELO',  clipCount: 3, tags: { year: '1977' } },
+  { kind: 'series', id: 'ootb',         title: 'Out of the Blue', poster: 'ootb.jpg',    type: null, section: 'music', artist: 'ELO',  clipCount: 3, tags: { year: '1977' }, hasLyrics: true },
   { kind: 'series', id: 'elo-time',     title: 'Time',            poster: 'time.jpg',    type: null, section: 'music', artist: 'ELO',  clipCount: 2, tags: { year: '1981' } },
   { kind: 'series', id: 'abba-arrival', title: 'Arrival',         poster: 'arrival.jpg', type: null, section: 'music', artist: 'ABBA', clipCount: 2, tags: { year: '1976' } }
 ];

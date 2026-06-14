@@ -40,6 +40,11 @@ export function tileModel(card, ctx) {
   // "clips") sub-label. Type-agnostic — no `format`/`mediaType` enum.
   var music = card.section === 'music';
 
+  // Lyrics badge: a music card whose backend `hasLyrics` is set (any member
+  // track has an .lrc). The audio analogue of the CC badge; only ever on music
+  // tiles (a non-music card carries no hasLyrics).
+  var showLyrics = !!(music && card.hasLyrics);
+
   // Sub-label: an explicit `subLabel` wins (FEAT-029 artist tiles carry their own
   // "N albums"); else a series' clip/track count from the v3 browse card (backend
   // `clipCount`). Absent (video cards, or older backend without the field) -> no
@@ -58,6 +63,7 @@ export function tileModel(card, ctx) {
     percent: pct,
     showBar: showBar,
     showCC: !!cc,
+    showLyrics: showLyrics,
     sub: sub,
     music: music
   };

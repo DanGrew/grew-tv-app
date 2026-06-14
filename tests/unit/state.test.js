@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { getProfile, setProfile, getPerson, setPerson, getCaptions, setCaptions, initCaptions, getParam, navTo } from '../../core/state.js';
+import { getProfile, setProfile, getPerson, setPerson, getCaptions, setCaptions, initCaptions, getLyrics, setLyrics, getParam, navTo } from '../../core/state.js';
 
 describe('getProfile / setProfile', () => {
   var store;
@@ -24,6 +24,33 @@ describe('getProfile / setProfile', () => {
     setProfile('kids');
     setProfile('adults');
     expect(getProfile()).toBe('adults');
+  });
+});
+
+describe('getLyrics / setLyrics', () => {
+  var store;
+  beforeEach(() => {
+    store = {};
+    vi.stubGlobal('localStorage', {
+      getItem:    (k) => store[k] ?? null,
+      setItem:    (k, v) => { store[k] = v; },
+      removeItem: (k) => { delete store[k]; }
+    });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('defaults ON when unset', () => {
+    expect(getLyrics()).toBe(true);
+  });
+  it('persists OFF and reads back false', () => {
+    setLyrics(false);
+    expect(store['grew-tv-lyrics']).toBe('off');
+    expect(getLyrics()).toBe(false);
+  });
+  it('re-enabling reads back true', () => {
+    setLyrics(false);
+    setLyrics(true);
+    expect(getLyrics()).toBe(true);
   });
 });
 

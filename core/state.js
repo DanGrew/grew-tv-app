@@ -90,6 +90,18 @@ export function initCaptions(server) {
     .catch(function() { return _captionsOn; });
 }
 
+// Sticky lyrics preference — per-device (localStorage), like profile selection
+// and unlike the server-backed captions toggle above. The ambient lyrics layer
+// can be hidden even when a track has an .lrc; the choice persists across tracks
+// and sessions. Default ON; only an explicit 'off' disables.
+export function getLyrics() {
+  return localStorage.getItem('grew-tv-lyrics') !== 'off';
+}
+
+export function setLyrics(on) {
+  localStorage.setItem('grew-tv-lyrics', on ? 'on' : 'off');
+}
+
 export function getParam(key) {
   return new URLSearchParams(location.search).get(key);
 }

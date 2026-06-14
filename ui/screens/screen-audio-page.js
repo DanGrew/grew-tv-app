@@ -1,4 +1,4 @@
-import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
+import { getParam, getProfile, getPerson, navTo, getLyrics, setLyrics as saveLyricsPref } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-audio-player.js';
 import { connectApp } from '../../core/app-ws.js';
@@ -56,9 +56,19 @@ export function initAudioPage() {
   var audioEl = document.getElementById('audio');
   var lyrics = [];
   var lastLyricIdx = -2;
+  // The Lyrics pill lets the viewer hide the ambient layer even when the track
+  // has an .lrc. The choice is sticky (per-device, getLyrics); the layer shows
+  // only when enabled AND cues are present.
+  var lyricsEnabled = getLyrics();
 
   function setLyricMode(has) {
-    document.body.classList.toggle('lyrics-on', has);
+    document.body.classList.toggle('lyrics-on', [has].filter(function() { return lyricsEnabled; }).length > 0);
+  }
+
+  function onLyrics(on) {
+    lyricsEnabled = on;
+    saveLyricsPref(on);
+    setLyricMode(lyrics.length > 0);
   }
 
   function bumpCurrent() {
@@ -165,6 +175,7 @@ export function initAudioPage() {
     onNext: nextNow,
     onPrev: previous,
     onShuffle: onShuffle,
+    onLyrics: onLyrics,
     emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
     appContext: function() {
       return { screen: 'player', itemId: [albumId].filter(Boolean).concat([state.currentId])[0], episodeId: state.currentId, profile: profile };
@@ -224,6 +235,7 @@ export function initAudioPage() {
       state.order = ORDER_FOR[shuffleParam + ''](state.items);
       player.setQueueMode(!res[0].single);
       player.setShuffle(shuffleParam);
+      player.setLyrics(lyricsEnabled);
       mountBreadcrumb('breadcrumb', buildCrumbs('video', { videoTitle: state.title }));
       playId(trackId, resumeStart(restart, res[1]));
     })

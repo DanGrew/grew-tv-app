@@ -37,8 +37,8 @@ button:focus { outline: none; border-color: var(--focus); box-shadow: var(--focu
 #amb-scrim { position: fixed; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.6) 100%); z-index: -1; }
 #audio-art { width: 280px; height: 280px; border-radius: 20px; background: var(--surface-hi); background-size: cover; background-position: center; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); display: flex; align-items: center; justify-content: center; font-size: 120px; box-shadow: 0 16px 60px rgba(0,0,0,0.55); }
 #audio-meta { text-align: center; }
-#audio-title { font-size: var(--fs-xl); font-weight: 700; letter-spacing: var(--heading-ls); }
-#audio-artist { font-size: var(--fs-md); color: var(--text-muted); margin-top: 6px; min-height: 26px; }
+#audio-title { font-size: calc(var(--fs-xl) * 2); font-weight: 700; letter-spacing: var(--heading-ls); }
+#audio-artist { font-size: calc(var(--fs-md) * 2); color: var(--text-muted); margin-top: 6px; min-height: 26px; }
 #amb-lyrics { display: none; flex-direction: column; align-items: center; gap: 26px; text-align: center; max-width: 80%; }
 .amb-line { line-height: 1.3; transition: opacity 0.4s var(--ease), transform 0.4s var(--ease); }
 #amb-prev, #amb-next { font-size: var(--fs-lg); color: rgba(255,255,255,0.32); min-height: 34px; }
@@ -98,6 +98,7 @@ body.lyrics-on #audio-artist { font-size: var(--fs-sm); margin-top: 2px; min-hei
       <button id="btn-play-pause" class="ctrl-btn" aria-label="Play/Pause">&#9208;</button>
       <button id="btn-next" class="ctrl-btn" aria-label="Next">&#9197;</button>
       <button id="btn-shuffle" class="ctrl-btn pill" aria-label="Shuffle">&#128256; Shuffle</button>
+      <button id="btn-lyrics" class="ctrl-btn pill" aria-label="Lyrics">&#127925; Lyrics</button>
       <button id="btn-jump" class="ctrl-btn pill">Jump</button>
       <div id="progress"><div id="progress-fill"></div></div>
       <div id="time-display">0:00 / 0:00</div>
