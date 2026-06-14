@@ -95,7 +95,7 @@ test('the Lyrics pill toggles the ambient layer off and back on (on by default)'
   await expect(page.locator('#amb-lyrics')).toBeVisible();
 });
 
-test('the lyrics-off choice persists across a reload (per-device)', async ({ page }) => {
+test('the lyrics-off choice persists across a reload (server-backed)', async ({ page }) => {
   await openTrack(page, 'ootb', 'ootb-02');
   await expect(page.locator('body')).toHaveClass(/lyrics-on/);
   await page.locator('#btn-lyrics').click();

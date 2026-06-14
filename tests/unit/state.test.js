@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { getProfile, setProfile, getPerson, setPerson, getCaptions, setCaptions, initCaptions, getLyrics, setLyrics, getParam, navTo } from '../../core/state.js';
+import { getProfile, setProfile, getPerson, setPerson, getCaptions, setCaptions, initCaptions, getLyrics, setLyrics, initLyrics, getParam, navTo } from '../../core/state.js';
 
 describe('getProfile / setProfile', () => {
   var store;
@@ -27,8 +27,11 @@ describe('getProfile / setProfile', () => {
   });
 });
 
-describe('getLyrics / setLyrics', () => {
-  var store;
+// FEAT-023: lyrics preference is server-backed, exactly like captions — an
+// in-memory cache seeded by initLyrics(), written through by setLyrics(). NOT
+// localStorage.
+describe('lyrics (server-backed)', () => {
+  var store, calls;
   beforeEach(() => {
     store = {};
     vi.stubGlobal('localStorage', {
@@ -36,21 +39,37 @@ describe('getLyrics / setLyrics', () => {
       setItem:    (k, v) => { store[k] = v; },
       removeItem: (k) => { delete store[k]; }
     });
+    calls = [];
+    global.fetch = async (url, opts) => {
+      calls.push({ url, opts });
+      return { ok: true, status: 200, json: async () => ({ lyricsOn: false }) };
+    };
   });
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  it('defaults ON when unset', () => {
-    expect(getLyrics()).toBe(true);
-  });
-  it('persists OFF and reads back false', () => {
+  it('setLyrics updates the cache and POSTs lyricsOn to the backend', async () => {
     setLyrics(false);
-    expect(store['grew-tv-lyrics']).toBe('off');
     expect(getLyrics()).toBe(false);
-  });
-  it('re-enabling reads back true', () => {
-    setLyrics(false);
+    expect(calls[0].url).toContain('/api/settings');
+    expect(calls[0].opts.method).toBe('POST');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ lyricsOn: false });
     setLyrics(true);
     expect(getLyrics()).toBe(true);
+  });
+
+  it('initLyrics seeds the cache from the backend GET', async () => {
+    await initLyrics('http://s');
+    expect(calls[0].url).toBe('http://s/api/settings');
+    expect(getLyrics()).toBe(false);   // backend says off
+  });
+
+  it('offline init keeps the current cached value and never throws', async () => {
+    global.fetch = async () => ({ ok: true, status: 200, json: async () => ({ lyricsOn: true }) });
+    await initLyrics('http://s');                            // seed ON from backend
+    expect(getLyrics()).toBe(true);
+    global.fetch = async () => { throw new Error('offline'); };
+    await expect(initLyrics('http://s')).resolves.toBe(true);
+    expect(getLyrics()).toBe(true);                          // cache preserved
   });
 });
 

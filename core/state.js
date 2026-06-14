@@ -66,7 +66,7 @@ export function setCaptions(on) {
   _captionsOn = !!on;
   // Fire-and-forget write-through; the companion mirror still rides the live WS
   // app_state.captionsOn relayed by the player on toggle.
-  saveSettings(_captionsServer, _captionsOn).catch(function() {});
+  saveSettings(_captionsServer, { captionsOn: _captionsOn }).catch(function() {});
 }
 
 // Boot: seed the captions cache from the backend, then resolve the value. Also
@@ -81,7 +81,7 @@ export function initCaptions(server) {
   var legacy = localStorage.getItem('grew-tv:captions');
   if (legacy !== null) {
     _captionsOn = legacy !== 'off';
-    return saveSettings(server, _captionsOn)
+    return saveSettings(server, { captionsOn: _captionsOn })
       .then(function() { localStorage.removeItem('grew-tv:captions'); return _captionsOn; })
       .catch(function() { return _captionsOn; });
   }
@@ -90,16 +90,31 @@ export function initCaptions(server) {
     .catch(function() { return _captionsOn; });
 }
 
-// Sticky lyrics preference — per-device (localStorage), like profile selection
-// and unlike the server-backed captions toggle above. The ambient lyrics layer
-// can be hidden even when a track has an .lrc; the choice persists across tracks
-// and sessions. Default ON; only an explicit 'off' disables.
+// Sticky lyrics preference (FEAT-023) — server-backed, exactly like captions
+// above (NOT localStorage). The ambient lyrics layer can be hidden even when a
+// track has an .lrc; the server is the single source of truth so the choice is
+// consistent across every device. getLyrics() returns an in-memory cache seeded
+// from the backend on the audio page (initLyrics); setLyrics() updates the cache
+// and writes through. Default ON until the backend answers.
+var _lyricsOn = true;
+var _lyricsServer = '';
+
 export function getLyrics() {
-  return localStorage.getItem('grew-tv-lyrics') !== 'off';
+  return _lyricsOn;
 }
 
 export function setLyrics(on) {
-  localStorage.setItem('grew-tv-lyrics', on ? 'on' : 'off');
+  _lyricsOn = !!on;
+  saveSettings(_lyricsServer, { lyricsOn: _lyricsOn }).catch(function() {});
+}
+
+// Boot (audio page): seed the lyrics cache from the backend, then resolve the
+// value. Offline/error keeps the current default (ON). Mirrors initCaptions.
+export function initLyrics(server) {
+  _lyricsServer = server;
+  return loadSettings(server)
+    .then(function(s) { _lyricsOn = !!s.lyricsOn; return _lyricsOn; })
+    .catch(function() { return _lyricsOn; });
 }
 
 export function getParam(key) {

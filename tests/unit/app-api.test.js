@@ -111,13 +111,19 @@ describe('loadSettings', () => {
 });
 
 describe('saveSettings', () => {
-  it('POSTs /api/settings with the captionsOn body', async () => {
+  it('POSTs /api/settings with the patch body verbatim', async () => {
     var calls = fakeFetch({ captionsOn: false });
-    await saveSettings('http://s', false);
+    await saveSettings('http://s', { captionsOn: false });
     expect(calls[0].url).toBe('http://s/api/settings');
     expect(calls[0].opts.method).toBe('POST');
     expect(calls[0].opts.headers).toEqual({ 'Content-Type': 'application/json' });
     expect(JSON.parse(calls[0].opts.body)).toEqual({ captionsOn: false });
+  });
+
+  it('sends a partial lyricsOn patch', async () => {
+    var calls = fakeFetch({ lyricsOn: false });
+    await saveSettings('http://s', { lyricsOn: false });
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ lyricsOn: false });
   });
 });
 

@@ -139,14 +139,16 @@ function lastSegment(url, marker) {
 async function installApi(page) {
   // Global settings (FEAT-023). Stateful per install so a POST sticks for later
   // GETs — stickiness now lives in the backend, not localStorage. Default ON.
-  var settings = { captionsOn: true };
+  // A POST is a partial patch (captionsOn and/or lyricsOn), merged like the
+  // real backend.
+  var settings = { captionsOn: true, lyricsOn: true };
   // Per-person progress store (FEAT-026): person id -> { itemId -> record }.
   // Stateful across this page so a saveProgress POST drives the same person's
   // later resume GET + CW. Different persons keep separate sets.
   var progress = {};
   await page.route('**/api/settings', function(route) {
     var post = route.request().method() === 'POST';
-    [post].filter(Boolean).forEach(function() { settings = JSON.parse(route.request().postData()); });
+    [post].filter(Boolean).forEach(function() { settings = Object.assign({}, settings, JSON.parse(route.request().postData())); });
     return json(route, 200, settings);
   });
   await page.route('**/api/browse**', function(route) {
