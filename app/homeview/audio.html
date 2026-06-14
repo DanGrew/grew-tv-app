@@ -64,6 +64,7 @@ body.lyrics-on #audio-artist { font-size: var(--fs-sm); margin-top: 2px; min-hei
 .ctrl-btn.pill { font-size: var(--fs-sm); font-weight: 700; letter-spacing: 1px; border: 2px solid var(--border); border-radius: 999px; min-width: auto; height: auto; padding: 6px 16px; color: var(--text); }
 .ctrl-btn.pill:focus { border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 .ctrl-btn.pill.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
+.ctrl-btn.pill.confirm { border-color: #ffce6b; color: #ffce6b; }
 #btn-prev.hidden, #btn-next.hidden { display: none; }
 #progress { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
 #progress-fill { height: 100%; background: var(--focus); border-radius: 3px; width: 0; }
@@ -103,6 +104,7 @@ body.lyrics-on #audio-artist { font-size: var(--fs-sm); margin-top: 2px; min-hei
       <button id="btn-shuffle" class="ctrl-btn pill" aria-label="Shuffle">&#128256; Shuffle</button>
       <button id="btn-lyrics" class="ctrl-btn pill" aria-label="Lyrics">&#127925; Lyrics</button>
       <button id="btn-jump" class="ctrl-btn pill">Jump</button>
+      <button id="btn-reset" class="ctrl-btn pill" aria-label="Reset progress">Reset</button>
       <div id="progress"><div id="progress-fill"></div></div>
       <div id="time-display">0:00 / 0:00</div>
     </div>

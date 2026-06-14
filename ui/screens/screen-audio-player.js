@@ -1,5 +1,5 @@
 import { fmt } from '../../core/time.js';
-import { mediaUrl, saveProgress } from '../../core/app-api.js';
+import { mediaUrl, saveProgress, resetProgress } from '../../core/app-api.js';
 import { getPerson } from '../../core/state.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
 
@@ -18,7 +18,7 @@ var JUMP_DEFAULT = 4;            // +10s, the most common forward skip
 var QUICK_SKIP   = 10;          // d-pad left/right one-press skip
 var BACKEND_SAVE_MS = 5000;
 
-var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-shuffle', 'btn-lyrics', 'btn-jump'];
+var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-shuffle', 'btn-lyrics', 'btn-jump', 'btn-reset'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 // {id}.{ext}: ext defaults to mp4 only as a guard — audio records carry m4a/mp3.
 var EXT_OF = { 'true': function(r) { return r.ext; }, 'false': function() { return 'mp4'; } };
@@ -225,6 +225,33 @@ export function setup(config) {
     onStop(rp);
   }
 
+  // Reset progress (TASK-142): wipe this track's backend progress for the active
+  // person, then leave. Pause first so the throttled timeupdate save stops firing
+  // (stopPlayback never saves), making the DELETE the last write — no race.
+  function resetAndExit() {
+    audio.pause();
+    [currentTrack].filter(Boolean).forEach(function(rec) {
+      resetProgress(server, rec.id, getPerson()).catch(function() {});
+    });
+    stopPlayback();
+  }
+
+  // Two-press confirm guards a mis-tap: first press arms (label -> "Reset?"),
+  // second resets + exits; blurring disarms.
+  function fireReset(btn) {
+    ({
+      'false': function() { btn.classList.add('confirm'); btn.textContent = 'Reset?'; btn.setAttribute('data-armed', '1'); },
+      'true':  function() { resetAndExit(); }
+    })[String(btn.getAttribute('data-armed') === '1')]();
+  }
+
+  function disarmReset() {
+    var btn = document.getElementById('btn-reset');
+    btn.classList.remove('confirm');
+    btn.textContent = 'Reset';
+    btn.removeAttribute('data-armed');
+  }
+
   // record: a full playable record (from the album items[] or /api/video).
   // startSec resolved by the page from the backend (resume by default, 0 on
   // restart / fresh track).
@@ -324,6 +351,8 @@ export function setup(config) {
   document.getElementById('btn-shuffle').addEventListener('click', toggleShuffle);
   document.getElementById('btn-lyrics').addEventListener('click', toggleLyrics);
   document.getElementById('btn-jump').addEventListener('click', openJumpPopup);
+  document.getElementById('btn-reset').addEventListener('click', function() { fireReset(document.getElementById('btn-reset')); });
+  document.getElementById('btn-reset').addEventListener('blur', disarmReset);
 
   return { playTrack, handleAudioKey, setQueueMode, setShuffle, setLyrics, currentTrackDisplay, stop: stopPlayback, remote };
 }

@@ -50,6 +50,7 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
 .ctrl-btn.pill { font-size: var(--fs-sm); font-weight: 700; letter-spacing: 1px; border: 2px solid var(--border); border-radius: 999px; min-width: auto; height: auto; padding: 6px 16px; color: var(--text); }
 .ctrl-btn.pill:focus { border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 .ctrl-btn.pill.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
+.ctrl-btn.pill.confirm { border-color: #ffce6b; color: #ffce6b; }
 #btn-cc.hidden, #btn-prev.hidden, #btn-next.hidden { display: none; }
 #btn-cc.cc-off { opacity: 0.45; }
 #progress { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
@@ -87,6 +88,7 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
       <button id="btn-next" class="ctrl-btn" aria-label="Next">&#9197;</button>
       <button id="btn-jump" class="ctrl-btn pill">Jump</button>
       <button id="btn-cc" class="ctrl-btn pill hidden" aria-label="Subtitles">CC</button>
+      <button id="btn-reset" class="ctrl-btn pill" aria-label="Reset progress">Reset</button>
       <div id="progress"><div id="progress-fill"></div></div>
       <div id="time-display">0:00 / 0:00</div>
     </div>
