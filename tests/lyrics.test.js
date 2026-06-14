@@ -70,6 +70,43 @@ test('a track with no .lrc falls back to the big-cover art view, no lyric pane',
   await expect(page.locator('#amb-lyrics')).toBeHidden();
 });
 
+test('a music album whose track has an .lrc shows a Lyrics badge; one without does not', async ({ page }) => {
+  await page.locator('#btn-kids').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  // ootb has a lyric track (hasLyrics) -> badge; elo-time has none -> no badge.
+  await expect(page.locator('.film-tile[data-id="ootb"] .tile-lyrics')).toHaveText('Lyrics');
+  await expect(page.locator('.film-tile[data-id="elo-time"] .tile-lyrics')).toHaveCount(0);
+});
+
+test('the Lyrics pill toggles the ambient layer off and back on (on by default)', async ({ page }) => {
+  await openTrack(page, 'ootb', 'ootb-02');
+  // On by default for a track with an .lrc.
+  await expect(page.locator('body')).toHaveClass(/lyrics-on/);
+  await expect(page.locator('#btn-lyrics')).toHaveClass(/\bon\b/);
+  // Disable -> ambient layer hides, the big cover art comes back.
+  await page.locator('#btn-lyrics').click();
+  await expect(page.locator('body')).not.toHaveClass(/lyrics-on/);
+  await expect(page.locator('#btn-lyrics')).not.toHaveClass(/\bon\b/);
+  await expect(page.locator('#audio-art')).toBeVisible();
+  // Re-enable -> lyrics return (the track still has cues).
+  await page.locator('#btn-lyrics').click();
+  await expect(page.locator('body')).toHaveClass(/lyrics-on/);
+  await expect(page.locator('#amb-lyrics')).toBeVisible();
+});
+
+test('the lyrics-off choice persists across a reload (server-backed)', async ({ page }) => {
+  await openTrack(page, 'ootb', 'ootb-02');
+  await expect(page.locator('body')).toHaveClass(/lyrics-on/);
+  await page.locator('#btn-lyrics').click();
+  await expect(page.locator('body')).not.toHaveClass(/lyrics-on/);
+  // Reload the player -> the disabled choice sticks (no ambient layer, pill off).
+  await page.reload();
+  await expect(page.locator('#screen-audio')).toBeVisible();
+  await expect(page.locator('body')).not.toHaveClass(/lyrics-on/);
+  await expect(page.locator('#btn-lyrics')).not.toHaveClass(/\bon\b/);
+});
+
 test('the transport auto-hides after idle and any d-pad key summons it back', async ({ page }) => {
   await openTrack(page, 'ootb', 'ootb-02');
   await expect(page.locator('#controls')).not.toHaveClass(/controls-hidden/);

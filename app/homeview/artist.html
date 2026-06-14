@@ -31,7 +31,7 @@ body { background: var(--bg); background-attachment: fixed; background-size: cov
 #grid-container { height: 100vh; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; padding: 96px 48px 80px; }
 #grid-container::-webkit-scrollbar, .rail-row::-webkit-scrollbar { display: none; }
 #grid-title { font-size: var(--fs-lg); letter-spacing: var(--heading-ls); margin-bottom: 28px; }
-#rail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr)); gap: 16px; align-items: start; }
+#rail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(372px, 1fr)); gap: 16px; align-items: start; }
 .home-empty { font-size: var(--fs-md); color: var(--text-muted); text-align: center; padding: 80px 0; grid-column: 1 / -1; }
 .film-tile { position: relative; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); cursor: pointer; overflow: hidden; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); }
 .film-tile:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); transform: scale(1.05); z-index: 1; }
@@ -42,6 +42,7 @@ body { background: var(--bg); background-attachment: fixed; background-size: cov
 .tile-title { font-size: var(--fs-sm); padding: 10px 12px 12px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur) var(--ease); }
 .tile-sub { margin-top: -8px; padding: 0 12px 10px; font-size: var(--fs-xs); color: var(--text-muted); }
 .tile-cc { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px; }
+.tile-lyrics { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px; }
 .tile-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,0.45); }
 .tile-progress-fill { height: 100%; background: var(--focus); }
 #breadcrumb { position: fixed; top: 20px; left: 32px; z-index: 5; }

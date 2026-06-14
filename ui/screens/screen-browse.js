@@ -168,6 +168,9 @@ function railSection(rail) {
   var row = document.createElement('div');
   row.className = 'rail-row';
   row.setAttribute('data-rail', rail.id);
+  // Music tiles are square (taller) — give their rail extra vertical room so the
+  // focus scale (1.05) isn't clipped by the row's overflow.
+  row.classList.toggle('rail-row-music', rail.items.some(function(card) { return card.section === 'music'; }));
   rail.items.forEach(function(card) {
     row.appendChild(createTile(STATE.server, card, { progress: STATE.progress, onSelect: STATE.onSelect }));
   });

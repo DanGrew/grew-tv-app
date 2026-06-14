@@ -1,4 +1,4 @@
-import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
+import { getParam, getProfile, getPerson, navTo, getLyrics, setLyrics as saveLyricsPref, initLyrics } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-audio-player.js';
 import { connectApp } from '../../core/app-ws.js';
@@ -56,9 +56,20 @@ export function initAudioPage() {
   var audioEl = document.getElementById('audio');
   var lyrics = [];
   var lastLyricIdx = -2;
+  // The Lyrics pill lets the viewer hide the ambient layer even when the track
+  // has an .lrc. The choice is sticky (server-backed, FEAT-023); seeded from the
+  // backend at entry (initLyrics) before this is read. The layer shows only when
+  // enabled AND cues are present.
+  var lyricsEnabled = true;
 
   function setLyricMode(has) {
-    document.body.classList.toggle('lyrics-on', has);
+    document.body.classList.toggle('lyrics-on', [has].filter(function() { return lyricsEnabled; }).length > 0);
+  }
+
+  function onLyrics(on) {
+    lyricsEnabled = on;
+    saveLyricsPref(on);
+    setLyricMode(lyrics.length > 0);
   }
 
   function bumpCurrent() {
@@ -165,6 +176,7 @@ export function initAudioPage() {
     onNext: nextNow,
     onPrev: previous,
     onShuffle: onShuffle,
+    onLyrics: onLyrics,
     emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
     appContext: function() {
       return { screen: 'player', itemId: [albumId].filter(Boolean).concat([state.currentId])[0], episodeId: state.currentId, profile: profile };
@@ -213,17 +225,22 @@ export function initAudioPage() {
 
   // Entry: load the queue, set the order (initial shuffle from the param), then
   // resume the start track from the backend position. Subsequent tracks start at 0.
+  // initLyrics seeds the sticky lyrics preference from the backend before it is
+  // read below; like initCaptions it never rejects, so it can't fail the all().
   var shuffleParam = !!getParam('shuffle');
   Promise.all([
     LOAD_QUEUE[(!!albumId) + ''](albumId, trackId),
-    loadProgress(SERVER, trackId, getPerson()).catch(function() { return { position_secs: 0, duration_secs: null }; })
+    loadProgress(SERVER, trackId, getPerson()).catch(function() { return { position_secs: 0, duration_secs: null }; }),
+    initLyrics(SERVER)
   ])
     .then(function(res) {
       state.items = res[0].items;
       state.title = res[0].title;
       state.order = ORDER_FOR[shuffleParam + ''](state.items);
+      lyricsEnabled = getLyrics();
       player.setQueueMode(!res[0].single);
       player.setShuffle(shuffleParam);
+      player.setLyrics(lyricsEnabled);
       mountBreadcrumb('breadcrumb', buildCrumbs('video', { videoTitle: state.title }));
       playId(trackId, resumeStart(restart, res[1]));
     })

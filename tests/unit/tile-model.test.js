@@ -38,6 +38,18 @@ describe('tileModel — CC badge', () => {
   });
 });
 
+describe('tileModel — Lyrics badge (music)', () => {
+  it('shows Lyrics for a music card with hasLyrics', () => {
+    expect(tileModel({ kind: 'series', id: 'ootb', section: 'music', hasLyrics: true }, {}).showLyrics).toBe(true);
+  });
+  it('no Lyrics for a music card without hasLyrics', () => {
+    expect(tileModel({ kind: 'series', id: 'ootb', section: 'music' }, {}).showLyrics).toBe(false);
+  });
+  it('never on a non-music card even if hasLyrics is set', () => {
+    expect(tileModel({ kind: 'series', id: 'bluey', section: 'series', hasLyrics: true }, {}).showLyrics).toBe(false);
+  });
+});
+
 describe('tileModel — series', () => {
   const series = {
     kind: 'series', id: 'ollie', title: 'Ollie', poster: 'ollie.jpg',

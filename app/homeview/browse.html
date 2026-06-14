@@ -53,18 +53,20 @@ button:hover { background: var(--surface-hi); }
 #profile-label:hover { color: var(--text); }
 #rails { display: flex; flex-direction: column; gap: 34px; }
 .rail-title { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); padding: 0 48px 14px; }
-.rail-row { display: flex; gap: 16px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding: 6px 48px; scroll-padding-left: 48px; }
+.rail-row { display: flex; gap: 16px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding: 12px 48px; scroll-padding-left: 48px; }
+.rail-row-music { padding-top: 24px; padding-bottom: 24px; }
 .home-empty { font-size: var(--fs-md); color: var(--text-muted); text-align: center; padding: 80px 0; }
-.film-tile { position: relative; flex: 0 0 248px; width: 248px; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); cursor: pointer; overflow: hidden; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); }
+.film-tile { position: relative; flex: 0 0 372px; width: 372px; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); cursor: pointer; overflow: hidden; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); }
 .film-tile:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); transform: scale(1.05); z-index: 1; }
 .film-tile:focus .tile-title { color: var(--focus); }
 .film-poster { width: 100%; aspect-ratio: 16/9; object-fit: contain; background: #000; display: block; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .film-poster-placeholder { width: 100%; aspect-ratio: 16/9; background: var(--surface-hi); display: flex; align-items: center; justify-content: center; font-size: var(--fs-xl); color: var(--text-muted); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
-.film-tile[data-music] { flex-basis: 200px; width: 200px; }
+.film-tile[data-music] { flex-basis: 300px; width: 300px; }
 .film-tile[data-music] .film-poster, .film-tile[data-music] .film-poster-placeholder { aspect-ratio: 1/1; }
 .tile-title { font-size: var(--fs-sm); padding: 10px 12px 12px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur) var(--ease); }
 .tile-sub { margin-top: -8px; padding: 0 12px 10px; font-size: var(--fs-xs); color: var(--text-muted); }
 .tile-cc { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px; }
+.tile-lyrics { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px; }
 .tile-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,0.45); }
 .tile-progress-fill { height: 100%; background: var(--focus); }
 #btn-settings { font-size: var(--fs-sm); padding: 12px 22px; min-width: auto; position: fixed; bottom: 32px; right: 32px; }
