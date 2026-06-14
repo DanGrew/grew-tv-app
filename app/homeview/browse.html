@@ -85,6 +85,8 @@ body.sidebar-collapsed #breadcrumb { display: none; }
 .settings-label { font-size: var(--fs-md); flex: 0 0 140px; }
 .settings-status { font-size: var(--fs-sm); color: var(--text-muted); flex: 1; }
 .settings-hr { border: none; border-top: 1px solid var(--border); margin: 0; }
+#device-badge { position: fixed; bottom: 24px; left: 24px; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; font-size: var(--fs-xs); color: var(--text-muted); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); pointer-events: none; }
+#device-swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
 #error-msg { display: none; }
 </style>
 </head>
@@ -111,9 +113,12 @@ body.sidebar-collapsed #breadcrumb { display: none; }
   <div id="rails-container"><div id="rails"></div></div>
 </div>
 <button id="btn-settings" tabindex="0">&#9881;</button>
+<div id="device-badge" title="This screen"></div>
 <div id="error-msg"></div>
 <script type="module">
 import { initBrowsePage } from '../../ui/screens/screen-browse-page.js';
+import { mountDeviceBadge } from '../../ui/screens/device-badge.js';
+mountDeviceBadge();
 initBrowsePage();
 </script>
 </body>
