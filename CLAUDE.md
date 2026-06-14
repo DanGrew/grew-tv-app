@@ -93,6 +93,17 @@ Read this BEFORE writing screen code — these gate the PR in CI even when local
   obsoleted `tests/screen-resume.test.js`). Mock new endpoints in
   `tests/fixtures/api.js`. e2e is CI-only; run locally with
   `npx playwright test tests/<file>.test.js` before pushing.
+- **Some screen modules are shared by more than one HTML page — any element they
+  touch must be optional-safe (`[el].filter(Boolean).forEach(...)`), and you must
+  run BOTH pages' e2e.** Known sharers: `screen-detail.js` (`buildDetailList` +
+  the d-pad fns) backs **both** `app/homeview/detail.html` (series) AND
+  `app/homeview/album-detail.html` (FEAT-018 albums reuse the series rows) — the
+  album page has no `#season-chips`, so a bare `getElementById('season-chips')`
+  threw and broke the music/lyrics suites. `core/*` helpers and `companion-*`
+  screens reuse the same `core/` logic too. Before finishing a change to a shared
+  screen, grep for every page that imports it and run each one's tests
+  (`tests/screen-detail.test.js` AND `tests/music.test.js`/`tests/lyrics.test.js`
+  for the detail module).
 
 ## Tests
 
