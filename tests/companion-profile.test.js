@@ -55,6 +55,13 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('.cmp-card[data-id="oliver"]')).toBeVisible();
 });
 
+// Mirror of the app two-row grouping: kids cards on one row, adults on another.
+test('groups the cards into a kids row and an adults row', async ({ page }) => {
+  await expect(page.locator('.cmp-cards')).toHaveCount(2);
+  await expect(page.locator('.cmp-cards').first().locator('.cmp-card[data-id="oliver"]')).toBeVisible();
+  await expect(page.locator('.cmp-cards').last().locator('.cmp-card[data-id="mom"]')).toBeVisible();
+});
+
 test('picking a person activates it on the targeted screen FIRST (gated), not a bare setProfile', async ({ page }) => {
   await page.locator('.cmp-card[data-id="oliver"]').click();
   await expect.poll(() => sent.filter(function(m) { return m.type === 'activate_person'; }).length).toBeGreaterThan(0);

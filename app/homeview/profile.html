@@ -32,7 +32,8 @@
 body { background: var(--bg); background-attachment: fixed; background-size: cover; color: var(--text); font-family: var(--font); height: 100vh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; }
 h1 { font-size: var(--fs-lg); margin-bottom: 10px; letter-spacing: var(--heading-ls); color: var(--text-muted); font-weight: 600; }
 h2 { font-size: var(--fs-2xl); color: var(--text); margin-bottom: 36px; font-weight: normal; letter-spacing: var(--heading-ls); }
-#profile-cards { display: flex; gap: 28px; }
+#profile-cards { display: flex; flex-direction: column; gap: 28px; align-items: center; }
+.profile-row { display: flex; gap: 28px; justify-content: center; }
 .profile-card { position: relative; width: 240px; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); overflow: hidden; cursor: pointer; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); }
 .profile-card:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); transform: translateY(-8px) scale(1.03); }
 .profile-card:focus .profile-name { color: var(--focus); }

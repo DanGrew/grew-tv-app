@@ -13,6 +13,7 @@ import { loadConfig, mediaUrl } from '../../core/app-api.js';
 import {
   defaultConfig, parseConfig, isLocked, pinMatches, pushDigit, popDigit, isPinComplete, dotFill
 } from '../../core/profile-config.js';
+import { groupRows } from '../../core/profile-rows.js';
 
 var KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'ok'];
 var KEY_LABEL = { back: '⌫', ok: '✓' };
@@ -162,10 +163,12 @@ export function initPage() {
     els.actionsEl.innerHTML = '';
     els.actionsEl.style.display = '';
     els.actionsEl.style.flexDirection = '';
-    var cards = document.createElement('div');
-    cards.className = 'cmp-cards';
-    config.persons.forEach(function(p) { buildCard(p, cards); });
-    els.actionsEl.appendChild(cards);
+    groupRows(config.persons).forEach(function(row) {
+      var cards = document.createElement('div');
+      cards.className = 'cmp-cards';
+      row.forEach(function(p) { buildCard(p, cards); });
+      els.actionsEl.appendChild(cards);
+    });
     keypadWrap = document.createElement('div');
     keypadWrap.className = 'cmp-keypad-wrap';
     keypadTitle = document.createElement('div');

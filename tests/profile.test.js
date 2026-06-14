@@ -98,12 +98,41 @@ test('Escape closes the keypad and returns focus to the Adults card', async ({ p
   await expect(page.locator('#btn-adults')).toBeFocused();
 });
 
-test('arrow keys move focus between profile cards', async ({ page }) => {
+// Two-row picker: kids row on top, adults row below. Left/Right walk a row;
+// Up/Down change rows. Default fixture has one kid + one adult, one per row.
+test('cards are grouped into a kids row and an adults row', async ({ page }) => {
+  await expect(page.locator('.profile-row')).toHaveCount(2);
+  await expect(page.locator('.profile-row').first().locator('.profile-card')).toHaveCount(1);
+  await expect(page.locator('.profile-row').first().locator('#btn-kids')).toBeVisible();
+  await expect(page.locator('.profile-row').last().locator('#btn-adults')).toBeVisible();
+});
+
+test('d-pad Up/Down move focus between the kids and adults rows', async ({ page }) => {
   await expect(page.locator('#btn-kids')).toBeFocused();
-  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowDown');
   await expect(page.locator('#btn-adults')).toBeFocused();
-  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowUp');
   await expect(page.locator('#btn-kids')).toBeFocused();
+});
+
+test('d-pad Left/Right walk within a row of several persons', async ({ page }) => {
+  await page.route('**/media/config.json', function(route) {
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      defaultPin: '1234',
+      persons: [
+        { id: 'oliver', name: 'Oliver', profile: 'kids', photo: null },
+        { id: 'millie', name: 'Millie', profile: 'kids', photo: null },
+        { id: 'mom', name: 'Mom', profile: 'adults', photo: null }
+      ]
+    }) });
+  });
+  await page.reload();
+  await expect(page.locator('#btn-oliver')).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#btn-millie')).toBeFocused();
+  // Down jumps to the adults row (single card)
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#btn-mom')).toBeFocused();
 });
 
 // ── FEAT-026 TASK-156: the generalized person model (N persons, ids distinct
