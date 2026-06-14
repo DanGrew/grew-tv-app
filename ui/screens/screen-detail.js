@@ -209,11 +209,14 @@ function setChipBoxVisible(box, n) {
   })[String(n === 0)]();
 }
 
+// buildDetailList is shared with the album-detail page, whose HTML has no
+// #season-chips (albums never have seasons) — no-op when the container is absent.
 function renderChips() {
-  var box = document.getElementById('season-chips');
-  box.innerHTML = '';
-  state.seasons.forEach(function(s) { box.appendChild(makeChip(s)); });
-  setChipBoxVisible(box, state.seasons.length);
+  [document.getElementById('season-chips')].filter(Boolean).forEach(function(box) {
+    box.innerHTML = '';
+    state.seasons.forEach(function(s) { box.appendChild(makeChip(s)); });
+    setChipBoxVisible(box, state.seasons.length);
+  });
 }
 
 function updateChipActive() {
