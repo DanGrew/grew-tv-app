@@ -460,6 +460,7 @@ export function setup(config) {
   remote.vol_down = function() { video.volume = Math.max(0, video.volume - 0.1); showControls(); };
   remote.toggleCaptions = function() { [ccVisible()].filter(Boolean).forEach(toggleSubtitles); };
   remote.cc       = function() { [ccVisible()].filter(Boolean).forEach(toggleSubtitles); };
+  remote.reset    = function() { resetAndExit(); };   // companion Reset intent (TASK-142)
 
   video.addEventListener('timeupdate', function() {
     [video.duration].filter(Boolean).forEach(updateProgress);
