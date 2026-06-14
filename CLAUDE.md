@@ -99,11 +99,18 @@ Read this BEFORE writing screen code — these gate the PR in CI even when local
   the d-pad fns) backs **both** `app/homeview/detail.html` (series) AND
   `app/homeview/album-detail.html` (FEAT-018 albums reuse the series rows) — the
   album page has no `#season-chips`, so a bare `getElementById('season-chips')`
-  threw and broke the music/lyrics suites. `core/*` helpers and `companion-*`
-  screens reuse the same `core/` logic too. Before finishing a change to a shared
+  threw and broke the music/lyrics suites. Before finishing a change to a shared
   screen, grep for every page that imports it and run each one's tests
   (`tests/screen-detail.test.js` AND `tests/music.test.js`/`tests/lyrics.test.js`
   for the detail module).
+- **A detail/browse change must update the companion mirror in the SAME task.**
+  Each app screen (`ui/screens/screen-*.js` + `app/homeview/*.html`) has a
+  companion counterpart (`ui/screens/companion-*.js` + `companion/*.html`) that
+  reuses the same `core/` logic — they are two surfaces of one feature
+  (FEAT-017/028 mirror invariant: companion drives, TV mirrors). Ship both halves
+  + a `tests/companion-*.test.js`. Companion e2e mocks the WS with
+  `page.routeWebSocket(/:8766/)`, so it does NOT collide with a live server —
+  unlike the app-screen e2e, which connects for real and can hit a person-lock.
 
 ## Tests
 
