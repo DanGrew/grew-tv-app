@@ -24,6 +24,29 @@ test.beforeEach(async ({ page }) => {
   await installApi(page);
 });
 
+// Playback pages: the badge is a fixed overlay, so it must not obscure the page
+// once the player chrome auto-hides. It rides the same show/hide as #controls —
+// pure-CSS sibling fade (#controls.hidden ~ #device-badge on video,
+// #controls.controls-hidden ~ on audio), so when the controls fade the badge does
+// too, and a tap that brings the controls back brings the badge back.
+test('the badge fades out with the player controls on video', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?video=toy-story-main');
+  await expect(page.locator('#device-badge')).toBeVisible();
+  await page.locator('#controls').evaluate(function (el) { el.classList.add('hidden'); });
+  await expect(page.locator('#device-badge')).toHaveCSS('opacity', '0');
+  await page.locator('#controls').evaluate(function (el) { el.classList.remove('hidden'); });
+  await expect(page.locator('#device-badge')).toHaveCSS('opacity', '1');
+});
+
+test('the badge fades out with the player controls on audio', async ({ page }) => {
+  await page.goto('/app/homeview/audio.html?track=ootb-01');
+  await expect(page.locator('#device-badge')).toBeVisible();
+  await page.locator('#controls').evaluate(function (el) { el.classList.add('controls-hidden'); });
+  await expect(page.locator('#device-badge')).toHaveCSS('opacity', '0');
+  await page.locator('#controls').evaluate(function (el) { el.classList.remove('controls-hidden'); });
+  await expect(page.locator('#device-badge')).toHaveCSS('opacity', '1');
+});
+
 PAGES.forEach(function (entry) {
   test('persistent device badge with a painted swatch on ' + entry[0], async ({ page }) => {
     await page.goto(entry[1]);
