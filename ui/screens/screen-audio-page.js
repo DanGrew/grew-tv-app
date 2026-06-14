@@ -63,7 +63,7 @@ export function initAudioPage() {
   var lyricsEnabled = true;
 
   function setLyricMode(has) {
-    document.body.classList.toggle('lyrics-on', [has].filter(function() { return lyricsEnabled; }).length > 0);
+    document.body.classList.toggle('lyrics-on', [has, lyricsEnabled].filter(Boolean).length === 2);
   }
 
   function onLyrics(on) {
