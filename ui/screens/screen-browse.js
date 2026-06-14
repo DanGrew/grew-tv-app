@@ -216,6 +216,7 @@ function tabButton(tab) {
 
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('collapsed');
+  document.body.classList.toggle('sidebar-collapsed');
 }
 
 function toggleButton() {
