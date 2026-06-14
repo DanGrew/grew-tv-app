@@ -157,6 +157,71 @@ test('last episode end loops back to the first (BUG-005)', async ({ page }) => {
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/, { timeout: 8000 });
 });
 
+test.describe('season selector (TASK-123)', () => {
+  // The multi-season fixture is reached by direct nav (it is on no browse rail),
+  // keeping it clear of the rail-count suites. The profile pick in beforeEach has
+  // already set the kids profile/person in localStorage for this origin.
+  // 1x1 PNG so the season/series posters actually decode — the default /media/**
+  // fixture serves an empty body, which fires <img> onerror and would walk the
+  // poster fallback chain past the season art we want to assert.
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+
+  async function openSeasons(page) {
+    await page.route('**/media/ib*.jpg', route => route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+    await page.goto('/app/homeview/detail.html?series=inbetweeners');
+    await expect(page.locator('#screen-detail')).toBeVisible();
+    await expect(page.locator('.season-chip').first()).toBeVisible();
+  }
+
+  test('renders a chip per declared season', async ({ page }) => {
+    await openSeasons(page);
+    await expect(page.locator('.season-chip')).toHaveCount(2);
+    await expect(page.locator('.season-chip')).toHaveText(['Season 1', 'Season 2']);
+  });
+
+  test('default chip is the Play-next season, filtered with no inline dividers', async ({ page }) => {
+    await openSeasons(page);
+    await expect(page.locator('.season-chip[data-season="1"]')).toHaveClass(/active/);
+    await expect(page.locator('.detail-row')).toHaveCount(2);
+    await expect(page.locator('.detail-row[data-id="ib-s1e1"]')).toBeVisible();
+    await expect(page.locator('.detail-season')).toHaveCount(0);
+    await expect(page.locator('#detail-header-poster')).toHaveAttribute('src', /ib-s1\.jpg$/);
+  });
+
+  test('selecting a season filters the list and swaps the header poster', async ({ page }) => {
+    await openSeasons(page);
+    await page.locator('.season-chip[data-season="2"]').focus();
+    await expect(page.locator('.season-chip[data-season="2"]')).toHaveClass(/active/);
+    await expect(page.locator('.season-chip[data-season="1"]')).not.toHaveClass(/active/);
+    await expect(page.locator('.detail-row')).toHaveCount(1);
+    await expect(page.locator('.detail-row[data-id="ib-s2e1"]')).toBeVisible();
+    await expect(page.locator('#detail-header-poster')).toHaveAttribute('src', /ib-s2\.jpg$/);
+  });
+
+  test('ArrowRight moves between season chips and re-filters', async ({ page }) => {
+    await openSeasons(page);
+    await page.locator('.season-chip[data-season="1"]').focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('.season-chip[data-season="2"]')).toBeFocused();
+    await expect(page.locator('.detail-row')).toHaveCount(1);
+  });
+
+  test('ArrowDown leaves the chip row for the first episode and back up', async ({ page }) => {
+    await openSeasons(page);
+    await page.locator('.season-chip[data-season="1"]').focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.locator('.detail-row').first()).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(page.locator('.season-chip[data-season="1"]')).toBeFocused();
+  });
+
+  test('a seasons-less series shows no chips (legacy single list)', async ({ page }) => {
+    await openDetail(page);
+    await expect(page.locator('.season-chip')).toHaveCount(0);
+    await expect(page.locator('#season-chips')).toBeHidden();
+  });
+});
+
 test('Escape on browse does not crash or navigate away', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(page.locator('#screen-browse')).toBeVisible();

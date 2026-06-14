@@ -51,6 +51,10 @@ button:hover { background: var(--surface-hi); }
 .detail-progress-fill { height: 100%; background: var(--focus); border-radius: 2px; width: 0; }
 .detail-restart { font-size: var(--fs-xs); padding: 5px 12px; min-width: auto; flex-shrink: 0; border-width: 1.5px; }
 .detail-season { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 600; padding: 18px 16px 8px; }
+#season-chips { display: flex; gap: 12px; flex-wrap: wrap; padding: 0 48px 14px; flex-shrink: 0; }
+.season-chip { font-size: var(--fs-sm); padding: 8px 22px; min-width: auto; color: var(--text-muted); border-width: 2px; }
+.season-chip.active { color: var(--text); background: var(--surface-hi); border-color: var(--surface-hi); }
+.season-chip:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 #btn-play-next { font-size: var(--fs-md); padding: 14px 26px; min-width: auto; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 .breadcrumb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .crumb { font-size: var(--fs-md); color: var(--text-muted); }
@@ -74,6 +78,7 @@ button:hover { background: var(--surface-hi); }
   </div>
   <button id="btn-play-next">&#9654; Play next</button>
 </div>
+<div id="season-chips" style="display:none"></div>
 <div id="detail-list"></div>
 <div id="error-msg"></div>
 <script type="module">
