@@ -114,6 +114,9 @@ test('the profile control returns to the Who\'s watching picker (BUG-007)', asyn
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
   await expect(page.locator('#profile-label')).toContainText('Kids');
+  // FEAT-033: the bar badges the active person's authored config.json emoji
+  // (kids has '🦖'), not the class-default face '🧒' — proving it's person-driven.
+  await expect(page.locator('#profile-label')).toContainText('🦖');
   await page.locator('#profile-label').click();
   await expect(page.locator('#screen-profile')).toBeVisible();
 });

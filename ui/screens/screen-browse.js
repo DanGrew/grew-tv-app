@@ -2,8 +2,8 @@ import { registerScreen } from '../../core/screen-registry.js';
 import { createTile } from '../../components/tile.js';
 import { buildTabs, buildTabRails, clampIndex } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
+import { personGlyph } from '../../core/profile-config.js';
 
-var PROFILE_LABEL = { kids: 'Kids', adults: 'Adults' };
 var PLAY_KEYS     = { Enter: true, ' ': true };
 
 // FEAT-020 (TASK-138): the browse screen is a content-type sidebar plus a
@@ -242,11 +242,12 @@ export function getActiveTab() {
 }
 
 // rails come from buildTabRails per the selected tab; the page passes the raw
-// /api/browse cards + the /api/continue-watching rows + genreLabels, the select
+// /api/browse cards + the /api/continue-watching rows + genreLabels, the active
+// `person` (FEAT-033 — its authored name + glyph badge the bar), the select
 // handler, and an optional initialTab to land on (else the first tab). The CW
 // rows feed both the per-tab Continue Watching rail and the tiles' progress bars
 // (via progressMapFromCW).
-export function renderBrowse(server, cards, cwRows, labels, profile, onSelect, initialTab) {
+export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab) {
   STATE.server = server;
   STATE.cards = cards;
   STATE.cw = cwRows;
@@ -254,7 +255,7 @@ export function renderBrowse(server, cards, cwRows, labels, profile, onSelect, i
   STATE.labels = labels;
   STATE.profile = profile;
   STATE.onSelect = onSelect;
-  document.getElementById('profile-label').textContent = '👤 ' + PROFILE_LABEL[profile] + ' ▸';
+  document.getElementById('profile-label').textContent = personGlyph(person) + ' ' + person.name + ' ▸';
   var tabs = buildTabs(cards);
   var ids = tabs.map(function(t) { return t.id; });
   renderSidebar(tabs);
