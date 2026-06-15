@@ -3,7 +3,8 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadBrowse, loadContinueWatching, scanDevices } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, scanDevices, loadConfig } from '../../core/app-api.js';
+import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute } from '../../core/home-rails.js';
@@ -119,11 +120,15 @@ export function initBrowsePage() {
 
   Promise.all([
     loadBrowse(SERVER, profile),
-    loadContinueWatching(SERVER, profile, getPerson()).catch(function() { return { content: [] }; })
+    loadContinueWatching(SERVER, profile, getPerson()).catch(function() { return { content: [] }; }),
+    loadConfig(SERVER).catch(function() { return null; })
   ])
     .then(function(res) {
       var browse = res[0];
       var cw = [res[1].content].filter(Boolean).concat([[]])[0];
+      // FEAT-033: badge the bar with the active person's authored name + glyph
+      // (e.g. "🦖 Daddy"); falls back to the profile class if config/id is absent.
+      var person = badgePerson(parseConfig(res[2]), getPerson(), profile);
       [browse.content].filter(Boolean).concat([[]])[0].forEach(function(c) { catalog[c.id] = c; });
       // Register CW items so a companion `select` on an in-progress tile resolves —
       // episodes are not browse cards, so add a minimal video card for any id the
@@ -133,7 +138,7 @@ export function initBrowsePage() {
       // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) wins
       // over the last-visited tab; renderBrowse falls back when neither matches.
       var initialTab = [getParam('tab')].filter(Boolean).concat([sessionStorage.getItem(LAST_TAB_KEY)]).filter(Boolean)[0];
-      renderBrowse(SERVER, browse.content, cw, labels, profile, onSelect, initialTab);
+      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
     })
     .catch(function() { navTo('error.html'); });

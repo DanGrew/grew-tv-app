@@ -19,6 +19,9 @@ export var DEFAULT_PIN = '0000';
 // Per-class fallback face when a person has no photo and no own emoji.
 var PH_EMOJI = { kids: '🧒', adults: '🧑' };
 
+// Per-class fallback name when no person resolves (config/id missing).
+var PROFILE_LABEL = { kids: 'Kids', adults: 'Adults' };
+
 // Generic placeholders only — one adult + one kid. NO real names or PINs here.
 function defaultPersons() {
   return [
@@ -79,6 +82,18 @@ export function pinMatches(config, person, entered) {
 
 export function personById(config, id) {
   return config.persons.filter(function(p) { return p.id === id; })[0] || null;
+}
+
+// The person to badge on the browse bar (FEAT-033): the active person resolved
+// from config so the bar shows their authored name + glyph (e.g. "🦖 Daddy").
+// When config or the person id is missing, fall back to a stand-in carrying the
+// profile class, so the label still renders a class name + class glyph and never
+// blanks.
+export function badgePerson(config, personId, profile) {
+  var found = personById(config, personId);
+  if (found) return found;
+  var prof = profile === 'adults' ? 'adults' : 'kids';
+  return { id: null, name: PROFILE_LABEL[prof], profile: prof, emoji: null, photo: null, pin: null };
 }
 
 // Resolve a content class (kids|adults) to a person of that class — the bridge

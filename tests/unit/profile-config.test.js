@@ -1,7 +1,7 @@
 import {
   PIN_LEN, DEFAULT_PIN, defaultConfig, parseConfig, isLocked, effectivePin,
   pinMatches, personById, personByProfile,
-  pushDigit, popDigit, isPinComplete, dotFill, keypadNav, personGlyph
+  pushDigit, popDigit, isPinComplete, dotFill, keypadNav, personGlyph, badgePerson
 } from '../../core/profile-config.js';
 
 describe('defaultConfig', () => {
@@ -122,6 +122,30 @@ describe('personById / personByProfile', () => {
     expect(personByProfile(config, 'adults').id).toBe('mom');
     expect(personByProfile(config, 'kids').id).toBe('oliver');
     expect(personByProfile({ defaultPin: '0', persons: [{ id: 'oliver', profile: 'kids' }] }, 'adults').id).toBe('oliver');
+  });
+});
+
+describe('badgePerson (FEAT-033)', () => {
+  var config = parseConfig({ persons: [
+    { id: 'dad', name: 'Daddy', profile: 'adults', emoji: '🦖' },
+    { id: 'evie', name: 'Evie', profile: 'kids' }
+  ] });
+
+  it('returns the active person (authored name + emoji) when the id resolves', () => {
+    var p = badgePerson(config, 'dad', 'adults');
+    expect(p.name).toBe('Daddy');
+    expect(personGlyph(p)).toBe('🦖');
+  });
+
+  it('falls back to the profile-class name + glyph when the id is absent', () => {
+    var p = badgePerson(config, 'ghost', 'adults');
+    expect(p.name).toBe('Adults');
+    expect(personGlyph(p)).toBe('🧑');
+  });
+
+  it('falls back via the profile class for a missing/odd profile arg', () => {
+    expect(badgePerson(config, null, 'kids').name).toBe('Kids');
+    expect(badgePerson(config, null, undefined).name).toBe('Kids');
   });
 });
 
