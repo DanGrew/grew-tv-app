@@ -10,17 +10,20 @@
 // the app falls back to the generic placeholders below so the screen always
 // works (real names/PINs are authored on-Mini at deploy).
 //
-// config shape: { defaultPin: "0000", persons: [ { id, name, profile, photo, pin? } ] }
+// config shape: { defaultPin: "0000", persons: [ { id, name, profile, photo, emoji?, pin? } ] }
 // A person's effective PIN = its own `pin` or the top-level `defaultPin`.
 
 export var PIN_LEN = 4;
 export var DEFAULT_PIN = '0000';
 
+// Per-class fallback face when a person has no photo and no own emoji.
+var PH_EMOJI = { kids: '🧒', adults: '🧑' };
+
 // Generic placeholders only — one adult + one kid. NO real names or PINs here.
 function defaultPersons() {
   return [
-    { id: 'child',   name: 'Child',   profile: 'kids',   photo: null, pin: null },
-    { id: 'grownup', name: 'Grown-up', profile: 'adults', photo: null, pin: null }
+    { id: 'child',   name: 'Child',   profile: 'kids',   photo: null, emoji: null, pin: null },
+    { id: 'grownup', name: 'Grown-up', profile: 'adults', photo: null, emoji: null, pin: null }
   ];
 }
 
@@ -34,8 +37,17 @@ function normalizePerson(raw) {
     name: raw.name != null ? raw.name : raw.id,
     profile: raw.profile === 'adults' ? 'adults' : 'kids',
     photo: raw.photo != null ? raw.photo : null,
+    emoji: typeof raw.emoji === 'string' && raw.emoji.length ? raw.emoji : null,
     pin: typeof raw.pin === 'string' && raw.pin.length ? raw.pin : null
   };
+}
+
+// Placeholder glyph for a person with no photo: the person's own emoji
+// (FEAT-033, authored in config.json) wins, else the class default, else a
+// generic face. The photo, when present, still wins upstream in the card
+// builder — this only resolves the no-photo fallback.
+export function personGlyph(person) {
+  return [person.emoji, PH_EMOJI[person.profile]].filter(Boolean).concat(['👤'])[0];
 }
 
 // Tolerant parse — any missing/invalid piece falls back to a default so a typo in

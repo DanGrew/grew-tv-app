@@ -1,7 +1,7 @@
 import {
   PIN_LEN, DEFAULT_PIN, defaultConfig, parseConfig, isLocked, effectivePin,
   pinMatches, personById, personByProfile,
-  pushDigit, popDigit, isPinComplete, dotFill, keypadNav
+  pushDigit, popDigit, isPinComplete, dotFill, keypadNav, personGlyph
 } from '../../core/profile-config.js';
 
 describe('defaultConfig', () => {
@@ -24,9 +24,16 @@ describe('parseConfig', () => {
       { id: 'mom', profile: 'adults', pin: '4321' }
     ] });
     expect(c.defaultPin).toBe('9876');
-    expect(c.persons[0]).toEqual({ id: 'oliver', name: 'Oliver', profile: 'kids', photo: 'o.jpg', pin: null });
+    expect(c.persons[0]).toEqual({ id: 'oliver', name: 'Oliver', profile: 'kids', photo: 'o.jpg', emoji: null, pin: null });
     // missing name falls back to id; missing photo -> null; own pin kept
-    expect(c.persons[1]).toEqual({ id: 'mom', name: 'mom', profile: 'adults', photo: null, pin: '4321' });
+    expect(c.persons[1]).toEqual({ id: 'mom', name: 'mom', profile: 'adults', photo: null, emoji: null, pin: '4321' });
+  });
+
+  it('passes a config.json emoji through, drops a blank/non-string emoji (FEAT-033)', () => {
+    expect(parseConfig({ persons: [{ id: 'oliver', profile: 'kids', emoji: '🦖' }] }).persons[0].emoji).toBe('🦖');
+    expect(parseConfig({ persons: [{ id: 'x', emoji: '' }] }).persons[0].emoji).toBe(null);
+    expect(parseConfig({ persons: [{ id: 'x', emoji: 5 }] }).persons[0].emoji).toBe(null);
+    expect(parseConfig({ persons: [{ id: 'x' }] }).persons[0].emoji).toBe(null);
   });
 
   it('defaults an unknown/missing profile to kids', () => {
@@ -55,6 +62,20 @@ describe('parseConfig', () => {
     expect(parseConfig({ persons: [{ name: 'x' }, { id: 'mom', profile: 'adults' }] }).persons.map(p => p.id)).toEqual(['mom']);
     expect(parseConfig({ persons: [{ name: 'x' }] }).persons).toEqual(defaultConfig().persons);
     expect(parseConfig({ persons: 'bad' }).persons).toEqual(defaultConfig().persons);
+  });
+});
+
+describe('personGlyph (FEAT-033)', () => {
+  it('prefers the person own emoji over the class default', () => {
+    expect(personGlyph({ profile: 'kids', emoji: '🦖' })).toBe('🦖');
+    expect(personGlyph({ profile: 'adults', emoji: '👵' })).toBe('👵');
+  });
+  it('falls back to the class default when no emoji', () => {
+    expect(personGlyph({ profile: 'kids', emoji: null })).toBe('🧒');
+    expect(personGlyph({ profile: 'adults' })).toBe('🧑');
+  });
+  it('falls back to a generic face for an unknown class with no emoji', () => {
+    expect(personGlyph({ profile: 'teens', emoji: null })).toBe('👤');
   });
 });
 

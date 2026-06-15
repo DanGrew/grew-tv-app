@@ -33,6 +33,12 @@ test('missing photo falls back to an emoji placeholder', async ({ page }) => {
   await expect(page.locator('#btn-kids .profile-photo-img')).toBeHidden();
 });
 
+test('renders the per-person config.json emoji on the placeholder (FEAT-033)', async ({ page }) => {
+  // kids has emoji '🦖' in config; adults has none -> class default.
+  await expect(page.locator('#btn-kids .profile-photo-ph')).toHaveText('🦖');
+  await expect(page.locator('#btn-adults .profile-photo-ph')).toHaveText('🧑');
+});
+
 test('Kids opens straight to browse with no PIN prompt', async ({ page }) => {
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();

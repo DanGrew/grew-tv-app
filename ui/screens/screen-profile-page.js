@@ -15,7 +15,7 @@ import { wsUrl } from '../../core/server-config.js';
 import { loadConfig, mediaUrl } from '../../core/app-api.js';
 import {
   defaultConfig, parseConfig, isLocked, pinMatches, personById, personByProfile,
-  pushDigit, popDigit, isPinComplete, dotFill, keypadNav
+  pushDigit, popDigit, isPinComplete, dotFill, keypadNav, personGlyph
 } from '../../core/profile-config.js';
 import { groupRows, gridNav } from '../../core/profile-rows.js';
 
@@ -24,7 +24,6 @@ var SERVER = window.location.origin;
 var KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'ok'];
 var KEYPAD_COLS = 3;
 var KEY_LABEL = { back: '⌫', ok: '✓' };
-var PH_EMOJI = { kids: '🧒', adults: '🧑' };
 
 export function initProfilePage() {
   var cardsEl = document.getElementById('profile-cards');
@@ -116,7 +115,7 @@ export function initProfilePage() {
     img.alt = '';
     var ph = document.createElement('div');
     ph.className = 'profile-photo-ph';
-    ph.textContent = [PH_EMOJI[person.profile]].filter(Boolean).concat(['👤'])[0];
+    ph.textContent = personGlyph(person);
     var src = mediaUrl(SERVER, person.photo);
     ({
       true: function() {
