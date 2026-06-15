@@ -11,13 +11,12 @@ import { screenPage } from '../../core/companion-utils.js';
 import { screenColour, screenLabel } from '../../core/screen-chooser.js';
 import { loadConfig, mediaUrl } from '../../core/app-api.js';
 import {
-  defaultConfig, parseConfig, isLocked, pinMatches, pushDigit, popDigit, isPinComplete, dotFill
+  defaultConfig, parseConfig, isLocked, pinMatches, pushDigit, popDigit, isPinComplete, dotFill, personGlyph
 } from '../../core/profile-config.js';
 import { groupRows } from '../../core/profile-rows.js';
 
 var KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'ok'];
 var KEY_LABEL = { back: '⌫', ok: '✓' };
-var PH_EMOJI = { kids: '🧒', adults: '🧑' };
 
 export function initPage() {
   var host = window.location.hostname;
@@ -113,7 +112,7 @@ export function initPage() {
     img.alt = '';
     var ph = document.createElement('div');
     ph.className = 'cmp-photo-ph';
-    ph.textContent = [PH_EMOJI[person.profile]].filter(Boolean).concat(['👤'])[0];
+    ph.textContent = personGlyph(person);
     var src = mediaUrl(server, person.photo);
     ({
       true: function() {

@@ -115,7 +115,7 @@ const BROWSE = {
 const CONFIG = {
   defaultPin: '1234',
   persons: [
-    { id: 'kids',   name: 'Kids',   profile: 'kids',   photo: null },
+    { id: 'kids',   name: 'Kids',   profile: 'kids',   photo: null, emoji: '🦖' },
     { id: 'adults', name: 'Adults', profile: 'adults', photo: null }
   ]
 };

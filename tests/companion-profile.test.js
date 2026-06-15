@@ -14,7 +14,7 @@ function msg(type, payload) { return JSON.stringify({ type, payload }); }
 const ROSTER = {
   defaultPin: '1234',
   persons: [
-    { id: 'oliver', name: 'Oliver', profile: 'kids',   photo: null },
+    { id: 'oliver', name: 'Oliver', profile: 'kids',   photo: null, emoji: '🦖' },
     { id: 'mom',    name: 'Mom',    profile: 'adults', photo: null, pin: '4321' }
   ]
 };
@@ -60,6 +60,13 @@ test('groups the cards into a kids row and an adults row', async ({ page }) => {
   await expect(page.locator('.cmp-cards')).toHaveCount(2);
   await expect(page.locator('.cmp-cards').first().locator('.cmp-card[data-id="oliver"]')).toBeVisible();
   await expect(page.locator('.cmp-cards').last().locator('.cmp-card[data-id="mom"]')).toBeVisible();
+});
+
+// Mirror invariant: the companion renders the same per-person config.json emoji
+// as the TV card (FEAT-033 TASK-192).
+test('renders the per-person config.json emoji on the companion placeholder', async ({ page }) => {
+  await expect(page.locator('.cmp-card[data-id="oliver"] .cmp-photo-ph')).toHaveText('🦖');
+  await expect(page.locator('.cmp-card[data-id="mom"] .cmp-photo-ph')).toHaveText('🧑');
 });
 
 test('picking a person activates it on the targeted screen FIRST (gated), not a bare setProfile', async ({ page }) => {
