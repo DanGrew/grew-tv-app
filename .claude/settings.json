@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/dan/dan-grew-repos/**)",
+      "Edit(//Users/dan/dan-grew-repos/**)",
+      "Write(//Users/dan/dan-grew-repos/**)",
+      "Bash(pytest:*)",
+      "Bash(python3 -m pytest:*)",
+      "Bash(/usr/bin/python3 -m pytest:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run test:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(node tools/validate-content.js:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(git worktree add:*)",
+      "Bash(git worktree list:*)",
+      "Bash(gh pr create:*)",
+      "Bash(/opt/homebrew/bin/gh pr create:*)"
+    ],
+    "deny": [
+      "Bash(gh pr merge:*)",
+      "Bash(/opt/homebrew/bin/gh pr merge:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)"
+    ]
+  }
+}
