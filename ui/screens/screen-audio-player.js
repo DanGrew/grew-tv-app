@@ -315,6 +315,8 @@ export function setup(config) {
   remote.shuffle  = function() { toggleShuffle(); };
   remote.lyrics   = function() { toggleLyrics(); };
   remote.skip     = function(params) { executeSkip([params].filter(Boolean).map(function(p) { return p.deltaSec; }).filter(Boolean).concat([0])[0]); };
+  remote.vol_up   = function() { audio.volume = Math.min(1, audio.volume + 0.1); };   // companion volume (TASK-198)
+  remote.vol_down = function() { audio.volume = Math.max(0, audio.volume - 0.1); };
   remote.reset    = function() { resetAndExit(); };   // companion Reset intent (TASK-142)
 
   audio.addEventListener('timeupdate', function() {

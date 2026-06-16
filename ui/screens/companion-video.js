@@ -154,6 +154,8 @@ export function initPage() {
   els.cc.addEventListener('click', function() { api.toggleCaptions(); });
   document.getElementById('c-prev').addEventListener('click', function() { api.prev(); });
   document.getElementById('c-next').addEventListener('click', function() { api.next(); });
+  document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
+  document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);
   buildJump();
   setInterval(renderBar, 250);
