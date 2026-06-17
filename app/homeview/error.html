@@ -47,6 +47,9 @@ button:hover { background: var(--surface-hi); }
 import { navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { connectApp } from '../../core/app-ws.js';
+import { installErrorReporter } from '../../core/error-reporter.js';
+
+installErrorReporter(window);   // app-wide JS-error capture (TASK-213); this page has no device badge
 
 document.getElementById('btn-retry').addEventListener('click', function() { navTo('profile.html'); });
 

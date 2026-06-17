@@ -1,5 +1,5 @@
 import { fmt } from '../../core/time.js';
-import { EVENTS, SOURCES, createEvent } from '../../core/telemetry-schema.js';
+import { logEvent, makeSeekCoalescer, SOURCE_TV } from '../../core/log.js';
 import { mediaUrl, saveProgress, resetProgress } from '../../core/app-api.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
 import { getCaptions, setCaptions, getPerson } from '../../core/state.js';
@@ -18,6 +18,10 @@ var BACKEND_SAVE_MS = 5000;
 var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-jump', 'btn-cc', 'btn-reset'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 var CC_MODE       = { 'true': 'showing', 'false': 'hidden' };
+// App-side log (TASK-213): a fresh start logs `play`, a start from a saved
+// position logs `resume`. startPlayback sets the flag the DOM `play` reads.
+var PLAY_EVENT    = { 'true': 'resume', 'false': 'play' };
+var SEEK_SETTLE_MS = 500;        // coalesce a scrub burst into one `seek` log
 
 export function setup(config) {
   var video    = config.video;
@@ -41,6 +45,7 @@ export function setup(config) {
   var upnextTimer       = null;
   var upnextRemaining   = 0;
   var captionsOn        = false;
+  var pendingResume     = false;
   var _currentDisplay   = {};
 
   var VIDEO_TOGGLE = {
@@ -48,20 +53,37 @@ export function setup(config) {
     'false': function() { video.pause(); }
   };
 
-  function sendTelemetry(event, source, opts) {
-    fetch('/telemetry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(createEvent(event, source, opts))
-    }).catch(function() {});
+  // Log context (TASK-213): who / what / where-in-the-item / which screen — the
+  // browser facts the server log can't see. itemId is the playing record; a
+  // series episode also carries its series as collectionId.
+  function logCtx() {
+    var ctx = appContext();
+    var id = [currentVideo].filter(Boolean).map(function(r) { return r.id; }).concat([ctx.itemId])[0];
+    return {
+      itemId: id,
+      collectionId: [ctx.itemId].filter(Boolean).filter(function(c) { return c !== id; }).concat([null])[0],
+      positionSec: video.currentTime,
+      durationSec: [video.duration].filter(function(d) { return !isNaN(d); }).concat([null])[0],
+      person: getPerson(),
+      source: SOURCE_TV
+    };
   }
+
+  // Fire-and-forget app-side log emit; `extra` merges health fields (e.g. dropped
+  // frame count) onto the base context. Never awaited, never throws (see core/log).
+  function emit(event, extra) {
+    logEvent(event, Object.assign(logCtx(), [extra].filter(Boolean).concat([{}])[0]));
+  }
+
+  // Scrubbing fires many `seeked` events; coalesce to ONE `seek` log once it settles.
+  var coalesceSeek = makeSeekCoalescer(function() { emit('seek'); }, SEEK_SETTLE_MS);
 
   function checkQuality() {
     var q = video.getVideoPlaybackQuality();
     var dropped = q.droppedVideoFrames - lastDroppedFrames;
     lastDroppedFrames = q.droppedVideoFrames;
     [dropped].filter(Boolean).forEach(function() {
-      sendTelemetry(EVENTS.FRAME_DROPPED, SOURCES.TV, { meta: { droppedFrames: dropped, perf: performance.now() } });
+      emit('frame_dropped', { droppedFrames: dropped, perf: performance.now() });
     });
   }
 
@@ -264,7 +286,10 @@ export function setup(config) {
     document.getElementById('btn-upnext-cancel').focus();
     upnextRemaining = UPNEXT_SECS;
     renderUpNextCount();
-    upnextTimer = setInterval(function() { tickUpNext(proceed); }, 1000);
+    // Auto-advance to the next episode logs `next` (TASK-213) when the countdown
+    // completes; cancelling never advances, so it never fires here.
+    var advance = function() { emit('next'); proceed(); };
+    upnextTimer = setInterval(function() { tickUpNext(advance); }, 1000);
   }
 
   var UPNEXT_NAV = {
@@ -316,6 +341,9 @@ export function setup(config) {
     document.getElementById('screen-video').style.display = '';
     onIntent('video');
     acquireWakeLock();
+    // TASK-213: a seek-to-position start is a `resume`, a from-zero start is a
+    // fresh `play`. The DOM `play` listener reads this flag, then clears it.
+    pendingResume = seekTo > 0;
     video.muted = false;
     var doPlay = function() {
       video.play().catch(function() { video.muted = true; video.play().catch(function() {}); promptForSound(); });
@@ -336,6 +364,9 @@ export function setup(config) {
 
   function stopPlayback() {
     clearUpNext();
+    // Log `stop` while the item is still current (TASK-213) — nav away / unload
+    // while playing. Guarded so a stop with nothing playing logs nothing.
+    [currentVideo].filter(Boolean).forEach(function() { emit('stop'); });
     heartbeat.stop();
     video.pause();
     video.src = '';
@@ -453,7 +484,7 @@ export function setup(config) {
   remote.play     = function() { video.play().catch(function() {}); showControls(); };
   remote.pause    = function() { video.pause(); showControls(); };
   remote.toggle   = function() { VIDEO_TOGGLE[video.paused](); showControls(); };
-  remote.next     = function() { onNext(); };
+  remote.next     = function() { emit('next'); onNext(); };
   remote.prev     = function() { onPrev(); };
   remote.skip     = function(params) { executeSkip([params].filter(Boolean).map(function(p) { return p.deltaSec; }).filter(Boolean).concat([0])[0]); };
   remote.vol_up   = function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); };
@@ -477,6 +508,7 @@ export function setup(config) {
   video.addEventListener('ended', function() {
     heartbeat.stop();
     [currentVideo].filter(Boolean).forEach(function(rec) { saveProgress(server, rec.id, video.duration, video.duration, getPerson()).catch(function() {}); });
+    emit('complete');
     emitState();
     onEnded();
   });
@@ -484,30 +516,27 @@ export function setup(config) {
     document.getElementById('btn-play-pause').textContent = '⏸';
     heartbeat.start();
     emitState();
-    sendTelemetry(EVENTS.VIDEO_PLAY, SOURCES.TV, { meta: { perf: performance.now() } });
+    emit(PLAY_EVENT[pendingResume + '']);
+    pendingResume = false;
     sampleFrameDrops();
   });
   video.addEventListener('pause', function() {
     document.getElementById('btn-play-pause').textContent = '▶';
     heartbeat.stop();
     emitState();
-    sendTelemetry(EVENTS.VIDEO_PAUSE, SOURCES.TV, { meta: { perf: performance.now() } });
+    emit('pause');
   });
-  video.addEventListener('waiting', function() {
-    sendTelemetry(EVENTS.VIDEO_BUFFER_START, SOURCES.TV, { meta: { perf: performance.now() } });
-  });
-  video.addEventListener('canplay', function() {
-    sendTelemetry(EVENTS.VIDEO_BUFFER_END, SOURCES.TV, { meta: { perf: performance.now() } });
-  });
+  video.addEventListener('waiting', function() { emit('buffer_start'); });
+  video.addEventListener('canplay', function() { emit('buffer_end'); });
   video.addEventListener('seeked', function() {
     emitState();
-    sendTelemetry(EVENTS.SEEK, SOURCES.TV, { meta: { perf: performance.now() } });
+    coalesceSeek();
     sampleFrameDrops();
   });
 
   document.getElementById('btn-play-pause').addEventListener('click', togglePlayPause);
   document.getElementById('btn-prev').addEventListener('click', function() { onPrev(); });
-  document.getElementById('btn-next').addEventListener('click', function() { onNext(); });
+  document.getElementById('btn-next').addEventListener('click', function() { emit('next'); onNext(); });
   document.getElementById('btn-jump').addEventListener('click', openJumpPopup);
   document.getElementById('btn-cc').addEventListener('click', toggleSubtitles);
   document.getElementById('btn-reset').addEventListener('click', function() { fireReset(document.getElementById('btn-reset')); });
