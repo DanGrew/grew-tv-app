@@ -156,8 +156,16 @@ test('retry button on error returns to profile select', async ({ page }) => {
   await page.route(BROWSE_URL, route => route.fulfill({ status: 500 }));
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-error')).toBeVisible();
-  await page.locator('#btn-retry').click();
-  await expect(page.locator('#screen-profile')).toBeVisible();
+  // #screen-error renders from static markup before error.html's module attaches
+  // #btn-retry's click handler (navTo profile), so under CI load an early click is
+  // dropped and the page sits on the error screen. Focus is a FALSE readiness
+  // signal here: <button autofocus> focuses #btn-retry before the module runs, so
+  // toBeFocused passes too early. No DOM marker distinguishes "module wired" from
+  // autofocus, so retry the click until the navigation actually lands.
+  await expect(async () => {
+    await page.locator('#btn-retry').click();
+    await expect(page.locator('#screen-profile')).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 5000 });
 });
 
 test('select standalone video plays directly with src set', async ({ page }) => {
@@ -382,6 +390,12 @@ test('Next works on an episode opened from a Continue Watching tile (BUG-005)', 
   await expect(page.locator('#screen-video')).toBeVisible();
   // Series transport is live (not a seriesless standalone) and Next advances.
   await expect(page.locator('#btn-next')).not.toHaveClass(/hidden/);
+  // Flake: under load Next occasionally lands back on s1e01 instead of advancing
+  // to s1e02 (observed src null -> s1e01, never s1e02) — Next is clicked before the
+  // video page has finished priming. The up-next line is the page's last async
+  // signal (set after the Promise.all load + /api/next resolve), so gating on it
+  // guarantees the page is fully primed before we manually advance.
+  await expect(page.locator('#video-upnext')).toHaveText('Up next: The Weekend');
   await page.locator('#btn-next').click();
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
 });

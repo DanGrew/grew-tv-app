@@ -217,6 +217,26 @@ async function installApi(page) {
   await page.route('**/media/config.json', function(route) {
     return json(route, 200, CONFIG);
   });
+  // Default WebSocket stub (FEAT-026). Every screen boots connectApp(ws://:8766),
+  // a port the app HARDCODES (core/server-config.js WS_PORT). With no route these
+  // connect to whatever real media-manager is live on :8766 and register on its
+  // shared device/person registry. Under parallel CI load many pages claim the
+  // same person, one gets `person_busy`, the picker opens the take-over prompt, and
+  // nav to browse never happens — the repo-wide e2e flake (74 cases, all stuck on
+  // `#screen-browse` never appearing). routeWebSocket handles the socket locally
+  // (we never call connectToServer) so nothing touches a real server. Grant
+  // `person_active` so the picker proceeds immediately, no 600ms grace wait. Tests
+  // needing a scripted verdict (profile.test.js busy/take-over, homeview BUG-008/009
+  // intent capture) register their own routeWebSocket AFTER this; Playwright matches
+  // most-recent-first, so theirs wins.
+  await page.routeWebSocket(/:8766/, function(ws) {
+    ws.onMessage(function(message) {
+      var msg = JSON.parse(message);
+      [msg].filter(function(m) { return m.type === 'activate_person' && m.payload.person_id; }).forEach(function(m) {
+        ws.send(JSON.stringify({ type: 'person_active', payload: { person_id: m.payload.person_id, device_id: m.payload.device_id } }));
+      });
+    });
+  });
 }
 
 // FEAT-031 (TASK-187): a faithful mini playback backend for the e2e player

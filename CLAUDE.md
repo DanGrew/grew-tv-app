@@ -108,9 +108,14 @@ Read this BEFORE writing screen code — these gate the PR in CI even when local
   companion counterpart (`ui/screens/companion-*.js` + `companion/*.html`) that
   reuses the same `core/` logic — they are two surfaces of one feature
   (FEAT-017/028 mirror invariant: companion drives, TV mirrors). Ship both halves
-  + a `tests/companion-*.test.js`. Companion e2e mocks the WS with
-  `page.routeWebSocket(/:8766/)`, so it does NOT collide with a live server —
-  unlike the app-screen e2e, which connects for real and can hit a person-lock.
+  + a `tests/companion-*.test.js`. Both companion AND app-screen e2e mock the WS
+  with `page.routeWebSocket(/:8766/)` so neither collides with a live server: the
+  app-screen `installApi()` fixture now installs a default stub granting
+  `person_active` (a test needing a scripted verdict registers its own route after
+  it — most-recent-first wins). Before that default existed the app-screen e2e
+  connected for real, and under parallel load collided on the shared person
+  registry (`person_busy` → take-over prompt → nav never fires) — the repo-wide
+  flake. Keep new app-screen suites on the fixture (don't hand-roll a live WS).
 
 ## Tests
 
