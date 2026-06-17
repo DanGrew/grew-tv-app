@@ -119,6 +119,17 @@ npm run test:unit   # vitest — unit tests for core/ (run locally)
 npm test            # playwright e2e — CI only; pre-push skips it
 ```
 
+**Verify touched suites, not the whole world — CI is the gate.** When checking
+a change locally, run the **touched + directly-relevant** e2e suites only
+(`npx playwright test tests/<file>.test.js`). Do NOT re-run the full e2e suite
+for confidence: it is slow and the repo carries a **pre-existing repo-wide
+`toBeVisible` focus/nav flake** that fails ~75 unrelated tests under parallel
+load but passes them in isolation. So **green-in-isolation + red-under-parallel
+≠ a regression** — classify a suspicious failure with `--workers=1` (and/or
+`--retries=2`, which tags flaky-vs-failed) before treating it as real, and
+reason about whether your diff can even reach the failing suite. Re-running the
+full suite repeatedly to "make sure" wastes time and tokens for no signal.
+
 **Running e2e from a secondary worktree — use your own port.** The Playwright
 `webServer` is a `python3 -m http.server 3456` with `reuseExistingServer` on
 (non-CI). If another worktree/session already has a server on `:3456`, your run
