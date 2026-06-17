@@ -1,5 +1,5 @@
 import { fmt } from '../../core/time.js';
-import { mediaUrl, saveProgress, resetProgress } from '../../core/app-api.js';
+import { mediaUrl, resetProgress } from '../../core/app-api.js';
 import { getPerson } from '../../core/state.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
 
@@ -31,6 +31,9 @@ export function setup(config) {
   var onNext   = [config.onNext  ].filter(Boolean).concat([function() {}])[0];
   var onPrev   = [config.onPrev  ].filter(Boolean).concat([function() {}])[0];
   var onShuffle = [config.onShuffle].filter(Boolean).concat([function() {}])[0];
+  // FEAT-031 (TASK-187): debounced position report — the page relays it to the
+  // server `position` action (playback_state is the audio resume source now).
+  var reportPosition = [config.reportPosition].filter(Boolean).concat([function() {}])[0];
   var onLyrics  = [config.onLyrics ].filter(Boolean).concat([function() {}])[0];
   var onIntent = [config.onIntent].filter(Boolean).concat([function() {}])[0];
   var emitSnapshot = [config.emitState ].filter(Boolean).concat([function() {}])[0];
@@ -276,16 +279,17 @@ export function setup(config) {
     ['btn-prev', 'btn-next'].forEach(function(id) { document.getElementById(id).classList[QUEUE_MODE[multi + '']]('hidden'); });
   }
 
-  // Shuffle toggle: reflect on the button, tell the page to rebuild the queue
-  // order, and push a fresh snapshot so the companion mirrors the flag.
+  // Shuffle is SERVER-owned now (FEAT-031/TASK-187). setShuffle only REFLECTS the
+  // flag from the incoming `playback` snapshot (the page calls it) + pushes the
+  // companion mirror. toggleShuffle just fires the toggle-shuffle action and waits
+  // for the snapshot to flip the button — no local guess at the new order.
   function setShuffle(on) {
     shuffleOn = !!on;
     document.getElementById('btn-shuffle').classList.toggle('on', shuffleOn);
     emitState();
   }
   function toggleShuffle() {
-    setShuffle(!shuffleOn);
-    onShuffle(shuffleOn);
+    onShuffle();
   }
 
   // Lyrics toggle: reflect on the pill (on = ambient lyrics enabled) and tell the
@@ -324,13 +328,14 @@ export function setup(config) {
       [rec].filter(function() { return audio.currentTime > 0; })
         .filter(function() { return !isNaN(audio.duration); })
         .filter(function() { return now - lastBackendSave > BACKEND_SAVE_MS; })
-        .forEach(function() { lastBackendSave = now; saveProgress(server, rec.id, audio.currentTime, audio.duration, getPerson()).catch(function() {}); });
+        .forEach(function() { lastBackendSave = now; reportPosition(audio.currentTime); });
     });
   });
 
+  // Track end -> the page fires the server `next` action (autoadvance is server
+  // queue math now); no client-side progress write.
   audio.addEventListener('ended', function() {
     heartbeat.stop();
-    [currentTrack].filter(Boolean).forEach(function(rec) { saveProgress(server, rec.id, audio.duration, audio.duration, getPerson()).catch(function() {}); });
     emitState();
     onEnded();
   });

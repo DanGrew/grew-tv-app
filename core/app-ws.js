@@ -70,6 +70,13 @@ export function connectApp(wsUrl, onIntent, opts) {
       person_busy: function() {
         [o.onPersonBusy].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
       },
+      // FEAT-031 (TASK-187): the server-authoritative `playback` snapshot. The
+      // server resolves all queue math and pushes this over the per-person relay
+      // (also replayed on reconnect so a (re)connecting screen re-syncs now-playing
+      // + position). The player renders from it; it never computes queue order.
+      playback: function() {
+        [o.onPlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
+      },
       deactivated: function() {
         [o.onDeactivated].filter(Boolean).concat([defaultDeactivated])[0](msg.payload);
       },

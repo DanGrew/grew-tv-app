@@ -219,4 +219,84 @@ async function installApi(page) {
   });
 }
 
-module.exports = { VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, BROWSE, CONFIG, nextOf, installApi };
+// FEAT-031 (TASK-187): a faithful mini playback backend for the e2e player
+// suites. The app is server-authoritative now — it POSTs to
+// /api/playback/{action} and renders the `playback` snapshot the server pushes
+// over the per-person WS relay. This stands in for media-manager: it applies a
+// tiny engine to each action and pushes the resolved snapshot to the page, the
+// same HTTP-action -> WS-snapshot loop the real backend runs (and replays the
+// latest snapshot on (re)connect so the player re-syncs after a reload).
+function albumOrder(albumId) {
+  var a = ALBUMS[albumId];
+  return a ? a.items.map(function(it) { return it.video.id; }) : [];
+}
+
+async function installPlaybackBackend(page) {
+  var state = { order: [], idx: 0, now: null, shuffle: false, repeat: false, sourceType: null, sourceId: null };
+  var live = null;
+
+  function resolve(id) {
+    var v = VIDEOS[id] || { id: id };
+    return { track_id: id, title: v.title, artist: v.artist, poster: v.poster, ext: v.ext, duration: v.duration, position: 0 };
+  }
+  function snapshot() {
+    return {
+      person_id: 'kids',
+      now_playing: [state.now].filter(Boolean).map(resolve).concat([null])[0],
+      play_next: [], from_source: [], then: [],
+      shuffle: state.shuffle, repeat: state.repeat,
+      source_type: state.sourceType, source_id: state.sourceId
+    };
+  }
+  function push() {
+    [live].filter(Boolean).forEach(function(ws) { ws.send(JSON.stringify({ type: 'playback', payload: snapshot() })); });
+  }
+
+  var ENGINE = {
+    'play-source': function(b) {
+      state.sourceType = b.source_type; state.sourceId = b.source_id;
+      state.order = albumOrder(b.source_id); state.shuffle = !!b.shuffle;
+      state.idx = 0; state.now = state.order[0] || null;
+    },
+    'play-track': function(b) {
+      state.now = b.track_id;
+      state.idx = [state.order.indexOf(b.track_id)].filter(function(i) { return i >= 0; }).concat([state.idx])[0];
+    },
+    'next':     function() { state.idx = Math.min(state.idx + 1, state.order.length - 1); state.now = [state.order[state.idx]].filter(Boolean).concat([state.now])[0]; },
+    'previous': function() { state.idx = Math.max(state.idx - 1, 0); state.now = [state.order[state.idx]].filter(Boolean).concat([state.now])[0]; },
+    'toggle-shuffle': function() { state.shuffle = !state.shuffle; },
+    'toggle-repeat':  function() { state.repeat = !state.repeat; },
+    'queue-track':        function() {},
+    'remove-queue-entry': function() {},
+    'move-queue-entry':   function() {},
+    'position':           function() {}
+  };
+  var NO_BROADCAST = { position: true };
+
+  await page.routeWebSocket(/:8766/, function(ws) {
+    live = ws;
+    function reply(type, payload) { ws.send(JSON.stringify({ type: type, payload: payload })); }
+    // Reconnect-restore: replay the latest snapshot so the player re-syncs.
+    [state.now].filter(Boolean).forEach(push);
+    // Satisfy the device/person handshake the screens run through on the way to
+    // the player (TASK-158): grant the person lock + answer device listing so the
+    // profile picker proceeds and content screens keep their lock.
+    ws.onMessage(function(raw) {
+      var m = JSON.parse(raw);
+      var REPLY = {
+        list_devices:    function() { reply('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }); },
+        activate_person: function() { [m.payload.person_id].filter(Boolean).forEach(function(pid) { reply('person_active', { person_id: pid }); }); }
+      };
+      [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
+    });
+  });
+  await page.route('**/api/playback/*', function(route) {
+    var action = decodeURIComponent(route.request().url().split('/api/playback/')[1].split('?')[0]);
+    var body = JSON.parse(route.request().postData() || '{}');
+    [ENGINE[action]].filter(Boolean).forEach(function(fn) { fn(body); });
+    route.fulfill({ status: 204, body: '' });
+    [NO_BROADCAST[action]].filter(function(x) { return !x; }).forEach(push);
+  });
+}
+
+module.exports = { VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, BROWSE, CONFIG, nextOf, installApi, installPlaybackBackend };

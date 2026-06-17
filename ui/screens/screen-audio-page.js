@@ -3,51 +3,40 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-audio-player.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadAlbum, loadVideo, loadProgress, loadLyrics, mediaUrl } from '../../core/app-api.js';
+import { loadAlbum, loadVideo, loadLyrics, mediaUrl, playbackAction } from '../../core/app-api.js';
 import { parseLrc, indexAt, windowAt } from '../../core/lrc.js';
-import { isMidWatch } from '../../core/progress.js';
-import { albumOrder, shuffleOrder, neighborId, trackById } from '../../core/queue.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
-// FEAT-018 (TASK-130) audio page. Drives the <audio> player over an album queue
-// (or a single track). Tracks switch IN PLACE — no per-track navigation — so the
-// shuffle order stays stable in memory and playback is continuous. An album is a
-// series, so /api/album gives the full track records up front (items[].video);
-// the page never re-fetches per track. Backend is the progress source of truth.
+// FEAT-031 (TASK-187) audio page — SERVER-AUTHORITATIVE playback. The album/artist
+// queue + shuffle order + next/prev are owned by the backend (TASK-184/185/186);
+// this page is a renderer + action sender. On entry it fires a `play-source`
+// (album/artist) or `play-track` (single) action; thereafter it renders the
+// incoming `playback` WS snapshot (now-playing track + position + shuffle flag)
+// and the transport (next/prev/shuffle) fires TASK-186 actions and waits for the
+// next snapshot to repaint. No `core/queue.js`, no local order math. The <audio>
+// element + debounced position reporting stay local; reconnect restores the
+// player from the replayed snapshot.
 var SERVER = window.location.origin;
 
-var RESUME_BY_RESTART = {
-  'true':  function() { return 0; },
-  'false': function(prog) { return [prog.position_secs].filter(function(p) { return isMidWatch(p, prog.duration_secs); }).concat([0])[0]; }
-};
-function resumeStart(restart, prog) { return RESUME_BY_RESTART[!!restart + ''](prog); }
 var AUDIO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 // Ambient transport auto-hides after this idle window; any d-pad key summons it.
 var TRANSPORT_HIDE_MS = 4000;
 
-// Album payload -> {items, title}; a single -> a one-track album wrapping the
-// /api/video record. Both feed the same queue model.
-var LOAD_QUEUE = {
-  'true':  function(albumId) { return loadAlbum(SERVER, albumId).then(function(a) { return { items: a.items, title: a.title, single: false }; }); },
-  'false': function(albumId, trackId) { return loadVideo(SERVER, trackId).then(function(v) { return { items: [{ video: v }], title: v.title, single: true }; }); }
-};
-
-// shuffle on -> a shuffled permutation; off -> album order. (Pure in core/queue.)
-var ORDER_FOR = {
-  'true':  function(items) { return shuffleOrder(albumOrder(items)); },
-  'false': function(items) { return albumOrder(items); }
-};
-
 export function initAudioPage() {
   var albumId  = getParam('album');
+  var artistId = getParam('artist');
   var trackId  = getParam('track');
-  var restart  = getParam('restart');
+  var shuffleParam = !!getParam('shuffle');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
+  var person   = getPerson();
   var wsApp = null;
   var player;
-  var state = { items: [], order: [], currentId: trackId, title: '' };
+  // Which track id is currently loaded in <audio>; a snapshot for a different
+  // track triggers a swap, the same track just updates the flag/position.
+  var loadedTrackId = null;
+  var title = '';
 
   // ── ambient lyrics (TASK-131) ──────────────────────────────────────────────
   // Lyrics are a page concern: the player stays playback-only. The current
@@ -111,8 +100,8 @@ export function initAudioPage() {
   function loadTrackLyrics(rec) { LYRIC_SOURCE[(!!rec.lyrics) + ''](rec); }
 
   // Blurred backdrop + (no-lyrics) big cover both draw the track poster.
-  function setArt(rec) {
-    [mediaUrl(SERVER, rec.poster)].filter(Boolean).forEach(function(u) {
+  function setArt(poster) {
+    [mediaUrl(SERVER, poster)].filter(Boolean).forEach(function(u) {
       document.getElementById('amb-bg').style.backgroundImage = 'url("' + u + '")';
       document.getElementById('audio-art').style.backgroundImage = 'url("' + u + '")';
       document.getElementById('audio-art').textContent = '';
@@ -130,39 +119,39 @@ export function initAudioPage() {
 
   audioEl.addEventListener('timeupdate', renderLyrics);
 
-  // Play a track id in place: resolve its full record from the album items and
-  // hand it to the player. delta-driven (next/prev/ended) tracks start fresh; the
-  // entry track resumes (handled at first play, below).
-  function playId(id, startSec) {
-    [trackById(state.items, id)].filter(Boolean).forEach(function(rec) {
-      state.currentId = id;
-      setArt(rec);
-      loadTrackLyrics(rec);
-      player.playTrack(rec, from, startSec);
-    });
+  // ── server `playback` snapshot -> UI (the single source of truth) ───────────
+  // A new now-playing track loads into <audio> at the server's position + pulls
+  // its lyrics; the same track just keeps playing (position lives client-side).
+  function swapTrack(np) {
+    loadedTrackId = np.track_id;
+    setArt(np.poster);
+    loadVideo(SERVER, np.track_id).then(loadTrackLyrics).catch(clearLyrics);
+    player.playTrack({ id: np.track_id, title: np.title, artist: np.artist, ext: np.ext, poster: np.poster }, from, np.position);
   }
 
-  function nextId() { return neighborId(state.order, state.currentId, 1); }
-  function prevId() { return neighborId(state.order, state.currentId, -1); }
-
-  // Manual ⏭/⏮ wrap the queue. Autoplay-at-end stops at the last track in the
-  // current order rather than looping the album forever.
-  function nextNow() { [nextId()].filter(Boolean).forEach(function(id) { playId(id, 0); }); }
-  function previous() { [prevId()].filter(Boolean).forEach(function(id) { playId(id, 0); }); }
-
-  var END_ACTION = {
-    'true':  function() { player.stop(); },
-    'false': function() { playId(nextId(), 0); }
+  var TRACK_CHANGED = {
+    'true':  function(np) { swapTrack(np); },
+    'false': function() {}
   };
-  function advanceAuto() { END_ACTION[(state.currentId === state.order[state.order.length - 1]) + ''](); }
+  function renderNowPlaying(np) {
+    TRACK_CHANGED[(np.track_id !== loadedTrackId) + ''](np);
+  }
 
-  // Shuffle toggled in the player -> rebuild the upcoming order, keep playing.
-  function onShuffle(on) { state.order = ORDER_FOR[on + ''](state.items); }
+  function applySnapshot(snap) {
+    player.setShuffle(snap.shuffle);
+    [snap.now_playing].filter(Boolean).forEach(renderNowPlaying);
+  }
+
+  // ── action sender (transport + autoadvance + position) ──────────────────────
+  function sendAction(action, body) {
+    playbackAction(SERVER, action, person, body).catch(function() {});
+  }
 
   function goBackNav() {
     clearTimeout(hideTimer);
     var STOP_NAV = {
       'detail-album': function() { navTo('album-detail.html', { album: albumId }); },
+      'artist':       function() { navTo('artist.html', { artist: artistId }); },
       'browse':       function() { navTo('browse.html'); }
     };
     [STOP_NAV[from]].filter(Boolean).concat([function() { navTo('browse.html'); }])[0]();
@@ -172,14 +161,15 @@ export function initAudioPage() {
     audio: document.getElementById('audio'),
     server: SERVER,
     onStop: goBackNav,
-    onEnded: advanceAuto,
-    onNext: nextNow,
-    onPrev: previous,
-    onShuffle: onShuffle,
+    onEnded: function() { sendAction('next', {}); },
+    onNext: function() { sendAction('next', {}); },
+    onPrev: function() { sendAction('previous', {}); },
+    onShuffle: function() { sendAction('toggle-shuffle', {}); },
     onLyrics: onLyrics,
+    reportPosition: function(sec) { sendAction('position', { current_position: sec }); },
     emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
     appContext: function() {
-      return { screen: 'player', itemId: [albumId].filter(Boolean).concat([state.currentId])[0], episodeId: state.currentId, profile: profile };
+      return { screen: 'player', itemId: [albumId].filter(Boolean).concat([artistId, loadedTrackId]).filter(Boolean)[0], episodeId: loadedTrackId, profile: profile };
     },
     onIntent: function(intent) {
       var AUDIO_CTX = { play: true, audio: true };
@@ -196,12 +186,12 @@ export function initAudioPage() {
   AUDIO_KEYS.forEach(function(k) { keys[k] = onAudioKey; });
   initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); armHide(); }, keys: keys, remote: player.remote });
 
-  // Companion `play` carries a track id -> teleport in place within the loaded
-  // queue (a tap on the album list); no id -> resume. `playAlbum` jumps the TV to
-  // a different album. `shuffle`/`toggle`/`next`/`prev`/`skip` fall through to
-  // player.remote.
+  // Companion `play` carries a track id -> teleport via the server play-track
+  // action (no id -> resume local <audio>). `playAlbum`/`playArtist` jump the TV
+  // to a different source. `shuffle`/`toggle`/`next`/`prev`/`skip` fall through to
+  // player.remote (which now fire server actions).
   var PLAY_BY_ID = {
-    'true':  function(id) { playId(id, 0); },
+    'true':  function(id) { sendAction('play-track', { track_id: id }); },
     'false': function() { player.remote.play(); }
   };
   function playIntent(p) {
@@ -212,37 +202,58 @@ export function initAudioPage() {
     var EXTRA = {
       navigate: function() { navTo(params.page, params.params); },
       play: function() { playIntent(params); },
-      playAlbum: function() { navTo('audio.html', { album: params.id, from: 'browse' }); }
+      playAlbum: function() { navTo('audio.html', { album: params.id, from: 'browse' }); },
+      playArtist: function() { navTo('audio.html', { artist: params.id, from: 'browse' }); }
     };
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
-  wsApp = connectApp(wsUrl(window.location.hostname), appIntent);
+  wsApp = connectApp(wsUrl(window.location.hostname), appIntent, { onPlayback: applySnapshot });
   wsApp.sendContext({ context_id: 'audio' });
-  wsApp.sendAppState({ screen: 'player', itemId: [albumId].filter(Boolean).concat([trackId])[0], profile: profile });
+  wsApp.sendAppState({ screen: 'player', itemId: [albumId].filter(Boolean).concat([artistId, trackId]).filter(Boolean)[0], profile: profile });
 
   document.addEventListener('keydown', dispatchKey);
 
-  // Entry: load the queue, set the order (initial shuffle from the param), then
-  // resume the start track from the backend position. Subsequent tracks start at 0.
+  // ── entry: establish the source, then jump to the tapped track ──────────────
+  // album/artist -> play-source (shuffle flag from the param); `play_track` leaves
+  // the source intact (engine: resumes the source on next advance), so a tapped
+  // row starts there and the album/artist queue still follows. A bare track id (no
+  // source) is a single — play-track only. The player is queue-mode (⏮/⏭) for a
+  // source, single for a lone track.
+  var SOURCE_BASE = {
+    album:  function() { sendAction('play-source', { source_type: 'album', source_id: albumId, shuffle: shuffleParam }); },
+    artist: function() { sendAction('play-source', { source_type: 'artist', source_id: artistId, shuffle: shuffleParam }); },
+    track:  function() {}
+  };
+  function fireEntry() {
+    SOURCE_BASE[kind]();
+    [trackId].filter(Boolean).forEach(function(t) { sendAction('play-track', { track_id: t }); });
+  }
+  function sourceKind() {
+    return [['album'].filter(function() { return !!albumId; })[0], ['artist'].filter(function() { return !!artistId; })[0]]
+      .filter(Boolean).concat(['track'])[0];
+  }
+  var kind = sourceKind();
+  var QUEUE_MODE = { album: true, artist: true, track: false };
+  // Breadcrumb title is collection-level: the album title (fetched), the artist
+  // name (already the param), or the single track's title.
+  var TITLE_FOR = {
+    album:  function() { return loadAlbum(SERVER, albumId).then(function(a) { return a.title; }); },
+    artist: function() { return Promise.resolve(artistId); },
+    track:  function() { return loadVideo(SERVER, trackId).then(function(v) { return v.title; }); }
+  };
+
   // initLyrics seeds the sticky lyrics preference from the backend before it is
   // read below; like initCaptions it never rejects, so it can't fail the all().
-  var shuffleParam = !!getParam('shuffle');
-  Promise.all([
-    LOAD_QUEUE[(!!albumId) + ''](albumId, trackId),
-    loadProgress(SERVER, trackId, getPerson()).catch(function() { return { position_secs: 0, duration_secs: null }; }),
-    initLyrics(SERVER)
-  ])
+  Promise.all([initLyrics(SERVER), TITLE_FOR[kind]()])
     .then(function(res) {
-      state.items = res[0].items;
-      state.title = res[0].title;
-      state.order = ORDER_FOR[shuffleParam + ''](state.items);
+      title = res[1];
       lyricsEnabled = getLyrics();
-      player.setQueueMode(!res[0].single);
+      player.setQueueMode(QUEUE_MODE[kind]);
       player.setShuffle(shuffleParam);
       player.setLyrics(lyricsEnabled);
-      mountBreadcrumb('breadcrumb', buildCrumbs('video', { videoTitle: state.title }));
-      playId(trackId, resumeStart(restart, res[1]));
+      mountBreadcrumb('breadcrumb', buildCrumbs('video', { videoTitle: title }));
+      fireEntry();
     })
     .catch(function() { navTo('error.html'); });
 }

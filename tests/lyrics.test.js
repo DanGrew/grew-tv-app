@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 
 // FEAT-018 (TASK-131) — always-on ambient lyrics on the audio player. A track
 // with an .lrc shows a rolling 3-line window (current ±1) that advances with
@@ -17,6 +17,7 @@ const LRC = [
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
+  await installPlaybackBackend(page);
   await page.route('**/api/browse**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS) })
