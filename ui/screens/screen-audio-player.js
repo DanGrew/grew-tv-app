@@ -2,6 +2,7 @@ import { fmt } from '../../core/time.js';
 import { mediaUrl, resetProgress } from '../../core/app-api.js';
 import { getPerson } from '../../core/state.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
+import { logEvent, makeSeekCoalescer, SOURCE_TV } from '../../core/log.js';
 
 // FEAT-018 (TASK-130) audio player. The <audio> analogue of the FEAT-017 video
 // player: same transport (play/pause, prev/next track, graduated skip, range
@@ -20,6 +21,9 @@ var BACKEND_SAVE_MS = 5000;
 
 var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-shuffle', 'btn-lyrics', 'btn-jump', 'btn-reset'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
+// App-side log (TASK-213): start from a saved position logs `resume`, else `play`.
+var PLAY_EVENT    = { 'true': 'resume', 'false': 'play' };
+var SEEK_SETTLE_MS = 500;        // coalesce a scrub burst into one `seek` log
 // {id}.{ext}: ext defaults to mp4 only as a guard — audio records carry m4a/mp3.
 var EXT_OF = { 'true': function(r) { return r.ext; }, 'false': function() { return 'mp4'; } };
 
@@ -45,6 +49,7 @@ export function setup(config) {
   var jumpPopup       = null;
   var shuffleOn       = false;
   var lyricsOn        = true;          // ambient lyrics shown by default
+  var pendingResume   = false;
   var _currentDisplay = {};
 
   var AUDIO_TOGGLE = {
@@ -74,6 +79,24 @@ export function setup(config) {
   }
   function emitState() { emitSnapshot(buildSnapshot()); }
   var heartbeat = createHeartbeat(emitState);
+
+  // App-side log context (TASK-213): who / what / where-in-the-track / which
+  // screen. itemId is the playing track; an album track also carries its album
+  // as collectionId.
+  function logCtx() {
+    var ctx = appContext();
+    var id = [currentTrack].filter(Boolean).map(function(r) { return r.id; }).concat([ctx.itemId])[0];
+    return {
+      itemId: id,
+      collectionId: [ctx.itemId].filter(Boolean).filter(function(c) { return c !== id; }).concat([null])[0],
+      positionSec: audio.currentTime,
+      durationSec: [audio.duration].filter(function(d) { return !isNaN(d); }).concat([null])[0],
+      person: getPerson(),
+      source: SOURCE_TV
+    };
+  }
+  function emit(event) { logEvent(event, logCtx()); }
+  var coalesceSeek = makeSeekCoalescer(function() { emit('seek'); }, SEEK_SETTLE_MS);
 
   function togglePlayPause() {
     onIntent(TOGGLE_INTENT[audio.paused + '']);
@@ -203,6 +226,7 @@ export function setup(config) {
 
   function startPlayback(seekTo) {
     onIntent('audio');
+    pendingResume = seekTo > 0;   // TASK-213: resume vs fresh play (DOM `play` reads it)
     var doPlay = function() { audio.play().catch(function() {}); };
     [seekTo].filter(function(t) { return t > 0; }).forEach(function(t) {
       [audio].filter(function(el) { return el.readyState >= 1; }).forEach(function() { audio.currentTime = t; doPlay(); });
@@ -218,6 +242,8 @@ export function setup(config) {
   }
 
   function stopPlayback() {
+    // Log `stop` while the track is still current (TASK-213); no-op if nothing playing.
+    [currentTrack].filter(Boolean).forEach(function() { emit('stop'); });
     heartbeat.stop();
     audio.pause();
     audio.src = '';
@@ -314,7 +340,7 @@ export function setup(config) {
   remote.play     = function() { audio.play().catch(function() {}); };
   remote.pause    = function() { audio.pause(); };
   remote.toggle   = function() { AUDIO_TOGGLE[audio.paused](); };
-  remote.next     = function() { onNext(); };
+  remote.next     = function() { emit('next'); onNext(); };
   remote.prev     = function() { onPrev(); };
   remote.shuffle  = function() { toggleShuffle(); };
   remote.lyrics   = function() { toggleLyrics(); };
@@ -338,6 +364,7 @@ export function setup(config) {
   // queue math now); no client-side progress write.
   audio.addEventListener('ended', function() {
     heartbeat.stop();
+    emit('complete');
     emitState();
     onEnded();
   });
@@ -345,17 +372,22 @@ export function setup(config) {
     document.getElementById('btn-play-pause').textContent = '⏸';
     heartbeat.start();
     emitState();
+    emit(PLAY_EVENT[pendingResume + '']);
+    pendingResume = false;
   });
   audio.addEventListener('pause', function() {
     document.getElementById('btn-play-pause').textContent = '▶';
     heartbeat.stop();
     emitState();
+    emit('pause');
   });
-  audio.addEventListener('seeked', function() { emitState(); });
+  audio.addEventListener('waiting', function() { emit('buffer_start'); });
+  audio.addEventListener('canplay', function() { emit('buffer_end'); });
+  audio.addEventListener('seeked', function() { emitState(); coalesceSeek(); });
 
   document.getElementById('btn-play-pause').addEventListener('click', togglePlayPause);
   document.getElementById('btn-prev').addEventListener('click', function() { onPrev(); });
-  document.getElementById('btn-next').addEventListener('click', function() { onNext(); });
+  document.getElementById('btn-next').addEventListener('click', function() { emit('next'); onNext(); });
   document.getElementById('btn-shuffle').addEventListener('click', toggleShuffle);
   document.getElementById('btn-lyrics').addEventListener('click', toggleLyrics);
   document.getElementById('btn-jump').addEventListener('click', openJumpPopup);

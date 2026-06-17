@@ -29,7 +29,8 @@ Apple Silicon Mac Mini (server, wired) runs media-manager on :8765
 ## Key Files
 
 - `core/screen-registry.js` — screen registration and d-pad key dispatch
-- `core/telemetry-schema.js` — telemetry event schema
+- `core/log.js` — app-side logging emitter (POST /log) + seek coalescer (TASK-213)
+- `core/error-reporter.js` — global browser-error capture → /log (TASK-213)
 - `core/ws-protocol.js` — WebSocket protocol (companion ↔ app)
 - `core/time.js` — time utilities
 - `ui/screens/screen-browse.js` — content grid browse screen
