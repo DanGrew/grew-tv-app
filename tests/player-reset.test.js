@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 
 // TASK-142: a single Reset control in the player clears this item's backend
 // progress for the active person, then exits. Covers films/episodes (video
@@ -11,6 +11,7 @@ const FILM = 'toy-story-main';
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
+  await installPlaybackBackend(page);
   await page.route('**/api/browse**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS) })

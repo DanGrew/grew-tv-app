@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 
 // FEAT-018/FEAT-027 — music browse + album detail + <audio> player + shuffle.
 // The Music tab (titled "Albums"), Continue Listening rollup and routing are
@@ -12,6 +12,7 @@ const { installApi, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
+  await installPlaybackBackend(page);
   await page.route('**/api/browse**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS) })
@@ -140,6 +141,41 @@ test('the player Shuffle button toggles the engaged state', async ({ page }) => 
   await expect(page.locator('#btn-shuffle')).toHaveClass(/on/);
   await page.locator('#btn-shuffle').click();
   await expect(page.locator('#btn-shuffle')).not.toHaveClass(/on/);
+});
+
+// REGRESSION (TASK-187): playback is server-authoritative — Next must POST the
+// `next` action and let the returning snapshot advance now-playing, NOT mutate a
+// local queue. Fails on pre-187 code (which advanced via core/queue.js and never
+// hit /api/playback).
+test('Next POSTs the server action and the snapshot advances now-playing (no client queue)', async ({ page }) => {
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="ootb"]').click();
+  await page.locator('.detail-row[data-id="ootb-01"]').click();
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
+  const nextPost = page.waitForRequest(r => r.url().includes('/api/playback/next') && r.method() === 'POST');
+  await page.locator('#btn-next').click();
+  await nextPost;
+  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
+});
+
+// The transport reports position via the server `position` action (playback_state
+// is the audio resume source now), not the legacy /api/progress write.
+test('position is reported to the playback position action', async ({ page }) => {
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="ootb"]').click();
+  await page.locator('.detail-row[data-id="ootb-01"]').click();
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
+  const posPost = page.waitForRequest(r => r.url().includes('/api/playback/position') && r.method() === 'POST');
+  await page.evaluate(() => {
+    const a = document.getElementById('audio');
+    Object.defineProperty(a, 'currentTime', { configurable: true, get: () => 42 });
+    Object.defineProperty(a, 'duration', { configurable: true, get: () => 227 });
+    a.dispatchEvent(new Event('timeupdate'));
+  });
+  const req = await posPost;
+  expect(JSON.parse(req.postData()).current_position).toBe(42);
 });
 
 test('Continue Listening rolls in-progress tracks up to ONE album tile, leading the Albums tab', async ({ page }) => {

@@ -43,6 +43,21 @@ export function resetProgress(serverUrl, id, person) {
   });
 }
 
+// FEAT-031 (TASK-187): server-authoritative playback. The app sends an action to
+// the TASK-186 endpoint (play-source / play-track / next / previous /
+// toggle-shuffle / toggle-repeat / position / queue-track / remove-queue-entry /
+// move-queue-entry); the server applies the pure engine transition, persists, and
+// broadcasts the resolved `playback` snapshot over the per-person relay — the UI
+// repaints from that snapshot, never from a local queue. Contract: 204 accept /
+// 400 bad input / never 500. `person` (FEAT-026) keys the per-person state.
+export function playbackAction(serverUrl, action, person, body) {
+  return fetch(serverUrl + '/api/playback/' + encodeURIComponent(action) + '?person=' + encodeURIComponent(person || ''), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
+  });
+}
+
 export function loadVideo(serverUrl, id) {
   return getJson(serverUrl + '/api/video/' + encodeURIComponent(id));
 }
