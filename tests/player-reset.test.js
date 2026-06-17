@@ -83,6 +83,9 @@ test('audio player shows a Reset control', async ({ page }) => {
   await page.locator('.film-tile[data-id="ootb"]').click();
   await page.locator('.detail-row[data-id="ootb-02"]').click();
   await expect(page.locator('#screen-audio')).toBeVisible();
+  // TASK-187: entry is now two async `playback` actions — wait for the track to
+  // land so a late snapshot can't repaint over the assert.
+  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
   await expect(page.locator('#btn-reset')).toBeVisible();
 });
 
@@ -92,6 +95,12 @@ test('audio Reset needs two presses, DELETEs progress, then exits the player', a
   await page.locator('.film-tile[data-id="ootb"]').click();
   await page.locator('.detail-row[data-id="ootb-02"]').click();
   await expect(page.locator('#screen-audio')).toBeVisible();
+  // TASK-187: entry is now two async `playback` actions. Wait for the track to
+  // land (so a late snapshot can't repaint mid-interaction), then summon the
+  // transport — a d-pad key resets the auto-hide timer so the armed Reset button
+  // isn't blurred, and silently disarmed, by the controls hiding under us.
+  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
+  await page.keyboard.press('ArrowDown');
   const methods = await captureProgress(page);
   const reset = page.locator('#btn-reset');
   await reset.click();
