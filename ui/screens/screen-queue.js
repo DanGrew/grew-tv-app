@@ -20,11 +20,12 @@ export function setupQueue(config) {
   var grid = [];                      // rows of focusable cells (DOM order)
   var pos  = { r: 0, c: 0 };
 
-  // Each .q-row contributes its buttons (select + ↑ + ↓ + ⊟) as one grid row.
+  // Grid rows: the now-playing transport (Shuffle/Repeat) then each queue row
+  // (select + ↑ + ↓ + ⊟). DOM order; empty groups drop out.
   function buildGrid() {
-    grid = Array.prototype.slice.call(body.querySelectorAll('.q-row')).map(function (rowEl) {
-      return Array.prototype.slice.call(rowEl.querySelectorAll('button'));
-    });
+    grid = Array.prototype.slice.call(body.querySelectorAll('.np-transport, .q-row'))
+      .map(function (rowEl) { return Array.prototype.slice.call(rowEl.querySelectorAll('button')); })
+      .filter(function (cells) { return cells.length > 0; });
   }
 
   function focusCell() {
@@ -35,9 +36,10 @@ export function setupQueue(config) {
   }
 
   var ACT = {
-    select: function (b) { onAction('play-track', { track_id: b.getAttribute('data-track') }); },
-    move:   function (b) { onAction('move-queue-entry', { entry_id: b.getAttribute('data-entry'), to_index: parseInt(b.getAttribute('data-to'), 10) }); },
-    remove: function (b) { onAction('remove-queue-entry', { entry_id: b.getAttribute('data-entry') }); }
+    select:    function (b) { onAction('play-track', { track_id: b.getAttribute('data-track') }); },
+    move:      function (b) { onAction('move-queue-entry', { entry_id: b.getAttribute('data-entry'), direction: b.getAttribute('data-dir') }); },
+    remove:    function (b) { onAction('remove-queue-entry', { entry_id: b.getAttribute('data-entry') }); },
+    transport: function (b) { onAction(b.getAttribute('data-action'), {}); }
   };
 
   function wireButton(b) {

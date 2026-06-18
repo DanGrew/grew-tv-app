@@ -28,25 +28,24 @@ function durationText(secs) {
   return fmt(secs);
 }
 
-// One materialized queue entry -> a view-model row. i / count drive the shift
-// targets: up clamps at the section head, down at its tail (a no-op move at the
-// edge, so the focus grid stays uniform).
-function modelRow(entry, i, count, queued) {
+// One materialized queue entry -> a view-model row. Shift up/down are single
+// neighbour swaps within the entry's own list (the engine's `direction` move),
+// NOT an absolute index — the client can't compute one (from_source is a slice
+// of current_permutation and the snapshot omits source_position).
+function modelRow(entry, queued) {
   return {
     entryId: entry.entry_id,
     trackId: entry.track_id,
     title: entry.title,
     artist: entry.artist,
     durationText: durationText(entry.duration),
-    queued: queued,
-    upIndex: Math.max(0, i - 1),
-    downIndex: Math.min(count - 1, i + 1)
+    queued: queued
   };
 }
 
 function modelRows(arr, queued) {
   var rows = arr || [];
-  return rows.map(function (e, i) { return modelRow(e, i, rows.length, queued); });
+  return rows.map(function (e) { return modelRow(e, queued); });
 }
 
 function sourceHint(snap) {
@@ -95,8 +94,11 @@ export function queueModel(snap) {
   return { nowPlaying: nowPlayingModel(s), shuffle: !!s.shuffle, repeat: !!s.repeat, sections: sections };
 }
 
-function pill(label, on) {
-  return '<span class="np-pill' + (on ? ' on' : '') + '">' + label + '</span>';
+// Shuffle / Repeat are live toggles inside the Queue View (data-act=transport ->
+// the overlay fires the toggle-shuffle / toggle-repeat action; the snapshot flips
+// the `on` state). The player owns prev/play/next.
+function pill(label, on, action, name) {
+  return '<button type="button" class="np-pill' + (on ? ' on' : '') + '" data-act="transport" data-action="' + action + '" aria-label="' + name + '">' + label + '</button>';
 }
 
 function nowPlayingHtml(np, shuffle, repeat) {
@@ -108,21 +110,24 @@ function nowPlayingHtml(np, shuffle, repeat) {
         '<div class="np-title">' + escapeHtml(np.title) + '</div>' +
         '<div class="np-artist">' + escapeHtml(np.artist) + '</div>' +
         '<div class="np-status">' +
-          pill('&#128256; Shuffle', shuffle) +
-          pill('&#128257; Repeat', repeat) +
+          '<div class="np-transport">' +
+            pill('&#128256; Shuffle', shuffle, 'toggle-shuffle', 'Shuffle') +
+            pill('&#128257; Repeat', repeat, 'toggle-repeat', 'Repeat') +
+          '</div>' +
           '<span class="np-time">' + escapeHtml(np.timeText) + '</span>' +
         '</div>' +
       '</div>' +
     '</div>';
 }
 
-// Per-row edit controls. Shift up/down carry the within-section to_index; remove
-// carries only the entry_id. data-act drives a dispatch table in the overlay.
+// Per-row edit controls. Shift up/down carry a `direction` (neighbour swap within
+// the section); remove carries the entry_id. data-act drives a dispatch table in
+// the overlay.
 function actionsHtml(row) {
   var entry = escapeHtml(row.entryId);
   return '<div class="q-actions">' +
-    '<button type="button" class="q-act" data-act="move" data-entry="' + entry + '" data-to="' + row.upIndex + '" title="Shift up" aria-label="Shift up">&#8593;</button>' +
-    '<button type="button" class="q-act" data-act="move" data-entry="' + entry + '" data-to="' + row.downIndex + '" title="Shift down" aria-label="Shift down">&#8595;</button>' +
+    '<button type="button" class="q-act" data-act="move" data-entry="' + entry + '" data-dir="up" title="Shift up" aria-label="Shift up">&#8593;</button>' +
+    '<button type="button" class="q-act" data-act="move" data-entry="' + entry + '" data-dir="down" title="Shift down" aria-label="Shift down">&#8595;</button>' +
     '<button type="button" class="q-act danger" data-act="remove" data-entry="' + entry + '" title="Remove" aria-label="Remove">&#8862;</button>' +
   '</div>';
 }

@@ -49,7 +49,7 @@ test('Queue button opens the overlay with NOW PLAYING + FROM SOURCE + Source-end
   await expect(page.locator('.q-ends')).toContainText('Source ends');
 });
 
-test('shifting a FROM SOURCE row down POSTs move-queue-entry (entry_id + to_index) and reorders', async ({ page }) => {
+test('shifting a FROM SOURCE row down POSTs move-queue-entry (entry_id + direction) and reorders', async ({ page }) => {
   const moves = [];
   page.on('request', req => {
     [req].filter(r => r.url().includes('/api/playback/move-queue-entry')).forEach(r => moves.push(JSON.parse(r.postData() || '{}')));
@@ -59,9 +59,21 @@ test('shifting a FROM SOURCE row down POSTs move-queue-entry (entry_id + to_inde
   await row(page, 'Mr. Blue Sky').getByRole('button', { name: 'Shift down' }).click();
   await expect.poll(() => moves.length).toBeGreaterThan(0);
   expect(moves[0]).toHaveProperty('entry_id');
-  expect(moves[0]).toHaveProperty('to_index', 1);
+  expect(moves[0]).toHaveProperty('direction', 'down');
+  expect(moves[0]).not.toHaveProperty('to_index');   // section-relative index was the bug
   // Re-rendered from the new snapshot: Sweet Talkin Woman is now first in source.
   await expect(page.locator('.q-row').first().locator('.q-name')).toContainText('Sweet Talkin Woman');
+});
+
+test('toggling Shuffle inside the Queue View flips it (live, no exit)', async ({ page }) => {
+  await enterPlayer(page, 'ootb-02', 'Mr. Blue Sky');
+  await openQueue(page);
+  const shuffle = page.locator('.np-pill', { hasText: 'Shuffle' });
+  await expect(shuffle).not.toHaveClass(/on/);
+  await shuffle.click();
+  await expect(shuffle).toHaveClass(/on/);
+  // toggle-shuffle populated THEN -> the Source-ends marker is gone.
+  await expect(page.locator('.q-ends')).toHaveCount(0);
 });
 
 test('deleting a FROM SOURCE row POSTs remove-queue-entry and the row disappears', async ({ page }) => {
@@ -113,11 +125,12 @@ test('Back closes the overlay and returns focus to the Queue button', async ({ p
 
 test('d-pad navigates rows and Enter fires the focused remove control', async ({ page }) => {
   await enterPlayer(page, 'ootb-01', 'Turn to Stone');
-  await openQueue(page);                              // focus lands on the first row's select
+  await openQueue(page);                              // focus lands on the now-playing transport (row 0)
+  await page.keyboard.press('ArrowDown');             // -> first queue row (Mr. Blue Sky), select cell
   await page.keyboard.press('ArrowRight');            // -> shift up
   await page.keyboard.press('ArrowRight');            // -> shift down
   await page.keyboard.press('ArrowRight');            // -> remove
   await expect(row(page, 'Mr. Blue Sky')).toHaveCount(1);
-  await page.keyboard.press('Enter');                 // remove the focused (first) row
+  await page.keyboard.press('Enter');                 // remove the focused row
   await expect(row(page, 'Mr. Blue Sky')).toHaveCount(0);
 });

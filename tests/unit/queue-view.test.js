@@ -77,28 +77,22 @@ describe('queueModel — empty override + THEN end', () => {
   });
 });
 
-describe('queueModel — shift to_index (within-section reorder)', () => {
-  it('clamps up at the head and down at the tail', () => {
-    var src = queueModel(shuffleSnap()).sections.find(s => s.key === 'from-source').rows;
-    expect(src[0].upIndex).toBe(0);   // head: up is a no-op
-    expect(src[0].downIndex).toBe(1);
-    expect(src[1].upIndex).toBe(0);
-    expect(src[1].downIndex).toBe(1); // tail: down is a no-op
-  });
-});
-
 describe('queueViewHtml', () => {
-  it('emits move actions keyed on entry_id + to_index and a remove per row', () => {
+  it('emits per-row shift up/down (direction) + remove keyed on entry_id', () => {
     var html = queueViewHtml(shuffleSnap());
-    expect(html).toContain('data-act="move" data-entry="s1" data-to="0"');
-    expect(html).toContain('data-act="move" data-entry="s1" data-to="1"');
+    expect(html).toContain('data-act="move" data-entry="s1" data-dir="up"');
+    expect(html).toContain('data-act="move" data-entry="s1" data-dir="down"');
     expect(html).toContain('data-act="remove" data-entry="s1"');
     expect(html).toContain('data-act="select" data-track="something"');
+    expect(html).not.toContain('data-to=');   // no absolute index (was the bug)
   });
 
-  it('shows shuffle/repeat status from the snapshot', () => {
-    expect(queueViewHtml(shuffleSnap())).toContain('np-pill on">&#128256; Shuffle');
-    expect(queueViewHtml(orderedSnap())).not.toContain('np-pill on">&#128256; Shuffle');
+  it('renders Shuffle/Repeat as live toggle buttons reflecting the snapshot', () => {
+    var html = queueViewHtml(shuffleSnap());
+    expect(html).toContain('data-act="transport" data-action="toggle-shuffle"');
+    expect(html).toContain('data-act="transport" data-action="toggle-repeat"');
+    expect(html).toContain('np-pill on" data-act="transport" data-action="toggle-shuffle"');
+    expect(queueViewHtml(orderedSnap())).not.toContain('np-pill on" data-act="transport" data-action="toggle-shuffle"');
   });
 
   it('escapes track titles', () => {

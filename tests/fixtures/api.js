@@ -294,6 +294,16 @@ async function installPlaybackBackend(page) {
     list.splice(toIndex, 0, e);
     return true;
   }
+  // Single neighbour swap within whichever list holds the entry (the engine's
+  // `direction` move — matches api/playback.py move-queue-entry without to_index).
+  function swapDir(entryId, dir) {
+    [state.override, state.source, state.then].forEach(function(list) {
+      var i = list.findIndex(function(e) { return e.entry_id === entryId; });
+      var j = dir === 'up' ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= list.length) return;
+      var tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+    });
+  }
   function dropEntry(list, entryId) { return list.filter(function(e) { return e.entry_id !== entryId; }); }
 
   var ENGINE = {
@@ -335,7 +345,10 @@ async function installPlaybackBackend(page) {
       state.then = dropEntry(state.then, b.entry_id);
     },
     'move-queue-entry':   function(b) {
-      [moveIn(state.override, b.entry_id, b.to_index) || moveIn(state.source, b.entry_id, b.to_index) || moveIn(state.then, b.entry_id, b.to_index)].forEach(function() {});
+      [b.direction].filter(Boolean).forEach(function(dir) { swapDir(b.entry_id, dir); });
+      [b.to_index].filter(function(x) { return x != null; }).forEach(function(ti) {
+        moveIn(state.override, b.entry_id, ti) || moveIn(state.source, b.entry_id, ti) || moveIn(state.then, b.entry_id, ti);
+      });
     },
     'position':           function() {}
   };
