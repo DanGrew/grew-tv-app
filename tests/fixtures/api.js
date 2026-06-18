@@ -252,18 +252,33 @@ function albumOrder(albumId) {
 }
 
 async function installPlaybackBackend(page) {
-  var state = { order: [], idx: 0, now: null, shuffle: false, repeat: false, sourceType: null, sourceId: null };
+  // TASK-188: a materialized queue (override + source permutation + next
+  // permutation), so the Queue View renders all four sections and edits round
+  // trip. Each row carries a STABLE entry_id (a counter, survives reorder) — the
+  // contract the overlay keys remove/move on.
+  var state = { now: null, shuffle: false, repeat: false, sourceType: null, sourceId: null, override: [], source: [], then: [] };
   var live = null;
+  var seq = 0;
+  function mkEntry(id) { seq += 1; return { entry_id: 'e' + seq, track_id: id }; }
 
   function resolve(id) {
     var v = VIDEOS[id] || { id: id };
     return { track_id: id, title: v.title, artist: v.artist, poster: v.poster, ext: v.ext, duration: v.duration, position: 0 };
   }
+  function resolveEntry(e) { return Object.assign(resolve(e.track_id), { entry_id: e.entry_id }); }
+  // THEN: the next permutation when the source continues (shuffle OR repeat),
+  // else [] -> the view shows "Source ends".
+  function computeThen(order) {
+    if (state.shuffle || state.repeat) return order.map(mkEntry);
+    return [];
+  }
   function snapshot() {
     return {
       person_id: 'kids',
       now_playing: [state.now].filter(Boolean).map(resolve).concat([null])[0],
-      play_next: [], from_source: [], then: [],
+      play_next: state.override.map(resolveEntry),
+      from_source: state.source.map(resolveEntry),
+      then: state.then.map(resolveEntry),
       shuffle: state.shuffle, repeat: state.repeat,
       source_type: state.sourceType, source_id: state.sourceId
     };
@@ -272,23 +287,56 @@ async function installPlaybackBackend(page) {
     [live].filter(Boolean).forEach(function(ws) { ws.send(JSON.stringify({ type: 'playback', payload: snapshot() })); });
   }
 
+  function moveIn(list, entryId, toIndex) {
+    var i = list.findIndex(function(e) { return e.entry_id === entryId; });
+    if (i < 0) return false;
+    var e = list.splice(i, 1)[0];
+    list.splice(toIndex, 0, e);
+    return true;
+  }
+  function dropEntry(list, entryId) { return list.filter(function(e) { return e.entry_id !== entryId; }); }
+
   var ENGINE = {
     'play-source': function(b) {
-      state.sourceType = b.source_type; state.sourceId = b.source_id;
-      state.order = albumOrder(b.source_id); state.shuffle = !!b.shuffle;
-      state.idx = 0; state.now = state.order[0] || null;
+      var order = albumOrder(b.source_id);
+      state.sourceType = b.source_type; state.sourceId = b.source_id; state.shuffle = !!b.shuffle;
+      state.now = order[0] || null;
+      state.source = order.slice(1).map(mkEntry);
+      state.then = computeThen(order); state.override = [];
     },
+    // Skip-to / play a row: set now-playing. A matching queued pick is consumed;
+    // a skip into the source advances the permutation past that track (so the
+    // now-playing track never also sits in from_source).
     'play-track': function(b) {
       state.now = b.track_id;
-      state.idx = [state.order.indexOf(b.track_id)].filter(function(i) { return i >= 0; }).concat([state.idx])[0];
+      var queued = state.override.filter(function(e) { return e.track_id === b.track_id; })[0];
+      [queued].filter(Boolean).forEach(function(e) { state.override = dropEntry(state.override, e.entry_id); });
+      var i = albumOrder(state.sourceId).indexOf(b.track_id);
+      [queued ? -1 : i].filter(function(x) { return x >= 0; }).forEach(function(x) {
+        state.source = albumOrder(state.sourceId).slice(x + 1).map(mkEntry);
+      });
     },
-    'next':     function() { state.idx = Math.min(state.idx + 1, state.order.length - 1); state.now = [state.order[state.idx]].filter(Boolean).concat([state.now])[0]; },
-    'previous': function() { state.idx = Math.max(state.idx - 1, 0); state.now = [state.order[state.idx]].filter(Boolean).concat([state.now])[0]; },
-    'toggle-shuffle': function() { state.shuffle = !state.shuffle; },
-    'toggle-repeat':  function() { state.repeat = !state.repeat; },
-    'queue-track':        function() {},
-    'remove-queue-entry': function() {},
-    'move-queue-entry':   function() {},
+    // Advance: drain the override queue first, else the source permutation.
+    'next': function() {
+      var nextEntry = state.override.concat(state.source)[0];
+      [nextEntry].filter(Boolean).forEach(function(e) {
+        state.now = e.track_id;
+        state.override = dropEntry(state.override, e.entry_id);
+        state.source = dropEntry(state.source, e.entry_id);
+      });
+    },
+    'previous': function() {},
+    'toggle-shuffle': function() { state.shuffle = !state.shuffle; state.then = computeThen(albumOrder(state.sourceId)); },
+    'toggle-repeat':  function() { state.repeat = !state.repeat; state.then = computeThen(albumOrder(state.sourceId)); },
+    'queue-track':        function(b) { state.override.unshift(mkEntry(b.track_id)); },
+    'remove-queue-entry': function(b) {
+      state.override = dropEntry(state.override, b.entry_id);
+      state.source = dropEntry(state.source, b.entry_id);
+      state.then = dropEntry(state.then, b.entry_id);
+    },
+    'move-queue-entry':   function(b) {
+      [moveIn(state.override, b.entry_id, b.to_index) || moveIn(state.source, b.entry_id, b.to_index) || moveIn(state.then, b.entry_id, b.to_index)].forEach(function() {});
+    },
     'position':           function() {}
   };
   var NO_BROADCAST = { position: true };

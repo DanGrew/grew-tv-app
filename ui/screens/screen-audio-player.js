@@ -18,7 +18,7 @@ var JUMP_DEFAULT = 4;            // +10s, the most common forward skip
 var QUICK_SKIP   = 10;          // d-pad left/right one-press skip
 var BACKEND_SAVE_MS = 5000;
 
-var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-shuffle', 'btn-lyrics', 'btn-jump', 'btn-reset'];
+var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-shuffle', 'btn-repeat', 'btn-lyrics', 'btn-jump', 'btn-reset', 'btn-queue'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 // {id}.{ext}: ext defaults to mp4 only as a guard — audio records carry m4a/mp3.
 var EXT_OF = { 'true': function(r) { return r.ext; }, 'false': function() { return 'mp4'; } };
@@ -31,6 +31,10 @@ export function setup(config) {
   var onNext   = [config.onNext  ].filter(Boolean).concat([function() {}])[0];
   var onPrev   = [config.onPrev  ].filter(Boolean).concat([function() {}])[0];
   var onShuffle = [config.onShuffle].filter(Boolean).concat([function() {}])[0];
+  // FEAT-031 (TASK-188): repeat is server-owned like shuffle (toggle-repeat
+  // action); Queue opens the full-screen Queue View overlay (owned by the page).
+  var onRepeat = [config.onRepeat].filter(Boolean).concat([function() {}])[0];
+  var onQueue  = [config.onQueue ].filter(Boolean).concat([function() {}])[0];
   // FEAT-031 (TASK-187): debounced position report — the page relays it to the
   // server `position` action (playback_state is the audio resume source now).
   var reportPosition = [config.reportPosition].filter(Boolean).concat([function() {}])[0];
@@ -292,6 +296,20 @@ export function setup(config) {
     onShuffle();
   }
 
+  // Repeat mirrors shuffle: SERVER-owned (FEAT-031/TASK-188). setRepeat only
+  // REFLECTS the flag from the incoming `playback` snapshot; toggleRepeat fires
+  // the toggle-repeat action and waits for the snapshot to flip the button.
+  function setRepeat(on) {
+    document.getElementById('btn-repeat').classList.toggle('on', !!on);
+  }
+  function toggleRepeat() {
+    onRepeat();
+  }
+
+  function openQueue() {
+    onQueue();
+  }
+
   // Lyrics toggle: reflect on the pill (on = ambient lyrics enabled) and tell the
   // page to show/hide the lyric layer. Default on; the page only shows lyrics for
   // a track that actually has an .lrc.
@@ -317,6 +335,8 @@ export function setup(config) {
   remote.next     = function() { onNext(); };
   remote.prev     = function() { onPrev(); };
   remote.shuffle  = function() { toggleShuffle(); };
+  remote.repeat   = function() { toggleRepeat(); };
+  remote.queue    = function() { openQueue(); };
   remote.lyrics   = function() { toggleLyrics(); };
   remote.skip     = function(params) { executeSkip([params].filter(Boolean).map(function(p) { return p.deltaSec; }).filter(Boolean).concat([0])[0]); };
   remote.vol_up   = function() { audio.volume = Math.min(1, audio.volume + 0.1); };   // companion volume (TASK-198)
@@ -357,10 +377,12 @@ export function setup(config) {
   document.getElementById('btn-prev').addEventListener('click', function() { onPrev(); });
   document.getElementById('btn-next').addEventListener('click', function() { onNext(); });
   document.getElementById('btn-shuffle').addEventListener('click', toggleShuffle);
+  document.getElementById('btn-repeat').addEventListener('click', toggleRepeat);
+  document.getElementById('btn-queue').addEventListener('click', openQueue);
   document.getElementById('btn-lyrics').addEventListener('click', toggleLyrics);
   document.getElementById('btn-jump').addEventListener('click', openJumpPopup);
   document.getElementById('btn-reset').addEventListener('click', function() { fireReset(document.getElementById('btn-reset')); });
   document.getElementById('btn-reset').addEventListener('blur', disarmReset);
 
-  return { playTrack, handleAudioKey, setQueueMode, setShuffle, setLyrics, currentTrackDisplay, stop: stopPlayback, remote };
+  return { playTrack, handleAudioKey, setQueueMode, setShuffle, setRepeat, setLyrics, currentTrackDisplay, stop: stopPlayback, remote };
 }

@@ -1,6 +1,7 @@
 import { getParam, getProfile, getPerson, navTo, getLyrics, setLyrics as saveLyricsPref, initLyrics } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-audio-player.js';
+import { setupQueue } from './screen-queue.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadAlbum, loadVideo, loadLyrics, mediaUrl, playbackAction } from '../../core/app-api.js';
@@ -33,6 +34,7 @@ export function initAudioPage() {
   var person   = getPerson();
   var wsApp = null;
   var player;
+  var queue;
   // Which track id is currently loaded in <audio>; a snapshot for a different
   // track triggers a swap, the same track just updates the flag/position.
   var loadedTrackId = null;
@@ -139,6 +141,8 @@ export function initAudioPage() {
 
   function applySnapshot(snap) {
     player.setShuffle(snap.shuffle);
+    player.setRepeat(snap.repeat);
+    queue.applySnapshot(snap);
     [snap.now_playing].filter(Boolean).forEach(renderNowPlaying);
   }
 
@@ -165,6 +169,8 @@ export function initAudioPage() {
     onNext: function() { sendAction('next', {}); },
     onPrev: function() { sendAction('previous', {}); },
     onShuffle: function() { sendAction('toggle-shuffle', {}); },
+    onRepeat: function() { sendAction('toggle-repeat', {}); },
+    onQueue: function() { queue.open(); },
     onLyrics: onLyrics,
     reportPosition: function(sec) { sendAction('position', { current_position: sec }); },
     emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
@@ -181,7 +187,21 @@ export function initAudioPage() {
     }
   });
 
-  function onAudioKey(e) { summonTransport(); player.handleAudioKey(e); }
+  // FEAT-031 (TASK-188): the Queue View overlay hangs off the player. While open
+  // it owns the d-pad (its own grid nav + Back to close); closed, keys drive the
+  // transport as before.
+  queue = setupQueue({
+    root: document.getElementById('queue-overlay'),
+    body: document.getElementById('queue-body'),
+    onAction: function(action, body) { sendAction(action, body); },
+    onClose: function() { document.getElementById('btn-queue').focus(); }
+  });
+
+  var KEY_TARGET = {
+    'true':  function(e) { queue.handleKey(e); },
+    'false': function(e) { summonTransport(); player.handleAudioKey(e); }
+  };
+  function onAudioKey(e) { KEY_TARGET[queue.isOpen() + ''](e); }
   var keys = {};
   AUDIO_KEYS.forEach(function(k) { keys[k] = onAudioKey; });
   initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); armHide(); }, keys: keys, remote: player.remote });
