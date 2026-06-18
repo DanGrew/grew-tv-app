@@ -31,21 +31,25 @@ function durationText(secs) {
 // One materialized queue entry -> a view-model row. Shift up/down are single
 // neighbour swaps within the entry's own list (the engine's `direction` move),
 // NOT an absolute index — the client can't compute one (from_source is a slice
-// of current_permutation and the snapshot omits source_position).
-function modelRow(entry, queued) {
+// of current_permutation and the snapshot omits source_position). canUp/canDown
+// gate the edges: the first row can't shift up (would swap with the now-playing
+// track / the prior section) and the last can't shift down.
+function modelRow(entry, queued, canUp, canDown) {
   return {
     entryId: entry.entry_id,
     trackId: entry.track_id,
     title: entry.title,
     artist: entry.artist,
     durationText: durationText(entry.duration),
-    queued: queued
+    queued: queued,
+    canUp: canUp,
+    canDown: canDown
   };
 }
 
 function modelRows(arr, queued) {
   var rows = arr || [];
-  return rows.map(function (e) { return modelRow(e, queued); });
+  return rows.map(function (e, i) { return modelRow(e, queued, i > 0, i < rows.length - 1); });
 }
 
 function sourceHint(snap) {
@@ -120,14 +124,23 @@ function nowPlayingHtml(np, shuffle, repeat) {
     '</div>';
 }
 
+// A shift control. Disabled at the section edge: a disabled button can't fire and
+// is dropped from the focus grid (buildGrid filters :not([disabled])), so the
+// d-pad never lands on a dead cell.
+function shiftBtn(entry, dir, enabled, glyph, label) {
+  var extra = enabled ? '' : ' is-disabled';
+  var dis = enabled ? '' : ' disabled';
+  return '<button type="button" class="q-act' + extra + '"' + dis + ' data-act="move" data-entry="' + entry + '" data-dir="' + dir + '" title="' + label + '" aria-label="' + label + '">' + glyph + '</button>';
+}
+
 // Per-row edit controls. Shift up/down carry a `direction` (neighbour swap within
 // the section); remove carries the entry_id. data-act drives a dispatch table in
 // the overlay.
 function actionsHtml(row) {
   var entry = escapeHtml(row.entryId);
   return '<div class="q-actions">' +
-    '<button type="button" class="q-act" data-act="move" data-entry="' + entry + '" data-dir="up" title="Shift up" aria-label="Shift up">&#8593;</button>' +
-    '<button type="button" class="q-act" data-act="move" data-entry="' + entry + '" data-dir="down" title="Shift down" aria-label="Shift down">&#8595;</button>' +
+    shiftBtn(entry, 'up', row.canUp, '&#8593;', 'Shift up') +
+    shiftBtn(entry, 'down', row.canDown, '&#8595;', 'Shift down') +
     '<button type="button" class="q-act danger" data-act="remove" data-entry="' + entry + '" title="Remove" aria-label="Remove">&#8862;</button>' +
   '</div>';
 }

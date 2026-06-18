@@ -24,7 +24,7 @@ export function setupQueue(config) {
   // (select + ↑ + ↓ + ⊟). DOM order; empty groups drop out.
   function buildGrid() {
     grid = Array.prototype.slice.call(body.querySelectorAll('.np-transport, .q-row'))
-      .map(function (rowEl) { return Array.prototype.slice.call(rowEl.querySelectorAll('button')); })
+      .map(function (rowEl) { return Array.prototype.slice.call(rowEl.querySelectorAll('button:not([disabled])')); })
       .filter(function (cells) { return cells.length > 0; });
   }
 

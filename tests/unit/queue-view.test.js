@@ -87,6 +87,17 @@ describe('queueViewHtml', () => {
     expect(html).not.toContain('data-to=');   // no absolute index (was the bug)
   });
 
+  it('disables shift-up on the first row and shift-down on the last (no swap with now-playing / off-section)', () => {
+    var src = queueModel(shuffleSnap()).sections.find(s => s.key === 'from-source').rows;
+    expect(src[0].canUp).toBe(false);    // first FROM SOURCE row: can't swap up into now-playing
+    expect(src[0].canDown).toBe(true);
+    expect(src[src.length - 1].canDown).toBe(false);
+    var html = queueViewHtml(shuffleSnap());
+    // s1 is first in from_source -> its shift-up is disabled, shift-down is not.
+    expect(html).toMatch(/class="q-act is-disabled" disabled data-act="move" data-entry="s1" data-dir="up"/);
+    expect(html).toContain('class="q-act" data-act="move" data-entry="s1" data-dir="down"');
+  });
+
   it('renders Shuffle/Repeat as live toggle buttons reflecting the snapshot', () => {
     var html = queueViewHtml(shuffleSnap());
     expect(html).toContain('data-act="transport" data-action="toggle-shuffle"');

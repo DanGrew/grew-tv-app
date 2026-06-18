@@ -56,6 +56,8 @@ test('shifting a FROM SOURCE row down POSTs move-queue-entry (entry_id + directi
   });
   await enterPlayer(page, 'ootb-01', 'Turn to Stone');  // from_source = [Mr. Blue Sky, Sweet Talkin Woman]
   await openQueue(page);
+  // First FROM SOURCE row can't shift up (would swap with the now-playing track).
+  await expect(row(page, 'Mr. Blue Sky').getByRole('button', { name: 'Shift up' })).toBeDisabled();
   await row(page, 'Mr. Blue Sky').getByRole('button', { name: 'Shift down' }).click();
   await expect.poll(() => moves.length).toBeGreaterThan(0);
   expect(moves[0]).toHaveProperty('entry_id');
