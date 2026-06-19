@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadAlbum } from '../../core/app-api.js';
+import { loadAlbum, playbackAction } from '../../core/app-api.js';
 import { screenPage, displayTitle } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
@@ -33,7 +33,7 @@ export function initPage() {
     back: document.getElementById('btn-back'),
     reset: document.getElementById('c-reset')
   };
-  var state = { snap: null, albumId: null };
+  var state = { snap: null, albumId: null, person: null };
   var api = {};
   var updateBar = null;
   function noop() {}
@@ -84,14 +84,24 @@ export function initPage() {
     return [state.snap].filter(Boolean).map(function(s) { return s.episodeId; }).concat([null])[0];
   }
 
-  // Highlight the row matching the live current track (episodeId).
+  // Highlight the row matching the live current track (episodeId). Scoped to the
+  // play buttons so the sibling ＋ Queue control isn't mistaken for a track row.
   function markCurrent() {
-    Array.from(els.tracks.children).forEach(function(b) {
+    Array.prototype.slice.call(els.tracks.querySelectorAll('.track-btn')).forEach(function(b) {
       b.classList.toggle('cur', b.getAttribute('data-id') === currentId());
     });
   }
 
-  function trackBtn(item) {
+  // FEAT-031 (TASK-189) producer: queue a track to PLAY NEXT. Server-authoritative
+  // — POST queue-track straight to /api/playback for the active person; it lands
+  // in the override queue and shows up under PLAY NEXT on the Queue View + TV.
+  function queueTrack(id) {
+    playbackAction(server, 'queue-track', state.person, { track_id: id }).catch(noop);
+  }
+
+  // A track row: the play button (tap = play now, keeps the .track-btn contract
+  // the highlight + e2e key off) plus a ＋ Queue producer (FEAT-031 mockup).
+  function playBtn(item) {
     var v = item.video;
     var b = document.createElement('button');
     b.className = 'track-btn';
@@ -99,6 +109,25 @@ export function initPage() {
     b.insertAdjacentHTML('beforeend', '<span class="t-num">' + item.episode + '</span><span class="t-name">' + v.title + '</span>');
     b.addEventListener('click', function() { api.play(v.id); });
     return b;
+  }
+
+  function queueBtn(item) {
+    var v = item.video;
+    var b = document.createElement('button');
+    b.className = 'queue-btn';
+    b.setAttribute('data-queue', v.id);
+    b.setAttribute('aria-label', 'Queue');
+    b.textContent = '＋';
+    b.addEventListener('click', function() { queueTrack(v.id); });
+    return b;
+  }
+
+  function trackBtn(item) {
+    var row = document.createElement('div');
+    row.className = 'track-row';
+    row.appendChild(playBtn(item));
+    row.appendChild(queueBtn(item));
+    return row;
   }
 
   function renderTracks(album) {
@@ -122,8 +151,15 @@ export function initPage() {
       .forEach(function(id) { state.albumId = id; loadTracks(id); });
   }
 
+  // The active person rides the app_state (TASK-158); the ＋ Queue POSTs key per
+  // person off it, like the companion's Continue-Watching reads.
+  function capturePerson(snap) {
+    [snap.person].filter(Boolean).forEach(function(p) { state.person = p; });
+  }
+
   function onAppState(snap) {
     state.snap = snap;
+    capturePerson(snap);
     renderControls();
     renderBar();
     captureAlbum(snap);
@@ -171,6 +207,7 @@ export function initPage() {
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);
+  document.getElementById('c-queue').addEventListener('click', function() { window.location.href = 'queue.html'; });
   buildJump();
   setInterval(renderBar, 250);
 

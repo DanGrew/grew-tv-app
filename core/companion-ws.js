@@ -94,6 +94,14 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices, opts)
         appStateAt = Date.now();
         [onAppState].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
       },
+      // FEAT-031 (TASK-189): the server-authoritative `playback` snapshot, the
+      // SAME per-person relay the TV screen receives (app-ws.js). The companion
+      // rides its target device's person (TASK-157/158), so the Queue View
+      // mirror repaints from this; it computes no queue order itself. Replayed on
+      // (re)connect via snapshot_request so the companion re-syncs.
+      playback: function() {
+        [o.onPlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
+      },
       // FEAT-026 person-plane verdicts for a companion-initiated person pick. The
       // backend replies to whoever SENT activate_person (it reads device_id from
       // the payload, not the socket), so when the companion activates a person on

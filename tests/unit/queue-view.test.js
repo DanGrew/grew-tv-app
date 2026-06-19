@@ -1,4 +1,4 @@
-import { queueModel, queueViewHtml } from '../../core/queue-view.js';
+import { queueModel, queueViewHtml, companionQueueHtml } from '../../core/queue-view.js';
 
 function entry(id, title, eid, dur) {
   return { track_id: id, title: title, artist: 'The Beatles', entry_id: eid, duration: dur };
@@ -116,5 +116,60 @@ describe('queueViewHtml', () => {
     var html = queueViewHtml(null);
     expect(html).toContain('Source ends');
     expect(html).not.toContain('now-playing');
+  });
+});
+
+// FEAT-031 (TASK-189) — the companion (phone) Queue View renders the SAME
+// queueModel into the mockup's `.ph-*` markup, with each control carrying the
+// same TASK-186 action the companion POSTs.
+describe('companionQueueHtml — phone mirror', () => {
+  it('renders now-playing + the four sections from the snapshot', () => {
+    var html = companionQueueHtml(shuffleSnap());
+    expect(html).toContain('class="ph-np"');
+    expect(html).toContain('Come Together');
+    expect(html).toContain('class="ph-section">Play Next');
+    expect(html).toContain('class="ph-section">From Source');
+    expect(html).toContain('class="ph-section">Then');
+    expect(html).toContain('Here Comes the Sun');
+  });
+
+  it('keys per-row edits on entry_id (select/move/remove) like the TV overlay', () => {
+    var html = companionQueueHtml(shuffleSnap());
+    expect(html).toContain('data-act="select" data-track="here-comes-the-sun" data-entry="q1"');
+    expect(html).toContain('data-act="move" data-entry="q1" data-dir="down"');
+    expect(html).toContain('data-act="remove" data-entry="q1"');
+  });
+
+  it('flags the queued (PLAY NEXT) row and disables the section-edge shift', () => {
+    var html = companionQueueHtml(shuffleSnap());
+    expect(html).toContain('class="ph-qrow queued"');
+    // q1 is first in PLAY NEXT -> shift-up disabled.
+    expect(html).toContain('class="ph-ract is-disabled" disabled data-act="move" data-entry="q1" data-dir="up"');
+  });
+
+  it('renders shuffle/repeat as transport actions, lit from the snapshot', () => {
+    var html = companionQueueHtml(shuffleSnap());
+    expect(html).toContain('data-act="transport" data-action="toggle-shuffle"');
+    expect(html).toContain('data-act="transport" data-action="toggle-repeat"');
+    expect(html).toContain('ph-tbtn on" data-act="transport" data-action="toggle-shuffle"');
+    // play/pause is a device-local WS toggle, not a server action.
+    expect(html).toContain('data-act="toggle"');
+  });
+
+  it('shows the end-of-source marker when THEN is empty (ordered + repeat off)', () => {
+    var html = companionQueueHtml(orderedSnap());
+    expect(html).toContain('Source ends');
+  });
+
+  it('escapes track titles', () => {
+    var snap = shuffleSnap();
+    snap.play_next[0].title = 'Tom & <Jerry>';
+    expect(companionQueueHtml(snap)).toContain('Tom &amp; &lt;Jerry&gt;');
+  });
+
+  it('renders a stable shell for an empty snapshot', () => {
+    var html = companionQueueHtml(null);
+    expect(html).toContain('Source ends');
+    expect(html).not.toContain('ph-np"');
   });
 });

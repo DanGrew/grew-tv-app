@@ -366,7 +366,17 @@ async function installPlaybackBackend(page) {
       var m = JSON.parse(raw);
       var REPLY = {
         list_devices:    function() { reply('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }); },
-        activate_person: function() { [m.payload.person_id].filter(Boolean).forEach(function(pid) { reply('person_active', { person_id: pid }); }); }
+        activate_person: function() { [m.payload.person_id].filter(Boolean).forEach(function(pid) { reply('person_active', { person_id: pid }); }); },
+        register_companion: function() {},
+        // TASK-189: a companion (re)connect asks for the current state; the real
+        // backend replays the device context + app_state + last playback snapshot
+        // over the per-person relay. The app_state carries the active person the
+        // companion keys its POSTs on; the playback snapshot paints the Queue View.
+        snapshot_request: function() {
+          reply('context', { context_id: 'audio', version: 1 });
+          reply('app_state', { person: 'kids', profile: 'kids', screen: 'player' });
+          push();
+        }
       };
       [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
     });
@@ -378,6 +388,11 @@ async function installPlaybackBackend(page) {
     route.fulfill({ status: 204, body: '' });
     [NO_BROADCAST[action]].filter(function(x) { return !x; }).forEach(push);
   });
+  // Seed the backend state before the page connects (no WS yet, so no push) — a
+  // companion test stands up a playing source + queue, then navigates the page,
+  // and the snapshot_request replay renders it. Mirrors driving the real backend.
+  function seed(action, body) { [ENGINE[action]].filter(Boolean).forEach(function(fn) { fn(body || {}); }); }
+  return { seed: seed, snapshot: snapshot };
 }
 
 module.exports = { VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, BROWSE, CONFIG, nextOf, installApi, installPlaybackBackend };

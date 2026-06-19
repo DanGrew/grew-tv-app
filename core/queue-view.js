@@ -13,6 +13,7 @@
 // vs source-generated), not editability — every row is editable.
 
 import { fmt } from './time.js';
+import { percent } from './progress.js';
 
 function escapeHtml(value) {
   return String(value == null ? '' : value)
@@ -170,4 +171,92 @@ export function queueViewHtml(snap) {
   var m = queueModel(snap);
   return nowPlayingHtml(m.nowPlaying, m.shuffle, m.repeat) +
     m.sections.map(sectionHtml).join('');
+}
+
+// ── companion (phone) Queue View ───────────────────────────────────────────
+// FEAT-031 (TASK-189). The phone mirror of the TV Queue View: the SAME four
+// sections off the SAME server snapshot (via queueModel — no re-derived queue
+// math), in the mockup's `.ph-*` phone markup. The companion drives the TV
+// (FEAT-017/028 mirror invariant): every control turns into the same TASK-186
+// action the TV fires, POSTed straight to /api/playback by companion-queue.js.
+// Transport play/pause is the lone exception — it toggles the TV's local
+// <audio>, so it carries data-act="toggle" (a WS intent), not a server action.
+
+// One phone transport control. prev/next/shuffle/repeat are server actions
+// (data-act="transport" + the action name); play/pause is a device-local WS
+// toggle (data-act="toggle"). `on` lights the shuffle/repeat pill state.
+function phTransportBtn(act, action, glyph, on, label) {
+  var cls = on ? ' on' : '';
+  return '<button type="button" class="ph-tbtn' + cls + '" data-act="' + act + '" data-action="' + action + '" aria-label="' + label + '">' + glyph + '</button>';
+}
+
+function phTransport(snap) {
+  return '<div class="ph-transport">' +
+    phTransportBtn('transport', 'previous', '&#9198;', false, 'Previous') +
+    phTransportBtn('toggle', '', '&#9199;', false, 'Play / pause') +
+    phTransportBtn('transport', 'next', '&#9197;', false, 'Next') +
+    phTransportBtn('transport', 'toggle-shuffle', '&#128256;', !!snap.shuffle, 'Shuffle') +
+    phTransportBtn('transport', 'toggle-repeat', '&#128257;', !!snap.repeat, 'Repeat') +
+  '</div>';
+}
+
+function phNowPlaying(snap) {
+  var np = snap.now_playing;
+  if (!np) return '';
+  var time = durationText(np.position) + ' / ' + durationText(np.duration);
+  return '<div class="ph-section">Now Playing</div>' +
+    '<div class="ph-np">' +
+      '<div class="art">&#127925;</div>' +
+      '<div class="ph-np-body">' +
+        '<div class="nm">' + escapeHtml(np.title) + '</div>' +
+        '<div class="by">' + escapeHtml(np.artist) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="ph-bar"><i style="width:' + percent(np.position, np.duration) + '%"></i></div>' +
+    '<div class="ph-sub ph-time">' + escapeHtml(time) + '</div>' +
+    phTransport(snap);
+}
+
+// Per-row ✕/↑/↓. Disabled at the section edge (matches the TV overlay): a
+// disabled control drops out of the tap targets and reads as a dead end.
+function phAct(entry, act, dir, enabled, glyph, label) {
+  var dis = enabled ? '' : ' disabled';
+  var cls = enabled ? '' : ' is-disabled';
+  return '<button type="button" class="ph-ract' + cls + '"' + dis + ' data-act="' + act + '" data-entry="' + entry + '" data-dir="' + dir + '" aria-label="' + label + '">' + glyph + '</button>';
+}
+
+function phRowActions(row) {
+  var entry = escapeHtml(row.entryId);
+  return '<span class="acts">' +
+    phAct(entry, 'move', 'up', row.canUp, '&#8593;', 'Shift up') +
+    phAct(entry, 'move', 'down', row.canDown, '&#8595;', 'Shift down') +
+    '<button type="button" class="ph-ract x" data-act="remove" data-entry="' + entry + '" aria-label="Remove">&#10005;</button>' +
+  '</span>';
+}
+
+// Tap the name to skip to (play) that track; the side controls edit the row.
+function phRow(row) {
+  var grip = row.queued ? '&#10239;' : '&#9834;';
+  var by = escapeHtml(row.durationText);
+  return '<div class="ph-qrow' + (row.queued ? ' queued' : '') + '">' +
+    '<button type="button" class="ph-qname" data-act="select" data-track="' + escapeHtml(row.trackId) + '" data-entry="' + escapeHtml(row.entryId) + '">' +
+      '<span class="grip">' + grip + '</span>' +
+      '<span class="nm">' + escapeHtml(row.title) + ' <span class="by">&middot; ' + by + '</span></span>' +
+    '</button>' +
+    phRowActions(row) +
+  '</div>';
+}
+
+function phSection(sec) {
+  var hint = sec.hint ? ' <span class="hint">' + escapeHtml(sec.hint) + '</span>' : '';
+  var label = '<div class="ph-section">' + escapeHtml(sec.label) + hint + '</div>';
+  var ends = sec.endsText ? '<div class="ph-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>' : '';
+  return label + sec.rows.map(phRow).join('') + ends;
+}
+
+// Full phone Queue View body for a snapshot. Empty/absent snapshot renders the
+// stable shell (no now-playing, empty FROM SOURCE, THEN "Source ends").
+export function companionQueueHtml(snap) {
+  var m = queueModel(snap);
+  return phNowPlaying(snap || {}) + m.sections.map(phSection).join('');
 }

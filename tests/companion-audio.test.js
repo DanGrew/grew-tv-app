@@ -16,7 +16,7 @@ const CTX_FOR = { 'album-detail': 'detail' };
 function mockApp(page) {
   let version = 1;
   let ctx = 'audio';
-  const st = { screen: 'player', itemId: 'ootb', episodeId: 'ootb-02', positionSec: 110, durationSec: 245, playing: true, profile: 'kids', shuffle: false };
+  const st = { screen: 'player', itemId: 'ootb', episodeId: 'ootb-02', positionSec: 110, durationSec: 245, playing: true, profile: 'kids', person: 'kids', shuffle: false };
   return page.routeWebSocket(/:8766/, (ws) => {
     function pushState() { ws.send(msg('app_state', st)); }
     function pushCtx() {
@@ -81,6 +81,26 @@ test('tapping a track teleports the TV — the highlight follows the echoed snap
 
 test('a graduated skip grid is present (±10s / ±30s)', async ({ page }) => {
   await expect(page.locator('.jump-btn')).toHaveText(['-30s', '-10s', '+10s', '+30s']);
+});
+
+test('+ Queue on a track POSTs queue-track for the active person (FEAT-031 producer)', async ({ page }) => {
+  const posts = [];
+  await page.route('**/api/playback/*', (route) => {
+    posts.push({ url: route.request().url(), body: JSON.parse(route.request().postData() || '{}') });
+    route.fulfill({ status: 204, body: '' });
+  });
+  // One ＋ producer control per track row, alongside the tap-to-play button.
+  await expect(page.locator('.queue-btn')).toHaveCount(3);
+  await page.locator('.queue-btn[data-queue="ootb-03"]').click();
+  await expect.poll(() => posts.length).toBeGreaterThan(0);
+  expect(posts[0].url).toContain('/api/playback/queue-track');
+  expect(posts[0].url).toContain('person=kids');
+  expect(posts[0].body.track_id).toBe('ootb-03');
+});
+
+test('a Queue button opens the companion Queue View', async ({ page }) => {
+  await page.locator('#c-queue').click();
+  await expect(page).toHaveURL(/companion\/queue\.html$/);
 });
 
 test('a back control returns to the album — labelled with it, teleporting the TV to the detail', async ({ page }) => {
