@@ -34,6 +34,23 @@ export function focusFirstGridTile() {
   [tiles()[0]].filter(Boolean).forEach(function(el) { el.focus(); });
 }
 
+// FEAT-031 (TASK-214) — an OPTIONAL header-action row (e.g. the artist page's
+// Play / Shuffle) that sits between the breadcrumb and the grid. Inert when the
+// page has no `#header-actions` (the rail-grid page): the lookups return [] so
+// gridUp/crumbDown fall back to their original crumb<->grid behaviour.
+function actionBtns() {
+  return Array.from(document.querySelectorAll('#header-actions .action-btn'));
+}
+
+function focusFirstAction() {
+  [actionBtns()[0]].filter(Boolean).forEach(function(el) { el.focus(); });
+}
+
+function focusActionAt(i) {
+  var a = actionBtns();
+  [a[clampIndex(i, a.length)]].filter(Boolean).forEach(function(el) { el.focus(); });
+}
+
 function crumbLinks() {
   return Array.from(document.querySelectorAll('#breadcrumb .crumb-link'));
 }
@@ -47,10 +64,16 @@ function focusCrumbAt(i) {
   [c[clampIndex(i, c.length)]].filter(Boolean).forEach(function(el) { el.focus(); });
 }
 
-// Up from the first grid row hops to the breadcrumb; from any lower row it steps
-// up one row (column kept by the index arithmetic).
+// The row above the grid: the header-action row when the page has one, else the
+// breadcrumb. Returns a focus fn (no branch — filter/map/concat).
+function aboveGrid() {
+  return [actionBtns().length].filter(Boolean).map(function() { return focusFirstAction; }).concat([focusFirstCrumb])[0];
+}
+
+// Up from the first grid row hops to whatever sits above it (actions or crumbs);
+// from any lower row it steps up one row (column kept by the index arithmetic).
 function gridUp(i, cols) {
-  ({ true: focusFirstCrumb, false: function() { focusTileAt(i - cols); } })[i < cols]();
+  ({ true: aboveGrid(), false: function() { focusTileAt(i - cols); } })[i < cols]();
 }
 
 // Grid zone: Left/Right step one tile, Up/Down a whole row; Up from row 0 leaves
@@ -68,17 +91,40 @@ function gridArrowImpl(e) {
   [MOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
 }
 
-// Breadcrumb zone: Left/Right move between crumbs, Down drops back into the grid,
-// Up is the edge.
+// The row below the breadcrumb: the header-action row when present, else the
+// grid (rail-grid page). Returns a focus fn (no branch).
+function belowCrumbs() {
+  return [actionBtns().length].filter(Boolean).map(function() { return focusFirstAction; }).concat([focusFirstGridTile])[0];
+}
+
+// Breadcrumb zone: Left/Right move between crumbs, Down drops to the next row
+// (actions or grid), Up is the edge.
 function crumbArrow(e) {
   var i = crumbLinks().indexOf(document.activeElement);
   var CMOVE = {
     ArrowLeft:  function() { focusCrumbAt(i - 1); },
     ArrowRight: function() { focusCrumbAt(i + 1); },
-    ArrowDown:  focusFirstGridTile,
+    ArrowDown:  belowCrumbs(),
     ArrowUp:    function() {}
   };
   [CMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
+}
+
+// Action zone: Left/Right between the header buttons, Down into the grid, Up to
+// the breadcrumb.
+function actionArrow(e) {
+  var i = actionBtns().indexOf(document.activeElement);
+  var AMOVE = {
+    ArrowLeft:  function() { focusActionAt(i - 1); },
+    ArrowRight: function() { focusActionAt(i + 1); },
+    ArrowDown:  focusFirstGridTile,
+    ArrowUp:    focusFirstCrumb
+  };
+  [AMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
+}
+
+function inActions() {
+  return [document.activeElement.closest('#header-actions')].filter(Boolean).map(function() { return 'actions'; });
 }
 
 function inCrumbs() {
@@ -86,10 +132,10 @@ function inCrumbs() {
 }
 
 function zoneOf() {
-  return inCrumbs().concat(['grid'])[0];
+  return inActions().concat(inCrumbs()).concat(['grid'])[0];
 }
 
-var ZONE = { crumbs: crumbArrow, grid: gridArrowImpl };
+var ZONE = { crumbs: crumbArrow, actions: actionArrow, grid: gridArrowImpl };
 
 // Single d-pad entry point — routes the arrow to the zone holding focus.
 export function gridArrow(e) {

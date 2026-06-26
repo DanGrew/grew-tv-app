@@ -27,6 +27,10 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 #ctx-title { font-size: 20px; color: var(--text); text-align: center; flex-shrink: 0; min-height: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #btn-back { align-self: flex-start; padding: 10px 16px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; flex-shrink: 0; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #btn-back:active, #btn-back:focus { outline: none; background: var(--surface-hi); border-color: var(--focus); color: var(--focus); }
+#artist-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.act-btn { flex: 1; padding: 12px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.act-btn:active, .act-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#btn-play.act-btn { border-color: var(--focus); color: var(--focus); }
 #grid-wrap { flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; padding-top: 4px; }
 #grid-wrap::-webkit-scrollbar { display: none; }
 #txtgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
@@ -64,6 +68,10 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 <div id="ctx-label"></div>
 <div id="ctx-title"></div>
 <button id="btn-back" type="button">← Back</button>
+<div id="artist-actions">
+  <button id="btn-play" class="act-btn" type="button">&#9654; Play</button>
+  <button id="btn-shuffle" class="act-btn" type="button">&#128256; Shuffle</button>
+</div>
 <div id="grid-wrap"><div id="txtgrid"></div></div>
 <script type="module">
 import { initPage } from '../ui/screens/companion-artist.js';

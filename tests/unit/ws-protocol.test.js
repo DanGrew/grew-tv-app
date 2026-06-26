@@ -16,6 +16,7 @@ import {
   createToggleCaptionsIntent,
   createShuffleIntent,
   createPlayAlbumIntent,
+  createPlayArtistIntent,
   createRegisterDevice,
   createActivatePerson,
   createRegisterCompanion,
@@ -139,11 +140,11 @@ describe('APP_STATE message type', () => {
 });
 
 describe('INTENTS', () => {
-  it('has the FEAT-017 six plus the FEAT-018 music pair', () => {
+  it('has the FEAT-017 six plus the FEAT-018 music pair and the TASK-214 artist play', () => {
     expect(INTENTS).toEqual({
       PLAY: 'play', SKIP: 'skip', NEXT: 'next', PREV: 'prev',
       SET_PROFILE: 'setProfile', TOGGLE_CAPTIONS: 'toggleCaptions',
-      SHUFFLE: 'shuffle', PLAY_ALBUM: 'playAlbum'
+      SHUFFLE: 'shuffle', PLAY_ALBUM: 'playAlbum', PLAY_ARTIST: 'playArtist'
     });
   });
 });
@@ -214,6 +215,11 @@ describe('intent builders', () => {
     expect(createPlayAlbumIntent('ootb').payload.intent).toBe('playAlbum');
     expect(createPlayAlbumIntent('ootb').payload.params.id).toBe('ootb');
     expect(createPlayAlbumIntent().payload.params.id).toBeNull();
+  });
+  it('createPlayArtistIntent carries the artist id, defaulting to null', () => {
+    expect(createPlayArtistIntent('ELO').payload.intent).toBe('playArtist');
+    expect(createPlayArtistIntent('ELO').payload.params.id).toBe('ELO');
+    expect(createPlayArtistIntent().payload.params.id).toBeNull();
   });
 });
 

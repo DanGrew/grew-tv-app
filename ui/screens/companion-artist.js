@@ -25,7 +25,9 @@ export function initPage() {
     ctxLabel: document.getElementById('ctx-label'),
     ctxTitle: document.getElementById('ctx-title'),
     gridEl: document.getElementById('txtgrid'),
-    backBtn: document.getElementById('btn-back')
+    backBtn: document.getElementById('btn-back'),
+    playBtn: document.getElementById('btn-play'),
+    shuffleBtn: document.getElementById('btn-shuffle')
   };
   var state = { artist: null, profile: null, person: null, albums: [], progress: {} };
   var api = {};
@@ -35,6 +37,12 @@ export function initPage() {
   function onDevices(devices) { updateBar(devices); }
 
   els.backBtn.addEventListener('click', function() { api.sendIntent('back'); });
+
+  // Play / Shuffle header (TASK-214): drive the TV's artist screen to the player
+  // on this artist source. Play-all sends PLAY_ARTIST, Shuffle reuses SHUFFLE —
+  // the artist screen owns the live artist id, so neither intent carries params.
+  els.playBtn.addEventListener('click', function() { api.sendIntent('playArtist'); });
+  els.shuffleBtn.addEventListener('click', function() { api.sendIntent('shuffle'); });
 
   // Breadcrumb trail (FEAT-021): Home > Albums (the Music tab) > Artist. A crumb
   // tap sends the `navigate` intent so the app teleports the TV; the companion
