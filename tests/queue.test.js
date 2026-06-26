@@ -126,6 +126,18 @@ test('Back closes the overlay and returns focus to the Queue button', async ({ p
   await expect(page.locator('#btn-queue')).toBeFocused();
 });
 
+test('TASK-216: clicking the breadcrumb closes the overlay to the still-playing player', async ({ page }) => {
+  await enterPlayer(page, 'ootb-02', 'Mr. Blue Sky');
+  await openQueue(page);
+  // The breadcrumb is a real control, not dead text (the only non-keyboard way back).
+  await page.locator('#queue-crumb-back').click();
+  await expect(page.locator('#queue-overlay')).not.toHaveClass(/open/);
+  await expect(page.locator('#btn-queue')).toBeFocused();
+  // No page nav: still on the audio player, NOW PLAYING unchanged (audio kept playing).
+  await expect(page.locator('#screen-audio')).toBeVisible();
+  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
+});
+
 test('d-pad navigates rows and Enter fires the focused remove control', async ({ page }) => {
   await enterPlayer(page, 'ootb-01', 'Turn to Stone');
   await openQueue(page);                              // focus lands on the now-playing transport (row 0)
