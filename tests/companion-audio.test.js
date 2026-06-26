@@ -10,13 +10,20 @@ const { installApi } = require('./fixtures/api.js');
 
 function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
-// Page name -> context_id the app echoes for it (album-detail emits 'detail').
+// Page name -> context_id the app echoes for it (album-detail emits 'detail');
+// artist.html echoes its own 'artist' context.
 const CTX_FOR = { 'album-detail': 'detail' };
 
-function mockApp(page) {
+// An ALBUM-sourced player: itemId/sourceId is the album, sourceType 'album'.
+const ALBUM_ST = { screen: 'player', itemId: 'ootb', episodeId: 'ootb-02', positionSec: 110, durationSec: 245, playing: true, profile: 'kids', person: 'kids', shuffle: false, sourceType: 'album', sourceId: 'ootb' };
+// An ARTIST-sourced player (BUG-018): itemId/sourceId is the ARTIST id, not an
+// album, while a real track plays (episodeId). The companion must route Back to
+// the artist screen and never loadAlbum(artistId).
+const ARTIST_ST = { ...ALBUM_ST, itemId: 'ELO', sourceType: 'artist', sourceId: 'ELO' };
+
+function mockApp(page, st) {
   let version = 1;
   let ctx = 'audio';
-  const st = { screen: 'player', itemId: 'ootb', episodeId: 'ootb-02', positionSec: 110, durationSec: 245, playing: true, profile: 'kids', person: 'kids', shuffle: false };
   return page.routeWebSocket(/:8766/, (ws) => {
     function pushState() { ws.send(msg('app_state', st)); }
     function pushCtx() {
@@ -42,9 +49,10 @@ function mockApp(page) {
   });
 }
 
+test.describe('album source', () => {
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await mockApp(page);
+  await mockApp(page, { ...ALBUM_ST });
   await page.goto('/companion/audio.html');
 });
 
@@ -110,4 +118,30 @@ test('a back control returns to the album — labelled with it, teleporting the 
   // navigate intent -> the app echoes the album-detail's `detail` context, which
   // the companion follows off the audio screen.
   await expect(page).toHaveURL(/companion\/detail\.html$/);
+});
+});
+
+// BUG-018: an artist-sourced player. The source id is the ARTIST, not an album,
+// so Back must teleport the TV to artist.html (NOT album-detail.html?album=<id>,
+// which 404s -> error page), and the companion must never loadAlbum(artistId).
+test.describe('artist source (BUG-018)', () => {
+  test.beforeEach(async ({ page }) => {
+    await installApi(page);
+    await mockApp(page, { ...ARTIST_ST });
+  });
+
+  test('Back returns to the artist screen, not album-detail; no bogus loadAlbum(artistId)', async ({ page }) => {
+    const albumReqs = [];
+    page.on('request', (r) => { [r.url()].filter((u) => u.includes('/api/album/')).forEach((u) => albumReqs.push(u)); });
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
+    await page.locator('#btn-back').click();
+    // artist source -> artist.html (the app echoes its 'artist' context, which the
+    // companion follows off the audio screen).
+    await expect(page).toHaveURL(/companion\/artist\.html$/);
+    // The artist id was never mistaken for an album: no /api/album/ELO fetch, and
+    // the album track list stays empty (an artist source has no companion list).
+    expect(albumReqs.filter((u) => u.includes('ELO'))).toHaveLength(0);
+    await expect(page.locator('.track-btn')).toHaveCount(0);
+  });
 });

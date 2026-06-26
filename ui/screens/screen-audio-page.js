@@ -180,7 +180,7 @@ export function initAudioPage() {
     reportPosition: function(sec) { sendAction('position', { current_position: sec }); },
     emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
     appContext: function() {
-      return { screen: 'player', itemId: [albumId].filter(Boolean).concat([artistId, loadedTrackId]).filter(Boolean)[0], episodeId: loadedTrackId, profile: profile };
+      return { screen: 'player', itemId: [albumId].filter(Boolean).concat([artistId, loadedTrackId]).filter(Boolean)[0], episodeId: loadedTrackId, profile: profile, sourceType: kind, sourceId: [albumId].filter(Boolean).concat([artistId]).filter(Boolean).concat([null])[0] };
     },
     onIntent: function(intent) {
       var AUDIO_CTX = { play: true, audio: true };
@@ -229,7 +229,7 @@ export function initAudioPage() {
       navigate: function() { navTo(params.page, params.params); },
       play: function() { playIntent(params); },
       playAlbum: function() { navTo('audio.html', { album: params.id, from: 'browse' }); },
-      playArtist: function() { navTo('audio.html', { artist: params.id, from: 'browse' }); }
+      playArtist: function() { navTo('audio.html', { artist: params.id, from: 'artist' }); }
     };
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
