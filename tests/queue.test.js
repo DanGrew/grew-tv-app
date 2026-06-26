@@ -74,8 +74,9 @@ test('toggling Shuffle inside the Queue View flips it (live, no exit)', async ({
   await expect(shuffle).not.toHaveClass(/on/);
   await shuffle.click();
   await expect(shuffle).toHaveClass(/on/);
-  // toggle-shuffle populated THEN -> the Source-ends marker is gone.
-  await expect(page.locator('.q-ends')).toHaveCount(0);
+  // BUG-015: shuffle has no say over THEN — repeat is still off, so the source
+  // still ends on exhaustion and the Source-ends marker stays.
+  await expect(page.locator('.q-ends')).toContainText('Source ends');
 });
 
 test('deleting a FROM SOURCE row POSTs remove-queue-entry and the row disappears', async ({ page }) => {
@@ -106,13 +107,13 @@ test('a queued track appears under PLAY NEXT, before FROM SOURCE', async ({ page
   await expect(rows.first()).toHaveClass(/queued/);
 });
 
-test('toggling shuffle fills THEN with the next permutation (no Source-ends)', async ({ page }) => {
+test('toggling repeat fills THEN with the next permutation (no Source-ends)', async ({ page }) => {
   await enterPlayer(page, 'ootb-02', 'Mr. Blue Sky');
   await openQueue(page);
   await expect(page.locator('.q-ends')).toContainText('Source ends');
   await page.keyboard.press('Escape');              // close overlay -> keys drive the player
   await page.keyboard.press('ArrowDown');
-  await page.locator('#btn-shuffle').click();        // toggle-shuffle -> THEN populates
+  await page.locator('#btn-repeat').click();         // BUG-015: repeat (not shuffle) populates THEN
   await openQueue(page);
   await expect(page.locator('.q-ends')).toHaveCount(0);
 });
