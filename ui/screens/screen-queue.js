@@ -1,4 +1,5 @@
 import { queueViewHtml } from '../../core/queue-view.js';
+import { queueCrumbHtml } from '../../core/queue-crumb.js';
 
 // FEAT-031 (TASK-188) Queue View overlay. Hangs off the audio player: the
 // player stays mounted (the <audio> keeps playing) and this layer draws the
@@ -19,6 +20,16 @@ export function setupQueue(config) {
   var lastSnap = null;
   var grid = [];                      // rows of focusable cells (DOM order)
   var pos  = { r: 0, c: 0 };
+  var crumb = config.crumb;           // overlay breadcrumb host (TASK-216)
+
+  // TASK-216: a clickable breadcrumb in the overlay header. The back crumb
+  // closes the overlay back to the still-playing player (no nav) — the pointer
+  // affordance the d-pad Back already gave. Rendered once; Back stays the d-pad
+  // close, the crumb is the pointer/tab path.
+  [crumb].filter(Boolean).forEach(function (el) {
+    el.innerHTML = queueCrumbHtml();
+    el.querySelector('#queue-crumb-back').addEventListener('click', function () { close(); });
+  });
 
   // Grid rows: the now-playing transport (Shuffle/Repeat) then each queue row
   // (select + ↑ + ↓ + ⊟). DOM order; empty groups drop out.

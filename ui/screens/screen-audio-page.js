@@ -193,6 +193,7 @@ export function initAudioPage() {
   queue = setupQueue({
     root: document.getElementById('queue-overlay'),
     body: document.getElementById('queue-body'),
+    crumb: document.getElementById('queue-crumb'),
     onAction: function(action, body) { sendAction(action, body); },
     onClose: function() { document.getElementById('btn-queue').focus(); }
   });
