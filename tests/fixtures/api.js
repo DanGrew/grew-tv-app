@@ -279,10 +279,11 @@ async function installPlaybackBackend(page) {
     return { track_id: id, title: v.title, artist: v.artist, poster: v.poster, ext: v.ext, duration: v.duration, position: 0 };
   }
   function resolveEntry(e) { return Object.assign(resolve(e.track_id), { entry_id: e.entry_id }); }
-  // THEN: the next permutation when the source continues (shuffle OR repeat),
-  // else [] -> the view shows "Source ends".
+  // THEN is gated on repeat ALONE (BUG-015): a non-repeat source ends on
+  // permutation exhaustion, shuffle or not, so shuffle has no say. repeat off ->
+  // [] (the view shows "Source ends"); repeat on -> the next permutation.
   function computeThen(order) {
-    if (state.shuffle || state.repeat) return order.map(mkEntry);
+    if (state.repeat) return order.map(mkEntry);
     return [];
   }
   function snapshot() {

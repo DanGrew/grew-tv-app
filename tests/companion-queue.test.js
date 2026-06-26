@@ -41,13 +41,14 @@ test('removing the queued row POSTs remove-queue-entry and repaints without it',
   await expect(page.locator('.ph-qrow.queued')).toHaveCount(0);
 });
 
-test('toggling shuffle POSTs the action and THEN gains the next permutation', async ({ page }) => {
+test('toggling repeat POSTs the action and THEN gains the next permutation', async ({ page }) => {
   await setup(page);
   await expect(page.locator('.ph-ends')).toContainText('Source ends');
-  await page.locator('.ph-tbtn[data-action="toggle-shuffle"]').click();
-  // shuffle on -> the source repeats, so THEN now lists a permutation (no "Source ends").
+  await page.locator('.ph-tbtn[data-action="toggle-repeat"]').click();
+  // BUG-015: repeat (not shuffle) gates THEN — repeat on -> the source wraps, so
+  // THEN now lists the next permutation (no "Source ends").
   await expect(page.locator('.ph-ends')).toHaveCount(0);
-  await expect(page.locator('.ph-tbtn[data-action="toggle-shuffle"]')).toHaveClass(/on/);
+  await expect(page.locator('.ph-tbtn[data-action="toggle-repeat"]')).toHaveClass(/on/);
 });
 
 test('tapping a queue row POSTs play-track — now-playing advances to it', async ({ page }) => {
