@@ -33,19 +33,26 @@ export function initPage() {
     back: document.getElementById('btn-back'),
     reset: document.getElementById('c-reset')
   };
-  var state = { snap: null, albumId: null, person: null };
+  var state = { snap: null, sourceType: null, sourceId: null, person: null };
   var api = {};
   var updateBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
 
-  // Back teleports the TV to the album detail (companion follows the echoed
-  // `detail` context); a single with no album falls back to browse. Same
-  // navigate-intent path the browse/detail companions use.
+  // Back routes by the playing SOURCE (carried on the app_state snapshot): an
+  // album returns to its detail, an artist to the artist screen, a lone single
+  // falls back to browse. BUG-018: an artist source id is NOT an album, so it
+  // must not route to album-detail. The TV teleports and the companion follows
+  // the echoed context — same navigate-intent path the browse/detail companions
+  // use.
+  var BACK_TARGET = {
+    album:  function(id) { return { page: 'album-detail.html', params: { album: id } }; },
+    artist: function(id) { return { page: 'artist.html', params: { artist: id } }; }
+  };
   function backTarget() {
-    return [state.albumId].filter(Boolean)
-      .map(function(id) { return { page: 'album-detail.html', params: { album: id } }; })
+    return [BACK_TARGET[state.sourceType]].filter(Boolean)
+      .map(function(fn) { return fn(state.sourceId); })
       .concat([{ page: 'browse.html', params: {} }])[0];
   }
   function goBack() {
@@ -143,12 +150,23 @@ export function initPage() {
       .catch(function() { els.tracks.innerHTML = ''; });
   }
 
-  // The album is itemId when it differs from the current track (episodeId); a
-  // standalone single has no album list. Reload only when the album changes.
-  function captureAlbum(s) {
-    [s.itemId].filter(function() { return s.itemId !== s.episodeId; })
-      .filter(function(id) { return id !== state.albumId; })
-      .forEach(function(id) { state.albumId = id; loadTracks(id); });
+  // Only an ALBUM source has a companion track list; an artist source must NOT
+  // loadAlbum(artistId) (a 404 that cleared the list AND set a bogus
+  // album-detail Back target — BUG-018), and a lone single has no list at all.
+  var SOURCE_TRACKS = {
+    album:  function(id) { loadTracks(id); },
+    artist: function() {},
+    track:  function() {}
+  };
+  function loadSource(s) {
+    state.sourceId = s.sourceId;
+    [SOURCE_TRACKS[s.sourceType]].filter(Boolean).forEach(function(fn) { fn(s.sourceId); });
+  }
+  // Always reflect the source type so Back routes correctly even before any list
+  // resolves; reload the track list only when the source id changes.
+  function captureSource(s) {
+    state.sourceType = s.sourceType;
+    [s.sourceId].filter(function(id) { return id !== state.sourceId; }).forEach(function() { loadSource(s); });
   }
 
   // The active person rides the app_state (TASK-158); the ＋ Queue POSTs key per
@@ -162,7 +180,7 @@ export function initPage() {
     capturePerson(snap);
     renderControls();
     renderBar();
-    captureAlbum(snap);
+    captureSource(snap);
     markCurrent();
   }
 

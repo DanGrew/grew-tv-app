@@ -248,3 +248,14 @@ test('after the idle window pointer activity wakes the bar so controls are click
   await page.locator('#btn-shuffle').click();
   await expect(page.locator('#btn-shuffle')).toHaveClass(/on/);
 });
+
+// BUG-018: an artist-sourced player carries from='artist'; pressing Back returns
+// to the artist screen, not browse and not the error page.
+test('Back from an artist-sourced player returns to the artist screen, not error', async ({ page }) => {
+  await page.goto('/app/homeview/audio.html?artist=ELO&from=artist');
+  await expect(page.locator('#screen-audio')).toBeVisible();
+  await page.locator('#btn-play-pause').focus();
+  await page.keyboard.press('Backspace');
+  await expect(page).toHaveURL(/artist\.html\?artist=ELO/);
+  await expect(page).not.toHaveURL(/error/);
+});

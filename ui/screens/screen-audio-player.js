@@ -77,6 +77,7 @@ export function setup(config) {
     var ctx = appContext();
     return {
       screen: ctx.screen, itemId: ctx.itemId, episodeId: ctx.episodeId, profile: ctx.profile,
+      sourceType: ctx.sourceType, sourceId: ctx.sourceId,
       positionSec: audio.currentTime,
       durationSec: [audio.duration].filter(function(d) { return !isNaN(d); }).concat([null])[0],
       playing: !audio.paused,
