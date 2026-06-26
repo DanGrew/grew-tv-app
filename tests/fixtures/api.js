@@ -251,6 +251,19 @@ function albumOrder(albumId) {
   return a ? a.items.map(function(it) { return it.video.id; }) : [];
 }
 
+// TASK-214: an artist source resolves to every audio track by that artist (the
+// id is the artist name, matching the `?artist=` param the audio page sends as
+// source_id). Lets the e2e play-source action paint a real now-playing line.
+function artistOrder(artist) {
+  return Object.keys(VIDEOS).filter(function(k) {
+    return VIDEOS[k].artist === artist && VIDEOS[k].mediaType === 'audio';
+  });
+}
+
+function sourceOrder(type, id) {
+  return type === 'artist' ? artistOrder(id) : albumOrder(id);
+}
+
 async function installPlaybackBackend(page) {
   // TASK-188: a materialized queue (override + source permutation + next
   // permutation), so the Queue View renders all four sections and edits round
@@ -308,7 +321,7 @@ async function installPlaybackBackend(page) {
 
   var ENGINE = {
     'play-source': function(b) {
-      var order = albumOrder(b.source_id);
+      var order = sourceOrder(b.source_type, b.source_id);
       state.sourceType = b.source_type; state.sourceId = b.source_id; state.shuffle = !!b.shuffle;
       state.now = order[0] || null;
       state.source = order.slice(1).map(mkEntry);
@@ -321,9 +334,9 @@ async function installPlaybackBackend(page) {
       state.now = b.track_id;
       var queued = state.override.filter(function(e) { return e.track_id === b.track_id; })[0];
       [queued].filter(Boolean).forEach(function(e) { state.override = dropEntry(state.override, e.entry_id); });
-      var i = albumOrder(state.sourceId).indexOf(b.track_id);
+      var i = sourceOrder(state.sourceType, state.sourceId).indexOf(b.track_id);
       [queued ? -1 : i].filter(function(x) { return x >= 0; }).forEach(function(x) {
-        state.source = albumOrder(state.sourceId).slice(x + 1).map(mkEntry);
+        state.source = sourceOrder(state.sourceType, state.sourceId).slice(x + 1).map(mkEntry);
       });
     },
     // Advance: drain the override queue first, else the source permutation.
@@ -336,8 +349,8 @@ async function installPlaybackBackend(page) {
       });
     },
     'previous': function() {},
-    'toggle-shuffle': function() { state.shuffle = !state.shuffle; state.then = computeThen(albumOrder(state.sourceId)); },
-    'toggle-repeat':  function() { state.repeat = !state.repeat; state.then = computeThen(albumOrder(state.sourceId)); },
+    'toggle-shuffle': function() { state.shuffle = !state.shuffle; state.then = computeThen(sourceOrder(state.sourceType, state.sourceId)); },
+    'toggle-repeat':  function() { state.repeat = !state.repeat; state.then = computeThen(sourceOrder(state.sourceType, state.sourceId)); },
     'queue-track':        function(b) { state.override.unshift(mkEntry(b.track_id)); },
     'remove-queue-entry': function(b) {
       state.override = dropEntry(state.override, b.entry_id);

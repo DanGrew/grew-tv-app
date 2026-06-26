@@ -30,7 +30,12 @@
 body { background: var(--bg); background-attachment: fixed; background-size: cover; color: var(--text); font-family: var(--font); height: 100vh; overflow: hidden; }
 #grid-container { height: 100vh; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; padding: 96px 48px 80px; }
 #grid-container::-webkit-scrollbar, .rail-row::-webkit-scrollbar { display: none; }
-#grid-title { font-size: var(--fs-lg); letter-spacing: var(--heading-ls); margin-bottom: 28px; }
+#grid-title { font-size: var(--fs-lg); letter-spacing: var(--heading-ls); margin-bottom: 20px; }
+#header-actions { display: flex; gap: 16px; margin-bottom: 28px; }
+.action-btn { background: var(--surface); color: var(--text); border: 2.5px solid var(--border); border-radius: var(--radius); font-size: var(--fs-md); padding: 14px 26px; cursor: pointer; min-width: auto; text-align: center; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease); }
+.action-btn:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
+.action-btn:hover { background: var(--surface-hi); }
+#btn-play { border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 #rail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(372px, 1fr)); gap: 16px; align-items: start; }
 .home-empty { font-size: var(--fs-md); color: var(--text-muted); text-align: center; padding: 80px 0; grid-column: 1 / -1; }
 .film-tile { position: relative; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); cursor: pointer; overflow: hidden; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); }
@@ -61,6 +66,10 @@ body { background: var(--bg); background-attachment: fixed; background-size: cov
 <div id="breadcrumb"></div>
 <div id="grid-container">
   <h1 id="grid-title"></h1>
+  <div id="header-actions">
+    <button id="btn-play" class="action-btn">&#9654; Play</button>
+    <button id="btn-shuffle" class="action-btn">&#128256; Shuffle</button>
+  </div>
   <div id="rail-grid"></div>
 </div>
 <div id="device-badge" title="This screen"></div>

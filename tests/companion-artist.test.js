@@ -13,6 +13,11 @@ function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
 const CTX_FOR = { 'album-detail': 'detail' };
 
+// Intents the companion sends this test — the mock records them so the Play /
+// Shuffle header (TASK-214) can be asserted (those drive the TV, not the
+// companion, so there's no companion URL change to observe).
+let sentIntents;
+
 function mockApp(page) {
   let version = 1;
   let ctx = 'artist';
@@ -26,6 +31,7 @@ function mockApp(page) {
     }
     ws.onMessage(function(raw) {
       const m = JSON.parse(raw);
+      if (m.type === 'intent') sentIntents.push(m.payload.intent);
       if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
       if (m.type === 'snapshot_request') pushCtx();
       // select teleports the TV to album detail; the app echoes its `detail` context.
@@ -40,6 +46,7 @@ function mockApp(page) {
 }
 
 test.beforeEach(async ({ page }) => {
+  sentIntents = [];
   await installApi(page);
   await page.route('**/api/browse**', route => route.fulfill({
     status: 200,
@@ -71,4 +78,14 @@ test('the breadcrumb Albums crumb teleports the TV back to the Music tab', async
   await expect(page.locator('#breadcrumb .crumb-link')).toHaveCount(2);
   await page.locator('#breadcrumb .crumb-link').last().click();
   await expect(page).toHaveURL(/companion\/browse\.html$/);
+});
+
+test('Play header sends the playArtist intent — drives the TV to the artist player', async ({ page }) => {
+  await page.locator('#btn-play').click();
+  await expect.poll(() => sentIntents).toContain('playArtist');
+});
+
+test('Shuffle header sends the shuffle intent', async ({ page }) => {
+  await page.locator('#btn-shuffle').click();
+  await expect.poll(() => sentIntents).toContain('shuffle');
 });

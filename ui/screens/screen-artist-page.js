@@ -27,6 +27,13 @@ export function initArtistPage() {
 
   function onSelect(card) { navTo('album-detail.html', { album: card.id }); }
 
+  // Header Play / Shuffle (TASK-214): the artist param IS the play-source id —
+  // the audio page reads `?artist=` and fires `play-source` { source_type:
+  // 'artist' } with the shuffle flag (TASK-187 plumbing). Play-all = ordered,
+  // Shuffle = shuffled; both carry from:'artist' for the breadcrumb.
+  function playArtist() { navTo('audio.html', { artist: artist, from: 'artist' }); }
+  function shuffleArtist() { navTo('audio.html', { artist: artist, shuffle: '1', from: 'artist' }); }
+
   // Back collapses one level — to the Music tab on the browse page (?tab=music).
   function goBack(e) {
     [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); });
@@ -43,6 +50,8 @@ export function initArtistPage() {
         var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
         [catalog[id]].filter(Boolean).forEach(onSelect);
       },
+      playArtist:     function() { playArtist(); },
+      shuffle:        function() { shuffleArtist(); },
       back:           function() { goBack(null); },
       navigate:       function() { navTo(params.page, params.params); }
     };
@@ -52,6 +61,8 @@ export function initArtistPage() {
   // Live snapshot so the companion mirrors this L3 state.
   wsApp.sendAppState({ screen: 'artist', artist: artist, profile: profile });
 
+  document.getElementById('btn-play').addEventListener('click', playArtist);
+  document.getElementById('btn-shuffle').addEventListener('click', shuffleArtist);
   document.addEventListener('keydown', dispatchKey);
 
   initPage({
