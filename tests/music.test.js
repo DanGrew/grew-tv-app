@@ -212,3 +212,39 @@ test('an in-progress track does not leak into the Films Continue Watching rail',
   await expect(filmsCw.locator('.film-tile[data-id="finding-nemo-main"]')).toHaveCount(1);
   await expect(filmsCw.locator('.film-tile[data-id="ootb-02"]')).toHaveCount(0);
 });
+
+// BUG-016: open the <audio> player on the first album track.
+async function openPlayer(page) {
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="ootb"]').click();
+  await page.locator('.detail-row[data-id="ootb-01"]').click();
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
+}
+
+// BUG-016 (relayout): the six pills live on their own row BELOW the progress bar,
+// in the order queue, jump, shuffle, repeat, lyrics, reset. The transport row keeps
+// only prev/play/next + the progress bar + time. Red on the old single-row markup.
+test('the pills sit on their own row below the progress bar in the BUG-016 order', async ({ page }) => {
+  await openPlayer(page);
+  const ids = await page.locator('#pill-row button').evaluateAll(els => els.map(e => e.id));
+  expect(ids).toEqual(['btn-queue', 'btn-jump', 'btn-shuffle', 'btn-repeat', 'btn-lyrics', 'btn-reset']);
+  // Progress bar + time stay on the transport row; no pills there.
+  await expect(page.locator('#transport #progress')).toHaveCount(1);
+  await expect(page.locator('#transport #time-display')).toHaveCount(1);
+  await expect(page.locator('#transport .pill')).toHaveCount(0);
+});
+
+// BUG-016 (dead clicks): the bar auto-hides after the idle window and sets
+// pointer-events:none. Before the fix only a d-pad key could summon it, so a mouse
+// could never wake it and every click was dead. Pointer activity must now wake the
+// bar (re-enabling clicks) and re-arm the timer. Red on the old key-only summon.
+test('after the idle window pointer activity wakes the bar so controls are clickable again', async ({ page }) => {
+  await openPlayer(page);
+  await expect(page.locator('#controls')).toHaveClass(/controls-hidden/, { timeout: 6000 });
+  await page.mouse.move(400, 400);
+  await expect(page.locator('#controls')).not.toHaveClass(/controls-hidden/);
+  // And a control now fires (server-authoritative shuffle echoes the on state).
+  await page.locator('#btn-shuffle').click();
+  await expect(page.locator('#btn-shuffle')).toHaveClass(/on/);
+});

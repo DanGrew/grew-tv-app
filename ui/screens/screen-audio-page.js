@@ -118,6 +118,11 @@ export function initAudioPage() {
     document.getElementById('controls').classList.remove('controls-hidden');
     armHide();
   }
+  // BUG-016: the bar sets `pointer-events:none` when hidden, so it must wake on
+  // pointer activity too — not only the d-pad. A move re-enables clicks (and
+  // re-arms the idle timer) before the press lands, so a real click reaches it.
+  document.addEventListener('pointermove', summonTransport);
+  document.addEventListener('pointerdown', summonTransport);
 
   audioEl.addEventListener('timeupdate', renderLyrics);
 

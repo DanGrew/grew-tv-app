@@ -19,7 +19,9 @@ var JUMP_DEFAULT = 4;            // +10s, the most common forward skip
 var QUICK_SKIP   = 10;          // d-pad left/right one-press skip
 var BACKEND_SAVE_MS = 5000;
 
-var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-shuffle', 'btn-repeat', 'btn-lyrics', 'btn-jump', 'btn-reset', 'btn-queue'];
+// BUG-016: d-pad up/down follows the new visual order — transport (prev/play/next)
+// then the pill row beneath the progress bar (queue, jump, shuffle, repeat, lyrics, reset).
+var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-queue', 'btn-jump', 'btn-shuffle', 'btn-repeat', 'btn-lyrics', 'btn-reset'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 // App-side log (TASK-213): start from a saved position logs `resume`, else `play`.
 var PLAY_EVENT    = { 'true': 'resume', 'false': 'play' };
