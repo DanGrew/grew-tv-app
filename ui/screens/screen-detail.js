@@ -15,7 +15,7 @@ var AVAILABLE_ROW = {
 // Per-render context for the detail screen: the series + progress + the active
 // season chip (TASK-123). null activeSeason = no season chips (legacy single
 // list). Reset on each buildDetailList.
-var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, seasons: [], activeSeason: null };
+var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, onAddToPlaylist: null, seasons: [], activeSeason: null };
 
 // Up/Down move between vertical stops: clickable breadcrumb crumbs (top), then
 // the header Play-next action, the shuffle button, the active season chip, then
@@ -56,25 +56,37 @@ function chipSibling(el, delta) {
   [chips[i + delta]].filter(Boolean).filter(function() { return i > -1; }).forEach(function(c) { c.focus(); });
 }
 
-// Right steps from a row onto its Restart control, or from a season chip to the
-// next chip.
+// A row's horizontal stops: the row itself, then each per-row action button in
+// DOM order (Restart, then "+ Playlist" — TASK-206). Left/Right step through this
+// list, so a row can carry more than one secondary control without bespoke nav.
+// closest('.detail-row') resolves both a focused row (returns itself) and a
+// focused action (returns its row); a non-row element (a season chip) yields [].
+function rowHStops(el) {
+  return [el.closest('.detail-row')].filter(Boolean)
+    .map(function(r) { return [r].concat(Array.from(r.querySelectorAll('.detail-row-action'))); })
+    .concat([[]])[0];
+}
+
+function rowHStep(el, delta) {
+  var stops = rowHStops(el);
+  var i = stops.indexOf(el);
+  [stops[i + delta]].filter(Boolean).filter(function() { return i > -1; }).forEach(function(s) { s.focus(); });
+}
+
+// Right steps from a row onto its next action control (Restart / + Playlist), or
+// from a season chip to the next chip.
 export function detailRight(e) {
   e.preventDefault();
   var el = document.activeElement;
-  [el].filter(function(r) { return r.classList.contains('detail-row'); })
-    .map(function(r) { return r.querySelector('.detail-restart'); })
-    .filter(Boolean)
-    .forEach(function(btn) { btn.focus(); });
+  rowHStep(el, 1);
   chipSibling(el, 1);
 }
 
 export function detailLeft(e) {
   e.preventDefault();
-  var active = document.activeElement;
-  [active.closest('.detail-row')].filter(Boolean)
-    .filter(function() { return active.classList.contains('detail-restart'); })
-    .forEach(function(r) { r.focus(); });
-  chipSibling(active, -1);
+  var el = document.activeElement;
+  rowHStep(el, -1);
+  chipSibling(el, -1);
 }
 
 // Default focus lands on Play-next (not the breadcrumb): the crumbs are a stop
@@ -119,7 +131,7 @@ function thumbMarkup(src) {
 function appendRestart(row, mid, onPlayItem, item, i) {
   [mid].filter(Boolean).forEach(function() {
     var btn = document.createElement('button');
-    btn.className = 'detail-restart';
+    btn.className = 'detail-restart detail-row-action';
     btn.tabIndex = 0;
     btn.textContent = '↺ Restart';
     btn.addEventListener('click', function(e) { e.stopPropagation(); onPlayItem(item, i, 'restart'); });
@@ -127,6 +139,27 @@ function appendRestart(row, mid, onPlayItem, item, i) {
       [e.key].filter(function(k) { return PLAY_KEYS[k]; }).forEach(function() { e.preventDefault(); e.stopPropagation(); onPlayItem(item, i, 'restart'); });
     });
     row.appendChild(btn);
+  });
+}
+
+// A per-track "+ Playlist" control (FEAT-036/TASK-206), present only on available
+// rows AND only when the page wired an onAddToPlaylist handler (album / artist
+// track contexts — never series episodes or the playlist's own detail). Like
+// Restart it stops propagation so it never also fires the row's play handler, and
+// carries `detail-row-action` so Left/Right reach it.
+function appendAdd(row, available, item) {
+  [available].filter(Boolean).forEach(function() {
+    [state.onAddToPlaylist].filter(Boolean).forEach(function(onAdd) {
+      var btn = document.createElement('button');
+      btn.className = 'detail-add detail-row-action';
+      btn.tabIndex = 0;
+      btn.textContent = '＋ Playlist';
+      btn.addEventListener('click', function(e) { e.stopPropagation(); onAdd(item); });
+      btn.addEventListener('keydown', function(e) {
+        [e.key].filter(function(k) { return PLAY_KEYS[k]; }).forEach(function() { e.preventDefault(); e.stopPropagation(); onAdd(item); });
+      });
+      row.appendChild(btn);
+    });
   });
 }
 
@@ -161,6 +194,7 @@ function buildRow(server, series, progress, onPlayItem, item, i, isNext) {
     progressBarMarkup(mid, percent(resume, video.duration), 'detail-progress') + '</div>';
 
   appendRestart(row, mid, onPlayItem, item, i);
+  appendAdd(row, available, item);
   bindRow(row, available, onPlayItem, item, i);
   return row;
 }
@@ -254,12 +288,16 @@ function renderList() {
 // items:[{season?, episode?, video:<full record>}]}. progress: id ->
 // {resumePositionSec, lastPlayed} from /api/continue-watching (backend is the
 // source of truth — no localStorage). onPlayItem(item, i, mode) where mode is
-// 'resume' (row default) or 'restart'. With seasons[] the header carries a season
-// chip row that filters the list + swaps the poster (TASK-123); without it the
-// legacy single list + inline dividers render unchanged.
-export function buildDetailList(server, series, progress, onPlayItem) {
+// 'resume' (row default) or 'restart'. onAddToPlaylist(item) is OPTIONAL
+// (FEAT-036/TASK-206): when supplied (album / artist track contexts) each
+// available row gains a "+ Playlist" control; omitted (series / playlist detail)
+// no add control renders. With seasons[] the header carries a season chip row that
+// filters the list + swaps the poster (TASK-123); without it the legacy single
+// list + inline dividers render unchanged.
+export function buildDetailList(server, series, progress, onPlayItem, onAddToPlaylist) {
   state = {
     server: server, series: series, progress: progress, onPlayItem: onPlayItem,
+    onAddToPlaylist: [onAddToPlaylist].filter(Boolean).concat([null])[0],
     seasons: seasonsOf(series),
     activeSeason: defaultSeason(series.items, progress, seasonsOf(series))
   };

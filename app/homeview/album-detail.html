@@ -48,6 +48,13 @@ button:hover { background: var(--surface-hi); }
 .detail-progress { height: 4px; background: rgba(0,0,0,0.45); border-radius: 2px; margin-top: 8px; max-width: 320px; }
 .detail-progress-fill { height: 100%; background: var(--focus); border-radius: 2px; width: 0; }
 .detail-restart { font-size: var(--fs-xs); padding: 5px 12px; min-width: auto; flex-shrink: 0; border-width: 1.5px; }
+.detail-add { font-size: var(--fs-xs); padding: 5px 12px; min-width: auto; flex-shrink: 0; border-width: 1.5px; }
+#add-sheet { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+.add-sheet-panel { background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); padding: 32px; width: 560px; max-height: 80vh; display: flex; flex-direction: column; gap: 14px; backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4); }
+.add-sheet-title { font-size: var(--fs-lg); }
+#add-sheet-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.add-choice { text-align: left; }
+#add-status { position: fixed; left: 50%; bottom: 48px; transform: translateX(-50%); z-index: 11; padding: 14px 28px; background: var(--surface-hi); border: 2.5px solid var(--border); border-radius: var(--radius); font-size: var(--fs-md); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); }
 .detail-season { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 600; padding: 18px 16px 8px; }
 #btn-play-next { font-size: var(--fs-md); padding: 14px 26px; min-width: auto; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 #btn-shuffle { font-size: var(--fs-md); padding: 14px 22px; min-width: auto; }
@@ -75,6 +82,15 @@ button:hover { background: var(--surface-hi); }
   <button id="btn-shuffle">&#128256; Shuffle</button>
 </div>
 <div id="detail-list"></div>
+<div id="add-sheet" style="display:none" role="dialog" aria-modal="true">
+  <div class="add-sheet-panel">
+    <div class="add-sheet-title">Add to playlist</div>
+    <div id="add-sheet-list"></div>
+    <button id="btn-add-create">&#65291; New playlist</button>
+    <button id="btn-add-cancel">Cancel</button>
+  </div>
+</div>
+<div id="add-status" style="display:none"></div>
 <div id="device-badge" title="This screen"></div>
 <div id="error-msg"></div>
 <script type="module">

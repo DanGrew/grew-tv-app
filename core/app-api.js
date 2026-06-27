@@ -125,6 +125,18 @@ export function createPlaylist(serverUrl, name, profile) {
   }).then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); });
 }
 
+// Append a track to a playlist (FEAT-036/TASK-206). POST /api/playlists/add-track
+// takes {playlist_id, track_id}; the server appends in order, gated catalog-known
+// AND profile-match (a mismatch / unknown track 400s, never 500). Contract is 204
+// on success — resolve only on a 2xx so the Add sheet can confirm vs. error.
+export function addToPlaylist(serverUrl, playlistId, trackId) {
+  return fetch(serverUrl + '/api/playlists/add-track', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playlist_id: playlistId, track_id: trackId })
+  }).then(function(r) { return r.ok ? r : Promise.reject(r.status); });
+}
+
 // Delete a user playlist (FEAT-036/TASK-208). POST /api/playlists/delete takes the
 // playlist_id; the contract is 204 on success / 400 on bad input, never 500.
 export function deletePlaylist(serverUrl, id) {
