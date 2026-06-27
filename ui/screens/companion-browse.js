@@ -191,6 +191,22 @@ export function initPage() {
     state.level = ({ true: 'grid', false: SECTION_LEVEL[Boolean(entry.params.tab)] })[Boolean(entry.params.rail)];
   }
 
+  // Seeding the level locally is not enough: a tile tap emits `select`, which the
+  // TV's rail-grid page routes — so the TV must be ON that rail-grid or the tap is
+  // dropped (the companion shows the restored grid but presses do nothing until a
+  // tab switch re-syncs). So once bound (first app_state), drive the TV to the
+  // restored position through the same navigate() funnel a drill uses. Fire once.
+  var restoreDriven = false;
+  function driveRestore() {
+    ({ 'false': doDriveRestore, 'true': function() {} })[String(restoreDriven)]();
+  }
+  function doDriveRestore() {
+    restoreDriven = true;
+    [peekTrail()].filter(Boolean).forEach(function(entry) {
+      api.sendIntent('navigate', ({ true: { page: 'rail-grid.html', params: { section: entry.params.tab, rail: entry.params.rail } }, false: { page: 'browse.html', params: { tab: entry.params.tab } } })[Boolean(entry.params.rail)]);
+    });
+  }
+
   // FEAT-036 (TASK-209) — the companion's create affordance. A real button (NOT a
   // synthetic rail tile, unlike the TV's withCreatePlaylistTile), shown whenever
   // the Music section is open. Always reachable: the Playlists rail is omitted when
@@ -314,6 +330,7 @@ export function initPage() {
     state.person = [snap.person].filter(Boolean).concat([state.person])[0];
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(loadCatalog);
     reconcile(snap);
+    driveRestore();
   }
 
   // Item/leaf contexts (detail/video/audio/profile) are real companion page

@@ -212,6 +212,10 @@ test('FEAT-032: a recorded grid trail restores the grid level on load, not the s
   await expect(page.locator('#grid-wrap')).toBeVisible();
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
   await expect(page.locator('.chip[data-section="series"]')).toHaveClass(/active/);
+  // Restore must DRIVE the TV to the matching rail-grid (not just seed the
+  // companion): a tile tap emits `select`, which the TV's rail-grid page routes —
+  // if the TV isn't on that rail-grid the tap is dropped. Proves they re-sync.
+  await expect.poll(() => intents.filter((i) => i.intent === 'navigate' && i.params.page === 'rail-grid.html' && i.params.params.rail === 'genre:animation').length).toBeGreaterThan(0);
 });
 
 test('FEAT-032: collapsing back to the sections root clears the trail (next load starts at top)', async ({ page }) => {
