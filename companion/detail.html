@@ -34,7 +34,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .detail-add-btn { flex-shrink: 0; align-self: stretch; padding: 0 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 14px; font-family: inherit; white-space: nowrap; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .detail-add-btn:active, .detail-add-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #add-sheet { display: none; position: fixed; inset: 0; z-index: 10; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); }
-.add-sheet-panel { background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 24px; width: 100%; max-width: 360px; max-height: 76vh; display: flex; flex-direction: column; gap: 12px; }
+.add-sheet-panel { background: #16213e; border: 2px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 24px; width: 100%; max-width: 360px; max-height: 76vh; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); }
 .add-sheet-title { font-size: 18px; text-align: center; }
 #add-sheet-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
 .add-choice { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
@@ -42,7 +42,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .add-sheet-act { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .add-sheet-act:active, .add-sheet-act:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #btn-add-create { border-color: #7ee787; color: #7ee787; }
-#add-status { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 11; padding: 12px 22px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; }
+#add-status { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 .tile-btn { display: flex; flex-direction: column; background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; padding: 0; color: var(--text); width: 100%; max-width: 2in; flex-shrink: 0; transition: border-color var(--dur) var(--ease); }
 .tile-btn img { width: 100%; height: 100px; object-fit: contain; background: #000; flex-shrink: 0; }
 .tile-btn span { color: var(--text); font-size: 14px; padding: 6px 8px; text-align: left; flex-shrink: 0; }
