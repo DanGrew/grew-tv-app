@@ -47,6 +47,11 @@ export function initPlaylistDetailPage() {
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
 
+  // Rename (TASK-210): hand off to the shared name screen in rename mode — it
+  // prefills the current title on its on-screen keyboard and POSTs the rename, then
+  // returns to this playlist (same id) showing the new name.
+  function rename() { navTo('playlist-create.html', { rename: playlistId, name: state.playlist.title }); }
+
   // Delete (TASK-208): a confirm overlay gates the destructive action. The overlay
   // buttons own their keydown (stopPropagation) so the detail screen's d-pad +
   // Back never fire underneath while the dialog is open. Confirm POSTs delete and
@@ -99,6 +104,7 @@ export function initPlaylistDetailPage() {
   document.getElementById('btn-back-detail').addEventListener('click', goBack);
   document.getElementById('btn-play-next').addEventListener('click', playFromResume);
   document.getElementById('btn-shuffle').addEventListener('click', shufflePlay);
+  document.getElementById('btn-rename-playlist').addEventListener('click', rename);
   document.getElementById('btn-delete-playlist').addEventListener('click', showConfirm);
   document.getElementById('btn-confirm-delete').addEventListener('click', doDelete);
   document.getElementById('btn-cancel-delete').addEventListener('click', hideConfirm);

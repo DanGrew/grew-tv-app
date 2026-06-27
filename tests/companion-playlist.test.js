@@ -107,6 +107,14 @@ test.describe('Road Trip playlist (2 tracks)', () => {
     await expect(page.locator('#confirm-delete')).toBeHidden();
     await expect(page).toHaveURL(/companion\/playlist\.html$/);
   });
+
+  // FEAT-036 (TASK-210) — Rename opens the companion name screen in rename mode,
+  // carrying the live playlist id + current name in the query string.
+  test('Rename navigates to the name screen in rename mode with the current name', async ({ page }) => {
+    await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
+    await page.locator('#btn-rename-playlist').click();
+    await expect(page).toHaveURL(/companion\/playlist-create\.html\?rename=pl-roadtrip&name=Road%20Trip/);
+  });
 });
 
 test.describe('Empty playlist (still lists + opens)', () => {

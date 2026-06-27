@@ -156,3 +156,42 @@ test('Cancel on the delete confirm keeps the playlist and closes the dialog', as
   await expect(page.locator('#confirm-delete')).toBeHidden();
   await expect(page).toHaveURL(/playlist-detail\.html/);
 });
+
+// FEAT-036 (TASK-210) — rename. The detail screen's Rename hands off to the shared
+// name screen in rename mode: prefilled name, NO profile picker (profile is
+// immutable), and Save returns to the same playlist (id unchanged) with the new
+// title.
+
+async function openRename(page) {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="pl-roadtrip"]').click();
+  await expect(page.locator('.detail-row')).toHaveCount(2);
+  await page.locator('#btn-rename-playlist').click();
+  await expect(page).toHaveURL(/playlist-create\.html\?rename=pl-roadtrip/);
+}
+
+test('Rename opens the name screen prefilled with the current name and no profile picker', async ({ page }) => {
+  await openRename(page);
+  await expect(page.locator('#create-title')).toHaveText('Rename Playlist');
+  await expect(page.locator('#pl-name')).toHaveText('Road Trip');
+  await expect(page.locator('#btn-profile-kids')).toHaveCount(0); // profile immutable -> picker absent
+  await expect(page.locator('#btn-create')).toHaveText(/Save/);
+});
+
+test('Rename: clearing, typing a new name and Save returns to the same playlist with the new title', async ({ page }) => {
+  await openRename(page);
+  await page.locator('#pl-keys button').filter({ hasText: /^Clear$/ }).click();
+  await typeName(page, 'TRIP2');
+  await expect(page.locator('#pl-name')).toHaveText('TRIP2');
+  await page.locator('#btn-create').click();
+  await expect(page).toHaveURL(/playlist-detail\.html\?playlist=pl-roadtrip/); // id is permanent
+  await expect(page.locator('#detail-title')).toHaveText('TRIP2');
+});
+
+test('Rename with a blank name is rejected with an error and stays on the name screen', async ({ page }) => {
+  await openRename(page);
+  await page.locator('#pl-keys button').filter({ hasText: /^Clear$/ }).click();
+  await page.locator('#btn-create').click();
+  await expect(page.locator('#error-msg')).toBeVisible();
+  await expect(page).toHaveURL(/playlist-create\.html\?rename=pl-roadtrip/);
+});
