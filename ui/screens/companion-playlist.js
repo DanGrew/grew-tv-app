@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadPlaylist, loadContinueWatching } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist } from '../../core/app-api.js';
 import { screenPage, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -31,7 +31,7 @@ export function initPage() {
     playBtn: document.getElementById('btn-play'),
     shuffleBtn: document.getElementById('btn-shuffle')
   };
-  var state = { playlistId: null, profile: null, person: null, tracks: [], progress: {} };
+  var state = { playlistId: null, profile: null, person: null, tracks: [], progress: {}, title: '' };
   var api = {};
   var updateBar = null;
   function noop() {}
@@ -45,6 +45,24 @@ export function initPage() {
   // Shuffle starts it shuffled. Neither carries params — the TV owns the live id.
   els.playBtn.addEventListener('click', function() { api.sendIntent('play_next'); });
   els.shuffleBtn.addEventListener('click', function() { api.sendIntent('shuffle'); });
+
+  // Delete (TASK-209) — the companion mirror of the TV's delete-with-confirm
+  // (screen-playlist-detail-page). A confirm overlay gates the destructive write;
+  // Confirm POSTs delete, drives the TV off the now-gone playlist (`back`), and
+  // returns the companion to its playlists list. Cancel just closes the overlay.
+  function showConfirm() {
+    document.getElementById('confirm-delete-name').textContent = state.title;
+    document.getElementById('confirm-delete').style.display = 'flex';
+  }
+  function hideConfirm() { document.getElementById('confirm-delete').style.display = 'none'; }
+  function doDelete() {
+    deletePlaylist(server, state.playlistId)
+      .then(function() { api.sendIntent('back'); window.location.href = 'browse.html'; })
+      .catch(function() { hideConfirm(); });
+  }
+  document.getElementById('btn-delete-playlist').addEventListener('click', showConfirm);
+  document.getElementById('btn-confirm-delete').addEventListener('click', doDelete);
+  document.getElementById('btn-cancel-delete').addEventListener('click', hideConfirm);
 
   // Breadcrumb trail (FEAT-021): Home > this playlist (current). A crumb tap sends
   // the `navigate` intent so the app teleports the TV; the companion follows on
@@ -106,6 +124,7 @@ export function initPage() {
     loadPlaylist(server, state.playlistId)
       .then(function(p) {
         state.tracks = [p.items].filter(Boolean).concat([[]])[0];
+        state.title = p.title;
         els.ctxTitle.textContent = p.title;
         mountCrumbs(p.title);
         render();

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>grew-tv</title>
+<style>
+:root {
+  --bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+  --surface: rgba(255,255,255,0.06);
+  --surface-hi: rgba(255,255,255,0.11);
+  --border: rgba(255,255,255,0.13);
+  --focus: #fff;
+  --text: rgba(255,255,255,0.95);
+  --text-muted: rgba(255,255,255,0.4);
+  --radius: 16px;
+  --radius-sm: 8px;
+  --dur: 0.18s;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); background-attachment: fixed; color: var(--text); font-family: var(--font); }
+body { display: flex; flex-direction: column; padding: 16px; gap: 14px; }
+#create-title { font-size: 20px; color: var(--text); text-align: center; flex-shrink: 0; margin-top: 6px; }
+.field-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+#pl-name { width: 100%; padding: 14px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 18px; font-family: inherit; }
+#pl-name:focus { outline: none; border-color: var(--focus); }
+#profile-row { display: flex; gap: 10px; }
+.profile-btn { flex: 1; padding: 14px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.profile-btn:active, .profile-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.profile-btn.selected { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
+#error-msg { display: none; font-size: 15px; color: #ff8787; }
+#action-row { display: flex; gap: 10px; margin-top: 4px; }
+.act-btn { flex: 1; padding: 14px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.act-btn:active, .act-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#btn-create { border-color: #7ee787; color: #7ee787; }
+</style>
+</head>
+<body>
+<div id="create-title">New Playlist</div>
+<div class="field-label">Name</div>
+<input id="pl-name" type="text" autocomplete="off" autocapitalize="words" placeholder="Playlist name">
+<div class="field-label">Profile</div>
+<div id="profile-row">
+  <button id="btn-profile-kids" class="profile-btn" type="button">Kids</button>
+  <button id="btn-profile-adults" class="profile-btn" type="button">Adults</button>
+</div>
+<div id="error-msg"></div>
+<div id="action-row">
+  <button id="btn-create" class="act-btn" type="button">&#10003; Create</button>
+  <button id="btn-cancel" class="act-btn" type="button">&#10005; Cancel</button>
+</div>
+<script type="module">
+import { initPage } from '../ui/screens/companion-playlist-create.js';
+initPage();
+</script>
+</body>
+</html>

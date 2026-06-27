@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi } = require('./fixtures/api.js');
+const { installApi, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 
 // FEAT-028 / TASK-168 — the companion drill-down browse (replaces the flat
 // FEAT-020/TASK-139 tab+rails+search). The companion walks four levels —
@@ -158,4 +158,35 @@ test('an in-progress section leads with a Continue rail; its grid tile shows the
   await page.locator('#rails-row .chip[data-rail="continue"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey-s1e01"] .nm')).toHaveText('Bluey · Daddy Putdown');
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey-s1e01"]')).toHaveClass(/prog/);
+});
+
+// FEAT-036 (TASK-209) — the companion create-playlist affordance: a real button
+// (not a synthetic rail tile), shown only when the Music section is open and
+// reachable even with ZERO playlists (the Playlists rail is omitted when empty, so
+// a grid-level entry would strand the create-then-delete loop). Music cards are
+// injected so the Music section exists; no playlist cards, proving zero-state reach.
+test.describe('create-playlist affordance', () => {
+  test.beforeEach(async ({ page }) => {
+    intents = [];
+    await installApi(page);
+    await mockApp(page, intents);
+    await page.route('**/api/browse**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat(MUSIC_CARDS) })
+    }));
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#sections-row .chip')).toContainText(['Albums']);
+  });
+
+  test('New Playlist is hidden until the Music section is open', async ({ page }) => {
+    await expect(page.locator('#btn-new-playlist')).toBeHidden();
+    await page.locator('.chip[data-section="music"]').click();
+    await expect(page.locator('#btn-new-playlist')).toBeVisible();
+  });
+
+  test('New Playlist opens the companion create page even with zero playlists', async ({ page }) => {
+    await page.locator('.chip[data-section="music"]').click();
+    await page.locator('#btn-new-playlist').click();
+    await expect(page).toHaveURL(/companion\/playlist-create\.html/);
+  });
 });
