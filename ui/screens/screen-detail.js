@@ -29,6 +29,7 @@ function verticalStops() {
   return crumbStops()
     .concat([document.getElementById('btn-play-next')].filter(Boolean))
     .concat(Array.from(document.querySelectorAll('#btn-shuffle:not(.hidden)')))
+    .concat(Array.from(document.querySelectorAll('#btn-add-all')))
     .concat(Array.from(document.querySelectorAll('#btn-delete-playlist')))
     .concat(Array.from(document.querySelectorAll('.season-chip.active')))
     .concat(Array.from(document.querySelectorAll('.detail-row:not(.unavailable)')));

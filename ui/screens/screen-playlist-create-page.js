@@ -1,6 +1,6 @@
 import { getParam, getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
-import { createPlaylist, renamePlaylist, addToPlaylist } from '../../core/app-api.js';
+import { createPlaylist, renamePlaylist, addToPlaylist, addSourceToPlaylist } from '../../core/app-api.js';
 import { CHAR_KEYS, KEY_COLS, appendChar, backspace, cleanName, isValidName, gridIndex, editorMode } from '../../core/playlist-name.js';
 
 // FEAT-036 — the TV name screen, shared by create (TASK-208) and rename (TASK-210)
@@ -45,11 +45,17 @@ export function initPlaylistCreatePage() {
   function invalidName() { showError('Enter a name (1–100 characters).'); }
 
   var addTrack = getParam('addTrack');
+  var addSourceType = getParam('addSourceType');
+  var addSourceId = getParam('addSourceId');
   function openNew(rec) { navTo('playlist-detail.html', { playlist: rec.id }); }
-  // Add the prompting track, then open the new playlist regardless of the add
-  // outcome (the playlist already exists; a failed add just lands on an empty one).
-  function addThenOpen(rec) { addToPlaylist(SERVER, rec.id, addTrack).then(function() { openNew(rec); }).catch(function() { openNew(rec); }); }
-  function afterCreate(rec) { ({ true: function() { addThenOpen(rec); }, false: function() { openNew(rec); } })[String(!!addTrack)](); }
+  // After create, apply any pending add — a single track (TASK-206) OR a whole
+  // album/playlist snapshot (TASK-212) — then open the new playlist regardless of
+  // the add outcome (the playlist already exists; a failed add just lands empty).
+  function addTrackThenOpen(rec) { addToPlaylist(SERVER, rec.id, addTrack).then(function() { openNew(rec); }).catch(function() { openNew(rec); }); }
+  function addSourceThenOpen(rec) { addSourceToPlaylist(SERVER, rec.id, addSourceType, addSourceId).then(function() { openNew(rec); }).catch(function() { openNew(rec); }); }
+  // Pick the post-create step without branching: source > track > plain open.
+  var POST_CREATE = [[Boolean(addSourceId), addSourceThenOpen], [Boolean(addTrack), addTrackThenOpen], [true, openNew]];
+  function afterCreate(rec) { POST_CREATE.filter(function(p) { return p[0]; })[0][1](rec); }
   function doCreate() {
     createPlaylist(SERVER, cleanName(st.name), st.profile)
       .then(afterCreate)

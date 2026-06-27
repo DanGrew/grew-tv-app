@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist } from '../../core/app-api.js';
+import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist } from '../../core/app-api.js';
 import { screenPage } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
@@ -27,7 +27,7 @@ export function initPage() {
     backBtn: document.getElementById('btn-back')
   };
   var state = { seriesId: null, profile: null, person: null, series: null, progress: {}, activeSeason: null };
-  var addState = { trackId: null, statusTimer: null };
+  var addState = { add: null, createHref: '', statusTimer: null };
   var api = {};
   var updateBar = null;
   function noop() {}
@@ -75,17 +75,14 @@ export function initPage() {
   }
   function closeAddSheet() { document.getElementById('add-sheet').style.display = 'none'; }
   function addExisting(id, title) {
-    addToPlaylist(server, id, addState.trackId)
+    addState.add(id)
       .then(function() { closeAddSheet(); showStatus('Added to ' + title); })
       .catch(function() { closeAddSheet(); showStatus('Could not add to playlist.'); });
   }
   // New playlist: hand off to the companion create screen (TASK-209, phone <input>)
-  // carrying the track id + the live profile, so it is created, the track added,
-  // then the playlists list reappears with the new playlist holding it.
-  function createNew() {
-    window.location.href = 'playlist-create.html?addTrack=' + encodeURIComponent(addState.trackId) +
-      '&profile=' + encodeURIComponent(activeProfile());
-  }
+  // carrying the pending add (a track id, OR a bulk source for TASK-212) + the live
+  // profile, so it is created, the add applied, then the list reappears holding it.
+  function createNew() { window.location.href = addState.createHref; }
   function choiceBtn(card) {
     var b = document.createElement('button');
     b.className = 'add-choice';
@@ -100,11 +97,25 @@ export function initPage() {
     cards.forEach(function(c) { list.appendChild(choiceBtn(c)); });
     document.getElementById('add-sheet').style.display = 'flex';
   }
-  function openAddSheet(item) {
-    addState.trackId = item.video.id;
+  function loadAndShowSheet() {
     loadBrowse(server, activeProfile())
       .then(function(res) { showAddSheet(playlistCards([res.content].filter(Boolean).concat([[]])[0])); })
       .catch(function() { showStatus('Could not load playlists.'); });
+  }
+  // Per-track: add ONE track (TASK-207).
+  function openAddSheet(item) {
+    addState.add = function(id) { return addToPlaylist(server, id, item.video.id); };
+    addState.createHref = 'playlist-create.html?addTrack=' + encodeURIComponent(item.video.id) +
+      '&profile=' + encodeURIComponent(activeProfile());
+    loadAndShowSheet();
+  }
+  // Album-level "Add all to playlist" (TASK-212): snapshot the WHOLE album as a
+  // source. Same sheet, but each pick POSTs add-source instead of add-track.
+  function openAddAllSheet() {
+    addState.add = function(id) { return addSourceToPlaylist(server, id, 'album', state.seriesId); };
+    addState.createHref = 'playlist-create.html?addSourceType=album&addSourceId=' + encodeURIComponent(state.seriesId) +
+      '&profile=' + encodeURIComponent(activeProfile());
+    loadAndShowSheet();
   }
   function addBtn(item) {
     var b = document.createElement('button');
@@ -114,6 +125,17 @@ export function initPage() {
     b.addEventListener('click', function() { openAddSheet(item); });
     return b;
   }
+  // The album-level control, rendered once above the track list (album context
+  // only — a TV series has no playlist semantics).
+  function appendAddAllBtn() {
+    var b = document.createElement('button');
+    b.className = 'add-all-btn';
+    b.id = 'btn-add-all';
+    b.textContent = '＋ Add all to playlist';
+    b.addEventListener('click', openAddAllSheet);
+    els.actionsEl.appendChild(b);
+  }
+  function maybeAddAll() { ({ 'true': appendAddAllBtn, 'false': noop })[isAlbum() + ''](); }
 
   // Breadcrumb trail (FEAT-021): Home (clickable) > this series (current). Home
   // sends the `navigate` intent so the app teleports the TV back to browse; the
@@ -205,6 +227,7 @@ export function initPage() {
 
   function renderSeries() {
     els.actionsEl.appendChild(playNextBtn());
+    maybeAddAll();
     renderSeasonChips();
     visibleItems(state.series.items, state.activeSeason).forEach(function(e) { els.actionsEl.appendChild(trackNode(e.item)); });
   }

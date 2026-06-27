@@ -51,6 +51,18 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 #btn-rename-playlist:active, #btn-rename-playlist:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #btn-delete-playlist { padding: 10px 18px; border: 2px solid rgba(255,135,135,0.5); border-radius: var(--radius-sm); background: var(--surface); color: #ff8787; font-size: 15px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease); }
 #btn-delete-playlist:active, #btn-delete-playlist:focus { outline: none; border-color: #ff8787; }
+#btn-add-all { padding: 10px 18px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 15px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#btn-add-all:active, #btn-add-all:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#add-sheet { display: none; position: fixed; inset: 0; z-index: 10; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); }
+.add-sheet-panel { background: #16213e; border: 2px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 24px; width: 100%; max-width: 360px; max-height: 76vh; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); }
+.add-sheet-title { font-size: 18px; text-align: center; }
+#add-sheet-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.add-choice { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.add-choice:active, .add-choice:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.add-sheet-act { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.add-sheet-act:active, .add-sheet-act:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#btn-add-create { border-color: #7ee787; color: #7ee787; }
+#add-status { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 #confirm-delete { display: none; position: fixed; inset: 0; z-index: 10; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); }
 #confirm-box { background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius); padding: 24px 26px; margin: 24px; max-width: 360px; text-align: center; }
 #confirm-title { font-size: 18px; margin-bottom: 8px; }
@@ -93,6 +105,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 </div>
 <div id="grid-wrap"><div id="txtgrid"></div></div>
 <div id="manage-actions">
+  <button id="btn-add-all" type="button">&#65291; Add all to playlist</button>
   <button id="btn-rename-playlist" type="button">&#9998; Rename</button>
   <button id="btn-delete-playlist" type="button">&#128465; Delete playlist</button>
 </div>
@@ -106,6 +119,15 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
     </div>
   </div>
 </div>
+<div id="add-sheet">
+  <div class="add-sheet-panel">
+    <div class="add-sheet-title">Add all to playlist</div>
+    <div id="add-sheet-list"></div>
+    <button id="btn-add-create" class="add-sheet-act" type="button">&#65291; New playlist</button>
+    <button id="btn-add-cancel" class="add-sheet-act" type="button">Cancel</button>
+  </div>
+</div>
+<div id="add-status"></div>
 <script type="module">
 import { initPage } from '../ui/screens/companion-playlist.js';
 initPage();

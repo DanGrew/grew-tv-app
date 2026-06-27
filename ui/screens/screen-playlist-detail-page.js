@@ -3,11 +3,13 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { playNextIndex } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
+import { playlistCards } from '../../core/playlist-pick.js';
+import { gridIndex } from '../../core/playlist-name.js';
 
 // FEAT-036 (TASK-204) playlist detail. A user playlist resolves into the same
 // detail shape as an album (/api/playlist), so this reuses the FEAT-017
@@ -109,6 +111,67 @@ export function initPlaylistDetailPage() {
     [H[e.key]].filter(Boolean).forEach(function(fn) { e.preventDefault(); fn(); });
   }
 
+  // Bulk-add (TASK-212): the header "Add all to playlist" button snapshots THIS
+  // whole playlist into ANOTHER playlist (the add-source API, source_type
+  // 'playlist'). The sheet mirrors the album-detail Add sheet — list the active
+  // profile's playlists (this one EXCLUDED, since a playlist can't be added into
+  // itself) + New playlist + Cancel, owning its own keydown so the d-pad never
+  // fires beneath it. The target gets a snapshot, so this playlist is unchanged
+  // and no reload is needed — just a transient toast.
+  var addState = { cells: [], statusTimer: null };
+  function focusAdd(i) { addState.cells[i].focus(); }
+  function closeAddSheet() {
+    document.getElementById('add-sheet').style.display = 'none';
+    document.getElementById('btn-add-all').focus();
+  }
+  function hideStatus() { document.getElementById('add-status').style.display = 'none'; }
+  function showStatus(text) {
+    var el = document.getElementById('add-status');
+    el.textContent = text;
+    el.style.display = 'block';
+    clearTimeout(addState.statusTimer);
+    addState.statusTimer = setTimeout(hideStatus, 2500);
+  }
+  function addExisting(id, title) {
+    addSourceToPlaylist(SERVER, id, 'playlist', playlistId)
+      .then(function() { closeAddSheet(); showStatus('Added to ' + title); })
+      .catch(function() { closeAddSheet(); showStatus('Could not add to playlist.'); });
+  }
+  function createNew() { navTo('playlist-create.html', { addSourceType: 'playlist', addSourceId: playlistId }); }
+  function moveAdd(e) {
+    var i = addState.cells.indexOf(document.activeElement);
+    var ni = gridIndex(i, 1, addState.cells.length, e.key);
+    [ni].filter(function(x) { return x !== i; }).filter(function() { return i > -1; }).forEach(function(x) { e.preventDefault(); focusAdd(x); });
+  }
+  var ADD_CLOSE = { Escape: true, Backspace: true };
+  function closeKeys(e) {
+    [ADD_CLOSE[e.key]].filter(Boolean).forEach(function() { e.preventDefault(); closeAddSheet(); });
+  }
+  function onAddKey(e) { e.stopPropagation(); moveAdd(e); closeKeys(e); }
+  function buildPlaylistChoice(card) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'add-choice';
+    b.textContent = card.title;
+    b.setAttribute('data-id', card.id);
+    b.addEventListener('click', function() { addExisting(card.id, card.title); });
+    b.addEventListener('keydown', onAddKey);
+    document.getElementById('add-sheet-list').appendChild(b);
+    return b;
+  }
+  function showAddSheet(cards) {
+    document.getElementById('add-sheet-list').innerHTML = '';
+    addState.cells = cards.map(buildPlaylistChoice)
+      .concat([document.getElementById('btn-add-create'), document.getElementById('btn-add-cancel')]);
+    document.getElementById('add-sheet').style.display = 'flex';
+    focusAdd(0);
+  }
+  function openAddSheet() {
+    loadBrowse(SERVER, profile)
+      .then(function(res) { showAddSheet(playlistCards(res.content, playlistId)); })
+      .catch(function() { showStatus('Could not load playlists.'); });
+  }
+
   var wsApp = connectApp(wsUrl(window.location.hostname), function(intent, params) {
     var INTENTS = {
       navigate_up:   function() { detailArrow({ key: 'ArrowUp',   preventDefault: function() {} }); },
@@ -135,12 +198,15 @@ export function initPlaylistDetailPage() {
   document.getElementById('btn-back-detail').addEventListener('click', goBack);
   document.getElementById('btn-play-next').addEventListener('click', playFromResume);
   document.getElementById('btn-shuffle').addEventListener('click', shufflePlay);
+  document.getElementById('btn-add-all').addEventListener('click', openAddSheet);
   document.getElementById('btn-rename-playlist').addEventListener('click', rename);
   document.getElementById('btn-delete-playlist').addEventListener('click', showConfirm);
   document.getElementById('btn-confirm-delete').addEventListener('click', doDelete);
   document.getElementById('btn-cancel-delete').addEventListener('click', hideConfirm);
-  document.getElementById('btn-confirm-delete').addEventListener('keydown', confirmKey);
-  document.getElementById('btn-cancel-delete').addEventListener('keydown', confirmKey);
+  document.getElementById('btn-add-create').addEventListener('click', createNew);
+  document.getElementById('btn-add-create').addEventListener('keydown', onAddKey);
+  document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
+  document.getElementById('btn-add-cancel').addEventListener('keydown', onAddKey);
   document.addEventListener('keydown', dispatchKey);
 
   initPage({

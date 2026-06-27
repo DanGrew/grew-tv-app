@@ -271,6 +271,20 @@ async function installApi(page) {
     pl.items.push({ season: null, episode: null, video: VIDEOS[body.track_id] || { id: body.track_id } });
     return route.fulfill({ status: 204, body: '' });
   });
+  // FEAT-036/TASK-212 add-source (bulk-add). Snapshot a whole album or another
+  // playlist's CURRENT tracks onto the target (the server resolves source tracks
+  // at add-time). 204 on success; 400 on unknown target/source or a self-add,
+  // mirroring the backend contract.
+  await page.route('**/api/playlists/add-source', function(route) {
+    var body = JSON.parse(route.request().postData());
+    var pl = playlists[body.playlist_id];
+    if (!pl) return json(route, 400, { error: 'unknown playlist' });
+    if (body.source_type === 'playlist' && body.source_id === body.playlist_id) return json(route, 400, { error: 'cannot add a playlist into itself' });
+    var src = ({ album: ALBUMS[body.source_id], playlist: playlists[body.source_id] })[body.source_type];
+    if (!src) return json(route, 400, { error: 'unknown source' });
+    src.items.forEach(function(it) { pl.items.push({ season: null, episode: null, video: it.video }); });
+    return route.fulfill({ status: 204, body: '' });
+  });
   // FEAT-036/TASK-211 move-track. Swap the entry at `index` with its up/down
   // neighbour BY POSITION (so duplicates stay addressable); an off-end move is a
   // no-op. 204 / 400-on-unknown, mirroring the backend contract.
