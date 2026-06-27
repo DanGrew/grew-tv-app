@@ -35,6 +35,9 @@ function mockApp(page, playlistId) {
       if (m.type === 'intent' && m.payload.intent === 'play') { ctx = 'audio'; pushCtx(); }
       // a breadcrumb tap teleports the TV; the app echoes the target screen's context.
       if (m.type === 'intent' && m.payload.intent === 'navigate') { ctx = m.payload.params.page.replace('.html', ''); pushCtx(); }
+      // delete drives the TV off the gone playlist (`back` -> browse); the companion
+      // then navigates itself to browse, where this echoed context keeps it put.
+      if (m.type === 'intent' && m.payload.intent === 'back') { ctx = 'browse'; }
     });
   });
 }
@@ -80,6 +83,29 @@ test.describe('Road Trip playlist (2 tracks)', () => {
   test('Shuffle header sends the shuffle intent', async ({ page }) => {
     await page.locator('#btn-shuffle').click();
     await expect.poll(() => sentIntents).toContain('shuffle');
+  });
+
+  // FEAT-036 (TASK-209) — delete-with-confirm, the companion mirror of the TV's
+  // screen-playlist-detail-page delete. Confirm POSTs /api/playlists/delete (the
+  // installApi fixture answers 204), drives the TV off the gone playlist (`back`),
+  // and returns the companion to its playlists list.
+  test('Delete confirms with the playlist name, then deletes and returns to the playlists list', async ({ page }) => {
+    await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
+    await page.locator('#btn-delete-playlist').click();
+    await expect(page.locator('#confirm-delete')).toBeVisible();
+    await expect(page.locator('#confirm-delete-name')).toHaveText('Road Trip');
+    await page.locator('#btn-confirm-delete').click();
+    await expect.poll(() => sentIntents).toContain('back');
+    await expect(page).toHaveURL(/companion\/browse\.html$/);
+  });
+
+  test('Cancel on the delete confirm keeps the playlist and closes the dialog', async ({ page }) => {
+    await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
+    await page.locator('#btn-delete-playlist').click();
+    await expect(page.locator('#confirm-delete')).toBeVisible();
+    await page.locator('#btn-cancel-delete').click();
+    await expect(page.locator('#confirm-delete')).toBeHidden();
+    await expect(page).toHaveURL(/companion\/playlist\.html$/);
   });
 });
 

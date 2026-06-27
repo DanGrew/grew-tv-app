@@ -40,6 +40,16 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .ph-txt.prog { border-color: var(--focus); }
 .ph-txt:active, .ph-txt:focus { outline: none; border-color: var(--focus); }
 .no-actions { color: var(--text-muted); font-size: 16px; text-align: center; margin-top: 40px; grid-column: 1 / -1; }
+#btn-delete-playlist { align-self: center; margin-top: 4px; padding: 10px 18px; border: 2px solid rgba(255,135,135,0.5); border-radius: var(--radius-sm); background: var(--surface); color: #ff8787; font-size: 15px; font-family: inherit; cursor: pointer; flex-shrink: 0; touch-action: manipulation; transition: border-color var(--dur) var(--ease); }
+#btn-delete-playlist:active, #btn-delete-playlist:focus { outline: none; border-color: #ff8787; }
+#confirm-delete { display: none; position: fixed; inset: 0; z-index: 10; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); }
+#confirm-box { background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius); padding: 24px 26px; margin: 24px; max-width: 360px; text-align: center; }
+#confirm-title { font-size: 18px; margin-bottom: 8px; }
+#confirm-delete-name { font-size: 15px; color: var(--text-muted); margin-bottom: 22px; }
+#confirm-actions { display: flex; gap: 12px; justify-content: center; }
+#confirm-actions button { padding: 12px 18px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#confirm-actions button:active, #confirm-actions button:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#btn-confirm-delete { border-color: rgba(255,135,135,0.5); color: #ff8787; }
 #breadcrumb { flex-shrink: 0; }
 .breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .crumb { font-size: 13px; }
@@ -73,6 +83,17 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
   <button id="btn-shuffle" class="act-btn" type="button">&#128256; Shuffle</button>
 </div>
 <div id="grid-wrap"><div id="txtgrid"></div></div>
+<button id="btn-delete-playlist" type="button">&#128465; Delete playlist</button>
+<div id="confirm-delete">
+  <div id="confirm-box">
+    <div id="confirm-title">Delete this playlist?</div>
+    <div id="confirm-delete-name"></div>
+    <div id="confirm-actions">
+      <button id="btn-confirm-delete" type="button">Delete</button>
+      <button id="btn-cancel-delete" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
 <script type="module">
 import { initPage } from '../ui/screens/companion-playlist.js';
 initPage();
