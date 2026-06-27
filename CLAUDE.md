@@ -284,6 +284,15 @@ per directory, so a stash/checkout slip can't silently drop your commit onto
 "plain branch in primary" convention.) A fresh worktree has no `node_modules` —
 symlink the primary's for gate runs, but `rm` it before `git add -A` so the
 ignore miss (`node_modules/` with a slash) doesn't commit the symlink.
+
+**`cd` into the repo/worktree before any `git` — never `git -C <path>`.** A
+session's cwd starts at `/Users/dan` (above the repos), but the perm allowlist
+grants granular per-verb git rules (`Bash(git fetch:*)`, `Bash(git worktree
+add:*)`, `Bash(git commit:*)`, …). Inserting `-C <path>` between `git` and the
+verb breaks prefix-matching (`git -C /p fetch` ≠ `git fetch …`), so every call
+then prompts. `cd` is allowlisted — so `cd` into the primary checkout to create
+the worktree, then `cd` into the **worktree** and run bare git verbs there (commit
+/ push / status all match their rules, no `-C`, no prompts). Same for `gh`.
 **Branching:** off `main`. Naming: `<topic>/<descriptor>` — e.g. `feat/task-012-resume-screen`.
 **PRs:** Always draft (`--draft`), one per logical unit. Merge target: `main`.
 **Deploy:** no GitHub Pages. The app ships by updating the clone media-manager serves from (`--app-dir`, `~/grew-tv/repos/grew-tv-app` on the Mini) — pull `main` there + restart/reload. `setup-mac-mini.sh` clones it.

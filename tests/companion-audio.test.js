@@ -20,6 +20,10 @@ const ALBUM_ST = { screen: 'player', itemId: 'ootb', episodeId: 'ootb-02', posit
 // album, while a real track plays (episodeId). The companion must route Back to
 // the artist screen and never loadAlbum(artistId).
 const ARTIST_ST = { ...ALBUM_ST, itemId: 'ELO', sourceType: 'artist', sourceId: 'ELO' };
+// A PLAYLIST-sourced player (FEAT-036/TASK-205): the source is a playlist, so the
+// companion loads the track list via loadPlaylist (NOT loadAlbum), and Back routes
+// to the playlist detail. pl-roadtrip is a 2-track cross-album mix.
+const PLAYLIST_ST = { ...ALBUM_ST, itemId: 'pl-roadtrip', episodeId: 'ootb-01', sourceType: 'playlist', sourceId: 'pl-roadtrip' };
 
 function mockApp(page, st) {
   let version = 1;
@@ -143,5 +147,33 @@ test.describe('artist source (BUG-018)', () => {
     // the album track list stays empty (an artist source has no companion list).
     expect(albumReqs.filter((u) => u.includes('ELO'))).toHaveLength(0);
     await expect(page.locator('.track-btn')).toHaveCount(0);
+  });
+});
+
+// FEAT-036 (TASK-205): a playlist-sourced player. The companion loads the track
+// list via loadPlaylist (NOT loadAlbum) and Back teleports the TV to the playlist
+// detail (playlist.html) — the music analogue of the album-source case.
+test.describe('playlist source (TASK-205)', () => {
+  test.beforeEach(async ({ page }) => {
+    await installApi(page);
+    await mockApp(page, { ...PLAYLIST_ST });
+  });
+
+  test('shows the playlist track list via loadPlaylist (never loadAlbum), in stored order', async ({ page }) => {
+    const albumReqs = [];
+    page.on('request', (r) => { [r.url()].filter((u) => u.includes('/api/album/')).forEach((u) => albumReqs.push(u)); });
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('.track-btn')).toHaveCount(2);
+    await expect(page.locator('.track-btn[data-id="ootb-03"] .t-name')).toHaveText('Sweet Talkin Woman');
+    await expect(page.locator('.track-btn[data-id="ootb-01"] .t-name')).toHaveText('Turn to Stone');
+    // The playlist id was never mistaken for an album (no /api/album/pl-roadtrip).
+    expect(albumReqs.filter((u) => u.includes('pl-roadtrip'))).toHaveLength(0);
+  });
+
+  test('Back returns to the playlist detail, teleporting the TV', async ({ page }) => {
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#btn-back')).toHaveText('‹ Road Trip');
+    await page.locator('#btn-back').click();
+    await expect(page).toHaveURL(/companion\/playlist\.html$/);
   });
 });

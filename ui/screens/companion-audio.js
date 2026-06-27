@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadAlbum, playbackAction } from '../../core/app-api.js';
+import { loadAlbum, loadPlaylist, playbackAction } from '../../core/app-api.js';
 import { screenPage, displayTitle } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
@@ -47,8 +47,9 @@ export function initPage() {
   // the echoed context — same navigate-intent path the browse/detail companions
   // use.
   var BACK_TARGET = {
-    album:  function(id) { return { page: 'album-detail.html', params: { album: id } }; },
-    artist: function(id) { return { page: 'artist.html', params: { artist: id } }; }
+    album:    function(id) { return { page: 'album-detail.html', params: { album: id } }; },
+    artist:   function(id) { return { page: 'artist.html', params: { artist: id } }; },
+    playlist: function(id) { return { page: 'playlist.html', params: { playlist: id } }; }
   };
   function backTarget() {
     return [BACK_TARGET[state.sourceType]].filter(Boolean)
@@ -110,10 +111,14 @@ export function initPage() {
   // the highlight + e2e key off) plus a ＋ Queue producer (FEAT-031 mockup).
   function playBtn(item) {
     var v = item.video;
+    // A flat playlist track carries no episode number (episode:null) — show a
+    // blank slot rather than the literal "null" (FEAT-036/TASK-205); an album
+    // track keeps its number.
+    var num = [item.episode].filter(Boolean).concat([''])[0];
     var b = document.createElement('button');
     b.className = 'track-btn';
     b.setAttribute('data-id', v.id);
-    b.insertAdjacentHTML('beforeend', '<span class="t-num">' + item.episode + '</span><span class="t-name">' + v.title + '</span>');
+    b.insertAdjacentHTML('beforeend', '<span class="t-num">' + num + '</span><span class="t-name">' + v.title + '</span>');
     b.addEventListener('click', function() { api.play(v.id); });
     return b;
   }
@@ -144,19 +149,26 @@ export function initPage() {
     markCurrent();
   }
 
-  function loadTracks(albumId) {
-    loadAlbum(server, albumId)
+  // Track list for a collection source (album or playlist) — both project to the
+  // same { title, items } shape (loadAlbum / loadPlaylist), so the render is one
+  // path; only the loader differs.
+  function loadTracksVia(loader, id) {
+    loader(server, id)
       .then(renderTracks)
       .catch(function() { els.tracks.innerHTML = ''; });
   }
+  function loadTracks(albumId) { loadTracksVia(loadAlbum, albumId); }
+  function loadPlaylistTracks(id) { loadTracksVia(loadPlaylist, id); }
 
-  // Only an ALBUM source has a companion track list; an artist source must NOT
-  // loadAlbum(artistId) (a 404 that cleared the list AND set a bogus
+  // Album AND playlist sources have a companion track list (FEAT-036/TASK-205:
+  // a playlist source loads via loadPlaylist, NOT loadAlbum). An artist source
+  // must NOT loadAlbum(artistId) (a 404 that cleared the list AND set a bogus
   // album-detail Back target — BUG-018), and a lone single has no list at all.
   var SOURCE_TRACKS = {
-    album:  function(id) { loadTracks(id); },
-    artist: function() {},
-    track:  function() {}
+    album:    function(id) { loadTracks(id); },
+    playlist: function(id) { loadPlaylistTracks(id); },
+    artist:   function() {},
+    track:    function() {}
   };
   function loadSource(s) {
     state.sourceId = s.sourceId;

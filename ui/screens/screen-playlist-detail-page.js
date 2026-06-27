@@ -63,8 +63,12 @@ export function initPlaylistDetailPage() {
     };
     [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
   });
-  wsApp.sendContext({ context_id: 'detail', series_id: playlistId });
-  wsApp.sendAppState({ screen: 'detail', itemId: playlistId, profile: profile });
+  // A dedicated `playlist` context (not the album/series `detail`) so the
+  // companion routes to its own playlist twin (companion-playlist.js), exactly as
+  // the artist drill-down emits `artist` — `detail` would land on the series
+  // companion and loadSeries(playlistId) 404s (TASK-205).
+  wsApp.sendContext({ context_id: 'playlist', playlist: playlistId });
+  wsApp.sendAppState({ screen: 'playlist', itemId: playlistId, profile: profile });
 
   document.getElementById('btn-back-detail').addEventListener('click', goBack);
   document.getElementById('btn-play-next').addEventListener('click', playFromResume);

@@ -23,14 +23,18 @@ export function initRailGridPage() {
   var catalog = {};
 
   // A video card plays; a series opens its detail; a music card opens album
-  // detail. cardRoute (core) picks by the server `section`, never a type enum.
-  // A CW episode tile carries `series` (its owning collection) so the player can
-  // run Next/Prev from a tile launch (BUG-005); a film has none and navTo drops it.
+  // detail; a playlist card opens its own detail (FEAT-036/TASK-205 — the Music
+  // tab's Playlists rail drills here too, so the companion `select` must resolve a
+  // playlist, mirroring the browse page). cardRoute (core) picks by the server
+  // `section`/`collectionType`, never a type enum. A CW episode tile carries
+  // `series` (its owning collection) so the player can run Next/Prev from a tile
+  // launch (BUG-005); a film has none and navTo drops it.
   var SELECT = {
-    artist: function(card) { navTo('artist.html', { artist: card.artist }); },
-    album:  function(card) { navTo('album-detail.html', { album: card.id }); },
-    video:  function(card) { navTo('video.html', { video: card.id, from: 'grid', series: card.series }); },
-    series: function(card) { navTo('detail.html', { series: card.id }); }
+    artist:   function(card) { navTo('artist.html', { artist: card.artist }); },
+    album:    function(card) { navTo('album-detail.html', { album: card.id }); },
+    playlist: function(card) { navTo('playlist-detail.html', { playlist: card.id }); },
+    video:    function(card) { navTo('video.html', { video: card.id, from: 'grid', series: card.series }); },
+    series:   function(card) { navTo('detail.html', { series: card.id }); }
   };
   function onSelect(card) {
     [SELECT[cardRoute(card)]].filter(Boolean).forEach(function(fn) { fn(card); });
