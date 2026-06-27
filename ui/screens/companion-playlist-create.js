@@ -1,4 +1,4 @@
-import { createPlaylist } from '../../core/app-api.js';
+import { createPlaylist, addToPlaylist } from '../../core/app-api.js';
 import { cleanName, isValidName } from '../../core/playlist-name.js';
 
 // FEAT-036 (TASK-209) — the companion create-playlist screen: the mirror of the
@@ -17,6 +17,13 @@ export function initPage() {
   var server = 'http://' + host + ':8765';
   var params = new URLSearchParams(window.location.search);
   var st = { profile: [params.get('profile')].filter(Boolean).concat(['adults'])[0] };
+  // FEAT-036/TASK-207: an `addTrack` query param marks the create-from-a-track
+  // flow (the companion Add-to-playlist sheet's "New playlist" choice). When
+  // present, the new playlist is created, that track is added, then we return to
+  // the playlists list — so the new playlist starts holding the track. The profile
+  // picker preselects the track's profile (the sheet carries it), so the add
+  // matches by construction.
+  var addTrack = params.get('addTrack');
 
   var nameEl = document.getElementById('pl-name');
   var errEl = document.getElementById('error-msg');
@@ -30,9 +37,13 @@ export function initPage() {
   function showError(msg) { errEl.textContent = msg; errEl.style.display = 'block'; }
   function invalidName() { showError('Enter a name (1–100 characters).'); }
   function cancel() { window.location.href = 'browse.html'; }
+  // Add the prompting track, then return to the list regardless of the add outcome
+  // (the playlist already exists; a failed add just lands on an empty one).
+  function addThenDone(rec) { addToPlaylist(server, rec.id, addTrack).then(cancel).catch(cancel); }
+  function afterCreate(rec) { ({ true: function() { addThenDone(rec); }, false: cancel })[String(!!addTrack)](); }
   function doCreate() {
     createPlaylist(server, cleanName(nameEl.value), st.profile)
-      .then(function() { cancel(); })
+      .then(afterCreate)
       .catch(function() { showError('Could not create playlist. Try again.'); });
   }
   function create() { ({ true: doCreate, false: invalidName })[isValidName(nameEl.value)](); }
