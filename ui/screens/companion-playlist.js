@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadPlaylist, loadContinueWatching, deletePlaylist } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist } from '../../core/app-api.js';
 import { screenPage, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -106,6 +106,34 @@ export function initPage() {
     return el;
   }
 
+  // Reorder + remove (TASK-211) — the companion mirror of the TV playlist detail's
+  // ↑ ↓ ✕. Each POSTs BY POSITION (move-track / remove-track) then reloads the
+  // list (the phone is touch, so a plain re-render is enough — no focus to keep).
+  function reloadOnEdit(promise) { promise.then(loadTracks).catch(noop); }
+  function moveTrack(i, direction) { reloadOnEdit(movePlaylistTrack(server, state.playlistId, i, direction)); }
+  function removeTrack(i) { reloadOnEdit(removeFromPlaylist(server, state.playlistId, i)); }
+
+  function editBtn(glyph, cls, label, onTap) {
+    var b = document.createElement('button');
+    b.className = 'ph-edit ' + cls;
+    b.setAttribute('aria-label', label);
+    b.innerHTML = glyph;
+    b.addEventListener('click', onTap);
+    return b;
+  }
+  // ↑ is omitted on the first track and ↓ on the last (an edge has nothing to swap
+  // with) — matches the TV detail's edge gating; ✕ is always present.
+  function appendUp(row, i) {
+    [i].filter(function(x) { return x > 0; }).forEach(function() {
+      row.appendChild(editBtn('&#8593;', 'up', 'Move up', function() { moveTrack(i, 'up'); }));
+    });
+  }
+  function appendDown(row, i, total) {
+    [i].filter(function(x) { return x < total - 1; }).forEach(function() {
+      row.appendChild(editBtn('&#8595;', 'down', 'Move down', function() { moveTrack(i, 'down'); }));
+    });
+  }
+
   // Playlist items -> tile cards (id/title/duration for the progress hint). Flat:
   // a playlist carries no season/episode, so the bare track title is the label.
   function trackCards() {
@@ -114,8 +142,22 @@ export function initPage() {
     });
   }
 
+  // A full-width row: the play tile (tap = play on the TV) plus the ↑ ↓ ✕ edit
+  // controls as siblings (a <button> can't nest, so the tile stays a button and
+  // the controls sit beside it — same shape as companion-audio's ＋ Queue row).
+  function trackRow(card, i, total) {
+    var row = document.createElement('div');
+    row.className = 'ph-row';
+    row.appendChild(trackTile(card));
+    appendUp(row, i);
+    appendDown(row, i, total);
+    row.appendChild(editBtn('&#10005;', 'x', 'Remove', function() { removeTrack(i); }));
+    return row;
+  }
+
   function renderTracks() {
-    trackCards().forEach(function(card) { els.gridEl.appendChild(trackTile(card)); });
+    var cards = trackCards();
+    cards.forEach(function(card, i) { els.gridEl.appendChild(trackRow(card, i, cards.length)); });
   }
 
   function renderEmpty() {

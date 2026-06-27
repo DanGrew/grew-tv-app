@@ -271,6 +271,28 @@ async function installApi(page) {
     pl.items.push({ season: null, episode: null, video: VIDEOS[body.track_id] || { id: body.track_id } });
     return route.fulfill({ status: 204, body: '' });
   });
+  // FEAT-036/TASK-211 move-track. Swap the entry at `index` with its up/down
+  // neighbour BY POSITION (so duplicates stay addressable); an off-end move is a
+  // no-op. 204 / 400-on-unknown, mirroring the backend contract.
+  await page.route('**/api/playlists/move-track', function(route) {
+    var body = JSON.parse(route.request().postData());
+    var pl = playlists[body.playlist_id];
+    if (!pl) return json(route, 400, { error: 'unknown playlist' });
+    var j = body.index + ({ up: -1, down: 1 })[body.direction];
+    if (j >= 0 && j < pl.items.length) {
+      var tmp = pl.items[body.index]; pl.items[body.index] = pl.items[j]; pl.items[j] = tmp;
+    }
+    return route.fulfill({ status: 204, body: '' });
+  });
+  // FEAT-036/TASK-211 remove-track. Drop the entry at `index` BY POSITION. 204 /
+  // 400-on-unknown.
+  await page.route('**/api/playlists/remove-track', function(route) {
+    var body = JSON.parse(route.request().postData());
+    var pl = playlists[body.playlist_id];
+    if (!pl) return json(route, 400, { error: 'unknown playlist' });
+    pl.items.splice(body.index, 1);
+    return route.fulfill({ status: 204, body: '' });
+  });
   await page.route('**/api/progress/*', function(route) {
     var req = route.request();
     var person = new URL(req.url()).searchParams.get('person');

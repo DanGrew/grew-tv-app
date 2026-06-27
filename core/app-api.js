@@ -137,6 +137,33 @@ export function addToPlaylist(serverUrl, playlistId, trackId) {
   }).then(function(r) { return r.ok ? r : Promise.reject(r.status); });
 }
 
+// Reorder a track within a playlist (FEAT-036/TASK-211). POST
+// /api/playlists/move-track takes {playlist_id, index, direction:'up'|'down'} and
+// swaps the entry at `index` with its neighbour — BY POSITION, so duplicates stay
+// individually addressable (reuses the FEAT-031 move_queue_entry idiom). A move
+// off either end is a server no-op. 204 on success / 400 on bad input, never 500;
+// resolves only on a 2xx so the caller reloads on success and leaves the list put
+// on error (mirrors addToPlaylist / renamePlaylist).
+export function movePlaylistTrack(serverUrl, playlistId, index, direction) {
+  return fetch(serverUrl + '/api/playlists/move-track', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playlist_id: playlistId, index: index, direction: direction })
+  }).then(function(r) { return r.ok ? r : Promise.reject(r.status); });
+}
+
+// Remove the track at a position from a playlist (FEAT-036/TASK-211). POST
+// /api/playlists/remove-track takes {playlist_id, index} and drops the entry at
+// `index` — BY POSITION (the TASK-201 action; 211 is the first UI to wire it).
+// 204 on success / 400 on bad input, never 500; resolves only on a 2xx.
+export function removeFromPlaylist(serverUrl, playlistId, index) {
+  return fetch(serverUrl + '/api/playlists/remove-track', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playlist_id: playlistId, index: index })
+  }).then(function(r) { return r.ok ? r : Promise.reject(r.status); });
+}
+
 // Delete a user playlist (FEAT-036/TASK-208). POST /api/playlists/delete takes the
 // playlist_id; the contract is 204 on success / 400 on bad input, never 500.
 export function deletePlaylist(serverUrl, id) {

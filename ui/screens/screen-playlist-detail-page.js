@@ -3,7 +3,7 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadPlaylist, loadContinueWatching, deletePlaylist } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { playNextIndex } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -46,6 +46,37 @@ export function initPlaylistDetailPage() {
   }
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
+
+  // Reorder + remove (TASK-211): per-track ↑ ↓ ✕ wired through buildDetailList.
+  // Each POSTs by POSITION (move-track / remove-track), then reloads the playlist
+  // and rebuilds the list so the order/membership reflects the server truth, and
+  // restores focus to a sensible row so repeated d-pad edits stay fluid.
+  var DIR_DELTA = { up: -1, down: 1 };
+  function reloadList(focusSel) {
+    return loadPlaylist(SERVER, playlistId).then(function(pl) {
+      state.playlist = pl;
+      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, onMove, onRemove);
+      ([document.querySelector(focusSel)].filter(Boolean)
+        .concat([document.querySelector('.detail-row')]).filter(Boolean)
+        .concat([document.getElementById('btn-play-next')]))[0].focus();
+    });
+  }
+  // Keep focus on the moved track's same-direction control at its NEW index, so a
+  // run of Up/Up (or Down/Down) walks one track without re-targeting each press.
+  function onMove(item, i, direction) {
+    var newIdx = i + DIR_DELTA[direction];
+    movePlaylistTrack(SERVER, playlistId, i, direction)
+      .then(function() { return reloadList('.detail-row[data-index="' + newIdx + '"] .detail-move-' + direction); })
+      .catch(function() {});
+  }
+  // After a remove the row that was at i+1 slides into i — focus it (the next
+  // track), so the list keeps a live focus; falls back to the first row / header
+  // when the removed track was last or the playlist is now empty.
+  function onRemove(item, i) {
+    removeFromPlaylist(SERVER, playlistId, i)
+      .then(function() { return reloadList('.detail-row[data-index="' + i + '"]'); })
+      .catch(function() {});
+  }
 
   // Rename (TASK-210): hand off to the shared name screen in rename mode — it
   // prefills the current title on its on-screen keyboard and POSTs the rename, then
@@ -133,7 +164,7 @@ export function initPlaylistDetailPage() {
       state.playlist = res[0];
       state.progress = progressMapFromCW(res[1].content);
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: playlistId, seriesTitle: state.playlist.title }));
-      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem);
+      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, onMove, onRemove);
       focusFirstDetailRow();
     })
     .catch(function() { navTo('error.html'); });

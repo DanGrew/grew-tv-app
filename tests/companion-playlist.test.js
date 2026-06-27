@@ -115,6 +115,38 @@ test.describe('Road Trip playlist (2 tracks)', () => {
     await page.locator('#btn-rename-playlist').click();
     await expect(page).toHaveURL(/companion\/playlist-create\.html\?rename=pl-roadtrip&name=Road%20Trip/);
   });
+
+  // FEAT-036 (TASK-211) — per-track reorder (↑ ↓) + remove (✕), the companion
+  // mirror of the TV playlist detail's row controls. Each POSTs BY POSITION (the
+  // installApi fixture mutates the playlist clone) then reloads the list.
+  function rowOf(page, id) {
+    return page.locator('.ph-row', { has: page.locator('.ph-txt[data-id="' + id + '"]') });
+  }
+
+  test('reorder/remove controls are edge-gated: first track has no ↑, last no ↓, both have ✕', async ({ page }) => {
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await expect(rowOf(page, 'ootb-03').locator('.ph-edit.up')).toHaveCount(0);   // first
+    await expect(rowOf(page, 'ootb-03').locator('.ph-edit.down')).toHaveCount(1);
+    await expect(rowOf(page, 'ootb-01').locator('.ph-edit.down')).toHaveCount(0); // last
+    await expect(rowOf(page, 'ootb-01').locator('.ph-edit.up')).toHaveCount(1);
+    await expect(rowOf(page, 'ootb-03').locator('.ph-edit.x')).toHaveCount(1);
+    await expect(rowOf(page, 'ootb-01').locator('.ph-edit.x')).toHaveCount(1);
+  });
+
+  test('moving the first track down reorders the list', async ({ page }) => {
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await rowOf(page, 'ootb-03').locator('.ph-edit.down').click();
+    await expect.poll(async () =>
+      page.locator('.ph-txt').evaluateAll(els => els.map(e => e.getAttribute('data-id')))
+    ).toEqual(['ootb-01', 'ootb-03']);
+  });
+
+  test('removing a track drops it from the list', async ({ page }) => {
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await rowOf(page, 'ootb-01').locator('.ph-edit.x').click();
+    await expect(page.locator('.ph-txt')).toHaveCount(1);
+    await expect(page.locator('.ph-txt').first()).toHaveAttribute('data-id', 'ootb-03');
+  });
 });
 
 test.describe('Empty playlist (still lists + opens)', () => {
