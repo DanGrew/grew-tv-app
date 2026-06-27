@@ -56,7 +56,7 @@ export function initAlbumDetailPage() {
   // add-track; Create-new hands off to the create screen carrying the track id. The
   // sheet owns its keydown (stopPropagation) so the detail d-pad never fires beneath
   // it, mirroring the playlist-detail delete-confirm overlay.
-  var addState = { trackId: null, cells: [] };
+  var addState = { trackId: null, cells: [], statusTimer: null };
 
   function focusAdd(i) { addState.cells[i].focus(); }
   function focusTrackRow() {
@@ -66,10 +66,15 @@ export function initAlbumDetailPage() {
     document.getElementById('add-sheet').style.display = 'none';
     focusTrackRow();
   }
+  function hideStatus() { document.getElementById('add-status').style.display = 'none'; }
+  // Transient confirmation — fades after 2.5s; a fresh add clears the prior timer
+  // so a rapid second toast restarts the clock rather than vanishing early.
   function showStatus(text) {
     var el = document.getElementById('add-status');
     el.textContent = text;
     el.style.display = 'block';
+    clearTimeout(addState.statusTimer);
+    addState.statusTimer = setTimeout(hideStatus, 2500);
   }
   function addExisting(id, title) {
     addToPlaylist(SERVER, id, addState.trackId)
