@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCrumbs, breadcrumbHtml } from '../../core/breadcrumb.js';
+import { buildCrumbs, breadcrumbHtml, trailCrumbs } from '../../core/breadcrumb.js';
 
 describe('buildCrumbs', () => {
   it('browse is a single non-clickable Home leaf', () => {
@@ -72,5 +72,30 @@ describe('breadcrumbHtml', () => {
     var html = breadcrumbHtml(buildCrumbs('detail', { seriesId: 'x', seriesTitle: 'Tom & <Jerry>' }));
     expect(html).toContain('Tom &amp; &lt;Jerry&gt;');
     expect(html).not.toContain('<Jerry>');
+  });
+});
+
+describe('trailCrumbs (FEAT-032 companion player breadcrumb)', () => {
+  it('no recorded entry -> Home (clickable) then the leaf, nothing in between', () => {
+    var crumbs = trailCrumbs(null, 'Some Song');
+    expect(crumbs).toHaveLength(2);
+    expect(crumbs[0]).toMatchObject({ label: 'Home', page: 'browse.html', current: false });
+    expect(crumbs[1]).toMatchObject({ label: 'Some Song', current: true });
+  });
+
+  it('a recorded entry becomes a clickable items crumb between Home and the leaf', () => {
+    var entry = { label: 'Albums', page: 'browse.html', params: { tab: 'music', rail: 'albums' } };
+    var crumbs = trailCrumbs(entry, 'Some Song');
+    expect(crumbs).toHaveLength(3);
+    expect(crumbs[0]).toMatchObject({ label: 'Home', page: 'browse.html', current: false });
+    expect(crumbs[1]).toMatchObject({ label: 'Albums', page: 'browse.html', params: { tab: 'music', rail: 'albums' }, current: false });
+    expect(crumbs[2]).toMatchObject({ label: 'Some Song', current: true });
+  });
+
+  it('the Home crumb carries empty params (so the player can detect it and clear the trail)', () => {
+    var entry = { label: 'Albums', page: 'browse.html', params: { tab: 'music' } };
+    var crumbs = trailCrumbs(entry, 'X');
+    expect(crumbs[0].params).toEqual({});
+    expect(crumbs[1].params.tab).toBe('music');
   });
 });

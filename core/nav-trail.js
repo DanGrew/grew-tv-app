@@ -59,6 +59,16 @@ export function push(entry) {
   write(stack);
 }
 
+// Push only if the entry isn't already the top (same page + params, order-
+// insensitive) — for a screen that records itself on load and must not stack a
+// duplicate when re-entered (e.g. the companion artist page reached again via a
+// child's Back). A different page/params still pushes.
+export function pushUnique(entry) {
+  var top = peek();
+  if (top && top.page === entry.page && stableParams(top.params) === stableParams(entry.params)) return;
+  push(entry);
+}
+
 // Back: remove and return the top entry (immediate parent), or null if the
 // trail is empty (deep-link / session's first nav — caller falls back to its
 // hardcoded default). The caller navTos the entry and restores scrollY/focusedId.
@@ -68,6 +78,14 @@ export function pop() {
   var top = stack.pop();
   write(stack);
   return top;
+}
+
+// The full stack, innermost-last (a copy is fine to read; callers don't mutate).
+// Lets a caller pick a specific ancestor — e.g. the companion browse page
+// restoring from ITS own browse.html entry even when a deeper artist entry sits
+// on top.
+export function entries() {
+  return read();
 }
 
 // Inspect the immediate parent without leaving the current screen. Returns null

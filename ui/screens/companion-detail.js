@@ -4,7 +4,8 @@ import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist }
 import { screenPage } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
-import { buildCrumbs } from '../../core/breadcrumb.js';
+import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
+import { peek as peekTrail } from '../../core/nav-trail.js';
 import { seasonsOf, hasSeasonChips, chipClass, seasonLabel, visibleItems, defaultSeason } from '../../core/seasons.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
@@ -33,7 +34,17 @@ export function initPage() {
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
 
-  els.backBtn.addEventListener('click', function() { api.sendIntent('back'); });
+  // FEAT-032 (TASK-218): if this album was opened FROM an artist's albums page,
+  // the trail top is that artist entry — Back returns there (not the default
+  // browse). For a series, or an album reached straight from a rail, the top is a
+  // browse entry (not artist.html) so Back keeps its existing behaviour.
+  function artistParent() {
+    return [peekTrail()].filter(Boolean).filter(function(e) { return e.page === 'artist.html'; })[0];
+  }
+  function goArtistParent() { var e = artistParent(); api.sendIntent('navigate', { page: e.page, params: e.params }); }
+  function goDefaultBack() { api.sendIntent('back'); }
+  function onBack() { ({ true: goArtistParent, false: goDefaultBack })[Boolean(artistParent())](); }
+  els.backBtn.addEventListener('click', onBack);
 
   // FEAT-036/TASK-207 — "Add to playlist" on the companion, the PRACTICAL build
   // surface (a phone has a real keyboard + easy track browsing). The mirror of the
@@ -109,7 +120,7 @@ export function initPage() {
   // companion follows on the app's echoed context.
   function navigate(page, params) { api.sendIntent('navigate', { page: page, params: params }); }
   function mountCrumbs(seriesTitle) {
-    mountCompanionBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesTitle: seriesTitle }), navigate);
+    mountCompanionBreadcrumb('breadcrumb', ({ true: trailCrumbs(artistParent(), seriesTitle), false: buildCrumbs('detail', { seriesTitle: seriesTitle }) })[Boolean(artistParent())], navigate);
   }
 
   // Poster <img> with a load-failure fallback: a missing/abortive poster hides

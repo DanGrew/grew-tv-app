@@ -115,14 +115,41 @@ test('a Queue button opens the companion Queue View', async ({ page }) => {
   await expect(page).toHaveURL(/companion\/queue\.html$/);
 });
 
-test('a back control returns to the album — labelled with it, teleporting the TV to the detail', async ({ page }) => {
-  // Back is labelled with the loaded album once the track list arrives.
-  await expect(page.locator('#btn-back')).toHaveText('‹ Out of the Blue');
-  await page.locator('#btn-back').click();
-  // navigate intent -> the app echoes the album-detail's `detail` context, which
-  // the companion follows off the audio screen.
-  await expect(page).toHaveURL(/companion\/detail\.html$/);
+// FEAT-032 (TASK-218): the player's way back is the breadcrumb, not a Back
+// button. With no recorded browse trail it is just Home > <track>; the Home crumb
+// navigates back to browse (the TV teleports, the companion follows the echoed
+// browse context off the audio screen).
+test('uses a breadcrumb (no Back button); the Home crumb returns to browse', async ({ page }) => {
+  await expect(page.locator('#btn-back')).toHaveCount(0);
+  await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Mr. Blue Sky');
+  await page.locator('#breadcrumb .crumb-link').first().click();
+  await expect(page).toHaveURL(/companion\/browse\.html$/);
 });
+});
+
+// FEAT-032 (TASK-218): when the user drilled browse before playing, that position
+// is recorded in nav-trail, so the player breadcrumb offers the items level they
+// came from (Home > Albums > <track>) and tapping it returns there.
+test.describe('with a recorded browse trail', () => {
+  test.beforeEach(async ({ page }) => {
+    await installApi(page);
+    await mockApp(page, { ...ALBUM_ST });
+    await page.addInitScript(() => {
+      sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([{ page: 'browse.html', params: { tab: 'music', rail: 'albums' }, label: 'Albums' }]));
+    });
+    await page.goto('/companion/audio.html');
+  });
+
+  test('the breadcrumb shows the recorded items level between Home and the track', async ({ page }) => {
+    const links = page.locator('#breadcrumb .crumb-link');
+    await expect(links).toHaveText(['Home', 'Albums']);
+    await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Mr. Blue Sky');
+  });
+
+  test('tapping the items crumb returns to browse', async ({ page }) => {
+    await page.locator('#breadcrumb .crumb-link', { hasText: 'Albums' }).click();
+    await expect(page).toHaveURL(/companion\/browse\.html$/);
+  });
 });
 
 // BUG-018: an artist-sourced player. The source id is the ARTIST, not an album,
@@ -134,19 +161,16 @@ test.describe('artist source (BUG-018)', () => {
     await mockApp(page, { ...ARTIST_ST });
   });
 
-  test('Back returns to the artist screen, not album-detail; no bogus loadAlbum(artistId)', async ({ page }) => {
+  test('an artist source loads no track list and never mistakes the artist id for an album', async ({ page }) => {
     const albumReqs = [];
     page.on('request', (r) => { [r.url()].filter((u) => u.includes('/api/album/')).forEach((u) => albumReqs.push(u)); });
     await page.goto('/companion/audio.html');
     await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
-    await page.locator('#btn-back').click();
-    // artist source -> artist.html (the app echoes its 'artist' context, which the
-    // companion follows off the audio screen).
-    await expect(page).toHaveURL(/companion\/artist\.html$/);
     // The artist id was never mistaken for an album: no /api/album/ELO fetch, and
     // the album track list stays empty (an artist source has no companion list).
     expect(albumReqs.filter((u) => u.includes('ELO'))).toHaveLength(0);
     await expect(page.locator('.track-btn')).toHaveCount(0);
+    await expect(page.locator('#btn-back')).toHaveCount(0);
   });
 });
 
@@ -170,10 +194,11 @@ test.describe('playlist source (TASK-205)', () => {
     expect(albumReqs.filter((u) => u.includes('pl-roadtrip'))).toHaveLength(0);
   });
 
-  test('Back returns to the playlist detail, teleporting the TV', async ({ page }) => {
+  test('the playlist player uses the breadcrumb (no Back button); Home returns to browse', async ({ page }) => {
     await page.goto('/companion/audio.html');
-    await expect(page.locator('#btn-back')).toHaveText('‹ Road Trip');
-    await page.locator('#btn-back').click();
-    await expect(page).toHaveURL(/companion\/playlist\.html$/);
+    await expect(page.locator('.track-btn')).toHaveCount(2);
+    await expect(page.locator('#btn-back')).toHaveCount(0);
+    await page.locator('#breadcrumb .crumb-link').first().click();
+    await expect(page).toHaveURL(/companion\/browse\.html$/);
   });
 });

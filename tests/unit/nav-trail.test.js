@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { push, pop, peek, truncateTo, clear } from '../../core/nav-trail.js';
+import { push, pop, peek, truncateTo, clear, pushUnique, entries } from '../../core/nav-trail.js';
 
 // sessionStorage does not exist in the `node` vitest environment — back it with
 // a plain in-memory Map, the same vi.stubGlobal approach state.test.js uses for
@@ -96,6 +96,53 @@ describe('nav-trail', () => {
       truncateTo('browse.html', { tab: 'films' });
       expect(peek()).toBe(null);
     });
+  });
+
+  describe('pushUnique', () => {
+    function e(page, params) { return { page: page, params: params, label: page }; }
+
+    it('pushes when the trail is empty', () => {
+      pushUnique(e('artist.html', { artist: 'elo' }));
+      expect(peek()).toMatchObject({ page: 'artist.html', params: { artist: 'elo' } });
+    });
+
+    it('does NOT stack a duplicate of the current top (same page + params)', () => {
+      pushUnique(e('artist.html', { artist: 'elo' }));
+      pushUnique(e('artist.html', { artist: 'elo' }));
+      expect(peek()).toMatchObject({ page: 'artist.html', params: { artist: 'elo' } });
+      pop();
+      expect(peek()).toBe(null);
+    });
+
+    it('matches the top order-insensitively', () => {
+      push(e('browse.html', { tab: 'music', rail: 'r1' }));
+      pushUnique({ page: 'browse.html', params: { rail: 'r1', tab: 'music' }, label: 'x' });
+      pop();
+      expect(peek()).toBe(null);
+    });
+
+    it('pushes when page or params differ from the top', () => {
+      pushUnique(e('browse.html', { tab: 'music' }));
+      pushUnique(e('artist.html', { artist: 'elo' }));
+      expect(peek().page).toBe('artist.html');
+      pop();
+      expect(peek().page).toBe('browse.html');
+    });
+  });
+
+  it('entries returns the full stack innermost-last, so a caller can pick an ancestor', () => {
+    push({ page: 'browse.html', params: { tab: 'music', rail: 'artists' }, label: 'Artists' });
+    push({ page: 'artist.html', params: { artist: 'elo' }, label: 'ELO' });
+    var all = entries();
+    expect(all).toHaveLength(2);
+    expect(all[0].page).toBe('browse.html');
+    expect(all[1].page).toBe('artist.html');
+    // pick the browse entry even though artist is on top
+    expect(all.filter((e) => e.page === 'browse.html').slice(-1)[0].params.rail).toBe('artists');
+  });
+
+  it('entries is empty for a fresh trail', () => {
+    expect(entries()).toEqual([]);
   });
 
   it('clear empties the trail', () => {

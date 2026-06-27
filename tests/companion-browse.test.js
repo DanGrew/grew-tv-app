@@ -190,3 +190,55 @@ test.describe('create-playlist affordance', () => {
     await expect(page).toHaveURL(/companion\/playlist-create\.html/);
   });
 });
+
+// FEAT-032 (TASK-218): the companion records its drill position into nav-trail as
+// you descend, so returning to browse — Back, or a player's breadcrumb — lands on
+// the items you came from, not the sections root. The trail is sessionStorage, so
+// it survives the page reload when the companion follows the TV back to browse.
+test('FEAT-032: drilling records the grid position in the nav trail', async ({ page }) => {
+  await page.locator('.chip[data-section="series"]').click();
+  await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
+  await expect(page.locator('#grid-wrap')).toBeVisible();
+  const trail = await page.evaluate(() => JSON.parse(sessionStorage.getItem('grew-tv:nav-trail')));
+  expect(trail).toHaveLength(1);
+  expect(trail[0]).toMatchObject({ page: 'browse.html', params: { tab: 'series', rail: 'genre:animation' } });
+});
+
+test('FEAT-032: a recorded grid trail restores the grid level on load, not the sections root', async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([{ page: 'browse.html', params: { tab: 'series', rail: 'genre:animation' }, label: 'Animation' }]));
+  });
+  await page.reload();
+  await expect(page.locator('#grid-wrap')).toBeVisible();
+  await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
+  await expect(page.locator('.chip[data-section="series"]')).toHaveClass(/active/);
+  // Restore must DRIVE the TV to the matching rail-grid (not just seed the
+  // companion): a tile tap emits `select`, which the TV's rail-grid page routes —
+  // if the TV isn't on that rail-grid the tap is dropped. Proves they re-sync.
+  await expect.poll(() => intents.filter((i) => i.intent === 'navigate' && i.params.page === 'rail-grid.html' && i.params.params.rail === 'genre:animation').length).toBeGreaterThan(0);
+});
+
+test('FEAT-032: collapsing back to the sections root clears the trail (next load starts at top)', async ({ page }) => {
+  await page.locator('.chip[data-section="series"]').click();
+  await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
+  await page.locator('#btn-back').click();
+  await page.locator('#btn-back').click();
+  await expect(page.locator('#sections-row .chip')).toHaveText(['Series', 'Films', 'Home Movies']);
+  const trail = await page.evaluate(() => sessionStorage.getItem('grew-tv:nav-trail'));
+  expect(trail).toBeNull();
+});
+
+test('FEAT-032: a deeper artist entry on top of the browse entry does NOT reset browse (regression)', async ({ page }) => {
+  // Returning from the artist page: the trail top is the artist entry, the browse
+  // grid entry sits beneath it. Browse must restore from ITS entry, not the top.
+  await page.addInitScript(() => {
+    sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
+      { page: 'browse.html', params: { tab: 'series', rail: 'genre:animation' }, label: 'Animation' },
+      { page: 'artist.html', params: { artist: 'elo' }, label: 'ELO' }
+    ]));
+  });
+  await page.reload();
+  await expect(page.locator('#grid-wrap')).toBeVisible();
+  await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
+  await expect(page.locator('.chip[data-section="series"]')).toHaveClass(/active/);
+});

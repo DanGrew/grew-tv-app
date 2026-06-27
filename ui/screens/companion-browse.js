@@ -5,6 +5,7 @@ import { screenPage, filterByTitle, tileHint } from '../../core/companion-utils.
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
+import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
@@ -162,6 +163,57 @@ export function initPage() {
     els.back.style.display = v.back;
   }
 
+  // FEAT-032 (TASK-218): persist the drill position so returning to browse — Back,
+  // or a player's breadcrumb — lands where you were (the items), not the sections
+  // root. The trail holds ONE browse entry = the current level; sections clears it
+  // (top = no trail). nav-trail is sessionStorage-backed, so it survives the page
+  // load when the companion follows the TV back onto browse.html.
+  function recordTrail() {
+    ({ sections: clearTrail, rails: recordRails, grid: recordGrid })[state.level]();
+  }
+  function recordRails() { writeTrail({ tab: state.section }, sectionTitle()); }
+  function recordGrid() { writeTrail({ tab: state.section, rail: state.rail }, railTitle()); }
+  function writeTrail(params, label) {
+    clearTrail();
+    pushTrail({ page: 'browse.html', params: params, label: label });
+  }
+
+  // On load, seed the level/section/rail from the recorded trail (if any) before
+  // the first render; an empty trail leaves the default sections root. reconcile()
+  // is guarded on level==='sections', so a restored grid is not clobbered by a
+  // late TV echo.
+  function restoreTrail() {
+    [browseTrailEntry()].filter(Boolean).forEach(seedFromTrail);
+  }
+  // Restore from THIS page's own browse.html entry — a deeper artist.html entry
+  // can sit on top of it (recorded by the artist page), and that one has no
+  // tab/rail so it would read as the sections root. The stale top is wiped by the
+  // next recordTrail() (clear+push) once browse renders.
+  function browseTrailEntry() {
+    return entriesTrail().filter(function(e) { return e.page === 'browse.html'; }).slice(-1)[0];
+  }
+  function seedFromTrail(entry) {
+    state.section = [entry.params.tab].filter(Boolean).concat([null])[0];
+    state.rail = [entry.params.rail].filter(Boolean).concat([null])[0];
+    state.level = ({ true: 'grid', false: SECTION_LEVEL[Boolean(entry.params.tab)] })[Boolean(entry.params.rail)];
+  }
+
+  // Seeding the level locally is not enough: a tile tap emits `select`, which the
+  // TV's rail-grid page routes — so the TV must be ON that rail-grid or the tap is
+  // dropped (the companion shows the restored grid but presses do nothing until a
+  // tab switch re-syncs). So once bound (first app_state), drive the TV to the
+  // restored position through the same navigate() funnel a drill uses. Fire once.
+  var restoreDriven = false;
+  function driveRestore() {
+    ({ 'false': doDriveRestore, 'true': function() {} })[String(restoreDriven)]();
+  }
+  function doDriveRestore() {
+    restoreDriven = true;
+    [browseTrailEntry()].filter(Boolean).forEach(function(entry) {
+      api.sendIntent('navigate', ({ true: { page: 'rail-grid.html', params: { section: entry.params.tab, rail: entry.params.rail } }, false: { page: 'browse.html', params: { tab: entry.params.tab } } })[Boolean(entry.params.rail)]);
+    });
+  }
+
   // FEAT-036 (TASK-209) — the companion's create affordance. A real button (NOT a
   // synthetic rail tile, unlike the TV's withCreatePlaylistTile), shown whenever
   // the Music section is open. Always reachable: the Playlists rail is omitted when
@@ -182,6 +234,7 @@ export function initPage() {
     renderSections();
     renderRails();
     renderGrid();
+    recordTrail();
     mountCompanionBreadcrumb('breadcrumb', crumbModel(), navigate);
   }
 
@@ -284,6 +337,7 @@ export function initPage() {
     state.person = [snap.person].filter(Boolean).concat([state.person])[0];
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(loadCatalog);
     reconcile(snap);
+    driveRestore();
   }
 
   // Item/leaf contexts (detail/video/audio/profile) are real companion page
@@ -299,6 +353,7 @@ export function initPage() {
   function switchProfile() { api.sendIntent('navigate', switchProfileTarget()); }
   document.getElementById('switch-profile').addEventListener('click', switchProfile);
 
+  restoreTrail();
   api = connect(wsUrl(host), onContext, function(s) { els.connStatus.textContent = s; }, onAppState, onDevices);
   updateBar = mountScreenBar(getApi, setBound);
 }
