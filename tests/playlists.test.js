@@ -195,3 +195,58 @@ test('Rename with a blank name is rejected with an error and stays on the name s
   await expect(page.locator('#error-msg')).toBeVisible();
   await expect(page).toHaveURL(/playlist-create\.html\?rename=pl-roadtrip/);
 });
+
+// FEAT-036 (TASK-211) — per-track reorder (↑ ↓) + remove (✕) on the playlist
+// detail. Each POSTs BY POSITION then reloads, so the list reflects the server
+// order/membership. ↑ is gated off the first row and ↓ off the last (an edge has
+// nothing to swap with); ✕ is on every row.
+
+async function openRoadtrip(page) {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="pl-roadtrip"]').click();
+  await expect(page.locator('.detail-row')).toHaveCount(2);
+}
+
+test('reorder/remove controls are edge-gated: first row has no ↑, last has no ↓, both have ✕', async ({ page }) => {
+  await openRoadtrip(page);
+  const first = page.locator('.detail-row[data-id="ootb-03"]'); // index 0
+  const last = page.locator('.detail-row[data-id="ootb-01"]');  // index 1
+  await expect(first.locator('.detail-move-up')).toHaveCount(0);
+  await expect(first.locator('.detail-move-down')).toHaveCount(1);
+  await expect(last.locator('.detail-move-down')).toHaveCount(0);
+  await expect(last.locator('.detail-move-up')).toHaveCount(1);
+  await expect(first.locator('.detail-remove')).toHaveCount(1);
+  await expect(last.locator('.detail-remove')).toHaveCount(1);
+});
+
+test('moving the first track down swaps it with the next and the list reflects the new order', async ({ page }) => {
+  await openRoadtrip(page);
+  await page.locator('.detail-row[data-id="ootb-03"] .detail-move-down').click();
+  // After the swap + reload the order is [ootb-01, ootb-03].
+  await expect(page.locator('.detail-row')).toHaveCount(2);
+  await expect(page.locator('.detail-row').first()).toHaveAttribute('data-id', 'ootb-01');
+  await expect(page.locator('.detail-row').last()).toHaveAttribute('data-id', 'ootb-03');
+});
+
+test('moving the last track up swaps it with the previous one', async ({ page }) => {
+  await openRoadtrip(page);
+  await page.locator('.detail-row[data-id="ootb-01"] .detail-move-up').click();
+  await expect(page.locator('.detail-row').first()).toHaveAttribute('data-id', 'ootb-01');
+});
+
+test('removing a track drops it from the playlist and the remaining track stays', async ({ page }) => {
+  await openRoadtrip(page);
+  await page.locator('.detail-row[data-id="ootb-01"] .detail-remove').click();
+  await expect(page.locator('.detail-row')).toHaveCount(1);
+  await expect(page.locator('.detail-row').first()).toHaveAttribute('data-id', 'ootb-03');
+});
+
+test('the album detail (shared screen) carries NO reorder/remove controls (playlist-only)', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.rail-row[data-rail="albums"] .film-tile[data-id="ootb"]').click();
+  await expect(page).toHaveURL(/album-detail\.html/);
+  await expect(page.locator('.detail-row').first()).toBeVisible();
+  await expect(page.locator('.detail-move-up')).toHaveCount(0);
+  await expect(page.locator('.detail-move-down')).toHaveCount(0);
+  await expect(page.locator('.detail-remove')).toHaveCount(0);
+});
