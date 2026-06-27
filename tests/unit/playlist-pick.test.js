@@ -29,4 +29,20 @@ describe('playlistCards', () => {
     expect(playlistCards(null)).toEqual([]);
     expect(playlistCards(undefined)).toEqual([]);
   });
+
+  it('excludes the given id (TASK-212 — a playlist cannot be added into itself)', () => {
+    var content = [
+      { id: 'pl-self', title: 'Self', collectionType: 'playlist' },
+      { id: 'pl-other', title: 'Other', collectionType: 'playlist' }
+    ];
+    expect(playlistCards(content, 'pl-self')).toEqual([{ id: 'pl-other', title: 'Other' }]);
+  });
+
+  it('keeps every playlist when excludeId is omitted/undefined', () => {
+    var content = [
+      { id: 'pl-a', title: 'A', collectionType: 'playlist' },
+      { id: 'pl-b', title: 'B', collectionType: 'playlist' }
+    ];
+    expect(playlistCards(content).map(function(c) { return c.id; })).toEqual(['pl-a', 'pl-b']);
+  });
 });

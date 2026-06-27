@@ -3,7 +3,7 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadAlbum, loadContinueWatching, addToPlaylist, loadBrowse } from '../../core/app-api.js';
+import { loadAlbum, loadContinueWatching, addToPlaylist, addSourceToPlaylist, loadBrowse } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { playNextIndex } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -49,22 +49,25 @@ export function initAlbumDetailPage() {
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
 
-  // FEAT-036/TASK-206 — "Add to playlist" sheet. The per-row + Playlist control
-  // (screen-detail.appendAdd) calls openAddSheet(item); the sheet lists the active
-  // profile's playlists (loadBrowse already profile-filters, so every card is a
-  // valid target — see core/playlist-pick) plus Create-new + Cancel. Picking POSTs
-  // add-track; Create-new hands off to the create screen carrying the track id. The
-  // sheet owns its keydown (stopPropagation) so the detail d-pad never fires beneath
-  // it, mirroring the playlist-detail delete-confirm overlay.
-  var addState = { trackId: null, cells: [], statusTimer: null };
+  // FEAT-036/TASK-206 + TASK-212 — "Add to playlist" sheet. Two entry points share
+  // one sheet: a per-row + Playlist control (screen-detail.appendAdd -> openAddSheet,
+  // adds ONE track) and the header "Add all to playlist" button (openAddSourceSheet,
+  // bulk-adds the WHOLE album as a snapshot). The sheet lists the active profile's
+  // playlists (loadBrowse already profile-filters, so every card is a valid target —
+  // see core/playlist-pick) plus Create-new + Cancel. addState.add(id) is the POST
+  // for the chosen mode (add-track vs add-source); createParams + returnFocus differ
+  // per mode too, so the rest of the sheet is mode-agnostic. The sheet owns its
+  // keydown (stopPropagation) so the detail d-pad never fires beneath it, mirroring
+  // the playlist-detail delete-confirm overlay.
+  var addState = { add: null, createParams: {}, returnFocus: function() {}, cells: [], statusTimer: null };
 
   function focusAdd(i) { addState.cells[i].focus(); }
-  function focusTrackRow() {
-    [document.querySelector('.detail-row[data-id="' + addState.trackId + '"]')].filter(Boolean).forEach(function(r) { r.focus(); });
+  function focusRow(id) {
+    [document.querySelector('.detail-row[data-id="' + id + '"]')].filter(Boolean).forEach(function(r) { r.focus(); });
   }
   function closeAddSheet() {
     document.getElementById('add-sheet').style.display = 'none';
-    focusTrackRow();
+    addState.returnFocus();
   }
   function hideStatus() { document.getElementById('add-status').style.display = 'none'; }
   // Transient confirmation — fades after 2.5s; a fresh add clears the prior timer
@@ -77,11 +80,11 @@ export function initAlbumDetailPage() {
     addState.statusTimer = setTimeout(hideStatus, 2500);
   }
   function addExisting(id, title) {
-    addToPlaylist(SERVER, id, addState.trackId)
+    addState.add(id)
       .then(function() { closeAddSheet(); showStatus('Added to ' + title); })
       .catch(function() { closeAddSheet(); showStatus('Could not add to playlist.'); });
   }
-  function createNew() { navTo('playlist-create.html', { addTrack: addState.trackId }); }
+  function createNew() { navTo('playlist-create.html', addState.createParams); }
 
   function moveAdd(e) {
     var i = addState.cells.indexOf(document.activeElement);
@@ -112,11 +115,25 @@ export function initAlbumDetailPage() {
     document.getElementById('add-sheet').style.display = 'flex';
     focusAdd(0);
   }
-  function openAddSheet(item) {
-    addState.trackId = item.video.id;
+  function loadAndShowSheet() {
     loadBrowse(SERVER, profile)
       .then(function(res) { showAddSheet(playlistCards(res.content)); })
       .catch(function() { showStatus('Could not load playlists.'); });
+  }
+  // Per-row: add ONE track. Return focus to the track row it opened from.
+  function openAddSheet(item) {
+    addState.add = function(id) { return addToPlaylist(SERVER, id, item.video.id); };
+    addState.createParams = { addTrack: item.video.id };
+    addState.returnFocus = function() { focusRow(item.video.id); };
+    loadAndShowSheet();
+  }
+  // Header "Add all to playlist": bulk-add the whole album as a snapshot. Return
+  // focus to the header button it opened from.
+  function openAddSourceSheet() {
+    addState.add = function(id) { return addSourceToPlaylist(SERVER, id, 'album', albumId); };
+    addState.createParams = { addSourceType: 'album', addSourceId: albumId };
+    addState.returnFocus = function() { document.getElementById('btn-add-all').focus(); };
+    loadAndShowSheet();
   }
 
   var wsApp = connectApp(wsUrl(window.location.hostname), function(intent, params) {
@@ -141,6 +158,7 @@ export function initAlbumDetailPage() {
   document.getElementById('btn-back-detail').addEventListener('click', goBack);
   document.getElementById('btn-play-next').addEventListener('click', playFromResume);
   document.getElementById('btn-shuffle').addEventListener('click', shufflePlay);
+  document.getElementById('btn-add-all').addEventListener('click', openAddSourceSheet);
   document.getElementById('btn-add-create').addEventListener('click', createNew);
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
   document.getElementById('btn-add-create').addEventListener('keydown', onAddKey);

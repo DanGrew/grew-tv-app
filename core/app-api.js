@@ -137,6 +137,22 @@ export function addToPlaylist(serverUrl, playlistId, trackId) {
   }).then(function(r) { return r.ok ? r : Promise.reject(r.status); });
 }
 
+// Bulk-add a whole album or another playlist into a playlist as a SNAPSHOT
+// (FEAT-036/TASK-212). POST /api/playlists/add-source takes {playlist_id,
+// source_type:'album'|'playlist', source_id}; the server resolves the source's
+// track ids AT ADD-TIME, profile-filters them against the target playlist, and
+// appends in order (flat track_ids[] — no live link, so later edits to the source
+// never ripple). A per-member profile mismatch is dropped server-side, not
+// rejected; the action 400s only on an unknown playlist/source, bad source_type,
+// or a self-add. 204 on success — resolve only on a 2xx (mirrors addToPlaylist).
+export function addSourceToPlaylist(serverUrl, playlistId, sourceType, sourceId) {
+  return fetch(serverUrl + '/api/playlists/add-source', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playlist_id: playlistId, source_type: sourceType, source_id: sourceId })
+  }).then(function(r) { return r.ok ? r : Promise.reject(r.status); });
+}
+
 // Reorder a track within a playlist (FEAT-036/TASK-211). POST
 // /api/playlists/move-track takes {playlist_id, index, direction:'up'|'down'} and
 // swaps the entry at `index` with its neighbour — BY POSITION, so duplicates stay
