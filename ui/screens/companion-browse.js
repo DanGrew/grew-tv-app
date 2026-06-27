@@ -5,7 +5,7 @@ import { screenPage, filterByTitle, tileHint } from '../../core/companion-utils.
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
-import { push as pushTrail, clear as clearTrail, peek as peekTrail } from '../../core/nav-trail.js';
+import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
@@ -183,7 +183,14 @@ export function initPage() {
   // is guarded on level==='sections', so a restored grid is not clobbered by a
   // late TV echo.
   function restoreTrail() {
-    [peekTrail()].filter(Boolean).forEach(seedFromTrail);
+    [browseTrailEntry()].filter(Boolean).forEach(seedFromTrail);
+  }
+  // Restore from THIS page's own browse.html entry — a deeper artist.html entry
+  // can sit on top of it (recorded by the artist page), and that one has no
+  // tab/rail so it would read as the sections root. The stale top is wiped by the
+  // next recordTrail() (clear+push) once browse renders.
+  function browseTrailEntry() {
+    return entriesTrail().filter(function(e) { return e.page === 'browse.html'; }).slice(-1)[0];
   }
   function seedFromTrail(entry) {
     state.section = [entry.params.tab].filter(Boolean).concat([null])[0];
@@ -202,7 +209,7 @@ export function initPage() {
   }
   function doDriveRestore() {
     restoreDriven = true;
-    [peekTrail()].filter(Boolean).forEach(function(entry) {
+    [browseTrailEntry()].filter(Boolean).forEach(function(entry) {
       api.sendIntent('navigate', ({ true: { page: 'rail-grid.html', params: { section: entry.params.tab, rail: entry.params.rail } }, false: { page: 'browse.html', params: { tab: entry.params.tab } } })[Boolean(entry.params.rail)]);
     });
   }

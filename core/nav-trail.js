@@ -80,6 +80,14 @@ export function pop() {
   return top;
 }
 
+// The full stack, innermost-last (a copy is fine to read; callers don't mutate).
+// Lets a caller pick a specific ancestor — e.g. the companion browse page
+// restoring from ITS own browse.html entry even when a deeper artist entry sits
+// on top.
+export function entries() {
+  return read();
+}
+
 // Inspect the immediate parent without leaving the current screen. Returns null
 // when the trail is empty.
 export function peek() {

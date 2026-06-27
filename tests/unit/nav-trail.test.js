@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { push, pop, peek, truncateTo, clear, pushUnique } from '../../core/nav-trail.js';
+import { push, pop, peek, truncateTo, clear, pushUnique, entries } from '../../core/nav-trail.js';
 
 // sessionStorage does not exist in the `node` vitest environment — back it with
 // a plain in-memory Map, the same vi.stubGlobal approach state.test.js uses for
@@ -128,6 +128,21 @@ describe('nav-trail', () => {
       pop();
       expect(peek().page).toBe('browse.html');
     });
+  });
+
+  it('entries returns the full stack innermost-last, so a caller can pick an ancestor', () => {
+    push({ page: 'browse.html', params: { tab: 'music', rail: 'artists' }, label: 'Artists' });
+    push({ page: 'artist.html', params: { artist: 'elo' }, label: 'ELO' });
+    var all = entries();
+    expect(all).toHaveLength(2);
+    expect(all[0].page).toBe('browse.html');
+    expect(all[1].page).toBe('artist.html');
+    // pick the browse entry even though artist is on top
+    expect(all.filter((e) => e.page === 'browse.html').slice(-1)[0].params.rail).toBe('artists');
+  });
+
+  it('entries is empty for a fresh trail', () => {
+    expect(entries()).toEqual([]);
   });
 
   it('clear empties the trail', () => {

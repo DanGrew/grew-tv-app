@@ -227,3 +227,18 @@ test('FEAT-032: collapsing back to the sections root clears the trail (next load
   const trail = await page.evaluate(() => sessionStorage.getItem('grew-tv:nav-trail'));
   expect(trail).toBeNull();
 });
+
+test('FEAT-032: a deeper artist entry on top of the browse entry does NOT reset browse (regression)', async ({ page }) => {
+  // Returning from the artist page: the trail top is the artist entry, the browse
+  // grid entry sits beneath it. Browse must restore from ITS entry, not the top.
+  await page.addInitScript(() => {
+    sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
+      { page: 'browse.html', params: { tab: 'series', rail: 'genre:animation' }, label: 'Animation' },
+      { page: 'artist.html', params: { artist: 'elo' }, label: 'ELO' }
+    ]));
+  });
+  await page.reload();
+  await expect(page.locator('#grid-wrap')).toBeVisible();
+  await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
+  await expect(page.locator('.chip[data-section="series"]')).toHaveClass(/active/);
+});
