@@ -183,6 +183,12 @@ function lastSegment(url, marker) {
   return decodeURIComponent(url.split(marker)[1].split('?')[0]);
 }
 
+// Mirror the backend's server-generated id (db/playlist_store _slugify): lower,
+// non-alnum -> '-', collapsed. Enough for the create e2e to predict the new id.
+function slugify(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
 async function installApi(page) {
   // Global settings (FEAT-023). Stateful per install so a POST sticks for later
   // GETs — stickiness now lives in the backend, not localStorage. Default ON.
@@ -222,6 +228,20 @@ async function installApi(page) {
   await page.route('**/api/playlist/*', function(route) {
     var p = PLAYLISTS[lastSegment(route.request().url(), '/api/playlist/')];
     return p ? json(route, 200, p) : json(route, 404, { error: 'not found' });
+  });
+  // FEAT-036/TASK-208 playlist actions. create -> 200 + the created record (the
+  // server mints the slug id); blank name -> 400. delete -> 204. create registers
+  // the new playlist into PLAYLISTS so its detail (/api/playlist/{id}) then loads.
+  await page.route('**/api/playlists/create', function(route) {
+    var body = JSON.parse(route.request().postData());
+    var name = (body.name || '').trim();
+    if (!name) return json(route, 400, { error: 'name must not be blank' });
+    var id = 'pl-' + slugify(name);
+    PLAYLISTS[id] = { id: id, title: name, profile: body.profile, collectionType: 'playlist', poster: null, seasons: [], items: [] };
+    return json(route, 200, { id: id, name: name, profile: body.profile, track_ids: [], created: 't0', modified: 't0' });
+  });
+  await page.route('**/api/playlists/delete', function(route) {
+    return route.fulfill({ status: 204, body: '' });
   });
   await page.route('**/api/progress/*', function(route) {
     var req = route.request();

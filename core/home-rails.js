@@ -74,6 +74,7 @@ function sectionOf(card) { return card.section || 'films'; }
 // `section`/`collectionType`, never a type enum. Pure so the browse screen stays
 // DOM-only (no-pure-fn-outside-core).
 export function cardRoute(card) {
+  if (card.kind === 'create-playlist') return 'create-playlist';
   if (card.kind === 'artist') return 'artist';
   if (card.collectionType === 'playlist') return 'playlist';
   if (card.section === 'music') return 'album';
@@ -287,6 +288,31 @@ function musicRails(cards, cwRows, byId) {
     .concat(simpleRail('artists', 'Artists', artistTiles(cards)))
     .concat(simpleRail('albums', 'Albums', albums))
     .concat(simpleRail('playlists', 'Playlists', playlists));
+}
+
+// FEAT-036 (TASK-208) — the synthetic "＋ New Playlist" card. Not a catalog card
+// (it never enters /api/browse or the select catalog); it is injected into the TV
+// Music tab's Playlists rail by withCreatePlaylistTile (below) so the d-pad always
+// has a create entry. cardRoute maps its `kind` to the create screen.
+function createPlaylistCard() {
+  return { kind: 'create-playlist', id: 'create-playlist', title: '＋ New Playlist', section: 'music', poster: null };
+}
+
+// APP-ONLY: guarantee a Playlists rail on the Music tab and lead it with the
+// create-playlist card, so the TV always offers "＋ New Playlist" — even with zero
+// playlists, where musicRails (simpleRail) omits the empty rail. The companion has
+// its own create path (TASK-209) and does NOT call this, which keeps the create
+// tile off the companion browse. Pure (no DOM) so it lives in core; the TV browse
+// screen calls it after buildTabRails for the music tab.
+export function withCreatePlaylistTile(rails) {
+  var card = createPlaylistCard();
+  var hasRail = rails.some(function(r) { return r.id === 'playlists'; });
+  var withCard = rails.map(function(rail) {
+    if (rail.id !== 'playlists') return rail;
+    return { id: rail.id, title: rail.title, items: [card].concat(rail.items) };
+  });
+  if (hasRail) return withCard;
+  return withCard.concat([{ id: 'playlists', title: 'Playlists', items: [card] }]);
 }
 
 // The sidebar tabs to show: a tab per section that has browse content, in fixed

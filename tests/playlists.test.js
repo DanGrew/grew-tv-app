@@ -29,7 +29,9 @@ test('Music tab gains a Playlists rail (after Albums) listing playlists, includi
   await enterMusic(page);
   await expect(page.locator('.rail-title')).toHaveText(['Artists', 'Albums', 'Playlists']);
   const rail = page.locator('.rail-row[data-rail="playlists"]');
-  await expect(rail.locator('.film-tile')).toHaveCount(2); // Road Trip + empty
+  // TASK-208: a leading "＋ New Playlist" create tile precedes Road Trip + empty.
+  await expect(rail.locator('.film-tile')).toHaveCount(3);
+  await expect(rail.locator('.film-tile').first()).toHaveAttribute('data-id', 'create-playlist');
   await expect(rail.locator('.film-tile[data-id="pl-roadtrip"] .tile-title')).toHaveText('Road Trip');
   await expect(rail.locator('.film-tile[data-id="pl-empty"]')).toHaveCount(1); // empty playlist still listed
 });
@@ -89,4 +91,68 @@ test('Back from the playlist detail returns to browse', async ({ page }) => {
   await expect(page.locator('.detail-row')).toHaveCount(2);
   await page.keyboard.press('Backspace');
   await expect(page).toHaveURL(/browse\.html/);
+});
+
+// FEAT-036 (TASK-208) — create / delete UI.
+
+async function typeName(page, text) {
+  for (const ch of text) {
+    await page.locator('#pl-keys button').filter({ hasText: new RegExp('^' + ch + '$') }).click();
+  }
+}
+
+test('the create tile opens the create screen with an empty name placeholder', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="create-playlist"]').click();
+  await expect(page).toHaveURL(/playlist-create\.html/);
+  await expect(page.locator('#pl-name')).toHaveClass(/placeholder/);
+});
+
+test('typing a name on the on-screen keyboard then Create opens the new playlist detail', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="create-playlist"]').click();
+  await typeName(page, 'ROADIES');
+  await expect(page.locator('#pl-name')).toHaveText('ROADIES');
+  await page.locator('#btn-create').click();
+  await expect(page).toHaveURL(/playlist-detail\.html\?playlist=pl-roadies/);
+  await expect(page.locator('#detail-title')).toHaveText('ROADIES');
+});
+
+test('Create with a blank name is rejected with an error and stays on the create screen', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="create-playlist"]').click();
+  await page.locator('#btn-create').click();
+  await expect(page.locator('#error-msg')).toBeVisible();
+  await expect(page).toHaveURL(/playlist-create\.html/);
+});
+
+test('the create screen offers a kids/adults profile picker (active profile preselected)', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="create-playlist"]').click();
+  await expect(page.locator('#btn-profile-kids')).toHaveClass(/selected/);
+  await page.locator('#btn-profile-adults').click();
+  await expect(page.locator('#btn-profile-adults')).toHaveClass(/selected/);
+  await expect(page.locator('#btn-profile-kids')).not.toHaveClass(/selected/);
+});
+
+test('Delete on the playlist detail confirms then returns to browse', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="pl-roadtrip"]').click();
+  await expect(page.locator('.detail-row')).toHaveCount(2);
+  await page.locator('#btn-delete-playlist').click();
+  await expect(page.locator('#confirm-delete')).toBeVisible();
+  await expect(page.locator('#confirm-delete-name')).toHaveText('Road Trip');
+  await page.locator('#btn-confirm-delete').click();
+  await expect(page).toHaveURL(/browse\.html/);
+});
+
+test('Cancel on the delete confirm keeps the playlist and closes the dialog', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="pl-roadtrip"]').click();
+  await expect(page.locator('.detail-row')).toHaveCount(2);
+  await page.locator('#btn-delete-playlist').click();
+  await expect(page.locator('#confirm-delete')).toBeVisible();
+  await page.locator('#btn-cancel-delete').click();
+  await expect(page.locator('#confirm-delete')).toBeHidden();
+  await expect(page).toHaveURL(/playlist-detail\.html/);
 });

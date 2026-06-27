@@ -33,7 +33,12 @@ test('a Music tab (titled Albums) appears after the video tabs, only when music 
 test('Music tab shows an Artists rail then an Albums rail with square (music) tiles, no Singles rail', async ({ page }) => {
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="music"]').click();
-  await expect(page.locator('.rail-title')).toHaveText(['Artists', 'Albums']);
+  // TASK-208: the Music tab always offers a Playlists rail (create entry), even
+  // with zero playlists — here it holds only the "＋ New Playlist" create tile.
+  await expect(page.locator('.rail-title')).toHaveText(['Artists', 'Albums', 'Playlists']);
+  const plRail = page.locator('.rail-row[data-rail="playlists"] .film-tile');
+  await expect(plRail).toHaveCount(1);
+  await expect(plRail.first()).toHaveAttribute('data-id', 'create-playlist');
   // Album = series card with section "music" (square art via data-music); "3 tracks" sub.
   const album = page.locator('.rail-row[data-rail="albums"] .film-tile[data-id="ootb"]');
   await expect(album).toHaveCount(1);
