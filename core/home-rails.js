@@ -67,13 +67,15 @@ var SECTION_ORDER = ['series', 'films', 'home-movies', 'music'];
 function sectionOf(card) { return card.section || 'films'; }
 
 // Where selecting a browse card navigates: an artist tile (FEAT-029, synthesised
-// for the Music tab's Artists rail) opens the artist drill-down; a music card
-// (album/playlist) opens album detail; otherwise the card's own kind ('video'
-// plays, 'series' opens collection detail). Routes on `kind`/server `section`,
-// never a type enum. Pure so the browse screen stays DOM-only
-// (no-pure-fn-outside-core).
+// for the Music tab's Artists rail) opens the artist drill-down; a playlist card
+// (FEAT-036) opens the playlist detail (its own state-DB route, not /api/album);
+// any other music card (album) opens album detail; otherwise the card's own kind
+// ('video' plays, 'series' opens collection detail). Routes on `kind`/server
+// `section`/`collectionType`, never a type enum. Pure so the browse screen stays
+// DOM-only (no-pure-fn-outside-core).
 export function cardRoute(card) {
   if (card.kind === 'artist') return 'artist';
+  if (card.collectionType === 'playlist') return 'playlist';
   if (card.section === 'music') return 'album';
   return card.kind || 'video';
 }
@@ -271,15 +273,20 @@ export function albumsByArtist(cards, artist) {
 }
 
 // The Music section's rails: Continue Listening (lead), then an Artists rail
-// (FEAT-029) of one tile per artist, then an Albums rail of the album/playlist
-// cards. (No Singles rail — a standalone song is a 1-track album; FEAT-027.)
-// Square-art tiles are CSS; the rail shape is identical to the video tabs so the
-// browse screen renders it as-is.
+// (FEAT-029) of one tile per artist, then an Albums rail, then a Playlists rail
+// (FEAT-036) of the user-created playlist cards. Albums and Playlists both sit in
+// the music section but split on `collectionType` — a playlist routes to its own
+// detail (cardRoute), so it must not leak into the Albums rail. (No Singles rail —
+// a standalone song is a 1-track album; FEAT-027.) Square-art tiles are CSS; the
+// rail shape is identical to the video tabs so the browse screen renders it as-is.
 function musicRails(cards, cwRows, byId) {
-  var albums = cards.filter(function(c) { return sectionOf(c) === 'music'; });
+  var music = cards.filter(function(c) { return sectionOf(c) === 'music'; });
+  var albums = music.filter(function(c) { return c.collectionType !== 'playlist'; });
+  var playlists = music.filter(function(c) { return c.collectionType === 'playlist'; });
   return continueListeningRail(cwRows, byId)
     .concat(simpleRail('artists', 'Artists', artistTiles(cards)))
-    .concat(simpleRail('albums', 'Albums', albums));
+    .concat(simpleRail('albums', 'Albums', albums))
+    .concat(simpleRail('playlists', 'Playlists', playlists));
 }
 
 // The sidebar tabs to show: a tab per section that has browse content, in fixed
