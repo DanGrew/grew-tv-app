@@ -248,6 +248,18 @@ async function installApi(page) {
   await page.route('**/api/playlists/delete', function(route) {
     return route.fulfill({ status: 204, body: '' });
   });
+  // FEAT-036/TASK-210 rename. 204 on success / 400 on a blank name; the id is
+  // PERMANENT (not re-slugged), so we mutate the existing record's title in place so
+  // a follow-up detail GET reflects the new name. An unknown playlist 400s.
+  await page.route('**/api/playlists/rename', function(route) {
+    var body = JSON.parse(route.request().postData());
+    var name = (body.name || '').trim();
+    var pl = playlists[body.playlist_id];
+    if (!pl) return json(route, 400, { error: 'unknown playlist' });
+    if (!name) return json(route, 400, { error: 'name must not be blank' });
+    pl.title = name;
+    return route.fulfill({ status: 204, body: '' });
+  });
   // FEAT-036/TASK-206 add-track. The backend appends in order, gated catalog-known
   // AND profile-match, 204 on success / 400 on a bad/mismatched track. Here we
   // append the resolved track to the named playlist (so a follow-up detail GET

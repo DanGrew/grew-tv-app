@@ -44,3 +44,30 @@ test('Cancel returns to the playlists list without creating', async ({ page }) =
   await page.locator('#btn-cancel').click();
   await expect(page).toHaveURL(/companion\/browse\.html$/);
 });
+
+// FEAT-036 (TASK-210) — rename mode (?rename=<id>&name=<current>): prefilled input,
+// NO profile picker (profile is immutable), Save action. POSTs /api/playlists/rename
+// then returns to the playlists list.
+
+test('rename mode prefills the name, hides the profile picker and labels the action Save', async ({ page }) => {
+  await page.goto('/companion/playlist-create.html?rename=pl-roadtrip&name=Road%20Trip');
+  await expect(page.locator('#create-title')).toHaveText('Rename Playlist');
+  await expect(page.locator('#pl-name')).toHaveValue('Road Trip');
+  await expect(page.locator('#profile-row')).toBeHidden();
+  await expect(page.locator('#btn-create')).toHaveText(/Save/);
+});
+
+test('rename: editing the name then Save returns to the playlists list', async ({ page }) => {
+  await page.goto('/companion/playlist-create.html?rename=pl-roadtrip&name=Road%20Trip');
+  await page.locator('#pl-name').fill('Road Trip 2');
+  await page.locator('#btn-create').click();
+  await expect(page).toHaveURL(/companion\/browse\.html$/);
+});
+
+test('rename with a blank name shows an error and stays on the page', async ({ page }) => {
+  await page.goto('/companion/playlist-create.html?rename=pl-roadtrip&name=Road%20Trip');
+  await page.locator('#pl-name').fill('   ');
+  await page.locator('#btn-create').click();
+  await expect(page.locator('#error-msg')).toBeVisible();
+  await expect(page).toHaveURL(/companion\/playlist-create\.html/);
+});

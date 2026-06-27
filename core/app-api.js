@@ -147,6 +147,19 @@ export function deletePlaylist(serverUrl, id) {
   });
 }
 
+// Rename a user playlist (FEAT-036/TASK-210). POST /api/playlists/rename takes the
+// playlist_id + the new name; like delete/add/remove it is 204 on success / 400 on
+// bad input (a blank or over-long name), never 500. The id is PERMANENT (the server
+// does not re-slug it), so the caller keeps using the same id afterwards. Rejects on
+// a non-2xx so the screen can show an error (mirrors createPlaylist / addToPlaylist).
+export function renamePlaylist(serverUrl, id, name) {
+  return fetch(serverUrl + '/api/playlists/rename', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playlist_id: id, name: name })
+  }).then(function(r) { return r.ok ? r : Promise.reject(r.status); });
+}
+
 // Fetch a track's `.lrc` lyric sidecar (TASK-129 serves it as text/plain) by
 // bare name, resolved through the same /media/ route as posters. Resolves to the
 // raw LRC text; rejects on a missing/!ok response so the ambient screen falls

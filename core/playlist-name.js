@@ -50,3 +50,20 @@ export function gridIndex(i, cols, len, key) {
   if (key === 'ArrowUp') return Math.max(i - cols, 0);
   return i;
 }
+
+// Editor-mode descriptor for the ONE shared name screen used by create (TASK-208)
+// and rename (TASK-210), so both surfaces drive the same screen with a single param
+// instead of a second copy of the on-screen keyboard. A truthy `renameId` selects
+// rename mode: it prefills the playlist's existing name and HIDES the profile picker
+// (a playlist's profile is immutable after create — rename edits the name only).
+// create mode starts blank with the picker shown. `kind` keys the screen's
+// submit/cancel dispatch; the rest is render data. Pure, so the rule lives in core
+// and the screens (UI cyclomatic-capped) stay branch-free.
+export function editorMode(renameId, presetName) {
+  if (renameId) {
+    return { kind: 'rename', title: 'Rename Playlist', initialName: presetName || '',
+             showProfile: false, action: '✓ Save' };
+  }
+  return { kind: 'create', title: 'New Playlist', initialName: '',
+           showProfile: true, action: '✓ Create' };
+}

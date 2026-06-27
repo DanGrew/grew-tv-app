@@ -60,6 +60,14 @@ export function initPage() {
       .then(function() { api.sendIntent('back'); window.location.href = 'browse.html'; })
       .catch(function() { hideConfirm(); });
   }
+  // Rename (TASK-210) — the companion mirror of the TV's rename. The phone has a
+  // real keyboard, so this opens the shared companion create page in rename mode
+  // (a text input prefilled with the current name) rather than an on-screen
+  // keyboard. The new name POSTs there; both surfaces pick it up via the catalog.
+  function rename() {
+    window.location.href = 'playlist-create.html?rename=' + encodeURIComponent(state.playlistId) + '&name=' + encodeURIComponent(state.title);
+  }
+  document.getElementById('btn-rename-playlist').addEventListener('click', rename);
   document.getElementById('btn-delete-playlist').addEventListener('click', showConfirm);
   document.getElementById('btn-confirm-delete').addEventListener('click', doDelete);
   document.getElementById('btn-cancel-delete').addEventListener('click', hideConfirm);

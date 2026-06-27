@@ -1,4 +1,4 @@
-import { NAME_MAX, KEY_COLS, CHAR_KEYS, appendChar, backspace, cleanName, isValidName, gridIndex } from '../../core/playlist-name.js';
+import { NAME_MAX, KEY_COLS, CHAR_KEYS, appendChar, backspace, cleanName, isValidName, gridIndex, editorMode } from '../../core/playlist-name.js';
 
 describe('CHAR_KEYS / layout', () => {
   it('exposes A-Z then 0-9 as single-character cells', () => {
@@ -74,5 +74,30 @@ describe('gridIndex', () => {
   });
   it('keeps the index for a non-arrow key (Enter falls through to native click)', () => {
     expect(gridIndex(7, COLS, LEN, 'Enter')).toBe(7);
+  });
+});
+
+describe('editorMode', () => {
+  it('create mode (no rename id): blank name, picker shown, Create action', () => {
+    const m = editorMode(null, null);
+    expect(m.kind).toBe('create');
+    expect(m.initialName).toBe('');
+    expect(m.showProfile).toBe(true);
+    expect(m.title).toBe('New Playlist');
+    expect(m.action).toContain('Create');
+  });
+  it('rename mode (truthy id): prefilled name, picker hidden, Save action', () => {
+    const m = editorMode('pl-roadtrip', 'Road Trip');
+    expect(m.kind).toBe('rename');
+    expect(m.initialName).toBe('Road Trip');
+    expect(m.showProfile).toBe(false);
+    expect(m.title).toBe('Rename Playlist');
+    expect(m.action).toContain('Save');
+  });
+  it('rename mode with no preset name falls back to empty (profile still hidden)', () => {
+    const m = editorMode('pl-x', null);
+    expect(m.kind).toBe('rename');
+    expect(m.initialName).toBe('');
+    expect(m.showProfile).toBe(false);
   });
 });
