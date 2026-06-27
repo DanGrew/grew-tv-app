@@ -81,6 +81,21 @@ export function buildCrumbs(screen, ctx) {
   return build(ctx || {});
 }
 
+// FEAT-032 (TASK-218) companion player breadcrumb from the recorded nav trail.
+// The companion records where you were in browse (section/rail) as you drill in
+// (core/nav-trail), so the player's breadcrumb can offer the real items level you
+// came from rather than a reconstructed Home > Series guess. `entry` is the
+// recorded browse position ({ label, page, params } from nav-trail.peek()) or
+// null/undefined when nothing was recorded (deep-link / fresh session) — then the
+// trail is just Home > leaf and Home returns to the top of browse.
+//   Home  -> browse.html {}        (sections root; the caller clears the trail)
+//   items -> entry.page/params     (browse self-restores the grid from the trail)
+//   leaf  -> the now-playing title (inert current crumb)
+export function trailCrumbs(entry, leafLabel) {
+  if (!entry) return [home(), leaf(leafLabel)];
+  return [home(), link(entry.label, entry.page, entry.params), leaf(leafLabel)];
+}
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')

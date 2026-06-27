@@ -4,6 +4,9 @@ import { loadAlbum, loadPlaylist, playbackAction } from '../../core/app-api.js';
 import { screenPage, displayTitle } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
+import { trailCrumbs } from '../../core/breadcrumb.js';
+import { peek as peekTrail, clear as clearTrail } from '../../core/nav-trail.js';
+import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 
 // Companion audio context (FEAT-018 TASK-132). The music analogue of
@@ -30,7 +33,6 @@ export function initPage() {
     shuffle: document.getElementById('c-shuffle'),
     jump: document.getElementById('jump'),
     tracks: document.getElementById('tracks'),
-    back: document.getElementById('btn-back'),
     reset: document.getElementById('c-reset')
   };
   var state = { snap: null, sourceType: null, sourceId: null, person: null };
@@ -40,25 +42,19 @@ export function initPage() {
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
 
-  // Back routes by the playing SOURCE (carried on the app_state snapshot): an
-  // album returns to its detail, an artist to the artist screen, a lone single
-  // falls back to browse. BUG-018: an artist source id is NOT an album, so it
-  // must not route to album-detail. The TV teleports and the companion follows
-  // the echoed context — same navigate-intent path the browse/detail companions
-  // use.
-  var BACK_TARGET = {
-    album:    function(id) { return { page: 'album-detail.html', params: { album: id } }; },
-    artist:   function(id) { return { page: 'artist.html', params: { artist: id } }; },
-    playlist: function(id) { return { page: 'playlist.html', params: { playlist: id } }; }
-  };
-  function backTarget() {
-    return [BACK_TARGET[state.sourceType]].filter(Boolean)
-      .map(function(fn) { return fn(state.sourceId); })
-      .concat([{ page: 'browse.html', params: {} }])[0];
+  // Back is the breadcrumb now (FEAT-032 / TASK-218), not a lone Back button: the
+  // player shows Home > <items> > Track, where <items> is the browse level you
+  // launched from (recorded into nav-trail as you drilled). Tapping <items>
+  // returns to that grid (browse self-restores from the trail); tapping Home
+  // clears the trail and returns to the sections root. The crumb fires the same
+  // `navigate` intent the other companion screens use — the TV teleports and the
+  // companion follows the echoed context onto browse.html.
+  function mountAudioCrumbs(title) {
+    mountCompanionBreadcrumb('breadcrumb', trailCrumbs(peekTrail(), title), onCrumbNav);
   }
-  function goBack() {
-    var t = backTarget();
-    api.sendIntent('navigate', { page: t.page, params: t.params });
+  function onCrumbNav(page, params) {
+    ({ 'true': clearTrail, 'false': noop })[String(!params.tab)]();
+    api.sendIntent('navigate', { page: page, params: params });
   }
 
   function buildJump() {
@@ -143,7 +139,6 @@ export function initPage() {
   }
 
   function renderTracks(album) {
-    els.back.textContent = '‹ ' + album.title;
     els.tracks.innerHTML = '';
     album.items.forEach(function(item) { els.tracks.appendChild(trackBtn(item)); });
     markCurrent();
@@ -199,6 +194,7 @@ export function initPage() {
   function onContext(payload) {
     els.ctxLabel.textContent = 'Now playing';
     els.title.textContent = displayTitle(payload);
+    mountAudioCrumbs(displayTitle(payload));
     var page = screenPage(payload.context_id);
     [page].filter(function(p) { return p !== 'audio'; }).forEach(function(p) { window.location.href = p + '.html'; });
   }
@@ -229,7 +225,6 @@ export function initPage() {
     ({ 'false': armReset, 'true': fireReset })[String(resetArmed)]();
   }
 
-  els.back.addEventListener('click', goBack);
   els.toggle.addEventListener('click', function() { api.sendIntent('toggle'); });
   els.shuffle.addEventListener('click', function() { api.shuffle(); });
   document.getElementById('c-prev').addEventListener('click', function() { api.prev(); });
