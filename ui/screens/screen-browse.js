@@ -1,6 +1,6 @@
 import { registerScreen } from '../../core/screen-registry.js';
 import { createTile } from '../../components/tile.js';
-import { buildTabs, buildTabRails, clampIndex } from '../../core/home-rails.js';
+import { buildTabs, buildTabRails, clampIndex, withCreatePlaylistTile } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { personGlyph } from '../../core/profile-config.js';
 
@@ -191,12 +191,15 @@ function markActive(tabId) {
   sidebarTabs().forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === tabId); });
 }
 
-// Show one tab's rails (does not move focus — the caller decides). Called both
-// on initial render and whenever a sidebar tab gains focus.
+// Show one tab's rails (does not move focus — the caller decides). Called both on
+// initial render and whenever a sidebar tab gains focus. The Music tab is
+// augmented with the app-only create-playlist tile (withCreatePlaylistTile) so the
+// TV always has a "＋ New Playlist" entry; other tabs render buildTabRails as-is.
 function selectTab(tabId) {
   STATE.activeTab = tabId;
   markActive(tabId);
-  renderRailRows(buildTabRails(tabId, STATE.cards, STATE.cw, STATE.labels));
+  var rails = buildTabRails(tabId, STATE.cards, STATE.cw, STATE.labels);
+  renderRailRows(({ true: function() { return withCreatePlaylistTile(rails); }, false: function() { return rails; } })[tabId === 'music']());
 }
 
 function tabButton(tab) {

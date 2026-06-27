@@ -112,6 +112,29 @@ export function loadPlaylist(serverUrl, id) {
   return getJson(serverUrl + '/api/playlist/' + encodeURIComponent(id));
 }
 
+// Create a user playlist (FEAT-036/TASK-208). POST /api/playlists/create takes a
+// name + profile (kids|adults); the SERVER generates the slug id, so — unlike the
+// 204 delete/add/remove actions — create returns 200 + the created record. The
+// caller reads the new `id` to open its detail. Rejects on a non-2xx (e.g. a
+// blank/over-long name 400s) so the screen can show an error.
+export function createPlaylist(serverUrl, name, profile) {
+  return fetch(serverUrl + '/api/playlists/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name, profile: profile })
+  }).then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); });
+}
+
+// Delete a user playlist (FEAT-036/TASK-208). POST /api/playlists/delete takes the
+// playlist_id; the contract is 204 on success / 400 on bad input, never 500.
+export function deletePlaylist(serverUrl, id) {
+  return fetch(serverUrl + '/api/playlists/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playlist_id: id })
+  });
+}
+
 // Fetch a track's `.lrc` lyric sidecar (TASK-129 serves it as text/plain) by
 // bare name, resolved through the same /media/ route as posters. Resolves to the
 // raw LRC text; rejects on a missing/!ok response so the ambient screen falls

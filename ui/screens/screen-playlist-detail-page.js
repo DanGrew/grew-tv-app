@@ -3,7 +3,7 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadPlaylist, loadContinueWatching } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { playNextIndex } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -47,6 +47,32 @@ export function initPlaylistDetailPage() {
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
 
+  // Delete (TASK-208): a confirm overlay gates the destructive action. The overlay
+  // buttons own their keydown (stopPropagation) so the detail screen's d-pad +
+  // Back never fire underneath while the dialog is open. Confirm POSTs delete and
+  // returns to browse; Cancel / Escape close back to the still-listed playlist.
+  function showConfirm() {
+    document.getElementById('confirm-delete-name').textContent = state.playlist.title;
+    document.getElementById('confirm-delete').style.display = 'flex';
+    document.getElementById('btn-confirm-delete').focus();
+  }
+  function hideConfirm() {
+    document.getElementById('confirm-delete').style.display = 'none';
+    document.getElementById('btn-delete-playlist').focus();
+  }
+  function doDelete() {
+    deletePlaylist(SERVER, playlistId)
+      .then(function() { navTo('browse.html'); })
+      .catch(function() { hideConfirm(); });
+  }
+  function focusConfirm() { document.getElementById('btn-confirm-delete').focus(); }
+  function focusCancel() { document.getElementById('btn-cancel-delete').focus(); }
+  function confirmKey(e) {
+    e.stopPropagation();
+    var H = { ArrowLeft: focusConfirm, ArrowRight: focusCancel, Escape: hideConfirm, Backspace: hideConfirm };
+    [H[e.key]].filter(Boolean).forEach(function(fn) { e.preventDefault(); fn(); });
+  }
+
   var wsApp = connectApp(wsUrl(window.location.hostname), function(intent, params) {
     var INTENTS = {
       navigate_up:   function() { detailArrow({ key: 'ArrowUp',   preventDefault: function() {} }); },
@@ -73,6 +99,11 @@ export function initPlaylistDetailPage() {
   document.getElementById('btn-back-detail').addEventListener('click', goBack);
   document.getElementById('btn-play-next').addEventListener('click', playFromResume);
   document.getElementById('btn-shuffle').addEventListener('click', shufflePlay);
+  document.getElementById('btn-delete-playlist').addEventListener('click', showConfirm);
+  document.getElementById('btn-confirm-delete').addEventListener('click', doDelete);
+  document.getElementById('btn-cancel-delete').addEventListener('click', hideConfirm);
+  document.getElementById('btn-confirm-delete').addEventListener('keydown', confirmKey);
+  document.getElementById('btn-cancel-delete').addEventListener('keydown', confirmKey);
   document.addEventListener('keydown', dispatchKey);
 
   initPage({

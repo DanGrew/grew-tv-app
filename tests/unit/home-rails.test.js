@@ -1,4 +1,26 @@
-import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, albumsByArtist } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, albumsByArtist, withCreatePlaylistTile } from '../../core/home-rails.js';
+
+describe('cardRoute create tile', () => {
+  it('routes the synthetic create-playlist card to the create screen', () => {
+    expect(cardRoute({ kind: 'create-playlist', id: 'create-playlist' })).toBe('create-playlist');
+  });
+});
+
+describe('withCreatePlaylistTile', () => {
+  it('prepends a create card to an existing Playlists rail', () => {
+    const rails = [{ id: 'albums', title: 'Albums', items: [{ id: 'a1' }] }, { id: 'playlists', title: 'Playlists', items: [{ id: 'pl1' }] }];
+    const out = withCreatePlaylistTile(rails);
+    const pl = out.find(r => r.id === 'playlists');
+    expect(pl.items.map(i => i.id)).toEqual(['create-playlist', 'pl1']);
+    expect(out.find(r => r.id === 'albums').items.map(i => i.id)).toEqual(['a1']);
+  });
+  it('adds a Playlists rail with just the create card when none exists (empty state)', () => {
+    const out = withCreatePlaylistTile([{ id: 'albums', title: 'Albums', items: [] }]);
+    const pl = out.find(r => r.id === 'playlists');
+    expect(pl.items.map(i => i.id)).toEqual(['create-playlist']);
+    expect(pl.items[0].section).toBe('music');
+  });
+});
 
 const cards = [
   { kind: 'video', id: 'film-a', title: 'A', duration: 600 },

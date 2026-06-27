@@ -74,8 +74,19 @@ button:hover { background: var(--surface-hi); }
   <div id="detail-title" style="padding:0;font-size:var(--fs-2xl);flex:1"></div>
   <button id="btn-play-next">&#9654; Play</button>
   <button id="btn-shuffle">&#128256; Shuffle</button>
+  <button id="btn-delete-playlist" style="font-size:var(--fs-sm);padding:12px 18px;min-width:auto">&#128465; Delete</button>
 </div>
 <div id="detail-list"></div>
+<div id="confirm-delete" style="display:none;position:fixed;inset:0;z-index:10;align-items:center;justify-content:center;background:rgba(0,0,0,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)">
+  <div style="background:var(--surface-hi);border:2.5px solid var(--border);border-radius:var(--radius);padding:36px 44px;max-width:600px;text-align:center;backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4)">
+    <div style="font-size:var(--fs-lg);margin-bottom:10px">Delete this playlist?</div>
+    <div id="confirm-delete-name" style="font-size:var(--fs-md);color:var(--text-muted);margin-bottom:28px"></div>
+    <div style="display:flex;gap:18px;justify-content:center">
+      <button id="btn-confirm-delete" style="border-color:#ff8787;color:#ff8787">Delete</button>
+      <button id="btn-cancel-delete">Cancel</button>
+    </div>
+  </div>
+</div>
 <div id="device-badge" title="This screen"></div>
 <div id="error-msg"></div>
 <script type="module">
