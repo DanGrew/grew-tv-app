@@ -295,6 +295,12 @@ the worktree, then `cd` into the **worktree** and run bare git verbs there (comm
 / push / status all match their rules, no `-C`, no prompts). Same for `gh`.
 **Branching:** off `main`. Naming: `<topic>/<descriptor>` — e.g. `feat/task-012-resume-screen`.
 **PRs:** Always draft (`--draft`), one per logical unit. Merge target: `main`.
+**Commit + push + open the draft PR without asking** (owner decision 2026-06-27).
+Once a change is built and its gates pass, commit, push, and open the draft PR
+autonomously — do NOT pause for commit/push/PR approval (the owner reviews and
+merges from the PR). Two things still hold: **WAIT for the user to merge before
+starting the next task**, and always present the PR link(s) prominently at the
+end of the reply.
 **Deploy:** no GitHub Pages. The app ships by updating the clone media-manager serves from (`--app-dir`, `~/grew-tv/repos/grew-tv-app` on the Mini) — pull `main` there + restart/reload. `setup-mac-mini.sh` clones it.
 
 ## Tooling
