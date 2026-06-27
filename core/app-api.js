@@ -105,6 +105,13 @@ export function loadAlbum(serverUrl, id) {
   return getJson(serverUrl + '/api/album/' + encodeURIComponent(id));
 }
 
+// Playlist detail (FEAT-036/TASK-204): a user playlist is state-DB-resident, so
+// it has its own route (not /api/album), but the backend projects it into the
+// same resolved-items shape so the album-detail layout renders it unchanged.
+export function loadPlaylist(serverUrl, id) {
+  return getJson(serverUrl + '/api/playlist/' + encodeURIComponent(id));
+}
+
 // Fetch a track's `.lrc` lyric sidecar (TASK-129 serves it as text/plain) by
 // bare name, resolved through the same /media/ route as posters. Resolves to the
 // raw LRC text; rejects on a missing/!ok response so the ambient screen falls

@@ -4,7 +4,7 @@ import { setup as setupPlayer } from './screen-audio-player.js';
 import { setupQueue } from './screen-queue.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadAlbum, loadVideo, loadLyrics, mediaUrl, playbackAction } from '../../core/app-api.js';
+import { loadAlbum, loadPlaylist, loadVideo, loadLyrics, mediaUrl, playbackAction } from '../../core/app-api.js';
 import { parseLrc, indexAt, windowAt } from '../../core/lrc.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
@@ -25,9 +25,10 @@ var AUDIO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight'
 var TRANSPORT_HIDE_MS = 4000;
 
 export function initAudioPage() {
-  var albumId  = getParam('album');
-  var artistId = getParam('artist');
-  var trackId  = getParam('track');
+  var albumId    = getParam('album');
+  var artistId   = getParam('artist');
+  var playlistId = getParam('playlist');
+  var trackId    = getParam('track');
   var shuffleParam = !!getParam('shuffle');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
@@ -159,9 +160,10 @@ export function initAudioPage() {
   function goBackNav() {
     clearTimeout(hideTimer);
     var STOP_NAV = {
-      'detail-album': function() { navTo('album-detail.html', { album: albumId }); },
-      'artist':       function() { navTo('artist.html', { artist: artistId }); },
-      'browse':       function() { navTo('browse.html'); }
+      'detail-album':    function() { navTo('album-detail.html', { album: albumId }); },
+      'detail-playlist': function() { navTo('playlist-detail.html', { playlist: playlistId }); },
+      'artist':          function() { navTo('artist.html', { artist: artistId }); },
+      'browse':          function() { navTo('browse.html'); }
     };
     [STOP_NAV[from]].filter(Boolean).concat([function() { navTo('browse.html'); }])[0]();
   }
@@ -180,7 +182,7 @@ export function initAudioPage() {
     reportPosition: function(sec) { sendAction('position', { current_position: sec }); },
     emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
     appContext: function() {
-      return { screen: 'player', itemId: [albumId].filter(Boolean).concat([artistId, loadedTrackId]).filter(Boolean)[0], episodeId: loadedTrackId, profile: profile, sourceType: kind, sourceId: [albumId].filter(Boolean).concat([artistId]).filter(Boolean).concat([null])[0] };
+      return { screen: 'player', itemId: [albumId].filter(Boolean).concat([artistId, playlistId, loadedTrackId]).filter(Boolean)[0], episodeId: loadedTrackId, profile: profile, sourceType: kind, sourceId: [albumId].filter(Boolean).concat([artistId, playlistId]).filter(Boolean).concat([null])[0] };
     },
     onIntent: function(intent) {
       var AUDIO_CTX = { play: true, audio: true };
@@ -229,14 +231,15 @@ export function initAudioPage() {
       navigate: function() { navTo(params.page, params.params); },
       play: function() { playIntent(params); },
       playAlbum: function() { navTo('audio.html', { album: params.id, from: 'browse' }); },
-      playArtist: function() { navTo('audio.html', { artist: params.id, from: 'artist' }); }
+      playArtist: function() { navTo('audio.html', { artist: params.id, from: 'artist' }); },
+      playPlaylist: function() { navTo('audio.html', { playlist: params.id, from: 'detail-playlist' }); }
     };
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
   wsApp = connectApp(wsUrl(window.location.hostname), appIntent, { onPlayback: applySnapshot });
   wsApp.sendContext({ context_id: 'audio' });
-  wsApp.sendAppState({ screen: 'player', itemId: [albumId].filter(Boolean).concat([artistId, trackId]).filter(Boolean)[0], profile: profile });
+  wsApp.sendAppState({ screen: 'player', itemId: [albumId].filter(Boolean).concat([artistId, playlistId, trackId]).filter(Boolean)[0], profile: profile });
 
   document.addEventListener('keydown', dispatchKey);
 
@@ -247,26 +250,28 @@ export function initAudioPage() {
   // source) is a single — play-track only. The player is queue-mode (⏮/⏭) for a
   // source, single for a lone track.
   var SOURCE_BASE = {
-    album:  function() { sendAction('play-source', { source_type: 'album', source_id: albumId, shuffle: shuffleParam }); },
-    artist: function() { sendAction('play-source', { source_type: 'artist', source_id: artistId, shuffle: shuffleParam }); },
-    track:  function() {}
+    album:    function() { sendAction('play-source', { source_type: 'album', source_id: albumId, shuffle: shuffleParam }); },
+    artist:   function() { sendAction('play-source', { source_type: 'artist', source_id: artistId, shuffle: shuffleParam }); },
+    playlist: function() { sendAction('play-source', { source_type: 'playlist', source_id: playlistId, shuffle: shuffleParam }); },
+    track:    function() {}
   };
   function fireEntry() {
     SOURCE_BASE[kind]();
     [trackId].filter(Boolean).forEach(function(t) { sendAction('play-track', { track_id: t }); });
   }
   function sourceKind() {
-    return [['album'].filter(function() { return !!albumId; })[0], ['artist'].filter(function() { return !!artistId; })[0]]
+    return [['album'].filter(function() { return !!albumId; })[0], ['artist'].filter(function() { return !!artistId; })[0], ['playlist'].filter(function() { return !!playlistId; })[0]]
       .filter(Boolean).concat(['track'])[0];
   }
   var kind = sourceKind();
-  var QUEUE_MODE = { album: true, artist: true, track: false };
+  var QUEUE_MODE = { album: true, artist: true, playlist: true, track: false };
   // Breadcrumb title is collection-level: the album title (fetched), the artist
   // name (already the param), or the single track's title.
   var TITLE_FOR = {
-    album:  function() { return loadAlbum(SERVER, albumId).then(function(a) { return a.title; }); },
-    artist: function() { return Promise.resolve(artistId); },
-    track:  function() { return loadVideo(SERVER, trackId).then(function(v) { return v.title; }); }
+    album:    function() { return loadAlbum(SERVER, albumId).then(function(a) { return a.title; }); },
+    artist:   function() { return Promise.resolve(artistId); },
+    playlist: function() { return loadPlaylist(SERVER, playlistId).then(function(p) { return p.title; }); },
+    track:    function() { return loadVideo(SERVER, trackId).then(function(v) { return v.title; }); }
   };
 
   // initLyrics seeds the sticky lyrics preference from the backend before it is

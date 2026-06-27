@@ -78,6 +78,33 @@ const ALBUMS = {
   }
 };
 
+// FEAT-036 playlists: a user playlist is state-DB-resident but /api/playlist/{id}
+// projects it into the SAME detail shape as /api/album so the app reuses the
+// album-detail layout. season/episode are null (a playlist is flat — no track
+// numbers; episodeLabel falls back to the bare title). The cross-album order
+// (an ELO track then an ABBA-less reuse) is preserved verbatim. An EMPTY playlist
+// is valid (pl-empty) and must still list + open.
+const PLAYLISTS = {
+  'pl-roadtrip': {
+    id: 'pl-roadtrip', title: 'Road Trip', profile: 'kids', collectionType: 'playlist', poster: null, seasons: [],
+    items: [
+      { season: null, episode: null, video: VIDEOS['ootb-03'] },
+      { season: null, episode: null, video: VIDEOS['ootb-01'] }
+    ]
+  },
+  'pl-empty': {
+    id: 'pl-empty', title: 'Empty Mix', profile: 'kids', collectionType: 'playlist', poster: null, seasons: [], items: []
+  }
+};
+
+// Playlist browse cards (collectionType:'playlist', section music) — the backend
+// projects them into get_browse_list. Injected by the playlist e2e onto the music
+// browse so the Playlists rail renders; kept out of the default music cards.
+const PLAYLIST_CARDS = [
+  { kind: 'series', id: 'pl-roadtrip', title: 'Road Trip', poster: null, type: null, section: 'music', collectionType: 'playlist', artist: null, clipCount: 2, tags: null },
+  { kind: 'series', id: 'pl-empty',    title: 'Empty Mix', poster: null, type: null, section: 'music', collectionType: 'playlist', artist: null, clipCount: 0, tags: null }
+];
+
 const BROWSE = {
   kids: {
     profile: 'kids',
@@ -192,6 +219,10 @@ async function installApi(page) {
     var a = ALBUMS[lastSegment(route.request().url(), '/api/album/')];
     return a ? json(route, 200, a) : json(route, 404, { error: 'not found' });
   });
+  await page.route('**/api/playlist/*', function(route) {
+    var p = PLAYLISTS[lastSegment(route.request().url(), '/api/playlist/')];
+    return p ? json(route, 200, p) : json(route, 404, { error: 'not found' });
+  });
   await page.route('**/api/progress/*', function(route) {
     var req = route.request();
     var person = new URL(req.url()).searchParams.get('person');
@@ -260,8 +291,16 @@ function artistOrder(artist) {
   });
 }
 
+// FEAT-036: a playlist source resolves to its stored track order (the id is the
+// playlist id, matching the `?playlist=` param the audio page sends as source_id).
+function playlistOrder(id) {
+  var p = PLAYLISTS[id];
+  return p ? p.items.map(function(it) { return it.video.id; }) : [];
+}
+
 function sourceOrder(type, id) {
-  return type === 'artist' ? artistOrder(id) : albumOrder(id);
+  var BY_TYPE = { artist: artistOrder, playlist: playlistOrder };
+  return (BY_TYPE[type] || albumOrder)(id);
 }
 
 async function installPlaybackBackend(page) {
@@ -409,4 +448,4 @@ async function installPlaybackBackend(page) {
   return { seed: seed, snapshot: snapshot };
 }
 
-module.exports = { VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, BROWSE, CONFIG, nextOf, installApi, installPlaybackBackend };
+module.exports = { VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, BROWSE, CONFIG, nextOf, installApi, installPlaybackBackend };

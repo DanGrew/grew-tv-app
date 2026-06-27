@@ -217,6 +217,41 @@ describe('music section routing (FEAT-027)', () => {
   });
 });
 
+// FEAT-036 — user playlists. A playlist is a music-section card distinguished by
+// collectionType:'playlist'; it lives in its own Playlists rail (not Albums) and
+// routes to the playlist detail (its own state-DB route), never album detail.
+const WITH_PLAYLISTS = MUSIC.concat([
+  { kind: 'series', id: 'pl-faves',    title: 'Faves',     section: 'music', collectionType: 'playlist' },
+  { kind: 'series', id: 'pl-roadtrip', title: 'Road Trip', section: 'music', collectionType: 'playlist' }
+]);
+
+describe('playlists rail + routing (FEAT-036)', () => {
+  it('splits playlists into their own Playlists rail, after Albums', () => {
+    const rails = buildTabRails('music', WITH_PLAYLISTS, [], {});
+    expect(rails.map(r => r.id)).toEqual(['artists', 'albums', 'playlists']);
+  });
+
+  it('keeps playlist cards OUT of the Albums rail (split on collectionType)', () => {
+    const rails = buildTabRails('music', WITH_PLAYLISTS, [], {});
+    const albums = rails.find(r => r.id === 'albums');
+    const playlists = rails.find(r => r.id === 'playlists');
+    expect(albums.items.map(c => c.id)).toEqual(['ootb', 'rumours']); // no playlists leaked in
+    expect(playlists.items.map(c => c.id)).toEqual(['pl-faves', 'pl-roadtrip']); // A-Z by title
+  });
+
+  it('omits the Playlists rail when there are no playlists', () => {
+    expect(buildTabRails('music', MUSIC, [], {}).some(r => r.id === 'playlists')).toBe(false);
+  });
+
+  it('a playlist card routes to the playlist detail, not album detail', () => {
+    expect(cardRoute({ kind: 'series', section: 'music', collectionType: 'playlist', id: 'pl-faves' })).toBe('playlist');
+  });
+
+  it('a plain album card still routes to album detail', () => {
+    expect(cardRoute({ kind: 'series', section: 'music', id: 'ootb' })).toBe('album');
+  });
+});
+
 // FEAT-029 — the Music tab's Artists rail + the artist drill-down. One tile per
 // distinct album artist (square art borrowed from their first album), routing to
 // the artist page; albumsByArtist powers that page's filtered album grid.
