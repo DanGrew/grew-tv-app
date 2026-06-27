@@ -199,6 +199,11 @@ async function installApi(page) {
   // Stateful across this page so a saveProgress POST drives the same person's
   // later resume GET + CW. Different persons keep separate sets.
   var progress = {};
+  // Per-install playlist store (FEAT-036). Cloned from the shared fixture so the
+  // create / add-track routes can MUTATE (add a playlist, append a track) without
+  // leaking state into another test that runs later in the same worker — the
+  // earlier in-place mutation made pl-roadtrip grow a row across tests.
+  var playlists = JSON.parse(JSON.stringify(PLAYLISTS));
   await page.route('**/api/settings', function(route) {
     var post = route.request().method() === 'POST';
     [post].filter(Boolean).forEach(function() { settings = Object.assign({}, settings, JSON.parse(route.request().postData())); });
@@ -226,7 +231,7 @@ async function installApi(page) {
     return a ? json(route, 200, a) : json(route, 404, { error: 'not found' });
   });
   await page.route('**/api/playlist/*', function(route) {
-    var p = PLAYLISTS[lastSegment(route.request().url(), '/api/playlist/')];
+    var p = playlists[lastSegment(route.request().url(), '/api/playlist/')];
     return p ? json(route, 200, p) : json(route, 404, { error: 'not found' });
   });
   // FEAT-036/TASK-208 playlist actions. create -> 200 + the created record (the
@@ -237,10 +242,21 @@ async function installApi(page) {
     var name = (body.name || '').trim();
     if (!name) return json(route, 400, { error: 'name must not be blank' });
     var id = 'pl-' + slugify(name);
-    PLAYLISTS[id] = { id: id, title: name, profile: body.profile, collectionType: 'playlist', poster: null, seasons: [], items: [] };
+    playlists[id] = { id: id, title: name, profile: body.profile, collectionType: 'playlist', poster: null, seasons: [], items: [] };
     return json(route, 200, { id: id, name: name, profile: body.profile, track_ids: [], created: 't0', modified: 't0' });
   });
   await page.route('**/api/playlists/delete', function(route) {
+    return route.fulfill({ status: 204, body: '' });
+  });
+  // FEAT-036/TASK-206 add-track. The backend appends in order, gated catalog-known
+  // AND profile-match, 204 on success / 400 on a bad/mismatched track. Here we
+  // append the resolved track to the named playlist (so a follow-up detail GET
+  // reflects it) and 204; an unknown playlist 400s, mirroring the contract.
+  await page.route('**/api/playlists/add-track', function(route) {
+    var body = JSON.parse(route.request().postData());
+    var pl = playlists[body.playlist_id];
+    if (!pl) return json(route, 400, { error: 'unknown playlist' });
+    pl.items.push({ season: null, episode: null, video: VIDEOS[body.track_id] || { id: body.track_id } });
     return route.fulfill({ status: 204, body: '' });
   });
   await page.route('**/api/progress/*', function(route) {

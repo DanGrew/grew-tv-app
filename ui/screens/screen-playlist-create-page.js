@@ -1,6 +1,6 @@
-import { getProfile, navTo } from '../../core/state.js';
+import { getParam, getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
-import { createPlaylist } from '../../core/app-api.js';
+import { createPlaylist, addToPlaylist } from '../../core/app-api.js';
 import { CHAR_KEYS, KEY_COLS, appendChar, backspace, cleanName, isValidName, gridIndex } from '../../core/playlist-name.js';
 
 // FEAT-036 (TASK-208) — the TV create-playlist screen. A name field driven by an
@@ -10,6 +10,13 @@ import { CHAR_KEYS, KEY_COLS, appendChar, backspace, cleanName, isValidName, gri
 // so this file is render-only. Create POSTs /api/playlists/create and opens the
 // new playlist's detail; Cancel returns to browse. The companion's create path is
 // its own (TASK-209, phone keyboard) — this is the TV d-pad path.
+//
+// FEAT-036/TASK-206: an `addTrack` query param marks the inline create-from-a-
+// track flow (the album Add-to-playlist sheet's "New playlist" choice). When
+// present, the new playlist is created, that track is added to it, then its detail
+// opens — so a brand-new playlist starts with the track that prompted it. The
+// profile picker still defaults to the active profile, which is the track's
+// profile (music is browsed under one profile), so the add matches by construction.
 var SERVER = window.location.origin;
 
 // The on-screen keyboard / action cells, row-major (KEY_COLS per row). Char cells
@@ -37,9 +44,15 @@ export function initPlaylistCreatePage() {
     el.style.display = 'block';
   }
   function invalidName() { showError('Enter a name (1–100 characters).'); }
+  var addTrack = getParam('addTrack');
+  function openNew(rec) { navTo('playlist-detail.html', { playlist: rec.id }); }
+  // Add the prompting track, then open the new playlist regardless of the add
+  // outcome (the playlist already exists; a failed add just lands on an empty one).
+  function addThenOpen(rec) { addToPlaylist(SERVER, rec.id, addTrack).then(function() { openNew(rec); }).catch(function() { openNew(rec); }); }
+  function afterCreate(rec) { ({ true: function() { addThenOpen(rec); }, false: function() { openNew(rec); } })[String(!!addTrack)](); }
   function doCreate() {
     createPlaylist(SERVER, cleanName(st.name), st.profile)
-      .then(function(rec) { navTo('playlist-detail.html', { playlist: rec.id }); })
+      .then(afterCreate)
       .catch(function() { showError('Could not create playlist. Try again.'); });
   }
   function create() { ({ true: doCreate, false: invalidName })[isValidName(st.name)](); }
