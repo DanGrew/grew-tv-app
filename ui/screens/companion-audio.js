@@ -43,17 +43,17 @@ export function initPage() {
   function onDevices(devices) { updateBar(devices); }
 
   // Back is the breadcrumb now (FEAT-032 / TASK-218), not a lone Back button: the
-  // player shows Home > <items> > Track, where <items> is the browse level you
-  // launched from (recorded into nav-trail as you drilled). Tapping <items>
-  // returns to that grid (browse self-restores from the trail); tapping Home
-  // clears the trail and returns to the sections root. The crumb fires the same
-  // `navigate` intent the other companion screens use — the TV teleports and the
-  // companion follows the echoed context onto browse.html.
+  // player shows Home > <items> > Track, where <items> is the level you launched
+  // from (a browse grid, or an artist's albums page) recorded into nav-trail.
+  // Tapping <items> returns there (browse self-restores; artist reloads). Only the
+  // Home crumb — the one with EMPTY params — clears the trail and roots at
+  // sections; an items crumb (browse tab/rail or artist) keeps it. The crumb fires
+  // the same `navigate` intent the other companion screens use.
   function mountAudioCrumbs(title) {
     mountCompanionBreadcrumb('breadcrumb', trailCrumbs(peekTrail(), title), onCrumbNav);
   }
   function onCrumbNav(page, params) {
-    ({ 'true': clearTrail, 'false': noop })[String(!params.tab)]();
+    ({ 'true': clearTrail, 'false': noop })[String(Object.keys(params).length === 0)]();
     api.sendIntent('navigate', { page: page, params: params });
   }
 

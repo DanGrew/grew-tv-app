@@ -59,6 +59,16 @@ export function push(entry) {
   write(stack);
 }
 
+// Push only if the entry isn't already the top (same page + params, order-
+// insensitive) — for a screen that records itself on load and must not stack a
+// duplicate when re-entered (e.g. the companion artist page reached again via a
+// child's Back). A different page/params still pushes.
+export function pushUnique(entry) {
+  var top = peek();
+  if (top && top.page === entry.page && stableParams(top.params) === stableParams(entry.params)) return;
+  push(entry);
+}
+
 // Back: remove and return the top entry (immediate parent), or null if the
 // trail is empty (deep-link / session's first nav — caller falls back to its
 // hardcoded default). The caller navTos the entry and restores scrollY/focusedId.

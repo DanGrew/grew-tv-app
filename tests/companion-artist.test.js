@@ -89,3 +89,9 @@ test('Shuffle header sends the shuffle intent', async ({ page }) => {
   await page.locator('#btn-shuffle').click();
   await expect.poll(() => sentIntents).toContain('shuffle');
 });
+
+test('FEAT-032: loading the artist page records it on the nav trail (so a child can return here)', async ({ page }) => {
+  await expect(page.locator('#ctx-title')).toHaveText('ELO');
+  const trail = await page.evaluate(() => JSON.parse(sessionStorage.getItem('grew-tv:nav-trail')));
+  expect(trail.some((e) => e.page === 'artist.html' && e.params.artist === 'ELO')).toBe(true);
+});

@@ -5,6 +5,7 @@ import { screenPage, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { albumsByArtist } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
+import { pushUnique as pushTrail } from '../../core/nav-trail.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 
@@ -115,6 +116,10 @@ export function initPage() {
     [payload.artist].filter(Boolean).filter(function(a) { return a !== state.artist; }).forEach(function(a) {
       state.artist = a;
       els.ctxTitle.textContent = a;
+      // FEAT-032 (TASK-218): record this artist's albums page as a trail level so a
+      // child (album detail / player) can return here, not skip back to the artists
+      // rail. pushUnique avoids stacking a duplicate when re-entered via a child's Back.
+      pushTrail({ page: 'artist.html', params: { artist: a }, label: a });
       mountCrumbs(a);
       loadAlbums();
     });
