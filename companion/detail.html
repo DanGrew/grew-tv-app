@@ -31,8 +31,8 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .no-actions { color: var(--text-muted); font-size: 16px; text-align: center; margin-top: 40px; }
 .detail-track-row { display: flex; align-items: stretch; gap: 8px; flex-shrink: 0; }
 .detail-track-row .tile-btn { flex: 1; }
-.detail-add-btn { flex-shrink: 0; align-self: stretch; padding: 0 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 14px; font-family: inherit; white-space: nowrap; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
-.detail-add-btn:active, .detail-add-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.detail-add-btn, .detail-queue-btn { flex-shrink: 0; align-self: stretch; padding: 0 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 14px; font-family: inherit; white-space: nowrap; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.detail-add-btn:active, .detail-add-btn:focus, .detail-queue-btn:active, .detail-queue-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #add-sheet { display: none; position: fixed; inset: 0; z-index: 10; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); }
 .add-sheet-panel { background: #16213e; border: 2px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 24px; width: 100%; max-width: 360px; max-height: 76vh; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); }
 .add-sheet-title { font-size: 18px; text-align: center; }

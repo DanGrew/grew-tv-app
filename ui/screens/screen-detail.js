@@ -15,7 +15,7 @@ var AVAILABLE_ROW = {
 // Per-render context for the detail screen: the series + progress + the active
 // season chip (TASK-123). null activeSeason = no season chips (legacy single
 // list). Reset on each buildDetailList.
-var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, onAddToPlaylist: null, onMoveItem: null, onRemoveItem: null, seasons: [], activeSeason: null };
+var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, onAddToPlaylist: null, onQueue: null, onMoveItem: null, onRemoveItem: null, seasons: [], activeSeason: null };
 
 // Up/Down move between vertical stops: clickable breadcrumb crumbs (top), then
 // the header Play-next action, the shuffle button, the active season chip, then
@@ -58,7 +58,8 @@ function chipSibling(el, delta) {
 }
 
 // A row's horizontal stops: the row itself, then each per-row action button in
-// DOM order (Restart, then "+ Playlist" — TASK-206). Left/Right step through this
+// DOM order (Restart, "+ Playlist" — TASK-206, then "+ Queue" — TASK-248).
+// Left/Right step through this
 // list, so a row can carry more than one secondary control without bespoke nav.
 // closest('.detail-row') resolves both a focused row (returns itself) and a
 // focused action (returns its row); a non-row element (a season chip) yields [].
@@ -164,6 +165,28 @@ function appendAdd(row, available, item) {
   });
 }
 
+// A per-track "+ Queue" control (FEAT-040/TASK-248): queue this track to PLAY
+// NEXT, present on the same rows as "+ Playlist" (the page wired onQueue — album /
+// artist track contexts) and only on available rows. Sits beside + Playlist; like
+// it, stops propagation so it never also fires the row's play handler, and carries
+// `detail-row-action` so Left/Right reach it. onQueue(item) POSTs queue-track per
+// person — durable across source swaps (TASK-246), so it outlives the album.
+function appendQueue(row, available, item) {
+  [available].filter(Boolean).forEach(function() {
+    [state.onQueue].filter(Boolean).forEach(function(onQueue) {
+      var btn = document.createElement('button');
+      btn.className = 'detail-queue detail-row-action';
+      btn.tabIndex = 0;
+      btn.textContent = '＋ Queue';
+      btn.addEventListener('click', function(e) { e.stopPropagation(); onQueue(item); });
+      btn.addEventListener('keydown', function(e) {
+        [e.key].filter(function(k) { return PLAY_KEYS[k]; }).forEach(function() { e.preventDefault(); e.stopPropagation(); onQueue(item); });
+      });
+      row.appendChild(btn);
+    });
+  });
+}
+
 // A small secondary row control (↑ / ↓ / ✕ — FEAT-036/TASK-211), built like the
 // Restart / + Playlist buttons: `detail-row-action` so Left/Right reach it, and
 // stopPropagation so it never also fires the row's play handler.
@@ -244,6 +267,7 @@ function buildRow(server, series, progress, onPlayItem, item, i, isNext) {
 
   appendRestart(row, mid, onPlayItem, item, i);
   appendAdd(row, available, item);
+  appendQueue(row, available, item);
   appendMove(row, available, item, i, series.items.length);
   appendRemove(row, available, item, i);
   bindRow(row, available, onPlayItem, item, i);
@@ -342,16 +366,20 @@ function renderList() {
 // 'resume' (row default) or 'restart'. onAddToPlaylist(item) is OPTIONAL
 // (FEAT-036/TASK-206): when supplied (album / artist track contexts) each
 // available row gains a "+ Playlist" control; omitted (series / playlist detail)
-// no add control renders. onMoveItem(item, i, 'up'|'down') + onRemoveItem(item, i)
-// are OPTIONAL (FEAT-036/TASK-211): supplied only by the playlist detail, they add
-// per-track ↑ ↓ (reorder by position) and ✕ (remove) controls; omitted elsewhere
-// (album / artist / series) no reorder/remove renders. With seasons[] the header
-// carries a season chip row that filters the list + swaps the poster (TASK-123);
-// without it the legacy single list + inline dividers render unchanged.
-export function buildDetailList(server, series, progress, onPlayItem, onAddToPlaylist, onMoveItem, onRemoveItem) {
+// no add control renders. onQueue(item) is OPTIONAL (FEAT-040/TASK-248): supplied
+// on the same album / artist track contexts as onAddToPlaylist, it adds a per-track
+// "+ Queue" (play next) control beside "+ Playlist"; omitted (series / playlist
+// detail) no queue control renders. onMoveItem(item, i, 'up'|'down') +
+// onRemoveItem(item, i) are OPTIONAL (FEAT-036/TASK-211): supplied only by the
+// playlist detail, they add per-track ↑ ↓ (reorder by position) and ✕ (remove)
+// controls; omitted elsewhere (album / artist / series) no reorder/remove renders.
+// With seasons[] the header carries a season chip row that filters the list + swaps
+// the poster (TASK-123); without it the legacy single list + inline dividers render.
+export function buildDetailList(server, series, progress, onPlayItem, onAddToPlaylist, onQueue, onMoveItem, onRemoveItem) {
   state = {
     server: server, series: series, progress: progress, onPlayItem: onPlayItem,
     onAddToPlaylist: [onAddToPlaylist].filter(Boolean).concat([null])[0],
+    onQueue: [onQueue].filter(Boolean).concat([null])[0],
     onMoveItem: [onMoveItem].filter(Boolean).concat([null])[0],
     onRemoveItem: [onRemoveItem].filter(Boolean).concat([null])[0],
     seasons: seasonsOf(series),
