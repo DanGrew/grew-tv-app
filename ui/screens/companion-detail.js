@@ -1,15 +1,17 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist } from '../../core/app-api.js';
-import { screenPage } from '../../core/companion-utils.js';
+import { screenPage, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { peek as peekTrail } from '../../core/nav-trail.js';
 import { seasonsOf, hasSeasonChips, chipClass, seasonLabel, visibleItems, defaultSeason } from '../../core/seasons.js';
 import { playlistCards } from '../../core/playlist-pick.js';
+import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
+import { mountSyncBar } from './companion-sync-bar.js';
 
 // Companion series context (TASK-118): the episode list with per-episode
 // progress + a Play-next button, fetched straight from the backend (catalog +
@@ -30,6 +32,8 @@ export function initPage() {
   var addState = { add: null, createHref: '', statusTimer: null };
   var api = {};
   var updateBar = null;
+  var mode = createCompanionMode();
+  var syncBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
@@ -43,7 +47,11 @@ export function initPage() {
   }
   function goArtistParent() { var e = artistParent(); api.sendIntent('navigate', { page: e.page, params: e.params }); }
   function goDefaultBack() { api.sendIntent('back'); }
-  function onBack() { ({ true: goArtistParent, false: goDefaultBack })[Boolean(artistParent())](); }
+  function tvBack() { ({ true: goArtistParent, false: goDefaultBack })[Boolean(artistParent())](); }
+  // Desynced, Back is a local hop to browse (we arrived here from browse's tile
+  // tap, carrying ?id); the TV is untouched.
+  function localBack() { window.location.href = 'browse.html'; }
+  function onBack() { ({ true: localBack, false: tvBack })[mode.isDesynced()](); }
   els.backBtn.addEventListener('click', onBack);
 
   // FEAT-036/TASK-207 — "Add to playlist" on the companion, the PRACTICAL build
@@ -140,7 +148,12 @@ export function initPage() {
   // Breadcrumb trail (FEAT-021): Home (clickable) > this series (current). Home
   // sends the `navigate` intent so the app teleports the TV back to browse; the
   // companion follows on the app's echoed context.
-  function navigate(page, params) { api.sendIntent('navigate', { page: page, params: params }); }
+  // SYNCED: breadcrumb navigation drives the TV (navigate intent). DESYNCED: hop
+  // locally instead, carrying any params as a query string.
+  function localGo(page, params) { window.location.href = page + queryString(params); }
+  function navigate(page, params) {
+    ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
+  }
   function mountCrumbs(seriesTitle) {
     mountCompanionBreadcrumb('breadcrumb', ({ true: trailCrumbs(artistParent(), seriesTitle), false: buildCrumbs('detail', { seriesTitle: seriesTitle }) })[Boolean(artistParent())], navigate);
   }
@@ -171,6 +184,10 @@ export function initPage() {
     var btn = document.createElement('button');
     btn.className = 'tile-btn';
     btn.setAttribute('data-id', video.id);
+    // Playing a track/episode drives the TV -> greyed when desynced (no dead
+    // click; the WS layer also no-ops the intent). The ＋ Playlist button beside
+    // it stays live (per-person add, both modes).
+    btn.classList.toggle('desync-off', mode.isDesynced());
     btn.appendChild(posterImg(posterName));
     btn.insertAdjacentHTML('beforeend',
       '<span>' + episodeLabel(item) + '</span>' + progressBarMarkup(mid, percent(resume, video.duration), 'ep-progress'));
@@ -182,6 +199,7 @@ export function initPage() {
     var btn = document.createElement('button');
     btn.className = 'play-next-btn';
     btn.textContent = '▶ Play next';
+    btn.classList.toggle('desync-off', mode.isDesynced());
     btn.addEventListener('click', function() { api.sendIntent('play_next'); });
     return btn;
   }
@@ -262,7 +280,7 @@ export function initPage() {
     });
   }
 
-  function onContext(payload) {
+  function followContext(payload) {
     var page = screenPage(payload.context_id);
     var ROUTE = {
       'true':  function() { window.location.href = page + '.html'; },
@@ -270,17 +288,37 @@ export function initPage() {
     };
     ROUTE[(page !== 'detail') + '']();
   }
+  // Desynced, the companion does NOT follow the TV's context (inbound nav seam
+  // gated); it stays on the page browse opened locally.
+  function onContext(payload) {
+    ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
+  }
 
   // The active person keys which Continue-Watching set tints the episode bars
   // (FEAT-026 TASK-158 — person rides the app_state; reloads when it changes).
+  // The TV status strip reads the same snapshot (display-only, both modes).
   function onAppState(snap) {
+    syncBar.updateStatus(snap);
     state.profile = [snap.profile].filter(Boolean).concat([state.profile])[0];
     [snap.person].filter(Boolean).filter(function(p) { return p !== state.person; }).forEach(function(p) { state.person = p; loadCW(); });
   }
 
+  // Toggle: going DESYNCED re-renders to grey the play controls; going SYNCED
+  // re-runs the reconnect path (reload) to snap back to the TV.
+  function reSync() { window.location.reload(); }
+  function onToggle(desynced) { ({ true: render, false: reSync })[desynced](); }
+
   document.getElementById('btn-add-create').addEventListener('click', createNew);
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
 
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices);
+  syncBar = mountSyncBar(mode, onToggle);
+  // Desynced entry: browse linked here with ?id=…, so load that collection
+  // ourselves rather than waiting for the TV's context echo (which won't come).
+  [new URLSearchParams(window.location.search).get('id')].filter(Boolean).forEach(function(id) {
+    state.seriesId = id;
+    els.ctxLabel.textContent = 'Series';
+    loadSeriesData(id);
+  });
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }

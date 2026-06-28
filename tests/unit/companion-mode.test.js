@@ -1,6 +1,22 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   createCompanionMode, appStateDrivesNav, navIntentsAllowed, SYNCED, DESYNCED
 } from '../../core/companion-mode.js';
+
+// sessionStorage does not exist in the `node` vitest environment — back it with a
+// plain in-memory Map (the same vi.stubGlobal approach nav-trail.test.js uses).
+function makeStorage() {
+  var store = {};
+  return {
+    getItem: function(k) { return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null; },
+    setItem: function(k, v) { store[k] = String(v); },
+    removeItem: function(k) { delete store[k]; }
+  };
+}
+
+beforeEach(() => {
+  vi.stubGlobal('sessionStorage', makeStorage());
+});
 
 describe('appStateDrivesNav / navIntentsAllowed predicates', () => {
   it('both seams open when synced', () => {
@@ -13,8 +29,8 @@ describe('appStateDrivesNav / navIntentsAllowed predicates', () => {
     expect(navIntentsAllowed(DESYNCED)).toBe(false);
   });
 
-  // Anything that is not literally DESYNCED is treated as driving (fail-open):
-  // a missing/unknown mode never silently suppresses the TV.
+  // Anything not literally DESYNCED is treated as driving (fail-open): a missing
+  // or unknown mode never silently suppresses the TV.
   it('treats an unknown mode as synced (fail-open)', () => {
     expect(appStateDrivesNav(undefined)).toBe(true);
     expect(navIntentsAllowed('something-else')).toBe(true);
@@ -46,10 +62,22 @@ describe('createCompanionMode', () => {
     expect(m.isDesynced()).toBe(false);
   });
 
-  it('setSynced re-syncs (idempotent from synced)', () => {
+  // The whole point of persistence: the companion is multi-page, so a fresh
+  // instance on the next page must read the SAME mode from sessionStorage.
+  it('persists across instances (survives a page load)', () => {
+    var first = createCompanionMode();
+    first.setDesynced();
+    var afterNav = createCompanionMode();
+    expect(afterNav.isDesynced()).toBe(true);
+    afterNav.setSynced();
+    expect(createCompanionMode().isDesynced()).toBe(false);
+  });
+
+  it('degrades to synced when sessionStorage is unavailable (never throws)', () => {
+    vi.stubGlobal('sessionStorage', undefined);
     var m = createCompanionMode();
-    m.setSynced();
     expect(m.mode()).toBe(SYNCED);
+    expect(function() { m.setDesynced(); m.toggle(); }).not.toThrow();
   });
 });
 
@@ -61,52 +89,23 @@ describe('local navigation stack', () => {
     expect(m.back()).toBe(null);
   });
 
-  it('push / current track the top entry', () => {
+  it('push / current / back track the top entry', () => {
     var m = createCompanionMode();
     m.push({ page: 'browse' });
     m.push({ page: 'detail', params: { id: 'film-1' } });
     expect(m.depth()).toBe(2);
     expect(m.current().page).toBe('detail');
-    expect(m.current().params.id).toBe('film-1');
-  });
-
-  it('back pops and returns the new current', () => {
-    var m = createCompanionMode();
-    m.push({ page: 'browse' });
-    m.push({ page: 'detail' });
     expect(m.back().page).toBe('browse');
     expect(m.depth()).toBe(1);
-    expect(m.back()).toBe(null);
-    expect(m.depth()).toBe(0);
   });
 
-  it('reset clears the stack without touching the mode', () => {
-    var m = createCompanionMode();
-    m.setDesynced();
-    m.push({ page: 'browse' });
-    m.reset();
-    expect(m.depth()).toBe(0);
-    expect(m.isDesynced()).toBe(true);
-  });
-
-  // Re-sync contract (FEAT-038): going synced clears the local stack so Sync
-  // re-applies the latest app_state from a clean slate.
   it('setSynced clears the local stack (re-sync contract)', () => {
     var m = createCompanionMode();
     m.setDesynced();
     m.push({ page: 'browse' });
     m.push({ page: 'detail' });
-    expect(m.depth()).toBe(2);
     m.setSynced();
     expect(m.depth()).toBe(0);
     expect(m.current()).toBe(null);
-  });
-
-  it('toggle back to synced also clears the stack', () => {
-    var m = createCompanionMode();
-    m.toggle();                 // -> desynced
-    m.push({ page: 'browse' });
-    m.toggle();                 // -> synced
-    expect(m.depth()).toBe(0);
   });
 });

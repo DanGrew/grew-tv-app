@@ -7,8 +7,12 @@ import { buildTabs, buildTabRails } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
+import { cardRoute } from '../../core/home-rails.js';
+import { createCompanionMode } from '../../core/companion-mode.js';
+import { tileOpenableDesynced, tileOffDesynced } from '../../core/companion-button-modes.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
+import { mountSyncBar } from './companion-sync-bar.js';
 
 // FEAT-028 / TASK-168 — companion drill-down browse (replaces the flat
 // FEAT-020/TASK-139 tab + all-rails + flat-search layout). The companion walks
@@ -62,6 +66,9 @@ export function initPage() {
   };
   var api = {};
   var updateBar = null;
+  var mode = createCompanionMode();
+  var syncBar = null;
+  function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
 
@@ -105,6 +112,9 @@ export function initPage() {
     el.className = 'ph-txt';
     el.setAttribute('data-id', card.id);
     el.classList.toggle('prog', Boolean(hint));
+    // Desynced: grey tiles we can't open on our own (artist/playlist pages aren't
+    // desync-aware yet; a bare film only plays). Safe-by-default — no dead clicks.
+    el.classList.toggle('desync-off', tileOffDesynced(cardRoute(card), mode.isDesynced()));
     var nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = [card.title].filter(Boolean).concat([card.id])[0];
@@ -228,8 +238,15 @@ export function initPage() {
   }
   els.newPlaylist.addEventListener('click', openCreate);
 
+  // Switch-profile drives the TV, so it greys out while desynced (the WS layer
+  // already no-ops its intent; this is the visible half — no dead click).
+  function applyMode() {
+    document.getElementById('switch-profile').classList.toggle('desync-off', mode.isDesynced());
+  }
+
   function render() {
     applyLevel();
+    applyMode();
     applyCreateBtn();
     renderSections();
     renderRails();
@@ -271,10 +288,17 @@ export function initPage() {
   function selectSection(id) { navigate('browse.html', { tab: id }); }
   function selectRail(id) { navigate('rail-grid.html', { section: state.section, rail: id }); }
 
-  // Tapping a tile sends `select`; the app's rail-grid page routes it to the
+  // Tapping a tile. SYNCED: send `select`; the app's rail-grid routes it to the
   // item's detail/player and echoes the new context, which onContext follows to
-  // the existing companion L4 screen (no redesign).
-  function openItem(card) { api.sendIntent('select', { id: card.id }); }
+  // the existing companion L4 screen (no redesign). DESYNCED: open the item's
+  // detail page locally (series/album only — see tileOpenableDesynced), carrying
+  // the id so detail.html self-loads without the TV.
+  function openItemLocal(card) {
+    ({ true: function() { window.location.href = 'detail.html?id=' + encodeURIComponent(card.id); }, false: noop })[tileOpenableDesynced(cardRoute(card))]();
+  }
+  function openItem(card) {
+    ({ true: function() { openItemLocal(card); }, false: function() { api.sendIntent('select', { id: card.id }); } })[mode.isDesynced()]();
+  }
 
   // Back collapses exactly one level: grid -> its section's rails, rails -> the
   // root sections. Each step drives the TV through the same navigate() funnel.
@@ -334,17 +358,24 @@ export function initPage() {
   // it first arrives or changes. The active person rides the same snapshot
   // (FEAT-026 TASK-158) and keys Continue-Watching per person.
   function onAppState(snap) {
+    syncBar.updateStatus(snap);
     state.person = [snap.person].filter(Boolean).concat([state.person])[0];
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(loadCatalog);
-    reconcile(snap);
-    driveRestore();
+    // Following the TV's deep position is the inbound nav seam — gated when
+    // desynced (FEAT-038). Catalog/person/status still update (display + data).
+    ({ true: function() { reconcile(snap); driveRestore(); }, false: noop })[mode.drivesNav()]();
   }
 
   // Item/leaf contexts (detail/video/audio/profile) are real companion page
   // changes; browse + rail-grid both live on this drill page, so stay put.
-  function onContext(payload) {
+  function followContext(payload) {
     var page = screenPage(payload.context_id);
     [page].filter(function(p) { return !DRILL_CTX[p]; }).forEach(function(p) { window.location.href = p + '.html'; });
+  }
+  // Desynced, the companion does NOT follow the TV onto a new page (inbound nav
+  // seam gated); it stays on its own browse.
+  function onContext(payload) {
+    ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
   // BUG-007: Switch profile drives the TV back to the picker via the same
@@ -353,7 +384,16 @@ export function initPage() {
   function switchProfile() { api.sendIntent('navigate', switchProfileTarget()); }
   document.getElementById('switch-profile').addEventListener('click', switchProfile);
 
+  // Toggle handler: going DESYNCED re-renders to grey TV-driving controls and
+  // switch the tile taps to local opens; going SYNCED re-runs the reconnect path
+  // (reload) so the companion snaps back to wherever the TV now is.
+  function reSync() { window.location.reload(); }
+  function onToggle(desynced) {
+    ({ true: render, false: reSync })[desynced]();
+  }
+
   restoreTrail();
-  api = connect(wsUrl(host), onContext, function(s) { els.connStatus.textContent = s; }, onAppState, onDevices);
+  syncBar = mountSyncBar(mode, onToggle);
+  api = connect(wsUrl(host), onContext, function(s) { els.connStatus.textContent = s; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, setBound);
 }

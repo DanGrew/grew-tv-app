@@ -1,4 +1,4 @@
-import { screenPage, titleCase, skipLabel, displayTitle, displayLabel, getContentBasePath, filterByTitle, seriesIdFromSnap, tileHint } from '../../core/companion-utils.js';
+import { screenPage, titleCase, skipLabel, displayTitle, displayLabel, getContentBasePath, filterByTitle, seriesIdFromSnap, tileHint, tvStatusText, queryString } from '../../core/companion-utils.js';
 
 describe('tileHint', () => {
   it('returns the rounded resume percent for a mid-watch item', () => {
@@ -116,5 +116,29 @@ describe('skipLabel', () => {
   });
   it('falls back to Xs for unknown seconds', () => {
     expect(skipLabel('skip_back_45')).toBe('45s');
+  });
+});
+
+describe('tvStatusText (desync TV status strip)', () => {
+  it('shows a play icon + title when playing', () => {
+    expect(tvStatusText({ display: { title: 'Bluey' }, playing: true })).toBe('TV: ▶ Bluey');
+  });
+  it('shows a pause icon + title when paused', () => {
+    expect(tvStatusText({ display: { title: 'Bluey' }, playing: false })).toBe('TV: ❚❚ Bluey');
+  });
+  it('reads as idle with no title (menu) or no snapshot', () => {
+    expect(tvStatusText({ display: { title: '' }, playing: false })).toBe('TV: —');
+    expect(tvStatusText(null)).toBe('TV: —');
+  });
+});
+
+describe('queryString', () => {
+  it('returns empty for no/empty params', () => {
+    expect(queryString()).toBe('');
+    expect(queryString({})).toBe('');
+  });
+  it('builds and encodes a query', () => {
+    expect(queryString({ id: 'film 1' })).toBe('?id=film%201');
+    expect(queryString({ tab: 'music', rail: 'r1' })).toBe('?tab=music&rail=r1');
   });
 });
