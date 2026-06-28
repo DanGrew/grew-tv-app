@@ -33,6 +33,13 @@ async function openPlaylist(page, id) {
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="' + id + '"]').click();
   await expect(page).toHaveURL(/playlist-detail\.html/);
+  // Wait for the rows to render before the test interacts — the page wires the
+  // header buttons (#btn-add-all) during init, which finishes only once the async
+  // playlist load resolves and buildDetailList paints. URL alone is too early: a
+  // click on #btn-add-all before its listener attaches is a silent no-op and the
+  // add-sheet never opens (BUG-019). A first visible row is that init-complete
+  // signal (every openPlaylist target here has tracks).
+  await expect(page.locator('.detail-row').first()).toBeVisible();
 }
 
 // --- album-detail: add the whole album --------------------------------------

@@ -101,11 +101,19 @@ export function setup(config) {
     [wakeLock].filter(Boolean).forEach(function(wl) { wl.release(); wakeLock = null; });
   }
 
+  // Auto-hide skips while the Reset is armed: a destructive two-press confirm must
+  // not vanish (and silently disarm via blur) under the viewer — it stays up until
+  // they act or move focus off it. While armed we just re-arm the timer instead of
+  // hiding (BUG-019: removes the controls-hide-vs-arm race for good).
+  function hideControls() {
+    var armed = document.getElementById('btn-reset').getAttribute('data-armed') === '1';
+    ({ true: showControls, false: function() { document.getElementById('controls').classList.add('hidden'); } })[armed]();
+  }
   function showControls() {
     var c = document.getElementById('controls');
     c.classList.remove('hidden');
     clearTimeout(controlsTimer);
-    controlsTimer = setTimeout(function() { c.classList.add('hidden'); }, 3000);
+    controlsTimer = setTimeout(hideControls, 3000);
   }
 
   function updateProgress() {

@@ -136,6 +136,28 @@ load but passes them in isolation. So **green-in-isolation + red-under-parallel
 reason about whether your diff can even reach the failing suite. Re-running the
 full suite repeatedly to "make sure" wastes time and tokens for no signal.
 
+**The residual flake is a test-side settle-signal gap, not an app bug (BUG-019,
+diagnosed 2026-06-28).** TASK-126 already killed the dominant cause (the live-WS
+person-lock collision — the `installApi` default `person_active` stub). What
+remained were tests that assert before the screen actually settles. Two confirmed
+mechanisms, both fixed in `player-reset` / `playlist-bulk-add`:
+- **Auto-hide timer disarms a control mid-test.** The video player hides
+  `#controls` 3s after the last input (`screen-video-player.js showControls`);
+  when they hide, a focused button blurs. The video Reset tests armed `#btn-reset`
+  then asserted `Reset?` — under load the 3s elapsed first, blur fired, the button
+  disarmed back to `Reset`. **Fix: press a d-pad key (`ArrowDown`) right before
+  arming** to re-kick the timer — exactly what the audio Reset tests already do.
+- **Interacting before init wires the handlers.** A nav helper that awaits only
+  `toHaveURL` lets the test click a header button (`#btn-add-all`) before the
+  page's async load → `buildDetailList` has attached its click listener; the click
+  is a silent no-op and the sheet never opens. **Fix: await a render signal that
+  proves init finished** (e.g. `.detail-row` first row visible), like the
+  `openAlbum` helper does — never `toHaveURL`-then-interact.
+Rule for new suites: **await the real post-nav settle signal (a rendered row /
+the element you're about to use), never just the URL; and keep auto-hiding player
+controls alive with a key press before interacting.** Don't paper over either
+with `--retries`.
+
 **Running e2e from a secondary worktree — use your own port.** The Playwright
 `webServer` is a `python3 -m http.server 3456` with `reuseExistingServer` on
 (non-CI). If another worktree/session already has a server on `:3456`, your run

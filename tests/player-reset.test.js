@@ -52,8 +52,12 @@ test('video Reset needs two presses, DELETEs progress, then exits the player', a
   await page.locator(`.film-tile[data-id="${FILM}"]`).first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
   const methods = await captureProgress(page);
-  // Keep the controls up before interacting (they auto-hide after a few seconds).
+  // Keep the controls up before interacting (they auto-hide 3s after the last
+  // input). A d-pad key re-kicks that timer right before we arm, so under parallel
+  // load the auto-hide can't blur — and silently disarm — the Reset mid-test
+  // (BUG-019; mirrors the audio Reset tests below).
   await page.locator('#screen-video').click();
+  await page.keyboard.press('ArrowDown');
   const reset = page.locator('#btn-reset');
   await reset.click();
   await expect(reset).toHaveText('Reset?');
@@ -69,7 +73,11 @@ test('blurring an armed video Reset disarms it', async ({ page }) => {
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator(`.film-tile[data-id="${FILM}"]`).first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
+  // Re-kick the 3s controls auto-hide before arming so it can't blur-disarm the
+  // Reset under us — we want the BLUR from focusing play-pause to be the only
+  // thing that disarms it (BUG-019).
   await page.locator('#screen-video').click();
+  await page.keyboard.press('ArrowDown');
   const reset = page.locator('#btn-reset');
   await reset.click();
   await expect(reset).toHaveText('Reset?');
