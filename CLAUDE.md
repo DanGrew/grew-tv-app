@@ -160,10 +160,10 @@ E2E tests run in CI only.
 
 ### Running the gates by hand
 
-Node is not on PATH — it lives at `~/.local/node/bin` (fallback `/opt/homebrew/bin`):
-```bash
-export PATH="$HOME/.local/node/bin:/opt/homebrew/bin:$PATH"
-```
+Node lives at `~/.local/node/bin` (fallback `/opt/homebrew/bin`). On Dan's dev
+mac it is already on `PATH` via `~/.claude/settings.json` `env.PATH` (see
+`grew-tv/docs/dev-machine-setup.md`), so just run `node`/`npx` directly. If a
+shell lacks it, fall back to `export PATH="$HOME/.local/node/bin:/opt/homebrew/bin:$PATH"`.
 The pre-push hook is non-executable, so **CI is the real gate** — run the checks
 yourself before pushing. `arch-check.js` and `tv-check.js` are per-rule: each
 takes `<rule> <outputFile>` (bare invocation just prints usage). The canonical
@@ -282,8 +282,9 @@ Do NOT `git checkout -b`/branch-switch the primary tree. (A worktree pins HEAD
 per directory, so a stash/checkout slip can't silently drop your commit onto
 `main` in the shared tree — that exact failure happened once on the old
 "plain branch in primary" convention.) A fresh worktree has no `node_modules` —
-symlink the primary's for gate runs, but `rm` it before `git add -A` so the
-ignore miss (`node_modules/` with a slash) doesn't commit the symlink.
+symlink the primary's for gate runs (`ln -s ../grew-tv-app/node_modules
+node_modules`); `.gitignore` lists `node_modules` (NO trailing slash) so the
+symlink is ignored and `git add -A` won't commit it — no manual `rm` step needed.
 
 **`cd` into the repo/worktree before any `git` — never `git -C <path>`.** A
 session's cwd starts at `/Users/dan` (above the repos), but the perm allowlist
@@ -309,5 +310,7 @@ end of the reply.
 - macOS (Homebrew): `/opt/homebrew/bin/gh`
 - Windows: `"/c/Program Files/GitHub CLI/gh.exe"`
 
-**Node:** not on PATH — lives at `~/.local/node/bin` (fallback `/opt/homebrew/bin`):
-`export PATH="$HOME/.local/node/bin:/opt/homebrew/bin:$PATH"`
+**Node:** lives at `~/.local/node/bin` (fallback `/opt/homebrew/bin`). Already on
+`PATH` via `~/.claude/settings.json` `env.PATH` on Dan's dev mac (see
+`grew-tv/docs/dev-machine-setup.md`) — run `node`/`npx` directly, no `export`.
+Fallback for a shell without it: `export PATH="$HOME/.local/node/bin:/opt/homebrew/bin:$PATH"`
