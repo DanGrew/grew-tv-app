@@ -2,7 +2,7 @@ import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { playbackAction } from '../../core/app-api.js';
 import { companionQueueHtml } from '../../core/queue-view.js';
-import { screenPage, displayTitle } from '../../core/companion-utils.js';
+import { screenPage } from '../../core/companion-utils.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 
@@ -26,7 +26,6 @@ export function initPage() {
   var state = { person: null };
   var api = {};
   var mode = createCompanionMode();
-  var syncBar = null;
   function noop() {}
   // FEAT-038 (TASK-230): the switch only changes mode. BROWSE greys the queue
   // actions in place (body.browsing) so nothing disturbs playback; reach the
@@ -61,7 +60,6 @@ export function initPage() {
   // The active person rides the app_state (TASK-158); the POSTs key per person
   // off it, exactly as the companion's Continue-Watching reads do.
   function onAppState(snap) {
-    syncBar.setPlaying(snap.playing);
     [snap.person].filter(Boolean).forEach(function(p) { state.person = p; });
   }
 
@@ -73,13 +71,12 @@ export function initPage() {
     [page].filter(function(p) { return p !== 'audio'; }).forEach(function(p) { window.location.href = p + '.html'; });
   }
   function onContext(payload) {
-    syncBar.setTitle(displayTitle(payload));
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
   els.back.addEventListener('click', function() { window.location.href = 'audio.html'; });
   render(null);
-  syncBar = mountSyncBar(mode, onModeChange);
+  mountSyncBar(mode, onModeChange);
   applyMode();
   api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, noop, { onPlayback: render, mode: mode });
 }

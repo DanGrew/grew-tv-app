@@ -1,7 +1,7 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
-import { screenPage, filterByTitle, tileHint, displayTitle } from '../../core/companion-utils.js';
+import { screenPage, filterByTitle, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -67,7 +67,6 @@ export function initPage() {
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
-  var syncBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
@@ -360,7 +359,6 @@ export function initPage() {
   // it first arrives or changes. The active person rides the same snapshot
   // (FEAT-026 TASK-158) and keys Continue-Watching per person.
   function onAppState(snap) {
-    syncBar.setPlaying(snap.playing);
     state.person = [snap.person].filter(Boolean).concat([state.person])[0];
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(loadCatalog);
     // Following the TV's deep position is the inbound nav seam — gated when
@@ -377,7 +375,6 @@ export function initPage() {
   // The status strip title rides the context (both modes); only the nav-follow is
   // gated — desynced, the companion stays on its own browse.
   function onContext(payload) {
-    syncBar.setTitle(displayTitle(payload));
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
@@ -390,13 +387,17 @@ export function initPage() {
   // Toggle handler: going DESYNCED re-renders to grey TV-driving controls and
   // switch the tile taps to local opens; going SYNCED re-runs the reconnect path
   // (reload) so the companion snaps back to wherever the TV now is.
-  function reSync() { window.location.reload(); }
+  // Re-sync = jump to where the TV IS. Clear the local browse trail first, so the
+  // reloaded (synced) browse does NOT driveRestore the companion's last drilled
+  // spot onto the TV (that stray rail-grid navigate was driving the TV to the
+  // Playlists rail + 404ing). With no trail it starts clean and follows the TV.
+  function reSync() { clearTrail(); window.location.reload(); }
   function onToggle(desynced) {
     ({ true: render, false: reSync })[desynced]();
   }
 
   restoreTrail();
-  syncBar = mountSyncBar(mode, onToggle);
+  mountSyncBar(mode, onToggle);
   api = connect(wsUrl(host), onContext, function(s) { els.connStatus.textContent = s; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, setBound);
 }

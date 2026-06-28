@@ -1,7 +1,7 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist } from '../../core/app-api.js';
-import { screenPage, tileHint, displayTitle, queryString } from '../../core/companion-utils.js';
+import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { playlistCards } from '../../core/playlist-pick.js';
@@ -38,7 +38,6 @@ export function initPage() {
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
-  var syncBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
@@ -274,7 +273,6 @@ export function initPage() {
   }
   // Status strip title always; nav-follow gated in Browse mode.
   function onContext(payload) {
-    syncBar.setTitle(displayTitle(payload));
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
@@ -282,7 +280,6 @@ export function initPage() {
   // TASK-158 — person rides the app_state; reloads when it changes). The track
   // list itself is id-addressed (loadPlaylist), so it does not depend on profile.
   function onAppState(snap) {
-    syncBar.setPlaying(snap.playing);
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(function(p) { state.profile = p; });
     [snap.person].filter(Boolean).filter(function(p) { return p !== state.person; }).forEach(function(p) {
       state.person = p;
@@ -290,7 +287,7 @@ export function initPage() {
     });
   }
 
-  syncBar = mountSyncBar(mode, onModeChange);
+  mountSyncBar(mode, onModeChange);
   applyMode();
   // Browse-mode entry: browse linked here with ?id=…, so load that playlist
   // ourselves (loadPlaylist / /api/playlist) instead of waiting for the TV echo.

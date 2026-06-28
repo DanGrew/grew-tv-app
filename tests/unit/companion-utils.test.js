@@ -1,4 +1,4 @@
-import { screenPage, titleCase, skipLabel, displayTitle, displayLabel, getContentBasePath, filterByTitle, seriesIdFromSnap, tileHint, tvStatusText, queryString } from '../../core/companion-utils.js';
+import { screenPage, titleCase, skipLabel, displayTitle, displayLabel, getContentBasePath, filterByTitle, seriesIdFromSnap, tileHint, queryString } from '../../core/companion-utils.js';
 
 describe('tileHint', () => {
   it('returns the rounded resume percent for a mid-watch item', () => {
@@ -116,21 +116,6 @@ describe('skipLabel', () => {
   });
   it('falls back to Xs for unknown seconds', () => {
     expect(skipLabel('skip_back_45')).toBe('45s');
-  });
-});
-
-describe('tvStatusText (desync TV status strip)', () => {
-  // Title comes from the context message, playing from app_state — passed in
-  // separately (app_state carries no title, the bug behind a stuck "TV: —").
-  it('shows a play icon + title when playing', () => {
-    expect(tvStatusText('Bluey', true)).toBe('TV: ▶ Bluey');
-  });
-  it('shows a pause icon + title when paused', () => {
-    expect(tvStatusText('Bluey', false)).toBe('TV: ❚❚ Bluey');
-  });
-  it('reads as idle with no title (menu)', () => {
-    expect(tvStatusText('', false)).toBe('TV: —');
-    expect(tvStatusText(undefined, true)).toBe('TV: —');
   });
 });
 

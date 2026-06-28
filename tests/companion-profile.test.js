@@ -55,6 +55,17 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('.cmp-card[data-id="oliver"]')).toBeVisible();
 });
 
+// FEAT-038 (DSYNC-2c): picking a profile is a session start, so a leftover Browse
+// flag must reset to Control — otherwise the new profile's browse stays desynced
+// and never follows the TV (the "no series available" bug).
+test('opening the profile picker resets a leftover Browse mode to Control', async ({ page }) => {
+  await page.evaluate(() => sessionStorage.setItem('grew-tv:companion-mode', 'desynced'));
+  await page.reload();
+  await expect(page.locator('.cmp-card[data-id="oliver"]')).toBeVisible();
+  const mode = await page.evaluate(() => sessionStorage.getItem('grew-tv:companion-mode'));
+  expect(mode).toBe('synced');
+});
+
 // Mirror of the app two-row grouping: kids cards on one row, adults on another.
 test('groups the cards into a kids row and an adults row', async ({ page }) => {
   await expect(page.locator('.cmp-cards')).toHaveCount(2);

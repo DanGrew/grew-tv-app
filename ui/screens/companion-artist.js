@@ -1,7 +1,7 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
-import { screenPage, tileHint, displayTitle, queryString } from '../../core/companion-utils.js';
+import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { albumsByArtist } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -36,7 +36,6 @@ export function initPage() {
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
-  var syncBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
@@ -155,14 +154,12 @@ export function initPage() {
   }
   // Status strip title always; nav-follow gated in Browse mode.
   function onContext(payload) {
-    syncBar.setTitle(displayTitle(payload));
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
   // Profile keys the catalog + the Continue-Watching set that tints album bars
   // (FEAT-026 TASK-158 — person rides the app_state; reloads when it changes).
   function onAppState(snap) {
-    syncBar.setPlaying(snap.playing);
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(function(p) {
       state.profile = p;
       loadAlbums();
@@ -173,7 +170,7 @@ export function initPage() {
     });
   }
 
-  syncBar = mountSyncBar(mode, onModeChange);
+  mountSyncBar(mode, onModeChange);
   applyMode();
   // Browse-mode entry: browse linked here with ?id=<artist>, so seed the artist
   // ourselves (captureArtist loads its albums once the profile arrives).

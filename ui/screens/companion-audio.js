@@ -41,7 +41,6 @@ export function initPage() {
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
-  var syncBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
@@ -199,7 +198,6 @@ export function initPage() {
   }
 
   function onAppState(snap) {
-    syncBar.setPlaying(snap.playing);
     state.snap = snap;
     capturePerson(snap);
     renderControls();
@@ -218,7 +216,6 @@ export function initPage() {
   // The TV status strip title rides the context (both modes); only the nav-follow
   // is gated in Browse mode.
   function onContext(payload) {
-    syncBar.setTitle(displayTitle(payload));
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
@@ -259,7 +256,7 @@ export function initPage() {
   buildJump();
   setInterval(renderBar, 250);
 
-  syncBar = mountSyncBar(mode, onModeChange);
+  mountSyncBar(mode, onModeChange);
   applyMode();
   api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);

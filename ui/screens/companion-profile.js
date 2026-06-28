@@ -14,11 +14,16 @@ import {
   defaultConfig, parseConfig, isLocked, pinMatches, pushDigit, popDigit, isPinComplete, dotFill, personGlyph
 } from '../../core/profile-config.js';
 import { groupRows } from '../../core/profile-rows.js';
+import { createCompanionMode } from '../../core/companion-mode.js';
 
 var KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'ok'];
 var KEY_LABEL = { back: '⌫', ok: '✓' };
 
 export function initPage() {
+  // FEAT-038 (DSYNC-2c): picking a profile is a fresh session start — reset the
+  // persisted Browse flag to Control, so the new profile's browse follows the TV
+  // instead of staying desynced from a leftover Browse toggle.
+  createCompanionMode().setSynced();
   var host = window.location.hostname;
   var server = 'http://' + host + ':8765';
   var els = {
