@@ -58,12 +58,17 @@ test.beforeEach(async ({ page }) => {
 // FEAT-038 (DSYNC-2c): picking a profile is a session start, so a leftover Browse
 // flag must reset to Control — otherwise the new profile's browse stays desynced
 // and never follows the TV (the "no series available" bug).
-test('opening the profile picker resets a leftover Browse mode to Control', async ({ page }) => {
-  await page.evaluate(() => sessionStorage.setItem('grew-tv:companion-mode', 'desynced'));
+test('opening the profile picker resets Browse mode AND clears a stale drill trail', async ({ page }) => {
+  await page.evaluate(() => {
+    sessionStorage.setItem('grew-tv:companion-mode', 'desynced');
+    // A leftover Music drill (from browsing playlists in Browse mode) — must not
+    // survive into the next profile, or its browse jumps to Music instead of Home.
+    sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([{ page: 'browse.html', params: { tab: 'music' }, label: 'Albums' }]));
+  });
   await page.reload();
   await expect(page.locator('.cmp-card[data-id="oliver"]')).toBeVisible();
-  const mode = await page.evaluate(() => sessionStorage.getItem('grew-tv:companion-mode'));
-  expect(mode).toBe('synced');
+  expect(await page.evaluate(() => sessionStorage.getItem('grew-tv:companion-mode'))).toBe('synced');
+  expect(await page.evaluate(() => sessionStorage.getItem('grew-tv:nav-trail'))).toBeNull();
 });
 
 // Mirror of the app two-row grouping: kids cards on one row, adults on another.
