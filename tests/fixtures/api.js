@@ -532,4 +532,97 @@ async function installPlaybackBackend(page) {
   return { seed: seed, snapshot: snapshot };
 }
 
-module.exports = { VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, BROWSE, CONFIG, nextOf, installApi, installPlaybackBackend };
+// FEAT-037 (TASK-222): the VIDEO twin of installPlaybackBackend — a faithful mini
+// video-playback backend for the persistent-player e2e. The series/boxset player is
+// server-authoritative: it POSTs to /api/video-playback/{action} and renders the
+// `video_playback` snapshot the server pushes over the per-person WS relay (a
+// SEPARATE channel from music). This applies the index-based TASK-220 engine
+// (next/prev walk + repeat-wrap, repeat defaults ON for a series) and pushes the
+// resolved snapshot, the same HTTP-action -> WS-snapshot loop the real backend runs.
+function seriesOrderIds(id) {
+  var s = SERIES[id];
+  return s ? s.items.map(function(it) { return it.video.id; }) : [];
+}
+
+async function installVideoPlaybackBackend(page) {
+  var state = { sourceType: null, sourceId: null, idx: 0, repeat: false };
+  var live = null;
+  function order() { return seriesOrderIds(state.sourceId); }
+  function resolve(id) {
+    var v = VIDEOS[id] || { id: id };
+    return { item_id: id, title: v.title, poster: v.poster, duration: v.duration, subtitles: v.subtitles, type: v.type, ext: v.ext };
+  }
+  function snapshot() {
+    var o = order();
+    return {
+      person_id: 'kids',
+      now_playing: [o[state.idx]].filter(Boolean).map(resolve).concat([null])[0],
+      current_item_index: state.idx,
+      items: o.map(resolve),
+      source_type: state.sourceType, source_id: state.sourceId,
+      repeat: state.repeat, shuffle: false
+    };
+  }
+  function push() {
+    [live].filter(Boolean).forEach(function(ws) { ws.send(JSON.stringify({ type: 'video_playback', payload: snapshot() })); });
+  }
+  function wrap(i, len) { return ((i % len) + len) % len; }
+
+  var ENGINE = {
+    // repeat defaults ON for a series (the 'start again' loop) when not sent;
+    // item_id starts on a chosen member (else item 0).
+    'play-source': function(b) {
+      state.sourceType = b.source_type; state.sourceId = b.source_id;
+      state.repeat = b.repeat === undefined ? true : !!b.repeat;
+      var i = order().indexOf(b.item_id);
+      state.idx = i >= 0 ? i : 0;
+    },
+    'next': function() {
+      var len = order().length;
+      if (!len) return;
+      state.idx = state.repeat ? wrap(state.idx + 1, len) : Math.min(state.idx + 1, len - 1);
+    },
+    'previous': function() {
+      var len = order().length;
+      if (!len) return;
+      state.idx = state.repeat ? wrap(state.idx - 1, len) : Math.max(state.idx - 1, 0);
+    },
+    'toggle-repeat': function() { state.repeat = !state.repeat; },
+    'position': function() {}
+  };
+  var NO_BROADCAST = { position: true };
+
+  await page.routeWebSocket(/:8766/, function(ws) {
+    live = ws;
+    function reply(type, payload) { ws.send(JSON.stringify({ type: type, payload: payload })); }
+    // Reconnect-restore: replay the latest snapshot so the player re-syncs.
+    [state.sourceType].filter(Boolean).forEach(push);
+    // The device/person handshake the screens run through on the way to the player
+    // (TASK-158): grant the lock + answer device listing so the picker proceeds.
+    ws.onMessage(function(raw) {
+      var m = JSON.parse(raw);
+      var REPLY = {
+        list_devices:    function() { reply('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }); },
+        activate_person: function() { [m.payload.person_id].filter(Boolean).forEach(function(pid) { reply('person_active', { person_id: pid }); }); },
+        register_companion: function() {},
+        snapshot_request: function() {
+          reply('context', { context_id: 'video', version: 1 });
+          reply('app_state', { person: 'kids', profile: 'kids', screen: 'player' });
+          push();
+        }
+      };
+      [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
+    });
+  });
+  await page.route('**/api/video-playback/*', function(route) {
+    var action = decodeURIComponent(route.request().url().split('/api/video-playback/')[1].split('?')[0]);
+    var body = JSON.parse(route.request().postData() || '{}');
+    [ENGINE[action]].filter(Boolean).forEach(function(fn) { fn(body); });
+    route.fulfill({ status: 204, body: '' });
+    [NO_BROADCAST[action]].filter(function(x) { return !x; }).forEach(push);
+  });
+  function seed(action, body) { [ENGINE[action]].filter(Boolean).forEach(function(fn) { fn(body || {}); }); }
+  return { seed: seed, snapshot: snapshot };
+}
+
+module.exports = { VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, BROWSE, CONFIG, nextOf, installApi, installPlaybackBackend, installVideoPlaybackBackend };

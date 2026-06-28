@@ -3,111 +3,117 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadVideo, loadNext, loadSeries, loadProgress } from '../../core/app-api.js';
-import { firstItem, upNextParts } from '../../core/series-detail.js';
+import { loadVideo, loadSeries, loadProgress, videoPlaybackAction } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
+import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
-// Derive the backend from the page origin, NOT a hardcoded host (BUG-009): the
-// media-manager serves app + API + media from one origin, but binds 0.0.0.0, so
-// the app can be opened at localhost OR 0.0.0.0 OR a LAN IP. A hardcoded
-// 'http://localhost:8765' then mismatches the page origin and the browser blocks
-// the cross-origin <track> .vtt (subs vanish) while the .mp4 still plays. Using
-// location.origin keeps media same-origin on whatever host the app loads from.
+// FEAT-037 (TASK-222) — the PERSISTENT video player document. Replaces the old
+// per-episode video.html reload: the <video> element lives for the whole play
+// session and media swaps in place.
+//
+// A SERIES/BOXSET is SERVER-AUTHORITATIVE (mirrors the music page, FEAT-031): on
+// entry the page fires a `play-source` action and thereafter renders the
+// `video_playback` snapshot the backend pushes (TASK-221) — next/previous and the
+// auto-advance fire actions and wait for the next snapshot, which swaps media in
+// place (no page reload). core/video-player-router turns each snapshot into the
+// view-model applied below.
+//
+// A STANDALONE FILM has no engine source type, so it stays a direct load — there
+// is nothing to advance to. Both paths resume from watch_progress (the single
+// source of truth for per-item position; the player saves there as it plays).
 var SERVER = window.location.origin;
 
-// Resume start: explicit restart -> 0; otherwise the backend resume position
-// when the video is still mid-watch (finished/unwatched -> 0). Backend is the
-// source of truth — no localStorage read.
 var RESUME_BY_RESTART = {
   'true':  function() { return 0; },
   'false': function(prog) { return [prog.position_secs].filter(function(p) { return isMidWatch(p, prog.duration_secs); }).concat([0])[0]; }
 };
 function resumeStart(restart, prog) { return RESUME_BY_RESTART[!!restart + ''](prog); }
+function zeroProgress() { return { position_secs: 0, duration_secs: null }; }
 var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 
 export function initVideoPage() {
   var videoId  = getParam('video');
   var seriesId = getParam('series');
+  var restart  = getParam('restart');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
+  var person   = getPerson();
+  var isSeries = !!seriesId;
   var wsApp = null;
   var player;
+  var snapshot = null;     // latest video_playback snapshot (series mode only)
+  var loadedId = null;     // which item id is currently loaded in <video>
+  var currentTitle = '';   // current item's title (for the breadcrumb leaf)
+  var seriesTitle = null;  // cached series title for the middle crumb
 
-  function goTo(id) { navTo('video.html', { video: id, series: seriesId, from: from }); }
+  function sendAction(action, body) { videoPlaybackAction(SERVER, action, person, body).catch(function() {}); }
 
-  // Breadcrumb trail (FEAT-021): a film is Home > Title; a series episode is
-  // Home > Series > Episode, so the series crumb needs the series title (fetched;
-  // graceful fallback to 'Series' when /api/series is unavailable). The trail's
-  // leaf carries the video title, so the player needs no separate big title.
-  function mountCrumbs(videoTitle, seriesTitle) {
-    mountBreadcrumb('breadcrumb', buildCrumbs('video', { seriesId: seriesId, seriesTitle: seriesTitle, videoTitle: videoTitle }));
+  // Breadcrumb (FEAT-021): a film is Home > Title; a series episode is Home >
+  // Series > Episode. The series title is fetched once (graceful 'Series'
+  // fallback); the leaf carries the current item title and is rebuilt on each swap.
+  function mountCrumbs() {
+    mountBreadcrumb('breadcrumb', buildCrumbs('video', {
+      seriesId: seriesId,
+      seriesTitle: [seriesTitle].filter(Boolean).concat(['Series'])[0],
+      videoTitle: currentTitle
+    }));
   }
-  var CRUMB_BUILD = {
-    'true': function(videoTitle) {
-      loadSeries(SERVER, seriesId)
-        .then(function(s) { mountCrumbs(videoTitle, s.title); })
-        .catch(function() { mountCrumbs(videoTitle, 'Series'); });
-    },
-    'false': function(videoTitle) { mountCrumbs(videoTitle, null); }
-  };
-  function buildVideoCrumbs(videoTitle) { CRUMB_BUILD[!!seriesId + ''](videoTitle); }
-
-  // Wrap to the series' first episode (BUG-005: loop last->first, never stop).
-  function wrapToFirst(action) {
+  function ensureSeriesTitle() {
     loadSeries(SERVER, seriesId)
-      .then(function(s) { [firstItem(s.items)].filter(Boolean).forEach(function(n) { action(n); }); })
-      .catch(function() { player.stop(); });
+      .then(function(s) { seriesTitle = s.title; mountCrumbs(); })
+      .catch(function() {});
   }
 
-  // Resolve the next episode, then act on it; at the end of the series, wrap
-  // round to the first episode (BUG-005) rather than stopping.
-  function loadNextThen(action) {
-    loadNext(SERVER, seriesId, videoId)
-      .then(function(d) {
-        [d.next].filter(Boolean).forEach(function(n) { action(n); });
-        [!d.next].filter(Boolean).forEach(function() { wrapToFirst(action); });
-      })
-      .catch(function() { player.stop(); });
+  // ── server `video_playback` snapshot -> UI (series, the source of truth) ─────
+  // The inline up-next line is set AFTER playVideo (which clears it) so the async
+  // swap can't wipe a freshly-set line.
+  function renderUpNextLine() {
+    [upNextLine(snapshot)].filter(Boolean).forEach(function(l) { player.setUpNext(l.prefix, l.label); });
   }
 
-  // Autoplay at true 100% end: within a series, 5s "Up next" countdown then
-  // advance — wrapping last->first at the end of the series (BUG-005); a
-  // standalone video returns to origin.
+  function swapVideo(np) {
+    loadedId = np.item_id;
+    currentTitle = np.title;
+    var restartThis = [restart].filter(Boolean).filter(function() { return np.item_id === videoId; })[0];
+    loadProgress(SERVER, np.item_id, person)
+      .catch(zeroProgress)
+      .then(function(prog) {
+        player.playVideo({ id: np.item_id, title: np.title, subtitles: np.subtitles }, from, resumeStart(restartThis, prog));
+        renderUpNextLine();
+        mountCrumbs();
+      });
+  }
+
+  // A changed now-playing swaps media in place; an unchanged one (a flag-only
+  // snapshot) just refreshes the up-next line (repeat can flip what's "next").
+  var SWAP = {
+    'true':  function(np) { swapVideo(np); },
+    'false': function()   { renderUpNextLine(); }
+  };
+  function renderNowPlaying(np) { SWAP[isSwap(loadedId, snapshot) + ''](np); }
+
+  function applySnapshot(snap) {
+    snapshot = snap;
+    player.setSeriesMode(seriesMode(snap));
+    [snap.now_playing].filter(Boolean).forEach(renderNowPlaying);
+  }
+
+  // Auto-advance at true 100% end (series): the next item -> a 5s "Up next"
+  // countdown then fire `next` (the snapshot wraps last->first when repeat is on);
+  // no next (no-repeat series end) -> stop back to origin.
   function advanceAuto() {
-    [seriesId].filter(Boolean).forEach(function() { loadNextThen(function(n) { player.startUpNext(n.video.title, function() { goTo(n.video.id); }); }); });
-    [!seriesId].filter(Boolean).forEach(function() { player.stop(); });
+    var next = upNextItem(snapshot);
+    ({
+      'true':  function() { player.startUpNext(next.title, function() { sendAction('next', {}); }); },
+      'false': function() { player.stop(); }
+    })[!!next + '']();
   }
 
-  // Manual ⏭ — immediate, no countdown. Standalone has no next: no-op.
-  function nextNow() {
-    [seriesId].filter(Boolean).forEach(function() { loadNextThen(function(n) { goTo(n.video.id); }); });
-  }
-
-  // Manual ⏮ — previous episode in series order (wraps). Standalone: no-op.
-  function previous() {
-    [seriesId].filter(Boolean).forEach(function() {
-      loadSeries(SERVER, seriesId)
-        .then(function(s) {
-          var items = [s.items].filter(Array.isArray).concat([[]])[0];
-          var idx = items.map(function(it) { return it.video.id; }).indexOf(videoId);
-          [items[(idx - 1 + items.length) % items.length]].filter(Boolean).filter(function() { return idx >= 0; }).forEach(function(p) { goTo(p.video.id); });
-        })
-        .catch(function() {});
-    });
-  }
-
-  // Prime the inline up-next line: the next episode's title, or "Start again" at
-  // the wrapping end of a series (upNextParts handles both). Series only — a
-  // standalone film has no up-next.
-  function showUpNextLine() {
-    [seriesId].filter(Boolean).forEach(function() {
-      loadNext(SERVER, seriesId, videoId)
-        .then(function(d) { var p = upNextParts(d.next); player.setUpNext(p.prefix, p.label); })
-        .catch(function() {});
-    });
-  }
+  var ON_ENDED = { 'true': advanceAuto, 'false': function() { player.stop(); } };
+  var ON_NEXT  = { 'true': function() { sendAction('next', {}); },     'false': function() {} };
+  var ON_PREV  = { 'true': function() { sendAction('previous', {}); }, 'false': function() {} };
 
   player = setupPlayer({
     video: document.getElementById('video'),
@@ -117,17 +123,16 @@ export function initVideoPage() {
         detail: function() { navTo('detail.html', { series: seriesId }); },
         browse: function() { navTo('browse.html'); }
       };
-      [STOP_NAV[from]].filter(Boolean).forEach(function(fn) { fn(); });
-      [!STOP_NAV[from]].filter(Boolean).forEach(function() { navTo('browse.html'); });
+      [STOP_NAV[from]].filter(Boolean).concat([function() { navTo('browse.html'); }])[0]();
     },
-    onEnded: advanceAuto,
-    onNext: nextNow,
-    onPrev: previous,
+    onEnded: function() { ON_ENDED[isSeries + ''](); },
+    onNext:  function() { ON_NEXT[isSeries + '']();  },
+    onPrev:  function() { ON_PREV[isSeries + '']();  },
     // Full app_state snapshot to the companion (FEAT-017): static context here,
     // live position/playing/captions added by the player.
     emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
     appContext: function() {
-      return { screen: 'player', itemId: [seriesId].filter(Boolean).concat([videoId])[0], episodeId: videoId, profile: profile };
+      return { screen: 'player', itemId: [seriesId].filter(Boolean).concat([loadedId, videoId]).filter(Boolean)[0], episodeId: [loadedId].filter(Boolean).concat([videoId])[0], profile: profile };
     },
     onIntent: function(intent) {
       var VIDEO_CTX = { play: true, video: true };
@@ -150,19 +155,34 @@ export function initVideoPage() {
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
-  wsApp = connectApp(wsUrl(window.location.hostname), appIntent);
+  wsApp = connectApp(wsUrl(window.location.hostname), appIntent, { onVideoPlayback: applySnapshot });
 
   document.addEventListener('keydown', dispatchKey);
 
-  var restart = getParam('restart');
-  // initCaptions seeds the global captions cache from the backend (FEAT-023)
-  // before playVideo reads it via getCaptions(); it never rejects (offline keeps
-  // the default), so it cannot fail the Promise.all.
-  Promise.all([
-    loadVideo(SERVER, videoId),
-    loadProgress(SERVER, videoId, getPerson()).catch(function() { return { position_secs: 0, duration_secs: null }; }),
+  // ── entry: series fires play-source (server then drives swaps); a standalone
+  // film loads directly. initCaptions seeds the global captions cache before the
+  // first playVideo reads it (FEAT-023); it never rejects.
+  function startSeries() {
+    mountCrumbs();
+    ensureSeriesTitle();
     initCaptions(SERVER)
-  ])
-    .then(function(res) { player.playVideo(res[0], from, resumeStart(restart, res[1])); player.setSeriesMode(!!seriesId); showUpNextLine(); buildVideoCrumbs(res[0].title); })
-    .catch(function() { navTo('error.html'); });
+      .then(function() { sendAction('play-source', { source_type: 'series', source_id: seriesId, item_id: videoId }); })
+      .catch(function() {});
+  }
+  function startSingle() {
+    player.setSeriesMode(false);
+    Promise.all([
+      loadVideo(SERVER, videoId),
+      loadProgress(SERVER, videoId, person).catch(zeroProgress),
+      initCaptions(SERVER)
+    ])
+      .then(function(res) {
+        loadedId = res[0].id;
+        currentTitle = res[0].title;
+        player.playVideo(res[0], from, resumeStart(restart, res[1]));
+        mountCrumbs();
+      })
+      .catch(function() { navTo('error.html'); });
+  }
+  ({ 'true': startSeries, 'false': startSingle })[isSeries + '']();
 }
