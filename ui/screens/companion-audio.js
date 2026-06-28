@@ -5,7 +5,7 @@ import { screenPage, displayTitle, queryString } from '../../core/companion-util
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
 import { trailCrumbs } from '../../core/breadcrumb.js';
-import { peek as peekTrail, clear as clearTrail } from '../../core/nav-trail.js';
+import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
@@ -68,7 +68,10 @@ export function initPage() {
   // navigate intent the other screens use.
   function localGo(page, params) { window.location.href = page + queryString(params); }
   function onCrumbNav(page, params) {
-    ({ 'true': clearTrail, 'false': noop })[String(Object.keys(params).length === 0)]();
+    // Trim the trail to the clicked ancestor (Home clears) so a later Back can't
+    // retrace past this jump (FEAT-032 stale-Back fix). Replaces the old
+    // clear-only-on-Home (an items crumb left the trail untrimmed).
+    trimOnCrumb(page, params);
     ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
   }
 

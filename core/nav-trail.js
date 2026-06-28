@@ -117,3 +117,19 @@ export function truncateTo(page, params) {
 export function clear() {
   sessionStorage.removeItem(KEY);
 }
+
+// A breadcrumb ancestor CLICK (a sideways/up jump): trim the trail so a later
+// Back can't retrace PAST where you jumped. The Home crumb (empty params) clears
+// the whole trail; any other ancestor truncates to itself (drops it + everything
+// deeper). This is the one call every companion crumb handler must make — without
+// it the trail only ever grew or cleared wholesale, so a stale top entry (e.g. an
+// old artist.html level) survived a sideways jump and drove the next screen's Back
+// to the wrong place (FEAT-032 stale-Back bug). truncateTo was built for exactly
+// this but was never wired in.
+export function trimOnCrumb(page, params) {
+  if (Object.keys(params || {}).length === 0) {
+    clear();
+    return;
+  }
+  truncateTo(page, params);
+}

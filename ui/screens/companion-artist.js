@@ -5,7 +5,7 @@ import { screenPage, tileHint, queryString } from '../../core/companion-utils.js
 import { progressMapFromCW } from '../../core/progress.js';
 import { albumsByArtist } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
-import { pushUnique as pushTrail } from '../../core/nav-trail.js';
+import { pushUnique as pushTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
@@ -61,6 +61,9 @@ export function initPage() {
   // Browse: a local hop to the library.
   function localGo(page, params) { window.location.href = page + queryString(params); }
   function navigate(page, params) {
+    // Trim the trail to the clicked ancestor (Home clears) so a later Back can't
+    // retrace past this jump (FEAT-032 stale-Back fix).
+    trimOnCrumb(page, params);
     ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
   }
   function mountCrumbs(artistName) {

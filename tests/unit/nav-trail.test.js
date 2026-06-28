@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { push, pop, peek, truncateTo, clear, pushUnique, entries } from '../../core/nav-trail.js';
+import { push, pop, peek, truncateTo, clear, pushUnique, entries, trimOnCrumb } from '../../core/nav-trail.js';
 
 // sessionStorage does not exist in the `node` vitest environment — back it with
 // a plain in-memory Map, the same vi.stubGlobal approach state.test.js uses for
@@ -94,6 +94,32 @@ describe('nav-trail', () => {
     it('clicking the Home crumb empties the trail', () => {
       deepTrail();
       truncateTo('browse.html', { tab: 'films' });
+      expect(peek()).toBe(null);
+    });
+  });
+
+  describe('trimOnCrumb (the wired-in crumb handler — FEAT-032 stale-Back fix)', () => {
+    function deepTrail() {
+      push(entry('browse.html', { tab: 'music' }, 0, 'rail-1'));
+      push(entry('artist.html', { artist: 'ELO' }, 0, 'album-2'));
+    }
+
+    it('trims to the clicked ancestor so a later Back cannot retrace past it', () => {
+      deepTrail();
+      // Tap the "ELO" artist crumb: it (and anything deeper) is dropped, Home stays.
+      trimOnCrumb('artist.html', { artist: 'ELO' });
+      expect(peek()).toEqual(entry('browse.html', { tab: 'music' }, 0, 'rail-1'));
+    });
+
+    it('the Home crumb (empty params) clears the whole trail', () => {
+      deepTrail();
+      trimOnCrumb('browse.html', {});
+      expect(peek()).toBe(null);
+    });
+
+    it('tolerates an undefined params object (Home) — clears', () => {
+      deepTrail();
+      trimOnCrumb('browse.html', undefined);
       expect(peek()).toBe(null);
     });
   });
