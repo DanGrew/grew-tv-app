@@ -20,7 +20,7 @@ test('click Kids shows the content-type sidebar, landing on Series', async ({ pa
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
   // No mid-watch -> no Continue tab; tabs follow content present, fixed order.
-  await expect(page.locator('.sidebar-tab')).toHaveText(['Series', 'Films', 'Home Movies']);
+  await expect(page.locator('.sidebar-tab')).toHaveText(['TV Series', 'Films', 'Home Movies']);
   // Default landing = first tab (Series); its genre rail holds Bluey.
   await expect(page.locator('.sidebar-tab[data-tab="series"]')).toHaveClass(/active/);
   await expect(page.locator('.rail-title')).toHaveText(['Animation']);
@@ -73,7 +73,7 @@ test('each content-type tab leads with a Continue Watching rail of its in-progre
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
   // No standalone Continue tab any more — it is a rail inside each tab.
-  await expect(page.locator('.sidebar-tab')).toHaveText(['Series', 'Films', 'Home Movies']);
+  await expect(page.locator('.sidebar-tab')).toHaveText(['TV Series', 'Films', 'Home Movies']);
   await expect(page.locator('.sidebar-tab[data-tab="continue"]')).toHaveCount(0);
 
   // Series tab (default landing) leads with a Continue Watching rail showing the

@@ -30,18 +30,18 @@ describe('buildCrumbs', () => {
   });
 
   it('rail-grid is Home > Section (clickable, ?tab=) > Rail leaf (FEAT-028)', () => {
-    var crumbs = buildCrumbs('rail-grid', { sectionId: 'series', sectionTitle: 'Series', railTitle: 'Preschool' });
+    var crumbs = buildCrumbs('rail-grid', { sectionId: 'series', sectionTitle: 'TV Series', railTitle: 'Preschool' });
     expect(crumbs).toHaveLength(3);
     expect(crumbs[0]).toMatchObject({ label: 'Home', page: 'browse.html', current: false });
-    expect(crumbs[1]).toMatchObject({ label: 'Series', page: 'browse.html', params: { tab: 'series' }, current: false });
+    expect(crumbs[1]).toMatchObject({ label: 'TV Series', page: 'browse.html', params: { tab: 'series' }, current: false });
     expect(crumbs[2]).toMatchObject({ label: 'Preschool', current: true });
   });
 
-  it('artist is Home > Albums (clickable, ?tab=music) > Artist leaf (FEAT-029)', () => {
+  it('artist is Home > Music (clickable, ?tab=music) > Artist leaf (FEAT-029)', () => {
     var crumbs = buildCrumbs('artist', { artistName: 'ELO' });
     expect(crumbs).toHaveLength(3);
     expect(crumbs[0]).toMatchObject({ label: 'Home', page: 'browse.html', current: false });
-    expect(crumbs[1]).toMatchObject({ label: 'Albums', page: 'browse.html', params: { tab: 'music' }, current: false });
+    expect(crumbs[1]).toMatchObject({ label: 'Music', page: 'browse.html', params: { tab: 'music' }, current: false });
     expect(crumbs[2]).toMatchObject({ label: 'ELO', current: true });
   });
 

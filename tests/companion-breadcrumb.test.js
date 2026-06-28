@@ -49,7 +49,7 @@ test('browse shows a single non-clickable Home crumb', async ({ page }) => {
   await expect(page.locator('#breadcrumb .crumb-link')).toHaveCount(0);
   // Guards the drill-down catalog render path (FEAT-028 / TASK-168: L1 is a row
   // of server-driven section chips, not a content-type tab strip).
-  await expect(page.locator('#sections-row .chip')).toHaveText(['Series', 'Films', 'Home Movies']);
+  await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
 });
 
 test('detail shows Home (clickable) then the series as current', async ({ page }) => {

@@ -206,7 +206,7 @@ describe('buildTabRails', () => {
   });
 });
 
-// FEAT-027 — music: a Music section (tab titled "Albums"); albums/playlists are
+// FEAT-027 — music: a Music section (tab titled "Music"); albums/playlists are
 // series cards with section:"music". A track is never a standalone browse card
 // (a single is a 1-track album), so there is no audio-single card and no Singles
 // rail. Routing/grouping is by `section`, never `format`/`mediaType`.
@@ -217,9 +217,9 @@ const MUSIC = [
 ];
 
 describe('music section routing (FEAT-027)', () => {
-  it('adds a Music tab (titled Albums) when music is present, after the video tabs', () => {
+  it('adds a Music tab (titled Music) when music is present, after the video tabs', () => {
     expect(buildTabs(MUSIC).map(t => t.id)).toEqual(['films', 'music']);
-    expect(Object.fromEntries(buildTabs(MUSIC).map(t => [t.id, t.title]))['music']).toBe('Albums');
+    expect(Object.fromEntries(buildTabs(MUSIC).map(t => [t.id, t.title]))['music']).toBe('Music');
   });
 
   it('keeps album cards off the Series tab (an album isn’t a series-tab card)', () => {

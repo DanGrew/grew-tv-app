@@ -55,10 +55,10 @@ function railGridCrumbs(ctx) {
   return [home(), sectionLink(ctx), leaf(ctx.railTitle)];
 }
 
-// FEAT-029 artist drill-down: Home › Albums (the Music tab) › Artist. The Albums
+// FEAT-029 artist drill-down: Home › Music (the Music tab) › Artist. The Music
 // crumb returns to the browse page on the music tab (browse honours ?tab=).
 function albumsLink() {
-  return link('Albums', HOME_PAGE, { tab: 'music' });
+  return link('Music', HOME_PAGE, { tab: 'music' });
 }
 
 function artistCrumbs(ctx) {
