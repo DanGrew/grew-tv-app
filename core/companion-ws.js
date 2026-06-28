@@ -117,6 +117,16 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices, opts)
       playback: function() {
         [o.onPlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
       },
+      // FEAT-037 (TASK-223): the server-authoritative VIDEO `playback` snapshot, on
+      // its OWN per-person channel (kept separate from music's `playback`). The same
+      // snapshot the persistent TV player renders (app-ws.js onVideoPlayback) — the
+      // companion video player drives next/previous/toggle-repeat over /api/video-
+      // playback and repaints now-playing / up-next / repeat from this, so it mirrors
+      // the TV instead of inferring transport from the 1 Hz app_state. Replayed on
+      // (re)connect via snapshot_request so the companion re-syncs.
+      video_playback: function() {
+        [o.onVideoPlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
+      },
       // FEAT-026 person-plane verdicts for a companion-initiated person pick. The
       // backend replies to whoever SENT activate_person (it reads device_id from
       // the payload, not the socket), so when the companion activates a person on

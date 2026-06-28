@@ -34,6 +34,8 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 .transport button:active { background: var(--surface-hi); border-color: var(--focus); color: var(--focus); }
 .transport .cc { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
 .transport .cc.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
+.transport .rp.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
+.transport button.single { opacity: 0.35; pointer-events: none; }
 .reset-btn { width: 100%; margin-top: 12px; padding: 14px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--surface); color: var(--text-muted); font-size: 16px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .reset-btn.confirm { border-color: #ffce6b; color: #ffce6b; }
 .jump { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
@@ -84,6 +86,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
   <button id="c-prev" aria-label="Previous">⏮</button>
   <button id="c-toggle" aria-label="Play/Pause">⏯</button>
   <button id="c-next" aria-label="Next">⏭</button>
+  <button id="c-repeat" class="rp" aria-label="Repeat">🔁</button>
   <button id="c-cc" class="cc" aria-label="Subtitles">CC</button>
 </div>
 <div class="transport">

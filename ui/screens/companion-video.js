@@ -1,7 +1,8 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadNext, loadSeries } from '../../core/app-api.js';
+import { loadSeries, videoPlaybackAction } from '../../core/app-api.js';
 import { screenPage, displayTitle, seriesIdFromSnap, queryString } from '../../core/companion-utils.js';
+import { nowPlaying, upNextLine, seriesMode } from '../../core/video-player-router.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -10,9 +11,16 @@ import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 
-// Companion player transport (FEAT-017). Read-only progress bar interpolated
-// locally between 1 Hz app_state snapshots; graduated discrete jumps + prev/next
-// /captions relayed as intents. No scrub — seek is a relative skip(deltaSec).
+// Companion player transport (FEAT-017 + FEAT-037/TASK-223). Two planes, by design
+// (the music-companion migration hasn't landed yet, so the shared intent rail must
+// stay). PLANE B — server-authoritative video engine: prev/next/repeat POST to
+// /api/video-playback for the active person and now-playing / up-next / repeat
+// repaint from the per-person `video_playback` snapshot (onVideoPlayback), the SAME
+// snapshot the persistent TV player renders — so a media change the companion drives
+// swaps the TV in place, no forced reload. PLANE A — the legacy WS intent rail still
+// carries play/pause, graduated skip, captions, volume and reset (the <video>'s own
+// transport has no server action); the progress bar is interpolated locally between
+// 1 Hz app_state snapshots. No scrub — seek is a relative skip(deltaSec).
 var JUMP = [
   { d: -10, label: '-10s' }, { d: -30, label: '-30s' }, { d: -120, label: '-2m' }, { d: -600, label: '-10m' }, { d: -1800, label: '-30m' },
   { d: 10, label: '+10s' }, { d: 30, label: '+30s' }, { d: 120, label: '+2m' }, { d: 600, label: '+10m' }, { d: 1800, label: '+30m' }
@@ -30,11 +38,14 @@ export function initPage() {
     time: document.getElementById('time'),
     toggle: document.getElementById('c-toggle'),
     cc: document.getElementById('c-cc'),
+    repeat: document.getElementById('c-repeat'),
+    prev: document.getElementById('c-prev'),
+    next: document.getElementById('c-next'),
     jump: document.getElementById('jump'),
     upnext: document.getElementById('upnext'),
     reset: document.getElementById('c-reset')
   };
-  var state = { snap: null, nextKey: null, loadedSeriesId: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '' } };
+  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '' } };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -103,24 +114,54 @@ export function initPage() {
     });
   }
 
-  // Up next is backend state — fetch it directly (only when on a series episode,
-  // and only when the episode actually changes).
-  function fetchUpNext(s) {
-    var key = s.itemId + '/' + s.episodeId;
-    [key].filter(function() { return s.itemId !== s.episodeId; }).filter(function() { return key !== state.nextKey; }).forEach(function() {
-      state.nextKey = key;
-      loadNext(server, s.itemId, s.episodeId)
-        .then(function(d) { els.upnext.textContent = [d.next].filter(Boolean).map(function(n) { return 'Up next: ' + n.video.title; }).concat([''])[0]; })
-        .catch(function() { els.upnext.textContent = ''; });
+  // PLANE B transport: each fires the same server action the TV player fires
+  // (TASK-222), keyed to the active person — the server advances the engine and
+  // broadcasts the resolved `video_playback` snapshot, which repaints BOTH surfaces.
+  function sendVideoAction(action) { videoPlaybackAction(server, action, state.person).catch(noop); }
+
+  // ── server `video_playback` snapshot -> companion (the now-playing source of
+  // truth, mirroring the TV). Now-playing + the breadcrumb leaf, the inline up-next
+  // line (wraps to "Start again" under repeat), and the repeat pill all read the
+  // snapshot; the ⏮/repeat/⏭ row hides for a single-item source (a standalone film).
+  function renderNowFromSnap(snap) {
+    [nowPlaying(snap)].filter(Boolean).forEach(function(np) {
+      els.ctxLabel.textContent = 'Now playing';
+      els.title.textContent = np.title;
+      state.crumb.videoTitle = np.title;
+      mountVideoCrumbs();
     });
+  }
+  function renderUpNext(snap) {
+    els.upnext.textContent = [upNextLine(snap)].filter(Boolean).map(function(l) { return l.prefix + l.label; }).concat([''])[0];
+  }
+  function renderRepeat(snap) {
+    els.repeat.classList.toggle('on', !!snap.repeat);
+  }
+  function applySeriesMode(on) {
+    els.prev.classList.toggle('single', !on);
+    els.next.classList.toggle('single', !on);
+    els.repeat.classList.toggle('single', !on);
+  }
+  function onVideoPlayback(snap) {
+    state.vsnap = snap;
+    renderNowFromSnap(snap);
+    renderUpNext(snap);
+    renderRepeat(snap);
+    applySeriesMode(seriesMode(snap));
+  }
+
+  // The active person rides the app_state (TASK-158); the Plane B POSTs key per
+  // person off it, like the companion-audio producer.
+  function capturePerson(snap) {
+    [snap.person].filter(Boolean).forEach(function(p) { state.person = p; });
   }
 
   function onAppState(snap) {
     syncBar.updateStatus(snap);
     state.snap = snap;
+    capturePerson(snap);
     renderControls();
     renderBar();
-    fetchUpNext(snap);
     captureSeries(snap);
   }
 
@@ -170,8 +211,9 @@ export function initPage() {
 
   els.toggle.addEventListener('click', function() { api.sendIntent('toggle'); });
   els.cc.addEventListener('click', function() { api.toggleCaptions(); });
-  document.getElementById('c-prev').addEventListener('click', function() { api.prev(); });
-  document.getElementById('c-next').addEventListener('click', function() { api.next(); });
+  els.prev.addEventListener('click', function() { sendVideoAction('previous'); });
+  els.next.addEventListener('click', function() { sendVideoAction('next'); });
+  els.repeat.addEventListener('click', function() { sendVideoAction('toggle-repeat'); });
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);
@@ -180,6 +222,6 @@ export function initPage() {
 
   syncBar = mountSyncBar(mode, onModeChange);
   applyMode();
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode, onVideoPlayback: onVideoPlayback });
   updateBar = mountScreenBar(getApi, noop);
 }
