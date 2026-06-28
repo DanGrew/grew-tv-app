@@ -58,6 +58,23 @@ export function playbackAction(serverUrl, action, person, body) {
   });
 }
 
+// FEAT-037 (TASK-221/222): server-authoritative VIDEO playback, the video twin of
+// playbackAction. Posts an action to the separate /api/video-playback endpoint
+// (play-source / next / previous / toggle-repeat / position); the server applies
+// the pure video engine transition, persists the per-person playback-state, and
+// broadcasts the resolved `video_playback` snapshot over the per-person relay — the
+// persistent player swaps media in place from that snapshot, never reloading the
+// page. Contract: 204 accept / 400 bad input / never 500. `person` (FEAT-026) keys
+// the per-person state. (Position still rides the existing /api/progress path —
+// both land in watch_progress, the single source of truth for per-item position.)
+export function videoPlaybackAction(serverUrl, action, person, body) {
+  return fetch(serverUrl + '/api/video-playback/' + encodeURIComponent(action) + '?person=' + encodeURIComponent(person || ''), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
+  });
+}
+
 export function loadVideo(serverUrl, id) {
   return getJson(serverUrl + '/api/video/' + encodeURIComponent(id));
 }

@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi } = require('./fixtures/api.js');
+const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
 
 // FEAT-017 / TASK-118: the standalone resume/restart prompt is gone. Progress
 // is backend state (/api/progress + /api/continue-watching), not localStorage.
@@ -31,6 +31,7 @@ async function openBluey(page) {
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
+  await installVideoPlaybackBackend(page);
   await page.goto('/app/homeview/profile.html');
 });
 

@@ -77,6 +77,13 @@ export function connectApp(wsUrl, onIntent, opts) {
       playback: function() {
         [o.onPlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
       },
+      // FEAT-037 (TASK-221/222): the server-authoritative VIDEO `playback` snapshot
+      // on its OWN channel (kept separate from music so a client never confuses the
+      // two). The persistent video player resolves it through core/video-player-router
+      // and swaps media in place; replayed on reconnect like music's `playback`.
+      video_playback: function() {
+        [o.onVideoPlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
+      },
       deactivated: function() {
         [o.onDeactivated].filter(Boolean).concat([defaultDeactivated])[0](msg.payload);
       },
