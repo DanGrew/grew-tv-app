@@ -126,13 +126,21 @@ test('uses a breadcrumb (no Back button); the Home crumb returns to browse', asy
   await expect(page).toHaveURL(/companion\/browse\.html$/);
 });
 
-// FEAT-038 (TASK-230): the player carries the Control/Browse switch so you can
-// leave to browse (and queue) without disturbing playback. Defaults to Control;
-// tapping Browse leaves for the library (the mode persists, so browse opens
-// desynced). The TV is never told to stop.
-test('defaults to Control; Browse leaves for the library', async ({ page }) => {
+// FEAT-038 (TASK-230): the player carries the Control/Browse switch. It ONLY
+// changes mode (consistent on every page — no jump). Browse greys the transport
+// in place (body.browsing) so there are no dead clicks; the breadcrumb is a local
+// hop to the library, keeping Browse mode. The TV is never told to stop.
+test('Browse toggles mode in place (no jump) and greys the transport', async ({ page }) => {
   await expect(page.locator('.seg-opt').filter({ hasText: 'Control' })).toHaveClass(/on/);
   await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
+  await expect(page).toHaveURL(/companion\/audio\.html$/);     // stayed on the player
+  await expect(page.locator('body')).toHaveClass(/browsing/);  // transport greyed via CSS
+  await expect(page.locator('.seg-opt').filter({ hasText: 'Browse' })).toHaveClass(/on/);
+});
+
+test('in Browse mode the breadcrumb is a local hop to the library (stays desynced)', async ({ page }) => {
+  await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
+  await page.locator('#breadcrumb .crumb-link').first().click();
   await expect(page).toHaveURL(/companion\/browse\.html$/);
   const mode = await page.evaluate(() => sessionStorage.getItem('grew-tv:companion-mode'));
   expect(mode).toBe('desynced');

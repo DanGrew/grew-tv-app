@@ -28,11 +28,12 @@ export function initPage() {
   var mode = createCompanionMode();
   var syncBar = null;
   function noop() {}
-  // FEAT-038 (TASK-230): "Browse" leaves the queue for the library (desynced) to
-  // add more without disturbing playback; "Control" reloads (reconnect).
+  // FEAT-038 (TASK-230): the switch only changes mode. BROWSE greys the queue
+  // actions in place (body.browsing) so nothing disturbs playback; reach the
+  // library via Back -> player -> breadcrumb. CONTROL reloads (reconnect).
   function reSync() { window.location.reload(); }
-  function goBrowse() { window.location.href = 'browse.html'; }
-  function onModeChange(browsing) { ({ true: goBrowse, false: reSync })[browsing](); }
+  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
+  function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
   // POST a playback action for the bound person; the server broadcasts the new
   // snapshot back over the relay, which repaints the view (no local queue math).
@@ -78,5 +79,6 @@ export function initPage() {
   els.back.addEventListener('click', function() { window.location.href = 'audio.html'; });
   render(null);
   syncBar = mountSyncBar(mode, onModeChange);
+  applyMode();
   api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, noop, { onPlayback: render, mode: mode });
 }

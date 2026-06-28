@@ -1,7 +1,7 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadAlbum, loadPlaylist, playbackAction } from '../../core/app-api.js';
-import { screenPage, displayTitle } from '../../core/companion-utils.js';
+import { screenPage, displayTitle, queryString } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
 import { trailCrumbs } from '../../core/breadcrumb.js';
@@ -45,12 +45,14 @@ export function initPage() {
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
-  // FEAT-038 (TASK-230): from a player, "Browse" = leave for the library
-  // (desynced — the component already set the flag) so you can queue without
-  // disturbing playback; "Control" re-runs the reconnect path (reload).
+  // FEAT-038 (TASK-230): the mode switch ONLY changes mode (consistent on every
+  // page — no surprise navigation). BROWSE greys the TV-driving transport in
+  // place (via body.browsing) so there are no dead clicks; you reach the library
+  // through the breadcrumb (local-nav while desynced). CONTROL reloads to re-run
+  // the reconnect path.
   function reSync() { window.location.reload(); }
-  function goBrowse() { window.location.href = 'browse.html'; }
-  function onModeChange(browsing) { ({ true: goBrowse, false: reSync })[browsing](); }
+  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
+  function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
   // Back is the breadcrumb now (FEAT-032 / TASK-218), not a lone Back button: the
   // player shows Home > <items> > Track, where <items> is the level you launched
@@ -62,9 +64,13 @@ export function initPage() {
   function mountAudioCrumbs(title) {
     mountCompanionBreadcrumb('breadcrumb', trailCrumbs(peekTrail(), title), onCrumbNav);
   }
+  // Browse mode: the crumb is a LOCAL hop (the intent would be suppressed anyway)
+  // so you can reach the library without driving the TV. Control mode: the usual
+  // navigate intent the other screens use.
+  function localGo(page, params) { window.location.href = page + queryString(params); }
   function onCrumbNav(page, params) {
     ({ 'true': clearTrail, 'false': noop })[String(Object.keys(params).length === 0)]();
-    api.sendIntent('navigate', { page: page, params: params });
+    ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
   }
 
   function buildJump() {
@@ -252,6 +258,7 @@ export function initPage() {
   setInterval(renderBar, 250);
 
   syncBar = mountSyncBar(mode, onModeChange);
+  applyMode();
   api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }

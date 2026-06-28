@@ -1,7 +1,7 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadNext, loadSeries } from '../../core/app-api.js';
-import { screenPage, displayTitle, seriesIdFromSnap } from '../../core/companion-utils.js';
+import { screenPage, displayTitle, seriesIdFromSnap, queryString } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -42,11 +42,12 @@ export function initPage() {
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
-  // FEAT-038 (TASK-230): "Browse" leaves the player for the library (desynced)
-  // so you can queue without disturbing playback; "Control" reloads (reconnect).
+  // FEAT-038 (TASK-230): the switch ONLY changes mode (consistent everywhere).
+  // BROWSE greys the transport in place (body.browsing); reach the library via
+  // the breadcrumb (local-nav while desynced). CONTROL reloads (reconnect).
   function reSync() { window.location.reload(); }
-  function goBrowse() { window.location.href = 'browse.html'; }
-  function onModeChange(browsing) { ({ true: goBrowse, false: reSync })[browsing](); }
+  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
+  function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
   // Breadcrumb trail (FEAT-021): Home > Series > Episode (film: Home > Title).
   // Ancestor crumbs send the `navigate` intent — the app teleports the TV and
@@ -54,7 +55,11 @@ export function initPage() {
   // the WS context; the series id/title are derived from the app_state snapshot
   // (itemId is the series for an episode, the video itself for a film) and the
   // series title is fetched once, mirroring the detail screen.
-  function navigate(page, params) { api.sendIntent('navigate', { page: page, params: params }); }
+  // Browse mode: crumb is a local hop (reach the library without driving the TV).
+  function localGo(page, params) { window.location.href = page + queryString(params); }
+  function navigate(page, params) {
+    ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
+  }
   function mountVideoCrumbs() {
     mountCompanionBreadcrumb('breadcrumb', buildCrumbs('video', state.crumb), navigate);
   }
@@ -174,6 +179,7 @@ export function initPage() {
   setInterval(renderBar, 250);
 
   syncBar = mountSyncBar(mode, onModeChange);
+  applyMode();
   api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }
