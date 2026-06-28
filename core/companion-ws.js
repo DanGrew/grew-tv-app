@@ -15,6 +15,21 @@ var TARGET_KEY = 'grew-tv-companion-target';
 
 export function connect(wsUrl, onContext, onStatus, onAppState, onDevices, opts) {
   var o = opts != null ? opts : {};
+  // FEAT-038 (TASK-229): the outbound nav/transport seam. When a desync mode is
+  // passed (o.mode, a core/companion-mode.js instance) and it is desynced, the
+  // nav/transport intent emitters below become no-ops — the companion stops
+  // driving the TV. The registration plane (list/register/snapshot/
+  // activate_person/pong) and per-person queue POSTs (HTTP, not WS) are NOT
+  // gated, so a desynced companion stays the same person and its queue-adds
+  // still land. No mode passed (pre-TASK-230 screens) => always synced =>
+  // behaviour unchanged.
+  var mode = o.mode != null ? o.mode : null;
+  function intentsAllowed() { return mode == null || mode.intentsAllowed(); }
+  function gate(fn) {
+    return function() {
+      if (intentsAllowed()) fn.apply(null, arguments);
+    };
+  }
   var ws = null;
   var currentVersion = -1;
   var lastPingTime = Date.now();
@@ -148,8 +163,11 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices, opts)
   }, 5000);
 
   doConnect();
+  // Nav/transport emitters are wrapped in gate() — suppressed while desynced
+  // (FEAT-038). The registration plane (target/activatePerson) and the read-only
+  // accessors are NOT gated.
   return {
-    sendIntent: sendIntent,
+    sendIntent: gate(sendIntent),
     position: position,
     appState: function() { return lastAppState; },
     devices: function() { return lastDevices; },
@@ -159,13 +177,13 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices, opts)
     // (onPersonActive / onPersonBusy). device_id is the companion's target, so
     // the verdict returns to this companion — the take-over prompt shows here.
     activatePerson: function(personId, takeover) { send(createActivatePerson(targeted, personId, takeover)); },
-    play: function(id) { send(createPlayIntent(id)); },
-    skip: function(deltaSec) { send(createSkipIntent(deltaSec)); },
-    next: function() { send(createNextIntent()); },
-    prev: function() { send(createPrevIntent()); },
-    setProfile: function(profile) { send(createSetProfileIntent(profile)); },
-    toggleCaptions: function() { send(createToggleCaptionsIntent()); },
-    shuffle: function() { send(createShuffleIntent()); },
-    playAlbum: function(id) { send(createPlayAlbumIntent(id)); }
+    play: gate(function(id) { send(createPlayIntent(id)); }),
+    skip: gate(function(deltaSec) { send(createSkipIntent(deltaSec)); }),
+    next: gate(function() { send(createNextIntent()); }),
+    prev: gate(function() { send(createPrevIntent()); }),
+    setProfile: gate(function(profile) { send(createSetProfileIntent(profile)); }),
+    toggleCaptions: gate(function() { send(createToggleCaptionsIntent()); }),
+    shuffle: gate(function() { send(createShuffleIntent()); }),
+    playAlbum: gate(function(id) { send(createPlayAlbumIntent(id)); })
   };
 }

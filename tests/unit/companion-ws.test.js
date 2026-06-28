@@ -326,4 +326,68 @@ describe('connect', () => {
     expect(msg.payload.person_id).toBe('mom');
     expect(msg.payload.takeover).toBe(true);
   });
+
+  // FEAT-038 (TASK-229): with a desync mode wired in via opts.mode, the outbound
+  // nav/transport seam is gated. Desynced => those intents are no-ops; the
+  // registration plane (target/register/snapshot/activate_person) still flows.
+  describe('desync mode gates outbound intents (opts.mode)', () => {
+    function desyncMode() {
+      var desynced = true;
+      return { intentsAllowed: () => !desynced, sync: () => { desynced = false; } };
+    }
+
+    it('suppresses ALL nav/transport intents while desynced', () => {
+      var mode = desyncMode();
+      var api = connect('ws://host:8766', () => {}, () => {}, () => {}, () => {}, { mode: mode });
+      var ws = MockWS.instances[0];
+      ws.onopen();
+      ws.sent.length = 0;
+      api.sendIntent('pause');
+      api.play('film-1');
+      api.skip(-30);
+      api.next();
+      api.prev();
+      api.setProfile('kids');
+      api.toggleCaptions();
+      api.shuffle();
+      api.playAlbum('album-1');
+      expect(ws.sent).toHaveLength(0);
+    });
+
+    it('still registers + snapshots its target while desynced (registration plane ungated)', () => {
+      var mode = desyncMode();
+      var api = connect('ws://host:8766', () => {}, () => {}, () => {}, () => {}, { mode: mode });
+      var ws = MockWS.instances[0];
+      ws.onopen();
+      ws.onmessage(deviceMsg([{ device_id: 'devA' }]));   // auto-target still works
+      var types = ws.sent.map(m => m.type);
+      expect(types).toContain('register_companion');
+      expect(types).toContain('snapshot_request');
+      ws.sent.length = 0;
+      api.activatePerson('mom', true);                    // person plane still works
+      expect(ws.sent.find(m => m.type === 'activate_person')).toBeTruthy();
+    });
+
+    it('re-emits intents once re-synced', () => {
+      var mode = desyncMode();
+      var api = connect('ws://host:8766', () => {}, () => {}, () => {}, () => {}, { mode: mode });
+      var ws = MockWS.instances[0];
+      ws.onopen();
+      ws.sent.length = 0;
+      api.next();
+      expect(ws.sent).toHaveLength(0);
+      mode.sync();
+      api.next();
+      expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('next');
+    });
+
+    it('no mode passed => intents emit as before (unchanged default)', () => {
+      var api = connect('ws://host:8766', () => {}, () => {});
+      var ws = MockWS.instances[0];
+      ws.onopen();
+      ws.sent.length = 0;
+      api.next();
+      expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('next');
+    });
+  });
 });
