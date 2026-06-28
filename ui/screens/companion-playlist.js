@@ -1,12 +1,14 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist } from '../../core/app-api.js';
-import { screenPage, tileHint } from '../../core/companion-utils.js';
+import { screenPage, tileHint, displayTitle, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { playlistCards } from '../../core/playlist-pick.js';
+import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
+import { mountSyncBar } from './companion-sync-bar.js';
 
 // FEAT-036 (TASK-205) — the companion playlist context: mirrors the TV's playlist
 // detail (its flat track list). The TV's screen-playlist-detail-page pushes
@@ -35,11 +37,23 @@ export function initPage() {
   var state = { playlistId: null, profile: null, person: null, tracks: [], progress: {}, title: '' };
   var api = {};
   var updateBar = null;
+  var mode = createCompanionMode();
+  var syncBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
+  // FEAT-038 (DSYNC-2c): the switch only changes mode. BROWSE greys the
+  // TV-driving controls (play/shuffle/track-play) via body.browsing so editing
+  // (rename/delete/add/reorder/remove — per-person POSTs) stays live; reach the
+  // library via Back (local hop). CONTROL reloads to re-run reconnect.
+  function reSync() { window.location.reload(); }
+  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
+  function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
-  els.backBtn.addEventListener('click', function() { api.sendIntent('back'); });
+  // Back: Control drives the TV back; Browse is a local hop to the library.
+  function tvBack() { api.sendIntent('back'); }
+  function localBack() { window.location.href = 'browse.html'; }
+  els.backBtn.addEventListener('click', function() { ({ true: localBack, false: tvBack })[mode.isDesynced()](); });
 
   // Header Play / Shuffle: drive the TV's playlist detail. Play resumes the
   // playlist from its last-played track (`play_next`, the header's own action);
@@ -125,7 +139,11 @@ export function initPage() {
   // Breadcrumb trail (FEAT-021): Home > this playlist (current). A crumb tap sends
   // the `navigate` intent so the app teleports the TV; the companion follows on
   // the app's echoed context. Same `detail` trail the app's playlist detail mounts.
-  function navigate(page, params) { api.sendIntent('navigate', { page: page, params: params }); }
+  // Browse mode: crumb is a local hop (reach the library without driving the TV).
+  function localGo(page, params) { window.location.href = page + queryString(params); }
+  function navigate(page, params) {
+    ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
+  }
   function mountCrumbs(title) {
     mountCompanionBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesTitle: title }), navigate);
   }
@@ -246,7 +264,7 @@ export function initPage() {
     });
   }
 
-  function onContext(payload) {
+  function followContext(payload) {
     var page = screenPage(payload.context_id);
     var ROUTE = {
       'true':  function() { window.location.href = page + '.html'; },
@@ -254,11 +272,17 @@ export function initPage() {
     };
     ROUTE[(page !== 'playlist') + '']();
   }
+  // Status strip title always; nav-follow gated in Browse mode.
+  function onContext(payload) {
+    syncBar.setTitle(displayTitle(payload));
+    ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
+  }
 
   // Profile keys the Continue-Watching set that tints track bars (FEAT-026
   // TASK-158 — person rides the app_state; reloads when it changes). The track
   // list itself is id-addressed (loadPlaylist), so it does not depend on profile.
   function onAppState(snap) {
+    syncBar.setPlaying(snap.playing);
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(function(p) { state.profile = p; });
     [snap.person].filter(Boolean).filter(function(p) { return p !== state.person; }).forEach(function(p) {
       state.person = p;
@@ -266,6 +290,15 @@ export function initPage() {
     });
   }
 
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices);
+  syncBar = mountSyncBar(mode, onModeChange);
+  applyMode();
+  // Browse-mode entry: browse linked here with ?id=…, so load that playlist
+  // ourselves (loadPlaylist / /api/playlist) instead of waiting for the TV echo.
+  [new URLSearchParams(window.location.search).get('id')].filter(Boolean).forEach(function(id) {
+    state.playlistId = id;
+    els.ctxLabel.textContent = 'Playlist';
+    loadTracks();
+  });
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }

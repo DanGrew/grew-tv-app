@@ -1,7 +1,7 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist } from '../../core/app-api.js';
-import { screenPage, queryString } from '../../core/companion-utils.js';
+import { screenPage, queryString, displayTitle } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
@@ -288,9 +288,10 @@ export function initPage() {
     };
     ROUTE[(page !== 'detail') + '']();
   }
-  // Desynced, the companion does NOT follow the TV's context (inbound nav seam
-  // gated); it stays on the page browse opened locally.
+  // The status strip title rides the context (both modes); only the nav-follow is
+  // gated — desynced, it stays on the page browse opened locally.
   function onContext(payload) {
+    syncBar.setTitle(displayTitle(payload));
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
@@ -298,7 +299,7 @@ export function initPage() {
   // (FEAT-026 TASK-158 — person rides the app_state; reloads when it changes).
   // The TV status strip reads the same snapshot (display-only, both modes).
   function onAppState(snap) {
-    syncBar.updateStatus(snap);
+    syncBar.setPlaying(snap.playing);
     state.profile = [snap.profile].filter(Boolean).concat([state.profile])[0];
     [snap.person].filter(Boolean).filter(function(p) { return p !== state.person; }).forEach(function(p) { state.person = p; loadCW(); });
   }

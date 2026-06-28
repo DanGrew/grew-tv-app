@@ -30,12 +30,15 @@ export function actionEnabled(action, desynced) {
   return DESYNC_OK[action] === true;
 }
 
-// Which browse-tile destinations a desynced companion can open on its own. Detail
-// pages (series + album) self-load from a URL id (TASK-230); artist + playlist
-// pages aren't desync-aware yet, and a bare video/film tile only "plays" (a TV
-// action). cardRoute() (core/home-rails.js) is the input.
-var DESYNC_OPENABLE = { series: true, album: true };
-export function tileOpenableDesynced(route) { return DESYNC_OPENABLE[route] === true; }
+// Which browse-tile destinations a desynced companion can open on its own, and
+// the COMPANION page that self-loads each from a URL id. series/album -> detail,
+// playlist -> playlist, artist -> artist (DSYNC-2c). A bare video/film only
+// "plays" (a TV action), so it has no desync page. cardRoute() (core/home-rails.js)
+// is the input. NB a playlist MUST route to playlist.html (loadPlaylist /
+// /api/playlist) — sending a playlist id to detail.html hits /api/series and 404s.
+var DESYNC_PAGE = { series: 'detail.html', album: 'detail.html', playlist: 'playlist.html', artist: 'artist.html' };
+export function desyncOpenPage(route) { return DESYNC_PAGE[route] || null; }
+export function tileOpenableDesynced(route) { return desyncOpenPage(route) != null; }
 
 // True when a browse tile should be greyed out: desynced AND not locally
 // openable. Synced tiles are never off.

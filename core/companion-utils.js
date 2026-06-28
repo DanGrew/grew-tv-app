@@ -46,13 +46,14 @@ export function displayLabel(payload) {
 }
 
 // FEAT-038 (TASK-230): the display-only "what's the TV doing" strip a desynced
-// companion shows so you never lose track of the telly. Reads the same app_state
-// snapshot the companion already receives (displayTitle + the playing flag); no
-// title (idle / on a menu) reads as a dash. Pure — provable without a browser.
-export function tvStatusText(snap) {
-  var title = [snap].filter(Boolean).map(displayTitle).filter(Boolean)[0];
+// companion shows so you never lose track of the telly. The TITLE rides the WS
+// `context` message (display.title) — NOT app_state, which only carries
+// {screen,itemId,profile}; the PLAYING flag rides app_state. So the strip is fed
+// from both: title from onContext, playing from onAppState. No title (idle / on a
+// menu) reads as a dash. Pure — provable without a browser.
+export function tvStatusText(title, playing) {
   if (!title) return 'TV: —';
-  var icon = snap.playing ? '▶' : '❚❚';
+  var icon = playing ? '▶' : '❚❚';
   return 'TV: ' + icon + ' ' + title;
 }
 

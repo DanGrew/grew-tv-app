@@ -163,3 +163,54 @@ test.describe('Empty playlist (still lists + opens)', () => {
     await expect(page.locator('.no-actions')).toHaveText('No tracks');
   });
 });
+
+// FEAT-038 (DSYNC-2c): opening a playlist while Browsing. The TV is elsewhere
+// (context 'browse'), so the page must self-load from ?id via /api/playlist —
+// NOT /api/series (the loadSeries(playlistId) 404 the user hit). Editing stays
+// live; transport greys; Back is a local hop.
+test.describe('desync mode (Browse) — playlist self-load + edit', () => {
+  function mockElsewhere(page) {
+    let version = 1;
+    return page.routeWebSocket(/:8766/, (ws) => {
+      function push() {
+        version += 1;
+        ws.send(msg('context', { version: version, context_id: 'browse' }));
+        ws.send(msg('app_state', { screen: 'home', profile: 'kids', person: 'kids' }));
+      }
+      ws.onMessage(function(raw) {
+        const m = JSON.parse(raw);
+        if (m.type === 'intent') sentIntents.push(m.payload.intent);
+        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+        if (m.type === 'snapshot_request') push();
+      });
+    });
+  }
+  test.beforeEach(async ({ page }) => {
+    sentIntents = [];
+    await installApi(page);
+    await mockElsewhere(page);
+    await page.addInitScript(() => { sessionStorage.setItem('grew-tv:companion-mode', 'desynced'); });
+  });
+
+  test('self-loads from ?id via /api/playlist (no TV echo, no /api/series 404)', async ({ page }) => {
+    await page.goto('/companion/playlist.html?id=pl-roadtrip');
+    await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await expect(page.locator('body')).toHaveClass(/browsing/);
+  });
+
+  test('editing stays live while browsing — remove POSTs and repaints', async ({ page }) => {
+    await page.goto('/companion/playlist.html?id=pl-roadtrip');
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await page.locator('.ph-row', { has: page.locator('.ph-txt[data-id="ootb-01"]') }).locator('.ph-edit.x').click();
+    await expect(page.locator('.ph-txt')).toHaveCount(1);
+  });
+
+  test('Back is a local hop to browse — no back intent to the TV', async ({ page }) => {
+    await page.goto('/companion/playlist.html?id=pl-roadtrip');
+    await expect(page.locator('.ph-txt').first()).toBeVisible();
+    await page.locator('#btn-back').click();
+    await page.waitForURL('**/companion/browse.html');
+    expect(sentIntents.filter((i) => i === 'back')).toHaveLength(0);
+  });
+});

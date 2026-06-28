@@ -1,13 +1,15 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
-import { screenPage, tileHint } from '../../core/companion-utils.js';
+import { screenPage, tileHint, displayTitle, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { albumsByArtist } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { pushUnique as pushTrail } from '../../core/nav-trail.js';
+import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
+import { mountSyncBar } from './companion-sync-bar.js';
 
 // Companion artist context (FEAT-029 follow-up): mirrors the TV's artist
 // drill-down (L3 off the Music tab's Artists rail) — a grid of one artist's
@@ -33,11 +35,21 @@ export function initPage() {
   var state = { artist: null, profile: null, person: null, albums: [], progress: {} };
   var api = {};
   var updateBar = null;
+  var mode = createCompanionMode();
+  var syncBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
+  // FEAT-038 (DSYNC-2c): the switch only changes mode. BROWSE greys play/shuffle
+  // (TV-driving); album tiles STAY openable (they navigate into album detail
+  // locally). CONTROL reloads (reconnect).
+  function reSync() { window.location.reload(); }
+  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
+  function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
-  els.backBtn.addEventListener('click', function() { api.sendIntent('back'); });
+  function tvBack() { api.sendIntent('back'); }
+  function localBack() { window.location.href = 'browse.html'; }
+  els.backBtn.addEventListener('click', function() { ({ true: localBack, false: tvBack })[mode.isDesynced()](); });
 
   // Play / Shuffle header (TASK-214): drive the TV's artist screen to the player
   // on this artist source. Play-all sends PLAY_ARTIST, Shuffle reuses SHUFFLE —
@@ -45,15 +57,23 @@ export function initPage() {
   els.playBtn.addEventListener('click', function() { api.sendIntent('playArtist'); });
   els.shuffleBtn.addEventListener('click', function() { api.sendIntent('shuffle'); });
 
-  // Breadcrumb trail (FEAT-021): Home > Albums (the Music tab) > Artist. A crumb
-  // tap sends the `navigate` intent so the app teleports the TV; the companion
-  // follows on the app's echoed context.
-  function navigate(page, params) { api.sendIntent('navigate', { page: page, params: params }); }
+  // Breadcrumb trail (FEAT-021): Home > Albums (the Music tab) > Artist. Control:
+  // a crumb tap sends the `navigate` intent (TV teleports, companion follows).
+  // Browse: a local hop to the library.
+  function localGo(page, params) { window.location.href = page + queryString(params); }
+  function navigate(page, params) {
+    ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
+  }
   function mountCrumbs(artistName) {
     mountCompanionBreadcrumb('breadcrumb', buildCrumbs('artist', { artistName: artistName }), navigate);
   }
 
-  function openItem(card) { api.sendIntent('select', { id: card.id }); }
+  // Tapping an album: Control sends `select` (TV drives, companion follows);
+  // Browse opens the album's detail locally (carrying ?id) — no TV interruption.
+  function openItemLocal(card) { window.location.href = 'detail.html?id=' + encodeURIComponent(card.id); }
+  function openItem(card) {
+    ({ true: function() { openItemLocal(card); }, false: function() { api.sendIntent('select', { id: card.id }); } })[mode.isDesynced()]();
+  }
 
   // Bare text-label tile: album title + an optional resume-percent badge, no
   // poster (matches the companion browse grid — posters live on the TV).
@@ -125,7 +145,7 @@ export function initPage() {
     });
   }
 
-  function onContext(payload) {
+  function followContext(payload) {
     var page = screenPage(payload.context_id);
     var ROUTE = {
       'true':  function() { window.location.href = page + '.html'; },
@@ -133,10 +153,16 @@ export function initPage() {
     };
     ROUTE[(page !== 'artist') + '']();
   }
+  // Status strip title always; nav-follow gated in Browse mode.
+  function onContext(payload) {
+    syncBar.setTitle(displayTitle(payload));
+    ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
+  }
 
   // Profile keys the catalog + the Continue-Watching set that tints album bars
   // (FEAT-026 TASK-158 — person rides the app_state; reloads when it changes).
   function onAppState(snap) {
+    syncBar.setPlaying(snap.playing);
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(function(p) {
       state.profile = p;
       loadAlbums();
@@ -147,6 +173,11 @@ export function initPage() {
     });
   }
 
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices);
+  syncBar = mountSyncBar(mode, onModeChange);
+  applyMode();
+  // Browse-mode entry: browse linked here with ?id=<artist>, so seed the artist
+  // ourselves (captureArtist loads its albums once the profile arrives).
+  [new URLSearchParams(window.location.search).get('id')].filter(Boolean).forEach(function(id) { captureArtist({ artist: id }); });
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }

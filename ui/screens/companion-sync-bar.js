@@ -50,6 +50,12 @@ export function mountSyncBar(mode, onChange) {
   browse.addEventListener('click', function() { selectMode(true); });
   applyActive();
 
-  function updateStatus(snap) { status.textContent = tvStatusText(snap); }
-  return { updateStatus: updateStatus };
+  // The strip is fed from two WS messages: the title from `context` (setTitle),
+  // the play state from `app_state` (setPlaying). Either updating repaints.
+  var lastTitle = '';
+  var lastPlaying = false;
+  function repaint() { status.textContent = tvStatusText(lastTitle, lastPlaying); }
+  function setTitle(title) { lastTitle = title; repaint(); }
+  function setPlaying(playing) { lastPlaying = playing; repaint(); }
+  return { setTitle: setTitle, setPlaying: setPlaying };
 }

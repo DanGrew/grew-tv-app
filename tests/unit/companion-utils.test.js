@@ -120,15 +120,17 @@ describe('skipLabel', () => {
 });
 
 describe('tvStatusText (desync TV status strip)', () => {
+  // Title comes from the context message, playing from app_state — passed in
+  // separately (app_state carries no title, the bug behind a stuck "TV: —").
   it('shows a play icon + title when playing', () => {
-    expect(tvStatusText({ display: { title: 'Bluey' }, playing: true })).toBe('TV: ▶ Bluey');
+    expect(tvStatusText('Bluey', true)).toBe('TV: ▶ Bluey');
   });
   it('shows a pause icon + title when paused', () => {
-    expect(tvStatusText({ display: { title: 'Bluey' }, playing: false })).toBe('TV: ❚❚ Bluey');
+    expect(tvStatusText('Bluey', false)).toBe('TV: ❚❚ Bluey');
   });
-  it('reads as idle with no title (menu) or no snapshot', () => {
-    expect(tvStatusText({ display: { title: '' }, playing: false })).toBe('TV: —');
-    expect(tvStatusText(null)).toBe('TV: —');
+  it('reads as idle with no title (menu)', () => {
+    expect(tvStatusText('', false)).toBe('TV: —');
+    expect(tvStatusText(undefined, true)).toBe('TV: —');
   });
 });
 

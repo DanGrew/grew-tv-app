@@ -1,7 +1,7 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
-import { screenPage, filterByTitle, tileHint } from '../../core/companion-utils.js';
+import { screenPage, filterByTitle, tileHint, displayTitle } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -9,7 +9,7 @@ import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from 
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute } from '../../core/home-rails.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
-import { tileOpenableDesynced, tileOffDesynced } from '../../core/companion-button-modes.js';
+import { desyncOpenPage, tileOffDesynced } from '../../core/companion-button-modes.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
@@ -291,10 +291,12 @@ export function initPage() {
   // Tapping a tile. SYNCED: send `select`; the app's rail-grid routes it to the
   // item's detail/player and echoes the new context, which onContext follows to
   // the existing companion L4 screen (no redesign). DESYNCED: open the item's
-  // detail page locally (series/album only — see tileOpenableDesynced), carrying
-  // the id so detail.html self-loads without the TV.
+  // page locally — detail (series/album), playlist, or artist per the card's
+  // route — carrying the id so that page self-loads without the TV. A
+  // non-openable card (film) is a no-op (its tile is greyed).
   function openItemLocal(card) {
-    ({ true: function() { window.location.href = 'detail.html?id=' + encodeURIComponent(card.id); }, false: noop })[tileOpenableDesynced(cardRoute(card))]();
+    var page = desyncOpenPage(cardRoute(card));
+    [page].filter(Boolean).forEach(function(p) { window.location.href = p + '?id=' + encodeURIComponent(card.id); });
   }
   function openItem(card) {
     ({ true: function() { openItemLocal(card); }, false: function() { api.sendIntent('select', { id: card.id }); } })[mode.isDesynced()]();
@@ -358,7 +360,7 @@ export function initPage() {
   // it first arrives or changes. The active person rides the same snapshot
   // (FEAT-026 TASK-158) and keys Continue-Watching per person.
   function onAppState(snap) {
-    syncBar.updateStatus(snap);
+    syncBar.setPlaying(snap.playing);
     state.person = [snap.person].filter(Boolean).concat([state.person])[0];
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(loadCatalog);
     // Following the TV's deep position is the inbound nav seam — gated when
@@ -372,9 +374,10 @@ export function initPage() {
     var page = screenPage(payload.context_id);
     [page].filter(function(p) { return !DRILL_CTX[p]; }).forEach(function(p) { window.location.href = p + '.html'; });
   }
-  // Desynced, the companion does NOT follow the TV onto a new page (inbound nav
-  // seam gated); it stays on its own browse.
+  // The status strip title rides the context (both modes); only the nav-follow is
+  // gated — desynced, the companion stays on its own browse.
   function onContext(payload) {
+    syncBar.setTitle(displayTitle(payload));
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 

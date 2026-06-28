@@ -199,7 +199,7 @@ export function initPage() {
   }
 
   function onAppState(snap) {
-    syncBar.updateStatus(snap);
+    syncBar.setPlaying(snap.playing);
     state.snap = snap;
     capturePerson(snap);
     renderControls();
@@ -215,8 +215,10 @@ export function initPage() {
     var page = screenPage(payload.context_id);
     [page].filter(function(p) { return p !== 'audio'; }).forEach(function(p) { window.location.href = p + '.html'; });
   }
-  // Browse mode does not follow the TV (inbound nav seam gated).
+  // The TV status strip title rides the context (both modes); only the nav-follow
+  // is gated in Browse mode.
   function onContext(payload) {
+    syncBar.setTitle(displayTitle(payload));
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 

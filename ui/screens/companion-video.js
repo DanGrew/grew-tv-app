@@ -116,7 +116,7 @@ export function initPage() {
   }
 
   function onAppState(snap) {
-    syncBar.updateStatus(snap);
+    syncBar.setPlaying(snap.playing);
     state.snap = snap;
     renderControls();
     renderBar();
@@ -137,6 +137,7 @@ export function initPage() {
     ({ true: function() { window.location.href = page + '.html'; }, false: noop })[mode.drivesNav()]();
   }
   function onContext(payload) {
+    syncBar.setTitle(displayTitle(payload));
     var page = screenPage(payload.context_id);
     ({ true: function() { followToOtherPage(page); }, false: function() { onVideoContext(payload); } })[page !== 'video']();
   }

@@ -2,7 +2,7 @@ import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { playbackAction } from '../../core/app-api.js';
 import { companionQueueHtml } from '../../core/queue-view.js';
-import { screenPage } from '../../core/companion-utils.js';
+import { screenPage, displayTitle } from '../../core/companion-utils.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 
@@ -61,7 +61,7 @@ export function initPage() {
   // The active person rides the app_state (TASK-158); the POSTs key per person
   // off it, exactly as the companion's Continue-Watching reads do.
   function onAppState(snap) {
-    syncBar.updateStatus(snap);
+    syncBar.setPlaying(snap.playing);
     [snap.person].filter(Boolean).forEach(function(p) { state.person = p; });
   }
 
@@ -73,6 +73,7 @@ export function initPage() {
     [page].filter(function(p) { return p !== 'audio'; }).forEach(function(p) { window.location.href = p + '.html'; });
   }
   function onContext(payload) {
+    syncBar.setTitle(displayTitle(payload));
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
