@@ -122,3 +122,50 @@ test('FEAT-032: a series detail (no artist parent) keeps the default Back intent
   await expect.poll(() => intents.filter((i) => i.intent === 'back').length).toBeGreaterThan(0);
   expect(intents.filter((i) => i.intent === 'navigate' && i.params.page === 'artist.html')).toHaveLength(0);
 });
+
+// FEAT-038 (TASK-230) — desynced detail. The companion arrives via browse's local
+// link (detail.html?id=…) while the TV is elsewhere, so it self-loads the series
+// from the id instead of waiting for the TV's context echo; it does not follow the
+// TV, greys the play controls, and Back is a local hop to browse.
+test.describe('desync mode', () => {
+  // The TV is NOT on detail (context: browse) — proving the page self-loads.
+  function mockElsewhere(page, intents) {
+    return mockAppRec(page, {
+      context: { context_id: 'browse' },
+      appState: { screen: 'browse', profile: 'kids' }
+    }, intents);
+  }
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      sessionStorage.setItem('grew-tv:companion-mode', 'desynced');
+      sessionStorage.removeItem('grew-tv:nav-trail');
+    });
+  });
+
+  test('self-loads the series from ?id without the TV echo', async ({ page }) => {
+    await installApi(page);
+    await mockElsewhere(page, []);
+    await page.goto('/companion/detail.html?id=bluey');
+    await expect(page.locator('.tile-btn')).toHaveCount(3);
+    await expect(page.locator('.seg-opt').filter({ hasText: 'Browse' })).toHaveClass(/on/);
+  });
+
+  test('play controls grey out (no dead clicks) while desynced', async ({ page }) => {
+    await installApi(page);
+    await mockElsewhere(page, []);
+    await page.goto('/companion/detail.html?id=bluey');
+    await expect(page.locator('.play-next-btn')).toHaveClass(/desync-off/);
+    await expect(page.locator('.tile-btn').first()).toHaveClass(/desync-off/);
+  });
+
+  test('Back is a local hop to browse — no back/navigate intent to the TV', async ({ page }) => {
+    const intents = [];
+    await installApi(page);
+    await mockElsewhere(page, intents);
+    await page.goto('/companion/detail.html?id=bluey');
+    await expect(page.locator('.tile-btn').first()).toBeVisible();
+    await page.locator('#btn-back').click();
+    await page.waitForURL('**/companion/browse.html');
+    expect(intents.filter((i) => i.intent === 'back')).toHaveLength(0);
+  });
+});

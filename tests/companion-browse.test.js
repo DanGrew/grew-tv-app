@@ -242,3 +242,45 @@ test('FEAT-032: a deeper artist entry on top of the browse entry does NOT reset 
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
   await expect(page.locator('.chip[data-section="series"]')).toHaveClass(/active/);
 });
+
+// FEAT-038 (TASK-230) — companion desync mode. SYNCED is the default (every test
+// above). Desynced, the companion browses on its own: it stops emitting nav/
+// transport intents and stops following the TV, opens series/album detail locally
+// (carrying ?id), and shows a Sync toggle + a display-only TV status strip.
+function browseOpt(page) { return page.locator('.seg-opt').filter({ hasText: 'Browse' }); }
+function controlOpt(page) { return page.locator('.seg-opt').filter({ hasText: 'Control' }); }
+
+test.describe('desync mode', () => {
+  test('Control/Browse segmented switch flips, with a TV status strip', async ({ page }) => {
+    await expect(controlOpt(page)).toHaveClass(/on/);
+    await expect(browseOpt(page)).not.toHaveClass(/on/);
+    await expect(page.locator('#tv-status')).toContainText('TV:');
+    await browseOpt(page).click();
+    await expect(browseOpt(page)).toHaveClass(/on/);
+    await expect(controlOpt(page)).not.toHaveClass(/on/);
+  });
+
+  test('Browse mode drills locally and emits NO intents (TV untouched)', async ({ page }) => {
+    await browseOpt(page).click();
+    await page.locator('.chip[data-section="series"]').click();
+    await expect(page.locator('#rails-wrap')).toBeVisible();
+    await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
+    await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"]')).toBeVisible();
+    expect(intents.filter((i) => i.intent === 'navigate')).toHaveLength(0);
+  });
+
+  test('Browse mode tile tap opens detail locally with ?id (no select intent)', async ({ page }) => {
+    await browseOpt(page).click();
+    await page.locator('.chip[data-section="series"]').click();
+    await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
+    await page.locator('#txtgrid .ph-txt[data-id="bluey"]').click();
+    await page.waitForURL('**/companion/detail.html?id=bluey');
+    expect(intents.filter((i) => i.intent === 'select')).toHaveLength(0);
+  });
+
+  test('switch-profile greys out in Browse mode (no dead click)', async ({ page }) => {
+    await expect(page.locator('#switch-profile')).not.toHaveClass(/desync-off/);
+    await browseOpt(page).click();
+    await expect(page.locator('#switch-profile')).toHaveClass(/desync-off/);
+  });
+});

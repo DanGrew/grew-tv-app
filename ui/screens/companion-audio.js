@@ -1,13 +1,15 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadAlbum, loadPlaylist, playbackAction } from '../../core/app-api.js';
-import { screenPage, displayTitle } from '../../core/companion-utils.js';
+import { screenPage, displayTitle, queryString } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
 import { trailCrumbs } from '../../core/breadcrumb.js';
 import { peek as peekTrail, clear as clearTrail } from '../../core/nav-trail.js';
+import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
+import { mountSyncBar } from './companion-sync-bar.js';
 
 // Companion audio context (FEAT-018 TASK-132). The music analogue of
 // companion-video: live transport (play/pause, prev/next track, graduated skip,
@@ -38,9 +40,19 @@ export function initPage() {
   var state = { snap: null, sourceType: null, sourceId: null, person: null };
   var api = {};
   var updateBar = null;
+  var mode = createCompanionMode();
+  var syncBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
+  // FEAT-038 (TASK-230): the mode switch ONLY changes mode (consistent on every
+  // page — no surprise navigation). BROWSE greys the TV-driving transport in
+  // place (via body.browsing) so there are no dead clicks; you reach the library
+  // through the breadcrumb (local-nav while desynced). CONTROL reloads to re-run
+  // the reconnect path.
+  function reSync() { window.location.reload(); }
+  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
+  function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
   // Back is the breadcrumb now (FEAT-032 / TASK-218), not a lone Back button: the
   // player shows Home > <items> > Track, where <items> is the level you launched
@@ -52,9 +64,13 @@ export function initPage() {
   function mountAudioCrumbs(title) {
     mountCompanionBreadcrumb('breadcrumb', trailCrumbs(peekTrail(), title), onCrumbNav);
   }
+  // Browse mode: the crumb is a LOCAL hop (the intent would be suppressed anyway)
+  // so you can reach the library without driving the TV. Control mode: the usual
+  // navigate intent the other screens use.
+  function localGo(page, params) { window.location.href = page + queryString(params); }
   function onCrumbNav(page, params) {
     ({ 'true': clearTrail, 'false': noop })[String(Object.keys(params).length === 0)]();
-    api.sendIntent('navigate', { page: page, params: params });
+    ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
   }
 
   function buildJump() {
@@ -183,6 +199,7 @@ export function initPage() {
   }
 
   function onAppState(snap) {
+    syncBar.updateStatus(snap);
     state.snap = snap;
     capturePerson(snap);
     renderControls();
@@ -191,12 +208,16 @@ export function initPage() {
     markCurrent();
   }
 
-  function onContext(payload) {
+  function followContext(payload) {
     els.ctxLabel.textContent = 'Now playing';
     els.title.textContent = displayTitle(payload);
     mountAudioCrumbs(displayTitle(payload));
     var page = screenPage(payload.context_id);
     [page].filter(function(p) { return p !== 'audio'; }).forEach(function(p) { window.location.href = p + '.html'; });
+  }
+  // Browse mode does not follow the TV (inbound nav seam gated).
+  function onContext(payload) {
+    ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
   // Reset progress (TASK-142): two-tap confirm then send the `reset` intent — the
@@ -236,6 +257,8 @@ export function initPage() {
   buildJump();
   setInterval(renderBar, 250);
 
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices);
+  syncBar = mountSyncBar(mode, onModeChange);
+  applyMode();
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }

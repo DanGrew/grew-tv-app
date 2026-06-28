@@ -3,6 +3,8 @@ import { wsUrl } from '../../core/server-config.js';
 import { playbackAction } from '../../core/app-api.js';
 import { companionQueueHtml } from '../../core/queue-view.js';
 import { screenPage } from '../../core/companion-utils.js';
+import { createCompanionMode } from '../../core/companion-mode.js';
+import { mountSyncBar } from './companion-sync-bar.js';
 
 // FEAT-031 (TASK-189) companion Queue View — the phone mirror of the TV Queue
 // View (screen-queue.js). It renders the four-section server `playback`
@@ -23,7 +25,15 @@ export function initPage() {
   };
   var state = { person: null };
   var api = {};
+  var mode = createCompanionMode();
+  var syncBar = null;
   function noop() {}
+  // FEAT-038 (TASK-230): the switch only changes mode. BROWSE greys the queue
+  // actions in place (body.browsing) so nothing disturbs playback; reach the
+  // library via Back -> player -> breadcrumb. CONTROL reloads (reconnect).
+  function reSync() { window.location.reload(); }
+  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
+  function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
   // POST a playback action for the bound person; the server broadcasts the new
   // snapshot back over the relay, which repaints the view (no local queue math).
@@ -51,18 +61,24 @@ export function initPage() {
   // The active person rides the app_state (TASK-158); the POSTs key per person
   // off it, exactly as the companion's Continue-Watching reads do.
   function onAppState(snap) {
+    syncBar.updateStatus(snap);
     [snap.person].filter(Boolean).forEach(function(p) { state.person = p; });
   }
 
   // Follow the TV: if it leaves the audio context, jump to that companion page
   // (mirrors companion-audio). Same-context ('audio') is a no-op, so the Queue
-  // View stays put while the album keeps playing.
-  function onContext(payload) {
+  // View stays put while the album keeps playing. Browse mode does not follow.
+  function followContext(payload) {
     var page = screenPage(payload.context_id);
     [page].filter(function(p) { return p !== 'audio'; }).forEach(function(p) { window.location.href = p + '.html'; });
+  }
+  function onContext(payload) {
+    ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
   els.back.addEventListener('click', function() { window.location.href = 'audio.html'; });
   render(null);
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, noop, { onPlayback: render });
+  syncBar = mountSyncBar(mode, onModeChange);
+  applyMode();
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, noop, { onPlayback: render, mode: mode });
 }
