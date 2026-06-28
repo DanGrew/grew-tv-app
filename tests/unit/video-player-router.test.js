@@ -59,6 +59,22 @@ describe('upNextItem', () => {
     expect(upNextItem(null)).toBe(null);
     expect(upNextItem({})).toBe(null);
   });
+  it('is the override-queue front when the queue is non-empty (plays ahead of source)', () => {
+    const snap = series(0, true);
+    snap.override_queue = [item('f1', 'Cars'), item('f2', 'Cars 2')];
+    expect(upNextItem(snap).item_id).toBe('f1');
+  });
+  it('falls back to the source once the queue is empty', () => {
+    const snap = series(0, true);
+    snap.override_queue = [];
+    expect(upNextItem(snap).item_id).toBe('e2');
+  });
+  it('is the queue front even on a single-item source', () => {
+    expect(upNextItem({
+      items: [item('only', 'Solo')], current_item_index: 0, repeat: false,
+      override_queue: [item('f1', 'Cars')]
+    }).item_id).toBe('f1');
+  });
 });
 
 describe('upNextLine', () => {
@@ -73,6 +89,11 @@ describe('upNextLine', () => {
   });
   it('is null for an empty snapshot', () => {
     expect(upNextLine({})).toBe(null);
+  });
+  it('is "Up next: <title>" for a queued item even at the wrapping series end', () => {
+    const snap = series(2, true);   // would be "Start again" without a queue
+    snap.override_queue = [item('f1', 'Cars')];
+    expect(upNextLine(snap)).toEqual({ prefix: 'Up next: ', label: 'Cars' });
   });
 });
 

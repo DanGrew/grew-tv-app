@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction } from '../../core/app-api.js';
+import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, videoPlaybackAction } from '../../core/app-api.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
@@ -149,6 +149,23 @@ export function initPage() {
     b.addEventListener('click', function() { queueTrack(item); });
     return b;
   }
+  // FEAT-040/TASK-249 — the VIDEO ＋ Queue: a series episode queues to the separate
+  // video queue (queue-video, distinct from the music queue-track above). Same
+  // per-person POST ⇒ works in BOTH modes (the play tile greys in Browse, this
+  // stays live); the durable queue (TASK-247) keeps it across source swaps.
+  function queueVideo(item) {
+    videoPlaybackAction(server, 'queue-video', state.person, { video_id: item.video.id })
+      .then(function() { showStatus('Queued to Play Next'); })
+      .catch(function() { showStatus('Could not queue.'); });
+  }
+  function videoQueueBtn(item) {
+    var b = document.createElement('button');
+    b.className = 'detail-queue-btn';
+    b.setAttribute('data-queue', item.video.id);
+    b.textContent = '＋ Queue';
+    b.addEventListener('click', function() { queueVideo(item); });
+    return b;
+  }
   // The album-level control, rendered once above the track list (album context
   // only — a TV series has no playlist semantics).
   function appendAddAllBtn() {
@@ -246,9 +263,9 @@ export function initPage() {
     ({ 'true': appendChipRow, 'false': noop })[hasSeasonChips(state.series) + '']();
   }
 
-  // An album track is rendered as a row: the existing play tile + ＋ Playlist and
-  // ＋ Queue controls beside it (a <button> can't nest, so they are siblings in a
-  // row, as companion-audio does for ＋ Queue). A TV episode renders the bare tile.
+  // An album track is rendered as a row: the play tile + ＋ Playlist and ＋ Queue
+  // (music) controls beside it (a <button> can't nest, so they are siblings in a
+  // row, as companion-audio does for ＋ Queue).
   function albumTrackNode(item) {
     var row = document.createElement('div');
     row.className = 'detail-track-row';
@@ -257,7 +274,16 @@ export function initPage() {
     row.appendChild(queueBtn(item));
     return row;
   }
-  var TRACK_NODE = { 'true': albumTrackNode, 'false': episodeBtn };
+  // A video series episode is the play tile + a ＋ Queue (VIDEO queue) beside it —
+  // no ＋ Playlist (playlists are music-only). FEAT-040/TASK-249.
+  function videoTrackNode(item) {
+    var row = document.createElement('div');
+    row.className = 'detail-track-row';
+    row.appendChild(episodeBtn(item));
+    row.appendChild(videoQueueBtn(item));
+    return row;
+  }
+  var TRACK_NODE = { 'true': albumTrackNode, 'false': videoTrackNode };
   function trackNode(item) { return TRACK_NODE[isAlbum() + ''](item); }
 
   function renderSeries() {

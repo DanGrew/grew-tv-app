@@ -3,7 +3,7 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadSeries, loadContinueWatching } from '../../core/app-api.js';
+import { loadSeries, loadContinueWatching, videoPlaybackAction } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { primaryAction, playNextLabel } from '../../core/series-detail.js';
 import { collectionMetaLine } from '../../core/detail-view.js';
@@ -35,6 +35,25 @@ export function initDetailPage() {
   }
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
+
+  // FEAT-040/TASK-249 — per-episode "＋ Queue" (Play Next) on a video series. POSTs
+  // queue-video for the active person to the SEPARATE video queue (distinct from
+  // the music queue); the durable queue (TASK-247) keeps it across source swaps and
+  // the persistent player shows it as Up next. A transient toast confirms.
+  var statusTimer = null;
+  function hideStatus() { document.getElementById('queue-status').style.display = 'none'; }
+  function showStatus(text) {
+    var el = document.getElementById('queue-status');
+    el.textContent = text;
+    el.style.display = 'block';
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(hideStatus, 2500);
+  }
+  function queueVideo(item) {
+    videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: item.video.id })
+      .then(function() { showStatus('Queued to Play Next'); })
+      .catch(function() { showStatus('Could not queue.'); });
+  }
 
   var wsApp = connectApp(wsUrl(window.location.hostname), function(intent, params) {
     var INTENTS = {
@@ -82,7 +101,7 @@ export function initDetailPage() {
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: seriesId, seriesTitle: state.series.title }));
       document.getElementById('detail-meta').textContent = collectionMetaLine(state.series);
       document.getElementById('btn-play-next').textContent = '▶ ' + playNextLabel(state.series.items, state.progress);
-      buildDetailList(SERVER, state.series, state.progress, onPlayItem);
+      buildDetailList(SERVER, state.series, state.progress, onPlayItem, null, queueVideo);
       focusFirstDetailRow();
     })
     .catch(function() { navTo('error.html'); });

@@ -74,6 +74,8 @@ test('every album track row carries a ＋ Playlist control', async ({ page }) =>
 });
 
 test('a TV series (not an album) offers no ＋ Playlist control', async ({ page }) => {
+  // ＋ Playlist is music-only; a TV series episode now carries a ＋ Queue (VIDEO
+  // queue, FEAT-040/TASK-249) but never ＋ Playlist.
   await installApi(page);
   await browseWithPlaylists(page);
   await mockApp(page, {
@@ -82,8 +84,9 @@ test('a TV series (not an album) offers no ＋ Playlist control', async ({ page 
   }, []);
   await page.goto('/companion/detail.html');
   await expect(page.locator('.tile-btn').first()).toBeVisible();
-  await expect(page.locator('.detail-add-btn')).toHaveCount(0);
-  await expect(page.locator('.detail-track-row')).toHaveCount(0);
+  await expect(page.locator('.detail-add-btn')).toHaveCount(0);     // no ＋ Playlist
+  await expect(page.locator('.detail-track-row')).toHaveCount(3);   // each w/ ＋ Queue
+  await expect(page.locator('.detail-queue-btn')).toHaveCount(3);
 });
 
 test('＋ Playlist opens a sheet listing the active profile\'s playlists + New playlist', async ({ page }) => {
