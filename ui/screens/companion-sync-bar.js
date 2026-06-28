@@ -1,10 +1,8 @@
-import { tvStatusText } from '../../core/companion-utils.js';
-
-// FEAT-038 (TASK-230) — the companion mode strip, shared by every desync-aware
-// page. A segmented [📺 Control | 🔍 Browse] switch plus a display-only
-// "TV: ▶ <title>" line. CONTROL = drive the TV (internally "synced"); BROWSE =
-// look around / queue without disturbing playback (internally "desynced"). The
-// friendly labels live here only; the mode flag keeps its synced/desynced names.
+// FEAT-038 (TASK-230) — the companion mode switch, shared by every desync-aware
+// page: a segmented [📺 Control | 🔍 Browse] control. CONTROL = drive the TV
+// (internally "synced"); BROWSE = look around / queue without disturbing playback
+// (internally "desynced"). The friendly labels live here only; the mode flag
+// keeps its synced/desynced names.
 //
 // onChange(browsing) fires only when the mode actually CHANGES (tapping the
 // already-active side is a no-op), so the host page re-renders (-> Browse) or
@@ -25,13 +23,9 @@ export function mountSyncBar(mode, onChange) {
   seg.className = 'seg';
   var control = segOpt('📺 Control');
   var browse = segOpt('🔍 Browse');
-  var status = document.createElement('span');
-  status.id = 'tv-status';
-  status.textContent = 'TV: —';
   seg.appendChild(control);
   seg.appendChild(browse);
   bar.appendChild(seg);
-  bar.appendChild(status);
 
   function applyActive() {
     control.classList.toggle('on', !mode.isDesynced());
@@ -49,7 +43,4 @@ export function mountSyncBar(mode, onChange) {
   control.addEventListener('click', function() { selectMode(false); });
   browse.addEventListener('click', function() { selectMode(true); });
   applyActive();
-
-  function updateStatus(snap) { status.textContent = tvStatusText(snap); }
-  return { updateStatus: updateStatus };
 }

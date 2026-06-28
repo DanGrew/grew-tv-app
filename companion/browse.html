@@ -68,8 +68,7 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 .screen-btn.on { border-color: var(--focus); color: var(--focus); }
 .screen-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
 .screen-btn, .screen-current { display: inline-flex; align-items: center; gap: 8px; }
-#sync-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; padding: 2px; }
-#tv-status { flex: 1; min-width: 0; font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+#sync-bar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; padding: 2px; }
 .seg { display: inline-flex; flex: 0 0 auto; border: 2px solid var(--border); border-radius: 999px; overflow: hidden; }
 .seg-opt { font-size: 14px; padding: 8px 16px; border: none; background: transparent; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
 .seg-opt.on { background: var(--surface-hi); color: var(--focus); }

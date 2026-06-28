@@ -95,3 +95,47 @@ test('FEAT-032: loading the artist page records it on the nav trail (so a child 
   const trail = await page.evaluate(() => JSON.parse(sessionStorage.getItem('grew-tv:nav-trail')));
   expect(trail.some((e) => e.page === 'artist.html' && e.params.artist === 'ELO')).toBe(true);
 });
+
+// FEAT-038 (DSYNC-2c): opening an artist while Browsing. The page self-loads its
+// albums from ?id (the TV is elsewhere); album tiles open album detail LOCALLY
+// (they stay live — browsing into them is the point); play/shuffle grey out.
+test.describe('desync mode (Browse)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => { sessionStorage.setItem('grew-tv:companion-mode', 'desynced'); });
+    // Re-point the WS so the TV is NOT on artist — proves the self-load.
+    let version = 1;
+    await page.routeWebSocket(/:8766/, (ws) => {
+      function push() {
+        version += 1;
+        ws.send(msg('context', { version: version, context_id: 'browse' }));
+        ws.send(msg('app_state', { screen: 'home', profile: 'kids', person: 'kids' }));
+      }
+      ws.onMessage(function(raw) {
+        const m = JSON.parse(raw);
+        if (m.type === 'intent') sentIntents.push(m.payload.intent);
+        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+        if (m.type === 'snapshot_request') push();
+      });
+    });
+    await page.goto('/companion/artist.html?id=ELO');
+  });
+
+  test('self-loads the artist albums from ?id (no TV echo)', async ({ page }) => {
+    await expect(page.locator('#ctx-title')).toHaveText('ELO');
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await expect(page.locator('body')).toHaveClass(/browsing/);
+  });
+
+  test('tapping an album opens detail locally (no select intent to the TV)', async ({ page }) => {
+    await page.locator('.ph-txt[data-id="ootb"]').click();
+    await page.waitForURL('**/companion/detail.html?id=ootb');
+    expect(sentIntents.filter((i) => i === 'select')).toHaveLength(0);
+  });
+
+  test('Back is a local hop to browse — no back intent', async ({ page }) => {
+    await expect(page.locator('.ph-txt').first()).toBeVisible();
+    await page.locator('#btn-back').click();
+    await page.waitForURL('**/companion/browse.html');
+    expect(sentIntents.filter((i) => i === 'back')).toHaveLength(0);
+  });
+});

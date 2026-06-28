@@ -49,7 +49,6 @@ export function initPage() {
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
-  var syncBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
@@ -157,7 +156,6 @@ export function initPage() {
   }
 
   function onAppState(snap) {
-    syncBar.updateStatus(snap);
     state.snap = snap;
     capturePerson(snap);
     renderControls();
@@ -220,7 +218,7 @@ export function initPage() {
   buildJump();
   setInterval(renderBar, 250);
 
-  syncBar = mountSyncBar(mode, onModeChange);
+  mountSyncBar(mode, onModeChange);
   applyMode();
   api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode, onVideoPlayback: onVideoPlayback });
   updateBar = mountScreenBar(getApi, noop);

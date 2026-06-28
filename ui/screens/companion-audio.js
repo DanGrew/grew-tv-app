@@ -41,7 +41,6 @@ export function initPage() {
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
-  var syncBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
@@ -199,7 +198,6 @@ export function initPage() {
   }
 
   function onAppState(snap) {
-    syncBar.updateStatus(snap);
     state.snap = snap;
     capturePerson(snap);
     renderControls();
@@ -215,7 +213,8 @@ export function initPage() {
     var page = screenPage(payload.context_id);
     [page].filter(function(p) { return p !== 'audio'; }).forEach(function(p) { window.location.href = p + '.html'; });
   }
-  // Browse mode does not follow the TV (inbound nav seam gated).
+  // The TV status strip title rides the context (both modes); only the nav-follow
+  // is gated in Browse mode.
   function onContext(payload) {
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
@@ -257,7 +256,7 @@ export function initPage() {
   buildJump();
   setInterval(renderBar, 250);
 
-  syncBar = mountSyncBar(mode, onModeChange);
+  mountSyncBar(mode, onModeChange);
   applyMode();
   api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);

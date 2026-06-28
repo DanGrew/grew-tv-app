@@ -45,17 +45,6 @@ export function displayLabel(payload) {
   return [payload.context_id].filter(Boolean).map(titleCase).concat([''])[0];
 }
 
-// FEAT-038 (TASK-230): the display-only "what's the TV doing" strip a desynced
-// companion shows so you never lose track of the telly. Reads the same app_state
-// snapshot the companion already receives (displayTitle + the playing flag); no
-// title (idle / on a menu) reads as a dash. Pure — provable without a browser.
-export function tvStatusText(snap) {
-  var title = [snap].filter(Boolean).map(displayTitle).filter(Boolean)[0];
-  if (!title) return 'TV: —';
-  var icon = snap.playing ? '▶' : '❚❚';
-  return 'TV: ' + icon + ' ' + title;
-}
-
 // Companion Home search (TASK-117): case-insensitive title substring match.
 // v1 is title-only by design (small library); tag/format search is parked.
 export function filterByTitle(cards, query) {
