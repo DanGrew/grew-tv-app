@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist } from '../../core/app-api.js';
+import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction } from '../../core/app-api.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
@@ -132,6 +132,23 @@ export function initPage() {
     b.addEventListener('click', function() { openAddSheet(item); });
     return b;
   }
+  // FEAT-040/TASK-248 — per-track "+ Queue" (play next). A per-person POST
+  // (queue-track), so it works in BOTH modes: in Browse the play tile greys but
+  // this stays live (like + Playlist). The durable override queue (TASK-246) keeps
+  // it across album swaps.
+  function queueTrack(item) {
+    playbackAction(server, 'queue-track', state.person, { track_id: item.video.id })
+      .then(function() { showStatus('Queued to Play Next'); })
+      .catch(function() { showStatus('Could not queue track.'); });
+  }
+  function queueBtn(item) {
+    var b = document.createElement('button');
+    b.className = 'detail-queue-btn';
+    b.setAttribute('data-queue', item.video.id);
+    b.textContent = '＋ Queue';
+    b.addEventListener('click', function() { queueTrack(item); });
+    return b;
+  }
   // The album-level control, rendered once above the track list (album context
   // only — a TV series has no playlist semantics).
   function appendAddAllBtn() {
@@ -229,14 +246,15 @@ export function initPage() {
     ({ 'true': appendChipRow, 'false': noop })[hasSeasonChips(state.series) + '']();
   }
 
-  // An album track is rendered as a row: the existing play tile + a ＋ Playlist
-  // control beside it (a <button> can't nest, so they are siblings in a row, as
-  // companion-audio does for ＋ Queue). A TV episode renders the bare tile.
+  // An album track is rendered as a row: the existing play tile + ＋ Playlist and
+  // ＋ Queue controls beside it (a <button> can't nest, so they are siblings in a
+  // row, as companion-audio does for ＋ Queue). A TV episode renders the bare tile.
   function albumTrackNode(item) {
     var row = document.createElement('div');
     row.className = 'detail-track-row';
     row.appendChild(episodeBtn(item));
     row.appendChild(addBtn(item));
+    row.appendChild(queueBtn(item));
     return row;
   }
   var TRACK_NODE = { 'true': albumTrackNode, 'false': episodeBtn };

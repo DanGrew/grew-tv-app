@@ -3,7 +3,7 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadAlbum, loadContinueWatching, addToPlaylist, addSourceToPlaylist, loadBrowse } from '../../core/app-api.js';
+import { loadAlbum, loadContinueWatching, addToPlaylist, addSourceToPlaylist, loadBrowse, playbackAction } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { playNextIndex } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -136,6 +136,15 @@ export function initAlbumDetailPage() {
     loadAndShowSheet();
   }
 
+  // FEAT-040/TASK-248 — per-track "+ Queue" (play next). POSTs queue-track for the
+  // active person; the durable override queue (TASK-246) keeps it across album swaps.
+  // Reuses the Add-sheet's transient toast for feedback (no sheet — a direct POST).
+  function queueTrack(item) {
+    playbackAction(SERVER, 'queue-track', getPerson(), { track_id: item.video.id })
+      .then(function() { showStatus('Queued to Play Next'); })
+      .catch(function() { showStatus('Could not queue track.'); });
+  }
+
   var wsApp = connectApp(wsUrl(window.location.hostname), function(intent, params) {
     var INTENTS = {
       navigate_up:   function() { detailArrow({ key: 'ArrowUp',   preventDefault: function() {} }); },
@@ -186,7 +195,7 @@ export function initAlbumDetailPage() {
       state.album = res[0];
       state.progress = progressMapFromCW(res[1].content);
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: albumId, seriesTitle: state.album.title }));
-      buildDetailList(SERVER, state.album, state.progress, onPlayItem, openAddSheet);
+      buildDetailList(SERVER, state.album, state.progress, onPlayItem, openAddSheet, queueTrack);
       focusFirstDetailRow();
     })
     .catch(function() { navTo('error.html'); });
