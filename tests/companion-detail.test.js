@@ -147,7 +147,7 @@ test.describe('desync mode', () => {
     await mockElsewhere(page, []);
     await page.goto('/companion/detail.html?id=bluey');
     await expect(page.locator('.tile-btn')).toHaveCount(3);
-    await expect(page.locator('#btn-sync-toggle')).toHaveText('Desynced · Sync');
+    await expect(page.locator('.seg-opt').filter({ hasText: 'Browse' })).toHaveClass(/on/);
   });
 
   test('play controls grey out (no dead clicks) while desynced', async ({ page }) => {

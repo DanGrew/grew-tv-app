@@ -125,6 +125,18 @@ test('uses a breadcrumb (no Back button); the Home crumb returns to browse', asy
   await page.locator('#breadcrumb .crumb-link').first().click();
   await expect(page).toHaveURL(/companion\/browse\.html$/);
 });
+
+// FEAT-038 (TASK-230): the player carries the Control/Browse switch so you can
+// leave to browse (and queue) without disturbing playback. Defaults to Control;
+// tapping Browse leaves for the library (the mode persists, so browse opens
+// desynced). The TV is never told to stop.
+test('defaults to Control; Browse leaves for the library', async ({ page }) => {
+  await expect(page.locator('.seg-opt').filter({ hasText: 'Control' })).toHaveClass(/on/);
+  await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
+  await expect(page).toHaveURL(/companion\/browse\.html$/);
+  const mode = await page.evaluate(() => sessionStorage.getItem('grew-tv:companion-mode'));
+  expect(mode).toBe('desynced');
+});
 });
 
 // FEAT-032 (TASK-218): when the user drilled browse before playing, that position

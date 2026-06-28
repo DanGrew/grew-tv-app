@@ -5,8 +5,10 @@ import { screenPage, displayTitle, seriesIdFromSnap } from '../../core/companion
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
+import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
+import { mountSyncBar } from './companion-sync-bar.js';
 
 // Companion player transport (FEAT-017). Read-only progress bar interpolated
 // locally between 1 Hz app_state snapshots; graduated discrete jumps + prev/next
@@ -35,9 +37,16 @@ export function initPage() {
   var state = { snap: null, nextKey: null, loadedSeriesId: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '' } };
   var api = {};
   var updateBar = null;
+  var mode = createCompanionMode();
+  var syncBar = null;
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
+  // FEAT-038 (TASK-230): "Browse" leaves the player for the library (desynced)
+  // so you can queue without disturbing playback; "Control" reloads (reconnect).
+  function reSync() { window.location.reload(); }
+  function goBrowse() { window.location.href = 'browse.html'; }
+  function onModeChange(browsing) { ({ true: goBrowse, false: reSync })[browsing](); }
 
   // Breadcrumb trail (FEAT-021): Home > Series > Episode (film: Home > Title).
   // Ancestor crumbs send the `navigate` intent — the app teleports the TV and
@@ -102,6 +111,7 @@ export function initPage() {
   }
 
   function onAppState(snap) {
+    syncBar.updateStatus(snap);
     state.snap = snap;
     renderControls();
     renderBar();
@@ -116,11 +126,14 @@ export function initPage() {
     mountVideoCrumbs();
   }
 
+  // Following the TV onto another page is gated in Browse mode; staying on the
+  // video page to refresh titles (display-only) is fine in both modes.
+  function followToOtherPage(page) {
+    ({ true: function() { window.location.href = page + '.html'; }, false: noop })[mode.drivesNav()]();
+  }
   function onContext(payload) {
     var page = screenPage(payload.context_id);
-    ({ true:  function() { window.location.href = page + '.html'; },
-       false: onVideoContext
-    })[page !== 'video'](payload);
+    ({ true: function() { followToOtherPage(page); }, false: function() { onVideoContext(payload); } })[page !== 'video']();
   }
 
   // Reset progress (TASK-142): two-tap confirm (tap -> "Reset progress?" -> tap)
@@ -160,6 +173,7 @@ export function initPage() {
   buildJump();
   setInterval(renderBar, 250);
 
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices);
+  syncBar = mountSyncBar(mode, onModeChange);
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }
