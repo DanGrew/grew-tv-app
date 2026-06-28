@@ -45,3 +45,27 @@ test('auto-advance at end runs the Up next countdown then swaps in place', async
   await expect(page.locator('#upnext-text')).toContainText('The Weekend');
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/, { timeout: 8000 });
 });
+
+// TASK-224 — entry rewiring / nav-trail Back reconcile. The player is entered ONCE
+// (the persistent player at video.html); in-player Back (Escape) returns to the
+// page that launched it, keyed off `from`, NOT a hardcoded parent. The trail still
+// governs browse↔browse separately (FEAT-032). After an in-place advance the Back
+// target is still the original launcher (the document never reloaded).
+test('in-player Back returns to the launching detail page', async ({ page }) => {
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL(/detail\.html\?.*series=bluey/);
+});
+
+test('in-player Back returns to browse when launched from browse', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=browse');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL(/browse\.html/);
+});
+
+test('Back target survives an in-place advance (still the original launcher)', async ({ page }) => {
+  await page.locator('#btn-next').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL(/detail\.html\?.*series=bluey/);
+});
