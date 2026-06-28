@@ -53,10 +53,10 @@ export function buildRails(cards, progress) {
 // 'series' | 'films' | 'home-movies' | 'music'.
 
 var SECTION_TITLE = {
-  'series': 'Series',
+  'series': 'TV Series',
   'films': 'Films',
   'home-movies': 'Home Movies',
-  'music': 'Albums'
+  'music': 'Music'
 };
 
 // Fixed display order; which tabs actually appear is data-driven (below).

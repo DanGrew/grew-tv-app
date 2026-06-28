@@ -101,7 +101,7 @@ test('picking a screen re-targets (register_companion + snapshot_request) and re
   expect(types(received)).toContain('snapshot_request');
 
   // The screen's pushed state renders the browse content.
-  await expect(page.locator('#sections-row .chip')).toHaveText(['Series', 'Films', 'Home Movies']);
+  await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
   await expect(page.locator('#search')).toBeVisible();
   // The bar collapses to a current-screen pill naming the bound screen.
   await expect(page.locator('#screen-bar .screen-current')).toContainText('Living Room');

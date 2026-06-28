@@ -43,7 +43,7 @@ test.beforeEach(async ({ page }) => {
   await installApi(page);
   await mockApp(page, intents);
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#sections-row .chip')).toHaveText(['Series', 'Films', 'Home Movies']);
+  await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
 });
 
 test('L1 shows section chips from the server sections — no rails/grid/Back yet', async ({ page }) => {
@@ -115,7 +115,7 @@ test('Back collapses exactly one level: grid → rails → sections', async ({ p
   await page.locator('#btn-back').click();
   await expect(page.locator('#rails-wrap')).toBeHidden();
   await expect(page.locator('#btn-back')).toBeHidden();
-  await expect(page.locator('#sections-row .chip')).toHaveText(['Series', 'Films', 'Home Movies']);
+  await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
 });
 
 test('reuses the FEAT-021 breadcrumb — trail builds Home › Section › Rail as you drill', async ({ page }) => {
@@ -175,7 +175,7 @@ test.describe('create-playlist affordance', () => {
       body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat(MUSIC_CARDS) })
     }));
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#sections-row .chip')).toContainText(['Albums']);
+    await expect(page.locator('#sections-row .chip')).toContainText(['Music']);
   });
 
   test('New Playlist is hidden until the Music section is open', async ({ page }) => {
@@ -223,7 +223,7 @@ test('FEAT-032: collapsing back to the sections root clears the trail (next load
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await page.locator('#btn-back').click();
   await page.locator('#btn-back').click();
-  await expect(page.locator('#sections-row .chip')).toHaveText(['Series', 'Films', 'Home Movies']);
+  await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
   const trail = await page.evaluate(() => sessionStorage.getItem('grew-tv:nav-trail'));
   expect(trail).toBeNull();
 });

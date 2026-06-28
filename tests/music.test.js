@@ -2,13 +2,13 @@ const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 
 // FEAT-018/FEAT-027 — music browse + album detail + <audio> player + shuffle.
-// The Music tab (titled "Albums"), Continue Listening rollup and routing are
+// The Music tab (titled "Music"), Continue Listening rollup and routing are
 // exercised end-to-end against the fixture album ("Out of the Blue", 3 tracks).
 // FEAT-027: the app is type-agnostic — it groups by the server `section`, and a
 // track is never a standalone browse card (no Singles rail). Host-agnostic:
 // backend derives from the page origin (BUG-009). Music browse cards are injected
 // here (not the shared fixture) so the video-only tests keep seeing exactly
-// Series/Films/Home Movies.
+// TV Series/Films/Home Movies.
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
@@ -25,9 +25,9 @@ async function enterKids(page) {
   await expect(page.locator('#screen-browse')).toBeVisible();
 }
 
-test('a Music tab (titled Albums) appears after the video tabs, only when music is present', async ({ page }) => {
+test('a Music tab (titled Music) appears after the video tabs, only when music is present', async ({ page }) => {
   await enterKids(page);
-  await expect(page.locator('.sidebar-tab')).toHaveText(['Series', 'Films', 'Home Movies', 'Albums']);
+  await expect(page.locator('.sidebar-tab')).toHaveText(['TV Series', 'Films', 'Home Movies', 'Music']);
 });
 
 test('Music tab shows an Artists rail then an Albums rail with square (music) tiles, no Singles rail', async ({ page }) => {
@@ -70,7 +70,7 @@ test('selecting an artist drills into a grid of just that artist’s albums; an 
   await expect(tiles).toHaveCount(2);
   await expect(tiles.locator('.tile-title')).toHaveText(['Time', 'Out of the Blue']);
   await expect(page.locator('#rail-grid .film-tile[data-id="abba-arrival"]')).toHaveCount(0);
-  // Breadcrumb: Home › Albums › ELO.
+  // Breadcrumb: Home › Music › ELO.
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('ELO');
   await page.locator('#rail-grid .film-tile[data-id="ootb"]').click();
   await expect(page).toHaveURL(/album-detail\.html/);

@@ -74,7 +74,7 @@ test('tapping an album teleports the TV — the companion follows to the album d
   await expect(page).toHaveURL(/companion\/detail\.html$/);
 });
 
-test('the breadcrumb Albums crumb teleports the TV back to the Music tab', async ({ page }) => {
+test('the breadcrumb Music crumb teleports the TV back to the Music tab', async ({ page }) => {
   await expect(page.locator('#breadcrumb .crumb-link')).toHaveCount(2);
   await page.locator('#breadcrumb .crumb-link').last().click();
   await expect(page).toHaveURL(/companion\/browse\.html$/);
