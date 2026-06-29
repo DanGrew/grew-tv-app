@@ -20,6 +20,14 @@ describe('withCreatePlaylistTile', () => {
     expect(pl.items.map(i => i.id)).toEqual(['create-playlist']);
     expect(pl.items[0].section).toBe('music');
   });
+  it('empty-state Playlists rail leads when nothing is in progress (TASK-234)', () => {
+    const out = withCreatePlaylistTile([{ id: 'artists', title: 'Artists', items: [] }, { id: 'albums', title: 'Albums', items: [] }]);
+    expect(out.map(r => r.id)).toEqual(['playlists', 'artists', 'albums']);
+  });
+  it('empty-state Playlists rail sits directly after Continue Listening (TASK-234)', () => {
+    const out = withCreatePlaylistTile([{ id: 'continue', title: 'Continue Listening', items: [] }, { id: 'artists', title: 'Artists', items: [] }]);
+    expect(out.map(r => r.id)).toEqual(['continue', 'playlists', 'artists']);
+  });
 });
 
 const cards = [
@@ -248,9 +256,9 @@ const WITH_PLAYLISTS = MUSIC.concat([
 ]);
 
 describe('playlists rail + routing (FEAT-036)', () => {
-  it('splits playlists into their own Playlists rail, after Albums', () => {
+  it('splits playlists into their own Playlists rail, directly after Continue Listening (TASK-234)', () => {
     const rails = buildTabRails('music', WITH_PLAYLISTS, [], {});
-    expect(rails.map(r => r.id)).toEqual(['artists', 'albums', 'playlists']);
+    expect(rails.map(r => r.id)).toEqual(['playlists', 'artists', 'albums']);
   });
 
   it('keeps playlist cards OUT of the Albums rail (split on collectionType)', () => {
