@@ -77,11 +77,20 @@ test('Back (Escape) closes the overlay back to the still-mounted player', async 
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/);
 });
 
-test('a standalone film has no Queue button (no engine source)', async ({ page }) => {
+test('a standalone film plays THROUGH the engine (play-video) and keeps the Queue button', async ({ page }) => {
+  // FEAT-040/TASK-251: films are engine-driven now (no off-engine divergence), so
+  // they render from the snapshot and still expose the Queue (the durable queue
+  // plays after the film).
   await installApi(page);
   await installVideoPlaybackBackend(page);
+  const played = page.waitForRequest(req =>
+    req.url().includes('/api/video-playback/play-video') && req.method() === 'POST');
   await page.goto('/app/homeview/video.html?video=finding-nemo-main&from=browse');
   await expect(page.locator('#screen-video')).toBeVisible();
+  expect(JSON.parse((await played).postData())).toEqual({ video_id: 'finding-nemo-main' });
   await expect(page.locator('#video')).toHaveAttribute('src', /finding-nemo-main/);
-  await expect(page.locator('#btn-queue')).toBeHidden();
+  await expect(page.locator('#btn-queue')).toBeVisible();
+  await page.locator('#btn-queue').click();
+  await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
+  await expect(page.locator('.now-playing .np-title')).toHaveText('Finding Nemo');
 });
