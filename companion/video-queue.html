@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>grew-tv</title>
+<style>
+:root {
+  --bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+  --surface: rgba(255,255,255,0.06);
+  --surface-hi: rgba(255,255,255,0.11);
+  --border: rgba(255,255,255,0.13);
+  --focus: #fff;
+  --text: rgba(255,255,255,0.95);
+  --text-muted: rgba(255,255,255,0.4);
+  --danger: #ff6b6b;
+  --radius: 16px;
+  --radius-sm: 8px;
+  --dur: 0.18s;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); background-attachment: fixed; color: var(--text); font-family: var(--font); }
+body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
+#conn-status { font-size: 13px; font-family: monospace; color: var(--text-muted); text-align: center; height: 16px; flex-shrink: 0; }
+.back { align-self: flex-start; flex-shrink: 0; background: none; border: 2px solid transparent; border-radius: var(--radius-sm); color: var(--text); font-size: 16px; line-height: 1.4; font-family: inherit; padding: 6px 8px; cursor: pointer; touch-action: manipulation; }
+.back:active { color: var(--focus); }
+.back:focus { outline: 1px solid var(--focus); }
+#queue-body { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+
+.ph-section { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); margin-top: 8px; }
+.ph-section .hint { text-transform: none; letter-spacing: 0; opacity: 0.7; margin-left: 6px; }
+
+.ph-np { display: flex; gap: 12px; align-items: center; background: var(--surface-hi); border: 2px solid var(--focus); border-radius: var(--radius-sm); padding: 10px; }
+.ph-np .art { width: 52px; height: 52px; border-radius: 6px; background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--text-muted); flex-shrink: 0; }
+.ph-np-body { flex: 1; min-width: 0; }
+.ph-np .nm { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-np .by { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ph-transport { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 4px 2px; }
+.ph-tbtn { flex: 1; padding: 12px 4px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-size: 20px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.ph-tbtn:active, .ph-tbtn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.ph-tbtn.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
+
+.ph-qrow { display: flex; align-items: center; gap: 8px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+.ph-qrow.queued { border-left: 4px solid var(--focus); }
+.ph-qname { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; background: none; border: 2px solid transparent; border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: 14px; text-align: left; padding: 6px 4px; cursor: pointer; touch-action: manipulation; }
+.ph-qname:active, .ph-qname:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.ph-qname.ph-static { cursor: default; }
+.ph-qname .grip { color: var(--text-muted); font-size: 13px; flex-shrink: 0; }
+.ph-qname .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-qname .nm .by { color: var(--text-muted); font-size: 11px; }
+.acts { display: flex; gap: 5px; flex-shrink: 0; }
+.ph-ract { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.ph-ract:active, .ph-ract:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.ph-ract.is-disabled { opacity: 0.3; }
+.ph-ract.x { color: var(--danger); border-color: rgba(255,107,107,0.4); }
+.ph-ract.x:active, .ph-ract.x:focus { border-color: var(--danger); color: var(--danger); }
+.ph-ends { font-size: 12px; color: var(--text-muted); font-style: italic; padding: 6px 8px; }
+#sync-bar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; padding: 2px; }
+.seg { display: inline-flex; flex: 0 0 auto; border: 2px solid var(--border); border-radius: 999px; overflow: hidden; }
+.seg-opt { font-size: 14px; padding: 8px 16px; border: none; background: transparent; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
+.seg-opt.on { background: var(--surface-hi); color: var(--focus); }
+.seg-opt:active { color: var(--focus); }
+.seg-opt:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
+.desync-off { opacity: 0.35; pointer-events: none; }
+.browsing #queue-body { opacity: 0.35; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="conn-status">connecting…</div>
+<div id="sync-bar"></div>
+<button id="btn-back" class="back" aria-label="Back to player">‹ Now Playing</button>
+<div id="queue-body"></div>
+<script type="module">
+import { initPage } from '../ui/screens/companion-video-queue.js';
+initPage();
+</script>
+</body>
+</html>

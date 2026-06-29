@@ -1,6 +1,7 @@
 import { getParam, getProfile, getPerson, navTo, initCaptions } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
+import { setupVideoQueue } from './screen-video-queue.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadVideo, loadSeries, loadProgress, videoPlaybackAction } from '../../core/app-api.js';
@@ -43,6 +44,7 @@ export function initVideoPage() {
   var isSeries = !!seriesId;
   var wsApp = null;
   var player;
+  var queue;
   var snapshot = null;     // latest video_playback snapshot (series mode only)
   var loadedId = null;     // which item id is currently loaded in <video>
   var currentTitle = '';   // current item's title (for the breadcrumb leaf)
@@ -97,6 +99,7 @@ export function initVideoPage() {
   function applySnapshot(snap) {
     snapshot = snap;
     player.setSeriesMode(seriesMode(snap));
+    queue.applySnapshot(snap);
     [snap.now_playing].filter(Boolean).forEach(renderNowPlaying);
   }
 
@@ -144,8 +147,26 @@ export function initVideoPage() {
     }
   });
 
+  // FEAT-040 (TASK-250): the Video Queue View overlay hangs off the player. While
+  // open it owns the d-pad (its own grid nav + Back to close); closed, keys drive
+  // the transport as before. Each row control fires a video-playback action — the
+  // server broadcasts the new snapshot, which repaints the overlay (no local math).
+  queue = setupVideoQueue({
+    root: document.getElementById('queue-overlay'),
+    body: document.getElementById('queue-body'),
+    crumb: document.getElementById('queue-crumb'),
+    onAction: function(action, body) { sendAction(action, body); },
+    onClose: function() { document.getElementById('btn-queue').focus(); }
+  });
+  document.getElementById('btn-queue').addEventListener('click', function() { queue.open(); });
+
+  var KEY_TARGET = {
+    'true':  function(e) { queue.handleKey(e); },
+    'false': function(e) { player.handleVideoKey(e); }
+  };
+  function onVideoKey(e) { KEY_TARGET[queue.isOpen() + ''](e); }
   var keys = {};
-  VIDEO_KEYS.forEach(function(k) { keys[k] = player.handleVideoKey; });
+  VIDEO_KEYS.forEach(function(k) { keys[k] = onVideoKey; });
   initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote });
 
   // Breadcrumb crumbs on the companion send a `navigate` intent (FEAT-021);
@@ -171,6 +192,7 @@ export function initVideoPage() {
   }
   function startSingle() {
     player.setSeriesMode(false);
+    document.getElementById('btn-queue').classList.add('hidden');
     Promise.all([
       loadVideo(SERVER, videoId),
       loadProgress(SERVER, videoId, person).catch(zeroProgress),
