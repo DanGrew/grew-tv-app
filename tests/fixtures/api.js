@@ -588,6 +588,15 @@ async function installVideoPlaybackBackend(page) {
       if (!len) return;
       state.idx = state.repeat ? wrap(state.idx + 1, len) : Math.min(state.idx + 1, len - 1);
     },
+    'play-item': function(b) {
+      var i = order().indexOf(b.item_id);
+      state.current = null;
+      state.idx = i >= 0 ? i : state.idx;
+    },
+    'play-video': function(b) {
+      state.sourceType = null; state.sourceId = null; state.idx = 0;
+      state.current = b.video_id;
+    },
     'queue-video': function(b) {
       state.queue.unshift({ entry_id: 'e' + (state.queue.length + 1), video_id: b.video_id });
     },

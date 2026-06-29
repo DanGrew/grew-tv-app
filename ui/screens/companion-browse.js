@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, videoPlaybackAction } from '../../core/app-api.js';
 import { screenPage, filterByTitle, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
@@ -104,8 +104,29 @@ export function initPage() {
       .filter(Boolean).concat([{ title: '', items: [] }])[0];
   }
 
+  // Transient confirmation toast for ＋ Queue (mirrors the companion-detail
+  // producer) — fades after 2.5s; a fresh queue restarts the clock.
+  function hideQueueStatus() { document.getElementById('queue-status').style.display = 'none'; }
+  function showQueueStatus(text) {
+    var el = document.getElementById('queue-status');
+    el.textContent = text;
+    el.style.display = 'block';
+    clearTimeout(state.queueTimer);
+    state.queueTimer = setTimeout(hideQueueStatus, 2500);
+  }
+
+  // FEAT-040 (TASK-250) film ＋ Queue producer: queue a standalone film to the
+  // SEPARATE video queue (Play Next). Server-authoritative — POST queue-video per
+  // person; per-person POST ⇒ works in BOTH modes (the play tile may grey in
+  // Browse, this stays live), and the film shows up on the Video Queue View + TV.
+  function queueVideo(id) {
+    videoPlaybackAction(server, 'queue-video', state.person, { video_id: id })
+      .then(function() { showQueueStatus('Queued to Play Next'); })
+      .catch(noop);
+  }
+
   // Bare text-label tile: title + an optional resume-percent badge, no poster.
-  function txtTile(card) {
+  function nameTile(card) {
     var hint = tileHint(state.progress, card);
     var el = document.createElement('button');
     el.className = 'ph-txt';
@@ -127,6 +148,32 @@ export function initPage() {
     el.addEventListener('click', function() { openItem(card); });
     return el;
   }
+
+  // A film tile gains a sibling ＋ Queue control (TASK-250 fills the gap: a
+  // standalone film has no detail-row list, so this is its only queue affordance).
+  // The control stays live in Browse (per-person POST), unlike the play tile.
+  function filmQueueBtn(card) {
+    var b = document.createElement('button');
+    b.className = 'ph-cell-queue';
+    b.setAttribute('data-queue', card.id);
+    b.setAttribute('aria-label', 'Queue');
+    b.textContent = '＋ Queue';
+    b.addEventListener('click', function() { queueVideo(card.id); });
+    return b;
+  }
+  function filmCell(card) {
+    var cell = document.createElement('div');
+    cell.className = 'ph-txt-cell';
+    cell.appendChild(nameTile(card));
+    cell.appendChild(filmQueueBtn(card));
+    return cell;
+  }
+
+  // Only a standalone film/video gets the ＋ Queue cell; series/album/artist/
+  // playlist tiles route to their own pages (and series already queue per-episode
+  // from the detail screen). cardRoute(card)==='video' marks a film.
+  var CELL = { 'true': filmCell, 'false': nameTile };
+  function txtTile(card) { return CELL[String(cardRoute(card) === 'video')](card); }
 
   function renderSections() {
     els.sectionsRow.innerHTML = '';

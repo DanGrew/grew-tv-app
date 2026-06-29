@@ -1,9 +1,10 @@
 import { getParam, getProfile, getPerson, navTo, initCaptions } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
+import { setupVideoQueue } from './screen-video-queue.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadVideo, loadSeries, loadProgress, videoPlaybackAction } from '../../core/app-api.js';
+import { loadSeries, loadProgress, videoPlaybackAction } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -43,6 +44,7 @@ export function initVideoPage() {
   var isSeries = !!seriesId;
   var wsApp = null;
   var player;
+  var queue;
   var snapshot = null;     // latest video_playback snapshot (series mode only)
   var loadedId = null;     // which item id is currently loaded in <video>
   var currentTitle = '';   // current item's title (for the breadcrumb leaf)
@@ -97,12 +99,15 @@ export function initVideoPage() {
   function applySnapshot(snap) {
     snapshot = snap;
     player.setSeriesMode(seriesMode(snap));
+    queue.applySnapshot(snap);
     [snap.now_playing].filter(Boolean).forEach(renderNowPlaying);
   }
 
-  // Auto-advance at true 100% end (series): the next item -> a 5s "Up next"
-  // countdown then fire `next` (the snapshot wraps last->first when repeat is on);
-  // no next (no-repeat series end) -> stop back to origin.
+  // Auto-advance at true 100% end: the next item -> a 5s "Up next" countdown then
+  // fire `next`; no next -> stop back to origin. ALL video is engine-driven now
+  // (FEAT-040/TASK-251 — a standalone film plays via play-video), so `next` is the
+  // override-queue front when one is queued (a film queued after a film plays
+  // next), else the source walk (series wrap under repeat), else nothing.
   function advanceAuto() {
     var next = upNextItem(snapshot);
     ({
@@ -110,10 +115,6 @@ export function initVideoPage() {
       'false': function() { player.stop(); }
     })[!!next + '']();
   }
-
-  var ON_ENDED = { 'true': advanceAuto, 'false': function() { player.stop(); } };
-  var ON_NEXT  = { 'true': function() { sendAction('next', {}); },     'false': function() {} };
-  var ON_PREV  = { 'true': function() { sendAction('previous', {}); }, 'false': function() {} };
 
   player = setupPlayer({
     video: document.getElementById('video'),
@@ -125,9 +126,9 @@ export function initVideoPage() {
       };
       [STOP_NAV[from]].filter(Boolean).concat([function() { navTo('browse.html'); }])[0]();
     },
-    onEnded: function() { ON_ENDED[isSeries + ''](); },
-    onNext:  function() { ON_NEXT[isSeries + '']();  },
-    onPrev:  function() { ON_PREV[isSeries + '']();  },
+    onEnded: function() { advanceAuto(); },
+    onNext:  function() { sendAction('next', {}); },
+    onPrev:  function() { sendAction('previous', {}); },
     // Full app_state snapshot to the companion (FEAT-017): static context here,
     // live position/playing/captions added by the player.
     emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
@@ -144,8 +145,26 @@ export function initVideoPage() {
     }
   });
 
+  // FEAT-040 (TASK-250): the Video Queue View overlay hangs off the player. While
+  // open it owns the d-pad (its own grid nav + Back to close); closed, keys drive
+  // the transport as before. Each row control fires a video-playback action — the
+  // server broadcasts the new snapshot, which repaints the overlay (no local math).
+  queue = setupVideoQueue({
+    root: document.getElementById('queue-overlay'),
+    body: document.getElementById('queue-body'),
+    crumb: document.getElementById('queue-crumb'),
+    onAction: function(action, body) { sendAction(action, body); },
+    onClose: function() { document.getElementById('btn-queue').focus(); }
+  });
+  document.getElementById('btn-queue').addEventListener('click', function() { queue.open(); });
+
+  var KEY_TARGET = {
+    'true':  function(e) { queue.handleKey(e); },
+    'false': function(e) { player.handleVideoKey(e); }
+  };
+  function onVideoKey(e) { KEY_TARGET[queue.isOpen() + ''](e); }
   var keys = {};
-  VIDEO_KEYS.forEach(function(k) { keys[k] = player.handleVideoKey; });
+  VIDEO_KEYS.forEach(function(k) { keys[k] = onVideoKey; });
   initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote });
 
   // Breadcrumb crumbs on the companion send a `navigate` intent (FEAT-021);
@@ -169,20 +188,17 @@ export function initVideoPage() {
       .then(function() { sendAction('play-source', { source_type: 'series', source_id: seriesId, item_id: videoId }); })
       .catch(function() {});
   }
+  // A standalone film now plays THROUGH the engine too (FEAT-040/TASK-251): fire
+  // play-video and render from the `video_playback` snapshot exactly like a series,
+  // so the companion + Queue View always reflect the real now-playing (previously a
+  // film loaded direct/off-engine and the companion showed the stale source). The
+  // snapshot's now_playing is the film (resolved current_video_id); swapVideo loads
+  // it + resumes from watch_progress. The durable queue plays after it.
   function startSingle() {
-    player.setSeriesMode(false);
-    Promise.all([
-      loadVideo(SERVER, videoId),
-      loadProgress(SERVER, videoId, person).catch(zeroProgress),
-      initCaptions(SERVER)
-    ])
-      .then(function(res) {
-        loadedId = res[0].id;
-        currentTitle = res[0].title;
-        player.playVideo(res[0], from, resumeStart(restart, res[1]));
-        mountCrumbs();
-      })
-      .catch(function() { navTo('error.html'); });
+    mountCrumbs();
+    initCaptions(SERVER)
+      .then(function() { sendAction('play-video', { video_id: videoId }); })
+      .catch(function() {});
   }
   ({ 'true': startSeries, 'false': startSingle })[isSeries + '']();
 }

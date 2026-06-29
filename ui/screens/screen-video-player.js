@@ -15,7 +15,7 @@ var UPNEXT_SECS  = 5;            // autoplay "Up next" countdown
 var BACKEND_SAVE_MS = 5000;
 
 // Transport focus order; CC is skipped while hidden (no .vtt for this video).
-var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-jump', 'btn-cc', 'btn-reset'];
+var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-jump', 'btn-cc', 'btn-queue', 'btn-reset'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 var CC_MODE       = { 'true': 'showing', 'false': 'hidden' };
 // App-side log (TASK-213): a fresh start logs `play`, a start from a saved

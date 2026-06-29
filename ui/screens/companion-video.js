@@ -215,6 +215,7 @@ export function initPage() {
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);
+  document.getElementById('c-queue').addEventListener('click', function() { window.location.href = 'video-queue.html'; });
   buildJump();
   setInterval(renderBar, 250);
 
