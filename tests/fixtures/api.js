@@ -545,20 +545,24 @@ function seriesOrderIds(id) {
 }
 
 async function installVideoPlaybackBackend(page) {
-  var state = { sourceType: null, sourceId: null, idx: 0, repeat: false };
+  var state = { sourceType: null, sourceId: null, idx: 0, repeat: false, queue: [], current: null };
   var live = null;
   function order() { return seriesOrderIds(state.sourceId); }
   function resolve(id) {
     var v = VIDEOS[id] || { id: id };
     return { item_id: id, title: v.title, poster: v.poster, duration: v.duration, subtitles: v.subtitles, type: v.type, ext: v.ext };
   }
+  // FEAT-040/TASK-247: now_playing is the queued item when one is playing
+  // (state.current), else the source item at the index.
+  function nowPlayingId() { return [state.current].filter(Boolean).concat([order()[state.idx]])[0]; }
   function snapshot() {
     var o = order();
     return {
       person_id: 'kids',
-      now_playing: [o[state.idx]].filter(Boolean).map(resolve).concat([null])[0],
+      now_playing: [nowPlayingId()].filter(Boolean).map(resolve).concat([null])[0],
       current_item_index: state.idx,
       items: o.map(resolve),
+      override_queue: state.queue.map(function(e) { var r = resolve(e.video_id); r.entry_id = e.entry_id; return r; }),
       source_type: state.sourceType, source_id: state.sourceId,
       repeat: state.repeat, shuffle: false
     };
@@ -579,8 +583,22 @@ async function installVideoPlaybackBackend(page) {
     },
     'next': function() {
       var len = order().length;
+      if (state.queue.length) { state.current = state.queue.shift().video_id; return; }
+      state.current = null;
       if (!len) return;
       state.idx = state.repeat ? wrap(state.idx + 1, len) : Math.min(state.idx + 1, len - 1);
+    },
+    'queue-video': function(b) {
+      state.queue.unshift({ entry_id: 'e' + (state.queue.length + 1), video_id: b.video_id });
+    },
+    'remove-queue-entry': function(b) {
+      state.queue = state.queue.filter(function(e) { return e.entry_id !== b.entry_id; });
+    },
+    'move-queue-entry': function(b) {
+      var i = state.queue.findIndex(function(e) { return e.entry_id === b.entry_id; });
+      var j = i + (b.direction === 'up' ? -1 : 1);
+      if (i < 0 || j < 0 || j >= state.queue.length) return;
+      var tmp = state.queue[i]; state.queue[i] = state.queue[j]; state.queue[j] = tmp;
     },
     'previous': function() {
       var len = order().length;

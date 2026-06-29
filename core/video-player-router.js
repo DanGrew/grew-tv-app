@@ -18,6 +18,9 @@
 function snap(snapshot) { return snapshot || {}; }
 function itemsOf(snapshot) { return snap(snapshot).items || []; }
 function indexOf(snapshot) { return snap(snapshot).current_item_index || 0; }
+// FEAT-040/TASK-249: the durable override ("Play Next") queue rides the snapshot
+// (TASK-247) as resolved entries that play AHEAD of the source.
+function queueOf(snapshot) { return snap(snapshot).override_queue || []; }
 
 // The now-playing item the view should show (or null for an empty / absent
 // source — e.g. a standalone film never has a snapshot).
@@ -34,12 +37,16 @@ export function isSwap(loadedId, snapshot) {
   return np.item_id !== loadedId;
 }
 
-// The item that plays AFTER the current one: the next in source order, wrapping
-// last -> first when repeat is on (the 'start again' loop, BUG-005). null when
-// there is no next — no source, a single-item source, or a no-repeat series
-// sitting on its last item. Drives both the inline up-next line and the
-// auto-advance countdown target.
+// The item that plays AFTER the current one. The override ("Play Next") queue
+// takes precedence: a non-empty queue means its FRONT plays next (FEAT-040 — the
+// queue plays ahead of the source, matching the engine's next_item). Otherwise the
+// next in source order, wrapping last -> first when repeat is on (the 'start again'
+// loop, BUG-005). null when there is no next — no source, a single-item source
+// with an empty queue, or a no-repeat series sitting on its last item. Drives both
+// the inline up-next line and the auto-advance countdown target.
 export function upNextItem(snapshot) {
+  var queue = queueOf(snapshot);
+  if (queue.length > 0) return queue[0];
   var items = itemsOf(snapshot);
   if (items.length <= 1) return null;
   var idx = indexOf(snapshot);
@@ -50,10 +57,14 @@ export function upNextItem(snapshot) {
 
 // Inline up-next line parts (mirrors series-detail.upNextParts): a real next
 // episode -> "Up next: " + its title; the wrapping end of a repeating series ->
-// "Start again". null when there is no up-next (the page leaves the line blank).
+// "Start again". A queued item up next is always "Up next: <title>" (it is an
+// explicit pick, never the repeat-wrap). null when there is no up-next (the page
+// leaves the line blank).
 export function upNextLine(snapshot) {
   var next = upNextItem(snapshot);
   if (!next) return null;
+  var queue = queueOf(snapshot);
+  if (queue.length > 0) return { prefix: 'Up next: ', label: next.title };
   var items = itemsOf(snapshot);
   var wrapping = indexOf(snapshot) >= items.length - 1;
   if (wrapping) return { prefix: '', label: 'Start again' };
