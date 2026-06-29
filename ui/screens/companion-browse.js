@@ -57,7 +57,6 @@ export function initPage() {
     gridWrap: document.getElementById('grid-wrap'),
     gridCount: document.getElementById('grid-count'),
     txtgrid: document.getElementById('txtgrid'),
-    newPlaylist: document.getElementById('btn-new-playlist'),
     back: document.getElementById('btn-back')
   };
   var state = {
@@ -94,6 +93,21 @@ export function initPage() {
     c.setAttribute('data-rail', r.id);
     c.classList.toggle('active', r.id === state.rail);
     c.addEventListener('click', function() { selectRail(r.id); });
+    return c;
+  }
+
+  // FEAT-039 (TASK-236) — the companion create affordance now lives INSIDE the
+  // Music section, as a subtle ＋ chip in the rails row beside the Playlists rail
+  // chip (was a standalone button alongside the top sections row). It's always
+  // appended when Music is open, so the first playlist is still creatable even with
+  // zero playlists (the Playlists rail chip is omitted when empty). Mirrors the
+  // app's TASK-235 ＋-on-the-Playlists-heading affordance.
+  function createChip() {
+    var c = chip('＋');
+    c.classList.add('chip-create');
+    c.setAttribute('data-create-playlist', '');
+    c.setAttribute('aria-label', 'New playlist');
+    c.addEventListener('click', openCreate);
     return c;
   }
 
@@ -203,6 +217,7 @@ export function initPage() {
   function renderRails() {
     els.railsRow.innerHTML = '';
     filterByTitle(railList(), state.query).forEach(function(r) { els.railsRow.appendChild(railChip(r)); });
+    [state.section].filter(function(s) { return s === 'music'; }).forEach(function() { els.railsRow.appendChild(createChip()); });
   }
 
   function renderGrid() {
@@ -290,19 +305,13 @@ export function initPage() {
     });
   }
 
-  // FEAT-036 (TASK-209) — the companion's create affordance. A real button (NOT a
-  // synthetic rail tile, unlike the TV's withCreatePlaylistTile), shown whenever
-  // the Music section is open. Always reachable: the Playlists rail is omitted when
-  // empty, so a grid-level entry would strand a user with zero playlists — this
-  // sits at the section level so the first playlist can always be created. It links
-  // to the companion create page, carrying the live profile so its picker preselects.
-  function applyCreateBtn() {
-    els.newPlaylist.style.display = ({ true: '', false: 'none' })[state.section === 'music'];
-  }
+  // FEAT-036 (TASK-209) — the companion's create affordance links to the companion
+  // create page, carrying the live profile so its picker preselects. TASK-236 moved
+  // its trigger from a standalone section-level button to the ＋ rails-row chip
+  // (createChip, rendered in renderRails when Music is open).
   function openCreate() {
     window.location.href = 'playlist-create.html?profile=' + encodeURIComponent([state.profile].filter(Boolean).concat(['adults'])[0]);
   }
-  els.newPlaylist.addEventListener('click', openCreate);
   document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
 
   // Switch-profile drives the TV, so it greys out while desynced (the WS layer
@@ -315,7 +324,6 @@ export function initPage() {
   function render() {
     applyLevel();
     applyMode();
-    applyCreateBtn();
     renderSections();
     renderRails();
     renderGrid();
