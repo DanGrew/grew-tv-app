@@ -172,6 +172,51 @@ test.describe('with a recorded browse trail', () => {
   });
 });
 
+// FEAT-032 stale-Back regression: tapping a breadcrumb ANCESTOR must TRIM the
+// trail to that ancestor (drop it + anything deeper) so a later screen's Back
+// can't retrace past the jump. Before the fix the trail only cleared on the Home
+// crumb — an items crumb left deeper entries behind, and the next detail's Back
+// (which peeks the trail top) jumped to a stale level.
+test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () => {
+  // A minimal app mock that does NOT echo the `navigate` intent — so the click's
+  // trail trim is observable in place (the shared mockApp would teleport to
+  // artist.html, which legitimately re-pushes ELO and hides the trim).
+  function mockNoNav(page, st) {
+    return page.routeWebSocket(/:8766/, (ws) => {
+      ws.onMessage(function(raw) {
+        const m = JSON.parse(raw);
+        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+        if (m.type === 'snapshot_request') {
+          ws.send(msg('context', { version: 2, context_id: 'audio', series_id: st.itemId, display: { id: st.episodeId, title: 'Mr. Blue Sky' } }));
+          ws.send(msg('app_state', st));
+        }
+      });
+    });
+  }
+
+  test('tapping the items crumb drops it and everything deeper, keeping its ancestors', async ({ page }) => {
+    await installApi(page);
+    await mockNoNav(page, { ...ARTIST_ST });
+    // A two-level trail: Home > Albums(browse) > ELO(artist). The player peeks the
+    // top (ELO) for its items crumb.
+    await page.addInitScript(() => {
+      sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
+        { page: 'browse.html', params: { tab: 'music', rail: 'albums' }, label: 'Albums' },
+        { page: 'artist.html', params: { artist: 'ELO' }, label: 'ELO' }
+      ]));
+    });
+    await page.goto('/companion/audio.html');
+    await page.locator('#breadcrumb .crumb-link', { hasText: 'ELO' }).waitFor();
+    await page.locator('#breadcrumb .crumb-link', { hasText: 'ELO' }).click();
+    // ELO (the clicked ancestor) + anything deeper is gone; only the browse level
+    // remains, so a later Back lands there, not on a stale ELO. (Old code only
+    // cleared on the Home crumb, so ELO survived -> stale Back.)
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('grew-tv:nav-trail'))).toBe(
+      JSON.stringify([{ page: 'browse.html', params: { tab: 'music', rail: 'albums' }, label: 'Albums' }])
+    );
+  });
+});
+
 // BUG-018: an artist-sourced player. The source id is the ARTIST, not an album,
 // so Back must teleport the TV to artist.html (NOT album-detail.html?album=<id>,
 // which 404s -> error page), and the companion must never loadAlbum(artistId).

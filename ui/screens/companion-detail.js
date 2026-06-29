@@ -5,7 +5,7 @@ import { screenPage, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
-import { peek as peekTrail } from '../../core/nav-trail.js';
+import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { seasonsOf, hasSeasonChips, chipClass, seasonLabel, visibleItems, defaultSeason } from '../../core/seasons.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
@@ -168,6 +168,9 @@ export function initPage() {
   // locally instead, carrying any params as a query string.
   function localGo(page, params) { window.location.href = page + queryString(params); }
   function navigate(page, params) {
+    // Trim the trail to the clicked ancestor (Home clears) so a later Back can't
+    // retrace past this jump (FEAT-032 stale-Back fix).
+    trimOnCrumb(page, params);
     ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
   }
   function mountCrumbs(seriesTitle) {
