@@ -68,9 +68,13 @@ button:hover { background: var(--surface-hi); }
 .tile-sub { margin-top: -8px; padding: 0 12px 10px; font-size: var(--fs-xs); color: var(--text-muted); }
 .tile-cc { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px; }
 .tile-lyrics { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px; }
+.tile-queue { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: var(--fs-lg); font-weight: 700; line-height: 1; padding: 0; border-radius: 8px; cursor: pointer; min-width: auto; }
+.tile-queue:hover, .tile-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 .tile-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,0.45); }
 .tile-progress-fill { height: 100%; background: var(--focus); }
-#btn-settings { font-size: var(--fs-sm); padding: 12px 22px; min-width: auto; position: fixed; bottom: 32px; right: 32px; }
+#btn-play-queue { font-size: var(--fs-sm); padding: 12px 22px; min-width: auto; position: fixed; bottom: 32px; right: 32px; border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); border-radius: 999px; z-index: 6; }
+#btn-play-queue:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); }
+#queue-status { display: none; position: fixed; bottom: 96px; right: 32px; z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 #breadcrumb { position: fixed; top: 20px; left: 32px; z-index: 5; }
 body.sidebar-collapsed #breadcrumb { display: none; }
 .breadcrumb { display: flex; align-items: center; gap: 10px; }
@@ -79,41 +83,20 @@ body.sidebar-collapsed #breadcrumb { display: none; }
 .crumb-link { background: none; border: 2px solid transparent; border-radius: var(--radius-sm); padding: 4px 12px; min-width: auto; font-size: var(--fs-md); color: var(--text-muted); }
 .crumb-link:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 .crumb-sep { color: var(--text-muted); font-size: var(--fs-md); }
-#screen-settings { display: none; position: fixed; inset: 0; background: var(--bg); flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
-#screen-settings.active { display: flex; }
-#settings-table { width: 100%; max-width: 720px; padding: 0 48px; }
-.settings-row { display: flex; align-items: center; gap: 24px; padding: 22px 0; }
-.settings-label { font-size: var(--fs-md); flex: 0 0 140px; }
-.settings-status { font-size: var(--fs-sm); color: var(--text-muted); flex: 1; }
-.settings-hr { border: none; border-top: 1px solid var(--border); margin: 0; }
 #device-badge { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; font-size: var(--fs-xs); color: var(--text-muted); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); pointer-events: none; }
 #device-swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
 #error-msg { display: none; }
 </style>
 </head>
 <body id="screen-browse">
-<div id="screen-settings">
-  <div style="display:flex;align-items:center;gap:24px;padding:28px 48px 20px;flex-shrink:0;width:100%;max-width:720px">
-    <button id="btn-back-settings" style="font-size:var(--fs-sm);padding:12px 20px;min-width:auto">&#8592; Back</button>
-    <h1 style="margin:0;font-size:var(--fs-xl);letter-spacing:var(--heading-ls)">Settings</h1>
-  </div>
-  <div id="settings-table">
-    <hr class="settings-hr">
-    <div class="settings-row">
-      <div class="settings-label">Devices</div>
-      <div class="settings-status" id="settings-device-status">&mdash;</div>
-      <button id="btn-refresh">Refresh</button>
-    </div>
-    <hr class="settings-hr">
-  </div>
-</div>
 <div id="breadcrumb"></div>
 <div id="top-bar"><div id="device-badge" title="This screen"></div><div id="profile-label" tabindex="0" role="button" aria-label="Switch profile"></div></div>
 <div id="browse-main">
   <nav id="sidebar"></nav>
   <div id="rails-container"><div id="rails"></div></div>
 </div>
-<button id="btn-settings" tabindex="0">&#9881;</button>
+<button id="btn-play-queue" tabindex="0" style="display:none">&#9654; Play Queue</button>
+<div id="queue-status"></div>
 <div id="error-msg"></div>
 <script type="module">
 import { initBrowsePage } from '../../ui/screens/screen-browse-page.js';

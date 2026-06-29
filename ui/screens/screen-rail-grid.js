@@ -145,13 +145,13 @@ export function gridArrow(e) {
 
 // Render every card of the chosen rail as a focusable tile, reusing the shared
 // component (posters + progress bar + CC badge) so the grid matches browse.
-export function renderGrid(server, items, progress, onSelect) {
+export function renderGrid(server, items, progress, onSelect, onQueue) {
   var root = document.getElementById('rail-grid');
   root.innerHTML = '';
   [items].filter(function() { return items.length === 0; }).forEach(function() {
     root.innerHTML = '<div class="home-empty">Nothing here yet</div>';
   });
   items.forEach(function(card) {
-    root.appendChild(createTile(server, card, { progress: progress, onSelect: onSelect }));
+    root.appendChild(createTile(server, card, { progress: progress, onSelect: onSelect, onQueue: onQueue }));
   });
 }

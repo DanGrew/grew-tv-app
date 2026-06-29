@@ -43,6 +43,8 @@ body { background: var(--bg); background-attachment: fixed; background-size: cov
 .tile-sub { margin-top: -8px; padding: 0 12px 10px; font-size: var(--fs-xs); color: var(--text-muted); }
 .tile-cc { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px; }
 .tile-lyrics { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px; }
+.tile-queue { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: var(--fs-lg); font-weight: 700; line-height: 1; padding: 0; border-radius: 8px; cursor: pointer; min-width: auto; }
+.tile-queue:hover, .tile-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 .tile-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,0.45); }
 .tile-progress-fill { height: 100%; background: var(--focus); }
 #breadcrumb { position: fixed; top: 20px; left: 32px; z-index: 5; }
@@ -54,6 +56,7 @@ body { background: var(--bg); background-attachment: fixed; background-size: cov
 .crumb-sep { color: var(--text-muted); font-size: var(--fs-md); }
 #device-badge { position: fixed; top: 24px; right: 28px; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; font-size: var(--fs-xs); color: var(--text-muted); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); pointer-events: none; }
 #device-swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
+#queue-status { display: none; position: fixed; bottom: 32px; right: 32px; z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 #error-msg { display: none; }
 </style>
 </head>
@@ -64,6 +67,7 @@ body { background: var(--bg); background-attachment: fixed; background-size: cov
   <div id="rail-grid"></div>
 </div>
 <div id="device-badge" title="This screen"></div>
+<div id="queue-status"></div>
 <div id="error-msg"></div>
 <script type="module">
 import { initRailGridPage } from '../../ui/screens/screen-rail-grid-page.js';

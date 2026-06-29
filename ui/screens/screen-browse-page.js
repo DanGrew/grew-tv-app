@@ -3,11 +3,12 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadBrowse, loadContinueWatching, scanDevices, loadConfig } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, videoPlaybackAction } from '../../core/app-api.js';
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute } from '../../core/home-rails.js';
+import { queueCount } from '../../core/video-player-router.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
 // Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
@@ -17,26 +18,35 @@ var LAST_TAB_KEY = 'grew-tv:last-tab';
 var ACTIVATE_KEYS = { Enter: true, ' ': true };
 
 export function initBrowsePage() {
-  function showSettings() {
-    document.getElementById('screen-settings').classList.add('active');
-    document.getElementById('btn-back-settings').focus();
-    var status = document.getElementById('settings-device-status');
-    var btn = document.getElementById('btn-refresh');
-    status.textContent = 'Scanning…';
-    btn.disabled = true;
-    btn.textContent = 'Scanning…';
-    scanDevices(SERVER)
-      .then(function(d) {
-        var devices = [d.devices].filter(Array.isArray).concat([[]])[0];
-        status.textContent = [devices].filter(function(x) { return x.length; }).map(function(x) { return x.join(', '); }).concat(['No devices found'])[0];
-      })
-      .catch(function() { status.textContent = 'Server unavailable'; })
-      .then(function() { btn.disabled = false; btn.textContent = 'Refresh'; });
+  // FEAT-040 Play Queue: the bottom-right pill (was the unused settings button)
+  // appears only when the video queue is non-empty; it drives the persistent
+  // player to start the queue head (?playQueue). Count read from the read-only
+  // video-playback snapshot, refreshed on load + after queueing a film here.
+  function showPlayQueue(count) {
+    var btn = document.getElementById('btn-play-queue');
+    btn.textContent = '▶ Play Queue (' + count + ')';
+    btn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[(count > 0) + ''];
   }
+  function refreshQueue() {
+    loadVideoPlayback(SERVER, getPerson()).then(function(snap) { showPlayQueue(queueCount(snap)); }).catch(function() {});
+  }
+  function onPlayQueue() { navTo('video.html', { playQueue: 1, from: 'browse' }); }
 
-  function hideSettings() {
-    document.getElementById('screen-settings').classList.remove('active');
-    [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
+  // Transient ＋Queue confirmation toast (films queued from a tile badge).
+  var statusTimer = null;
+  function hideStatus() { document.getElementById('queue-status').style.display = 'none'; }
+  function showStatus(text) {
+    var el = document.getElementById('queue-status');
+    el.textContent = text;
+    el.style.display = 'block';
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(hideStatus, 2500);
+  }
+  // Film ＋Queue producer: POST queue-video per person; confirm + refresh the pill.
+  function onQueue(card) {
+    videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: card.id })
+      .then(function() { showStatus('Queued to Play Next'); refreshQueue(); })
+      .catch(function() {});
   }
 
   // BUG-007: the top-right profile control returns to the picker. Activating it
@@ -54,9 +64,7 @@ export function initBrowsePage() {
     [ACTIVATE_KEYS[e.key]].filter(Boolean).forEach(function() { e.preventDefault(); goToProfile(); });
   });
 
-  document.getElementById('btn-settings').addEventListener('click', showSettings);
-  document.getElementById('btn-back-settings').addEventListener('click', hideSettings);
-  document.getElementById('btn-refresh').addEventListener('click', function() { showSettings(); });
+  document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
   document.addEventListener('keydown', dispatchKey);
   mountBreadcrumb('breadcrumb', buildCrumbs('browse'));
 
@@ -140,8 +148,9 @@ export function initBrowsePage() {
       // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) wins
       // over the last-visited tab; renderBrowse falls back when neither matches.
       var initialTab = [getParam('tab')].filter(Boolean).concat([sessionStorage.getItem(LAST_TAB_KEY)]).filter(Boolean)[0];
-      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab);
+      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
+      refreshQueue();
     })
     .catch(function() { navTo('error.html'); });
 }

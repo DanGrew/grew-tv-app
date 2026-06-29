@@ -11,7 +11,7 @@ var PLAY_KEYS     = { Enter: true, ' ': true };
 // rails. Pure grouping/ordering lives in core/home-rails.js; this module owns
 // the DOM and the two-zone (sidebar / rails) d-pad focus model. Module state
 // holds the last-rendered data so a tab switch can rebuild the rails.
-var STATE = { server: null, cards: [], cw: [], progress: {}, labels: {}, profile: null, onSelect: null };
+var STATE = { server: null, cards: [], cw: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null };
 
 function tilesIn(railEl) {
   return Array.from(railEl.querySelectorAll('.film-tile'));
@@ -172,7 +172,7 @@ function railSection(rail) {
   // focus scale (1.05) isn't clipped by the row's overflow.
   row.classList.toggle('rail-row-music', rail.items.some(function(card) { return card.section === 'music'; }));
   rail.items.forEach(function(card) {
-    row.appendChild(createTile(STATE.server, card, { progress: STATE.progress, onSelect: STATE.onSelect }));
+    row.appendChild(createTile(STATE.server, card, { progress: STATE.progress, onSelect: STATE.onSelect, onQueue: STATE.onQueue }));
   });
   section.appendChild(row);
   return section;
@@ -250,7 +250,7 @@ export function getActiveTab() {
 // handler, and an optional initialTab to land on (else the first tab). The CW
 // rows feed both the per-tab Continue Watching rail and the tiles' progress bars
 // (via progressMapFromCW).
-export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab) {
+export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue) {
   STATE.server = server;
   STATE.cards = cards;
   STATE.cw = cwRows;
@@ -258,6 +258,7 @@ export function renderBrowse(server, cards, cwRows, labels, profile, person, onS
   STATE.labels = labels;
   STATE.profile = profile;
   STATE.onSelect = onSelect;
+  STATE.onQueue = onQueue;
   document.getElementById('profile-label').textContent = personGlyph(person) + ' ' + person.name + ' ▸';
   var tabs = buildTabs(cards);
   var ids = tabs.map(function(t) { return t.id; });
