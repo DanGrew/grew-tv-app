@@ -117,6 +117,17 @@ Read this BEFORE writing screen code — these gate the PR in CI even when local
   connected for real, and under parallel load collided on the shared person
   registry (`person_busy` → take-over prompt → nav never fires) — the repo-wide
   flake. Keep new app-screen suites on the fixture (don't hand-roll a live WS).
+- **A companion action page keys its `/api/*` POSTs on `person`, captured in
+  `onAppState` — keep that handler throw-free, or EVERY action silently no-ops.**
+  Companion pages (queue, player, detail) read `state.person` from the per-person
+  `app_state` snapshot in `onAppState`, then POST `…?person=<that>`. If `onAppState`
+  throws BEFORE the person-capture line, `person` stays empty, the POST goes to
+  `?person=` and the server drops it — so move/next/remove/play all "do nothing"
+  with no error in the UI (FEAT-040 queue-fixes bug: a stray `syncBar.updateStatus`
+  call threw — `mountSyncBar` returns nothing, so don't assign or call it).
+  Capture person FIRST / keep `onAppState` minimal, and an e2e that asserts
+  `req.url()` contains `person=<id>` guards it (an empty-person POST still 204s in
+  the fixture's global state, so assert the person, not just that the POST fired).
 
 ## Tests
 

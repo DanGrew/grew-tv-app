@@ -47,8 +47,15 @@ export function setupVideoQueue(config) {
     [cells[pos.c]].filter(Boolean).forEach(function (el) { el.focus(); });
   }
 
+  // play-now (tapping a queued row): play it immediately AND drop it from the
+  // queue so it does not replay from there. remove + play-video touch independent
+  // state fields (override_queue vs current_video_id), so order does not matter.
   var ACT = {
     select:    function (b) { onAction('play-item', { item_id: b.getAttribute('data-item') }); },
+    'play-now': function (b) {
+      onAction('remove-queue-entry', { entry_id: b.getAttribute('data-entry') });
+      onAction('play-video', { video_id: b.getAttribute('data-item') });
+    },
     move:      function (b) { onAction('move-queue-entry', { entry_id: b.getAttribute('data-entry'), direction: b.getAttribute('data-dir') }); },
     remove:    function (b) { onAction('remove-queue-entry', { entry_id: b.getAttribute('data-entry') }); },
     transport: function (b) { onAction(b.getAttribute('data-action'), {}); }

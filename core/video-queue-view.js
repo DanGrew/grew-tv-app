@@ -177,12 +177,14 @@ function actionsHtml(row) {
 }
 
 // A queued row's name is inert (no backend action plays a queue entry directly); a
-// source row's name is a play-to-jump button (play-item by item_id).
+// A queued ("Play Next") row plays NOW on tap (play-now = remove this entry +
+// play-video it, so it doesn't replay from the queue afterwards); a source row's
+// name jumps within the source (play-item by item_id).
 function nameHtml(row) {
   var inner = '<span class="q-grip">' + (row.queued ? '&#10239;' : '&#127916;') + '</span>' +
     '<span class="q-name">' + escapeHtml(row.title) + '</span>' +
     '<span class="q-dur">' + escapeHtml(row.durationText) + '</span>';
-  if (row.editable) return '<span class="q-select q-static">' + inner + '</span>';
+  if (row.editable) return '<button type="button" class="q-select" data-act="play-now" data-entry="' + escapeHtml(row.entryId) + '" data-item="' + escapeHtml(row.itemId) + '">' + inner + '</button>';
   return '<button type="button" class="q-select" data-act="select" data-item="' + escapeHtml(row.itemId) + '">' + inner + '</button>';
 }
 
@@ -261,7 +263,7 @@ function phRowActions(row) {
 function phName(row) {
   var inner = '<span class="grip">' + (row.queued ? '&#10239;' : '&#127916;') + '</span>' +
     '<span class="nm">' + escapeHtml(row.title) + ' <span class="by">&middot; ' + escapeHtml(row.durationText) + '</span></span>';
-  if (row.editable) return '<span class="ph-qname ph-static">' + inner + '</span>';
+  if (row.editable) return '<button type="button" class="ph-qname" data-act="play-now" data-entry="' + escapeHtml(row.entryId) + '" data-item="' + escapeHtml(row.itemId) + '">' + inner + '</button>';
   return '<button type="button" class="ph-qname" data-act="select" data-item="' + escapeHtml(row.itemId) + '">' + inner + '</button>';
 }
 

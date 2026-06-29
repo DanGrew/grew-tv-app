@@ -35,8 +35,8 @@ test('Queue button opens the overlay with the durable Play Next queue', async ({
 test('From Series lists the source items after the current one as play-to-jump rows', async ({ page }) => {
   await openPlayer(page);
   await openQueue(page);
-  await expect(page.locator('.q-row .q-select[data-item="bluey-s1e02"]')).toBeVisible();
-  await expect(page.locator('.q-row .q-select[data-item="bluey-s1e03"]')).toBeVisible();
+  await expect(page.locator('.q-select[data-act="select"][data-item="bluey-s1e02"]')).toBeVisible();
+  await expect(page.locator('.q-select[data-act="select"][data-item="bluey-s1e03"]')).toBeVisible();
 });
 
 test('removing a queued entry POSTs remove-queue-entry and the overlay repaints', async ({ page }) => {
@@ -54,8 +54,37 @@ test('a source row plays-to-jump via play-item', async ({ page }) => {
   await openQueue(page);
   const jumped = page.waitForRequest(req =>
     req.url().includes('/api/video-playback/play-item') && req.method() === 'POST');
-  await page.locator('.q-row .q-select[data-item="bluey-s1e02"]').click();
+  await page.locator('.q-select[data-act="select"][data-item="bluey-s1e02"]').click();
   expect(JSON.parse((await jumped).postData())).toEqual({ item_id: 'bluey-s1e02' });
+});
+
+test('tapping a queued row plays it now (play-video) AND drops it from the queue', async ({ page }) => {
+  await openPlayer(page);
+  await openQueue(page);
+  const removed = page.waitForRequest(req => req.url().includes('/api/video-playback/remove-queue-entry'));
+  const played = page.waitForRequest(req => req.url().includes('/api/video-playback/play-video'));
+  await page.locator('.q-row.queued .q-select[data-act="play-now"]').click();
+  expect(JSON.parse((await removed).postData())).toEqual({ entry_id: 'e1' });
+  expect(JSON.parse((await played).postData())).toEqual({ video_id: 'bluey-s1e03' });
+  await expect(page.locator('.q-row.queued')).toHaveCount(0);   // consumed
+});
+
+test('reorder: the down arrow on a queued entry POSTs move-queue-entry', async ({ page }) => {
+  // two queued entries so an edge arrow is enabled
+  await installApi(page);
+  const vb = await installVideoPlaybackBackend(page);
+  vb.seed('play-source', { source_type: 'series', source_id: 'bluey', item_id: 'bluey-s1e01' });
+  vb.seed('queue-video', { video_id: 'bluey-s1e02' });   // e1
+  vb.seed('queue-video', { video_id: 'bluey-s1e03' });   // e2 (append)
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await page.locator('#btn-queue').click();
+  await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
+  await expect(page.locator('.q-row.queued')).toHaveCount(2);
+  const moved = page.waitForRequest(req => req.url().includes('/api/video-playback/move-queue-entry'));
+  // first queued row's down arrow (↑ is disabled at the top, so [0] is ↓)
+  await page.locator('.q-row.queued').first().locator('.q-act:not([disabled])').first().click();
+  expect(JSON.parse((await moved).postData())).toEqual({ entry_id: 'e1', direction: 'down' });
 });
 
 test('the Repeat pill toggles repeat and reflects the snapshot', async ({ page }) => {
