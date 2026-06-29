@@ -83,6 +83,22 @@ export function createTile(server, card, opts) {
     tile.appendChild(bar);
   });
 
+  // FEAT-040: a standalone film/video tile gets a ＋ Queue action badge (top-right)
+  // when the page supplies `onQueue` — tap to add the film to the video Play-Next
+  // queue. stopPropagation so it never triggers the tile's play (onSelect).
+  // Films have no Lyrics badge, so the right corner is free; only video kind.
+  var QUEUEABLE = { video: true };
+  function appendQueueBadge(fn) {
+    var q = document.createElement('button');
+    q.className = 'tile-queue';
+    q.setAttribute('aria-label', 'Queue');
+    q.setAttribute('data-queue', m.id);
+    q.textContent = '＋';
+    q.addEventListener('click', function(e) { e.stopPropagation(); fn(card); });
+    tile.appendChild(q);
+  }
+  [o.onQueue].filter(Boolean).filter(function() { return QUEUEABLE[m.kind]; }).forEach(appendQueueBadge);
+
   [o.onSelect].filter(Boolean).forEach(function(fn) {
     tile.addEventListener('click', function() { fn(card); });
     tile.addEventListener('keydown', function(e) {
