@@ -39,6 +39,19 @@ test('?playQueue entry starts the queue head (play-queue) and plays it', async (
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);   // front plays
 });
 
+test('re-entering ?playQueue resumes the SAME head — going in/out does not consume it', async ({ page }) => {
+  // Owner bug: hitting back then Play Queue again skipped to the next item.
+  await installApi(page);
+  const vb = await installVideoPlaybackBackend(page);
+  vb.seed('queue-video', { video_id: 'bluey-s1e02' });
+  vb.seed('queue-video', { video_id: 'bluey-s1e03' });
+  await page.goto('/app/homeview/video.html?playQueue=1&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
+  await page.goto('about:blank');                                   // leave the player
+  await page.goto('/app/homeview/video.html?playQueue=1&from=browse');   // re-enter
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);   // same head, NOT e03
+});
+
 test('Queue button opens the overlay with the durable Play Next queue', async ({ page }) => {
   await openPlayer(page);
   await openQueue(page);

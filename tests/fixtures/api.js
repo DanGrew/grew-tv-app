@@ -555,6 +555,12 @@ async function installVideoPlaybackBackend(page) {
   // FEAT-040/TASK-247: now_playing is the queued item when one is playing
   // (state.current), else the source item at the index.
   function nowPlayingId() { return [state.current].filter(Boolean).concat([order()[state.idx]])[0]; }
+  // Pending queue = stored queue minus the now-playing head (it plays but stays
+  // stored for resume; hidden from the displayed pending list — FEAT-040 play-queue).
+  function pendingQueue() {
+    var q = state.queue;
+    return (q.length && state.current && q[0].video_id === state.current) ? q.slice(1) : q;
+  }
   function snapshot() {
     var o = order();
     return {
@@ -562,7 +568,7 @@ async function installVideoPlaybackBackend(page) {
       now_playing: [nowPlayingId()].filter(Boolean).map(resolve).concat([null])[0],
       current_item_index: state.idx,
       items: o.map(resolve),
-      override_queue: state.queue.map(function(e) { var r = resolve(e.video_id); r.entry_id = e.entry_id; return r; }),
+      override_queue: pendingQueue().map(function(e) { var r = resolve(e.video_id); r.entry_id = e.entry_id; return r; }),
       source_type: state.sourceType, source_id: state.sourceId,
       repeat: state.repeat, shuffle: false
     };
@@ -583,7 +589,9 @@ async function installVideoPlaybackBackend(page) {
     },
     'next': function() {
       var len = order().length;
-      if (state.queue.length) { state.current = state.queue.shift().video_id; return; }
+      // the playing head is consumed only when advancing past it (it's the current).
+      if (state.queue.length && state.current === state.queue[0].video_id) state.queue.shift();
+      if (state.queue.length) { state.current = state.queue[0].video_id; return; }
       state.current = null;
       if (!len) return;
       state.idx = state.repeat ? wrap(state.idx + 1, len) : Math.min(state.idx + 1, len - 1);
@@ -598,11 +606,8 @@ async function installVideoPlaybackBackend(page) {
       state.current = b.video_id;
     },
     'play-queue': function() {
-      // pop + play the front of the queue (consumed); clear source. empty -> no-op.
-      [state.queue.shift()].filter(Boolean).forEach(function(e) {
-        state.sourceType = null; state.sourceId = null; state.idx = 0;
-        state.current = e.video_id;
-      });
+      // play the FRONT without removing it (resumable; source kept). empty -> no-op.
+      [state.queue[0]].filter(Boolean).forEach(function(e) { state.current = e.video_id; });
     },
     'queue-video': function(b) {
       // append (FEAT-040 fix): a newly-queued video goes to the END of the queue.
