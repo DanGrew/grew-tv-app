@@ -336,3 +336,17 @@ end of the reply.
 `PATH` via `~/.claude/settings.json` `env.PATH` on Dan's dev mac (see
 `grew-tv/docs/dev-machine-setup.md`) — run `node`/`npx` directly, no `export`.
 Fallback for a shell without it: `export PATH="$HOME/.local/node/bin:/opt/homebrew/bin:$PATH"`
+
+**Minimise permission prompts — use the native tool, not a novel shell shape.**
+- **Read** files with the **Read tool** (`offset`/`limit`), not `sed -n`/`head`/
+  `tail`/`cat`. **Edit / write / append** with the **Edit / Write tools**, never a
+  shell write-shape (`cat >> f <<EOF`, `perl -0pi -e`, `sed -i`, `tee`, `>`/`>>`
+  redirects) — those prompt AND are error-prone (heredoc/quoting slips). Applies to
+  test tweaks too — Read then Edit. (Commit messages via `git commit -F -` are fine.)
+- `gh pr create` is allowlisted broadly (`gh pr create:*`), so flag order doesn't
+  matter — still pass `--draft` (PR convention). `git` verbs, `npx playwright/
+  eslint/vitest`, `node scripts/*`, `lsof`, `ln` are allowlisted; reach for a
+  native tool / allowlisted command before a one-off shell shape. Recurring
+  read-only shapes with no native equivalent → propose for the global allowlist
+  (`~/.claude/settings.json` + the committed `grew-tv/.claude/settings.backup.json`
+  mirror), don't keep re-prompting.
