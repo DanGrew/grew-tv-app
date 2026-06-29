@@ -43,15 +43,15 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .ph-tbtn:active, .ph-tbtn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .ph-tbtn.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
 
-.ph-qrow { display: flex; align-items: center; gap: 8px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+.ph-qrow { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); padding: 8px 12px; }
 .ph-qrow.queued { border-left: 4px solid var(--focus); }
-.ph-qname { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; background: none; border: 2px solid transparent; border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: 14px; text-align: left; padding: 6px 4px; cursor: pointer; touch-action: manipulation; }
+.ph-qname { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; background: none; border: 2px solid transparent; border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: 15px; text-align: left; padding: 0; cursor: pointer; touch-action: manipulation; }
 .ph-qname:active, .ph-qname:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-.ph-qname .grip { color: var(--text-muted); font-size: 13px; flex-shrink: 0; }
+.ph-qname .grip { width: 48px; height: 48px; border-radius: var(--radius-sm); background: var(--surface-hi); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 22px; flex-shrink: 0; }
 .ph-qname .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ph-qname .nm .by { color: var(--text-muted); font-size: 11px; }
-.acts { display: flex; gap: 5px; flex-shrink: 0; }
-.ph-ract { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.ph-qname .nm .by { color: var(--text-muted); font-size: 12px; }
+.acts { display: flex; gap: 6px; flex-shrink: 0; }
+.ph-ract { width: 34px; height: 34px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 14px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .ph-ract:active, .ph-ract:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .ph-ract.is-disabled { opacity: 0.3; }
 .ph-ract.x { color: var(--danger); border-color: rgba(255,107,107,0.4); }
