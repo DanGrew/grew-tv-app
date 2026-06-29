@@ -25,6 +25,20 @@ async function openQueue(page) {
   await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
 }
 
+test('?playQueue entry starts the queue head (play-queue) and plays it', async ({ page }) => {
+  // FEAT-040 Play Queue: enter the player with no video, just the queue.
+  await installApi(page);
+  const vb = await installVideoPlaybackBackend(page);
+  vb.seed('queue-video', { video_id: 'bluey-s1e02' });
+  vb.seed('queue-video', { video_id: 'bluey-s1e03' });
+  const played = page.waitForRequest(req =>
+    req.url().includes('/api/video-playback/play-queue') && req.method() === 'POST');
+  await page.goto('/app/homeview/video.html?playQueue=1&from=browse');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await played;
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);   // front plays
+});
+
 test('Queue button opens the overlay with the durable Play Next queue', async ({ page }) => {
   await openPlayer(page);
   await openQueue(page);

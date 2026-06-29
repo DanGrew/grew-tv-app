@@ -75,6 +75,12 @@ export function videoPlaybackAction(serverUrl, action, person, body) {
   });
 }
 
+// FEAT-040 (Play Queue): read-only video playback snapshot for a person — lets a
+// non-player screen (browse) read the override queue (to offer "Play Queue").
+export function loadVideoPlayback(serverUrl, person) {
+  return getJson(serverUrl + '/api/video-playback?person=' + encodeURIComponent(person || ''));
+}
+
 export function loadVideo(serverUrl, id) {
   return getJson(serverUrl + '/api/video/' + encodeURIComponent(id));
 }

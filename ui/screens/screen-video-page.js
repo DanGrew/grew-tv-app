@@ -200,5 +200,19 @@ export function initVideoPage() {
       .then(function() { sendAction('play-video', { video_id: videoId }); })
       .catch(function() {});
   }
-  ({ 'true': startSeries, 'false': startSingle })[isSeries + '']();
+  // FEAT-040 (Play Queue): entered with ?playQueue (no video/series) — fire
+  // play-queue (the server pops + plays the queue head) and render from the
+  // snapshot like the others. Lets you START the queue without opening a random
+  // video first.
+  function startQueue() {
+    mountCrumbs();
+    initCaptions(SERVER)
+      .then(function() { sendAction('play-queue', {}); })
+      .catch(function() {});
+  }
+  var ENTRY = {
+    'true':  startQueue,
+    'false': function() { ({ 'true': startSeries, 'false': startSingle })[isSeries + ''](); }
+  };
+  ENTRY[!!getParam('playQueue') + '']();
 }

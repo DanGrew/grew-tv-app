@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nowPlaying, isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
+import { nowPlaying, isSwap, upNextItem, upNextLine, seriesMode, queueCount } from '../../core/video-player-router.js';
 
 function item(id, title) { return { item_id: id, title: title }; }
 
@@ -24,6 +24,14 @@ describe('nowPlaying', () => {
   it('is null for an empty / absent snapshot', () => {
     expect(nowPlaying(null)).toBe(null);
     expect(nowPlaying({})).toBe(null);
+  });
+});
+
+describe('queueCount', () => {
+  it('counts the override queue (0 for empty/absent)', () => {
+    expect(queueCount(null)).toBe(0);
+    expect(queueCount({})).toBe(0);
+    expect(queueCount({ override_queue: [{ entry_id: 'e1' }, { entry_id: 'e2' }] })).toBe(2);
   });
 });
 

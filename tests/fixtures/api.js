@@ -597,6 +597,13 @@ async function installVideoPlaybackBackend(page) {
       state.sourceType = null; state.sourceId = null; state.idx = 0;
       state.current = b.video_id;
     },
+    'play-queue': function() {
+      // pop + play the front of the queue (consumed); clear source. empty -> no-op.
+      [state.queue.shift()].filter(Boolean).forEach(function(e) {
+        state.sourceType = null; state.sourceId = null; state.idx = 0;
+        state.current = e.video_id;
+      });
+    },
     'queue-video': function(b) {
       // append (FEAT-040 fix): a newly-queued video goes to the END of the queue.
       state.queue.push({ entry_id: 'e' + (state.queue.length + 1), video_id: b.video_id });
@@ -641,6 +648,11 @@ async function installVideoPlaybackBackend(page) {
       };
       [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
     });
+  });
+  // GET /api/video-playback?person= -> read-only snapshot (FEAT-040 Play Queue).
+  // Registered before the action route; matched first for the query-form URL.
+  await page.route(/\/api\/video-playback\?/, function(route) {
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(snapshot()) });
   });
   await page.route('**/api/video-playback/*', function(route) {
     var action = decodeURIComponent(route.request().url().split('/api/video-playback/')[1].split('?')[0]);

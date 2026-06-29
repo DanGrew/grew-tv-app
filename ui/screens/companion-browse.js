@@ -1,6 +1,7 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadBrowse, loadContinueWatching, videoPlaybackAction } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, videoPlaybackAction, loadVideoPlayback } from '../../core/app-api.js';
+import { queueCount } from '../../core/video-player-router.js';
 import { screenPage, filterByTitle, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
@@ -121,8 +122,27 @@ export function initPage() {
   // Browse, this stays live), and the film shows up on the Video Queue View + TV.
   function queueVideo(id) {
     videoPlaybackAction(server, 'queue-video', state.person, { video_id: id })
-      .then(function() { showQueueStatus('Queued to Play Next'); })
+      .then(function() { showQueueStatus('Queued to Play Next'); refreshQueue(); })
       .catch(noop);
+  }
+
+  // FEAT-040 (Play Queue): when the override queue is non-empty, offer a quick
+  // "▶ Play Queue (N)" — tapping it drives the TV player to start the queue head
+  // (?playQueue), so you don't have to open a random video to reach the queue. The
+  // count is read from the read-only GET snapshot (refreshed on person-load + after
+  // queueing here). It drives the TV, so it greys while desynced (Browse).
+  function showPlayQueue(count) {
+    var btn = document.getElementById('btn-play-queue');
+    btn.textContent = '▶ Play Queue (' + count + ')';
+    btn.style.display = ({ 'true': 'block', 'false': 'none' })[(count > 0) + ''];
+  }
+  function refreshQueue() {
+    [state.person].filter(Boolean).forEach(function(p) {
+      loadVideoPlayback(server, p).then(function(snap) { showPlayQueue(queueCount(snap)); }).catch(noop);
+    });
+  }
+  function onPlayQueue() {
+    api.sendIntent('navigate', { page: 'video.html', params: { playQueue: 1, from: 'browse' } });
   }
 
   // Bare text-label tile: title + an optional resume-percent badge, no poster.
@@ -283,11 +303,13 @@ export function initPage() {
     window.location.href = 'playlist-create.html?profile=' + encodeURIComponent([state.profile].filter(Boolean).concat(['adults'])[0]);
   }
   els.newPlaylist.addEventListener('click', openCreate);
+  document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
 
   // Switch-profile drives the TV, so it greys out while desynced (the WS layer
   // already no-ops its intent; this is the visible half — no dead click).
   function applyMode() {
     document.getElementById('switch-profile').classList.toggle('desync-off', mode.isDesynced());
+    document.getElementById('btn-play-queue').classList.toggle('desync-off', mode.isDesynced());
   }
 
   function render() {
@@ -407,6 +429,11 @@ export function initPage() {
   // (FEAT-026 TASK-158) and keys Continue-Watching per person.
   function onAppState(snap) {
     state.person = [snap.person].filter(Boolean).concat([state.person])[0];
+    // Read the queue once the person is known (first app_state) — drives the
+    // "Play Queue" button's count.
+    [state.person].filter(Boolean).filter(function() { return !state.queueFetched; }).forEach(function() {
+      state.queueFetched = true; refreshQueue();
+    });
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(loadCatalog);
     // Following the TV's deep position is the inbound nav seam — gated when
     // desynced (FEAT-038). Catalog/person/status still update (display + data).

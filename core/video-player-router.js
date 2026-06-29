@@ -28,6 +28,13 @@ export function nowPlaying(snapshot) {
   return snap(snapshot).now_playing || null;
 }
 
+// FEAT-040 (Play Queue): how many videos are queued ("Play Next"). A non-player
+// screen (browse) reads this from the GET snapshot to decide whether to offer
+// "Play Queue" — so you can start the queue without opening a random video first.
+export function queueCount(snapshot) {
+  return queueOf(snapshot).length;
+}
+
 // True when the snapshot's now-playing differs from what the <video> element
 // currently holds — the thin mount swaps media in place ONLY then, so the same
 // item re-arriving (a position-only or flag-only snapshot) never reloads.
