@@ -153,9 +153,14 @@ export function initAudioPage() {
   }
 
   // ── action sender (transport + autoadvance + position) ──────────────────────
-  function sendAction(action, body) {
-    playbackAction(SERVER, action, person, body).catch(function() {});
-  }
+  // Returns the POST promise so fireEntry can serialise the track jump after the
+  // source POST resolves (see fireEntry). A function EXPRESSION, not a declaration:
+  // it is an IO call (no DOM token, returns a value), which the no-pure-fn arch
+  // check would otherwise flag as "move to core/" — but it closes over SERVER/
+  // person and only fans out a request, so it belongs here.
+  var sendAction = function(action, body) {
+    return playbackAction(SERVER, action, person, body).catch(function() {});
+  };
 
   function goBackNav() {
     clearTimeout(hideTimer);
@@ -243,21 +248,32 @@ export function initAudioPage() {
 
   document.addEventListener('keydown', dispatchKey);
 
-  // ── entry: establish the source, then jump to the tapped track ──────────────
+  // ── entry: establish the source, THEN jump to the tapped track ──────────────
   // album/artist -> play-source (shuffle flag from the param); `play_track` leaves
   // the source intact (engine: resumes the source on next advance), so a tapped
   // row starts there and the album/artist queue still follows. A bare track id (no
   // source) is a single — play-track only. The player is queue-mode (⏮/⏭) for a
   // source, single for a lone track.
+  //
+  // The play-track POST MUST land AFTER play-source has persisted: each action is
+  // an independent get→modify→upsert on the ThreadingHTTPServer (own thread + DB
+  // conn, no lock), so firing both un-awaited races last-writer-wins — play-source
+  // (heavier: resolve + build permutations) usually writes last and clobbers the
+  // jump back to track 0, "starting at the beginning". `then`-chaining play-track
+  // on the resolved source POST serialises the two so the tapped track wins. The
+  // `track` (no-source) kind returns undefined ⇒ Promise.resolve fires play-track
+  // immediately.
   var SOURCE_BASE = {
-    album:    function() { sendAction('play-source', { source_type: 'album', source_id: albumId, shuffle: shuffleParam }); },
-    artist:   function() { sendAction('play-source', { source_type: 'artist', source_id: artistId, shuffle: shuffleParam }); },
-    playlist: function() { sendAction('play-source', { source_type: 'playlist', source_id: playlistId, shuffle: shuffleParam }); },
+    album:    function() { return sendAction('play-source', { source_type: 'album', source_id: albumId, shuffle: shuffleParam }); },
+    artist:   function() { return sendAction('play-source', { source_type: 'artist', source_id: artistId, shuffle: shuffleParam }); },
+    playlist: function() { return sendAction('play-source', { source_type: 'playlist', source_id: playlistId, shuffle: shuffleParam }); },
     track:    function() {}
   };
-  function fireEntry() {
-    SOURCE_BASE[kind]();
+  function jumpToTrack() {
     [trackId].filter(Boolean).forEach(function(t) { sendAction('play-track', { track_id: t }); });
+  }
+  function fireEntry() {
+    Promise.resolve(SOURCE_BASE[kind]()).then(jumpToTrack);
   }
   function sourceKind() {
     return [['album'].filter(function() { return !!albumId; })[0], ['artist'].filter(function() { return !!artistId; })[0], ['playlist'].filter(function() { return !!playlistId; })[0]]

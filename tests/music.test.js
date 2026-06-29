@@ -164,6 +164,39 @@ test('Next POSTs the server action and the snapshot advances now-playing (no cli
   await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
 });
 
+// REGRESSION (companion album track-jump race): tapping a track opens the player
+// with album+track params, whose entry fires TWO independent actions — play-source
+// (build the album queue, current = track 0) then play-track (jump to the tapped
+// track). The server runs each on its own thread + DB conn (ThreadingHTTPServer,
+// no lock), so firing them un-awaited races last-writer-wins; play-source is the
+// heavier op and usually persists LAST, clobbering the jump back to track 0 ("it
+// starts at the beginning"). The fix `then`-chains play-track on the resolved
+// play-source POST. Here play-source is delayed: old code sends play-track DURING
+// the delay (events: source-start, track, source-end → now-playing snaps back to
+// track 0); fixed code sends it only AFTER play-source resolves.
+test('a tapped track jumps only AFTER play-source persists — no race back to track 0', async ({ page }) => {
+  const events = [];
+  await page.route('**/api/playback/play-source**', async route => {
+    events.push('source-start');
+    await new Promise(r => setTimeout(r, 300));
+    events.push('source-end');
+    await route.fallback();
+  });
+  await page.route('**/api/playback/play-track**', async route => {
+    events.push('track');
+    await route.fallback();
+  });
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="ootb"]').click();
+  await expect(page.locator('.detail-row')).toHaveCount(3);
+  await page.locator('.detail-row[data-id="ootb-03"]').click();
+  // The player settles on the TAPPED track, not the album's first track.
+  await expect(page.locator('#audio-title')).toHaveText('Sweet Talkin Woman');
+  // …because play-track is serialised after play-source fully resolves.
+  expect(events).toEqual(['source-start', 'source-end', 'track']);
+});
+
 // The transport reports position via the server `position` action (playback_state
 // is the audio resume source now), not the legacy /api/progress write.
 test('position is reported to the playback position action', async ({ page }) => {
