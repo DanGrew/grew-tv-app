@@ -598,7 +598,8 @@ async function installVideoPlaybackBackend(page) {
       state.current = b.video_id;
     },
     'queue-video': function(b) {
-      state.queue.unshift({ entry_id: 'e' + (state.queue.length + 1), video_id: b.video_id });
+      // append (FEAT-040 fix): a newly-queued video goes to the END of the queue.
+      state.queue.push({ entry_id: 'e' + (state.queue.length + 1), video_id: b.video_id });
     },
     'remove-queue-entry': function(b) {
       state.queue = state.queue.filter(function(e) { return e.entry_id !== b.entry_id; });

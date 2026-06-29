@@ -26,7 +26,6 @@ export function initPage() {
   var state = { person: null };
   var api = {};
   var mode = createCompanionMode();
-  var syncBar = null;
   function noop() {}
   // FEAT-038 (TASK-230): the switch only changes mode. BROWSE greys the queue
   // actions in place (body.browsing) so nothing disturbs playback; reach the
@@ -43,6 +42,12 @@ export function initPage() {
 
   var ACT = {
     select:    function(b) { post('play-item', { item_id: b.getAttribute('data-item') }); },
+    // Tapping a queued row plays it now + drops it from the queue (independent
+    // fields, so the two POSTs need no ordering).
+    'play-now': function(b) {
+      post('remove-queue-entry', { entry_id: b.getAttribute('data-entry') });
+      post('play-video', { video_id: b.getAttribute('data-item') });
+    },
     move:      function(b) { post('move-queue-entry', { entry_id: b.getAttribute('data-entry'), direction: b.getAttribute('data-dir') }); },
     remove:    function(b) { post('remove-queue-entry', { entry_id: b.getAttribute('data-entry') }); },
     transport: function(b) { post(b.getAttribute('data-action'), {}); },
@@ -59,9 +64,11 @@ export function initPage() {
   }
 
   // The active person rides the app_state (TASK-158); the POSTs key per person off
-  // it, exactly as the companion video player does.
+  // it, exactly as the companion music Queue View does. (Must NOT touch syncBar
+  // here — mountSyncBar returns nothing; a stray syncBar.updateStatus call threw
+  // and aborted this handler before person was captured, so every POST went to
+  // person= and the server no-op'd it — the move/next/remove "not working" bug.)
   function onAppState(snap) {
-    syncBar.updateStatus(snap);
     [snap.person].filter(Boolean).forEach(function(p) { state.person = p; });
   }
 
@@ -78,7 +85,7 @@ export function initPage() {
 
   els.back.addEventListener('click', function() { window.location.href = 'video.html'; });
   render(null);
-  syncBar = mountSyncBar(mode, onModeChange);
+  mountSyncBar(mode, onModeChange);
   applyMode();
   api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, noop, { onVideoPlayback: render, mode: mode });
 }

@@ -95,6 +95,10 @@ describe('videoQueueViewHtml (TV)', () => {
     expect(html).toContain('data-act="move" data-entry="q1"');
     expect(html).toContain('data-act="select" data-item="e2"');
   });
+  it('a queued row name is a play-now control (plays it + drops it from the queue)', () => {
+    var html = videoQueueViewHtml(snap(0, true, [entry('q1', 'fz', 'Frozen')]));
+    expect(html).toContain('data-act="play-now" data-entry="q1" data-item="fz"');
+  });
   it('renders the Repeat transport pill reflecting the flag', () => {
     expect(videoQueueViewHtml(snap(0, true))).toContain('data-action="toggle-repeat"');
     expect(videoQueueViewHtml(snap(0, true))).toContain('np-pill on');
