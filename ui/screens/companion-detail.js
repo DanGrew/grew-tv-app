@@ -4,6 +4,7 @@ import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, 
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
+import { fmt } from '../../core/time.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { seasonsOf, hasSeasonChips, chipClass, seasonLabel, visibleItems, defaultSeason } from '../../core/seasons.js';
@@ -224,9 +225,11 @@ export function initPage() {
     // click; the WS layer also no-ops the intent). The ＋ Playlist button beside
     // it stays live (per-person add, both modes).
     btn.classList.toggle('desync-off', mode.isDesynced());
+    var subHtml = [video.duration].filter(Boolean).map(function(d) { return '<span class="t-sub">' + fmt(d) + '</span>'; }).concat([''])[0];
     btn.appendChild(posterImg(posterName));
     btn.insertAdjacentHTML('beforeend',
-      '<span>' + episodeLabel(item) + '</span>' + progressBarMarkup(mid, percent(resume, video.duration), 'ep-progress'));
+      '<div class="t-info"><span class="t-label">' + episodeLabel(item) + '</span>' + subHtml +
+      progressBarMarkup(mid, percent(resume, video.duration), 'ep-progress') + '</div>');
     btn.addEventListener('click', function() { api.sendIntent('play', { id: video.id }); });
     return btn;
   }
