@@ -20,6 +20,7 @@
 // carry the item_id (select -> play-item). The left accent marks a queued row.
 
 import { fmt } from './time.js';
+import { tabShellHtml, phTabShellHtml } from './queue-tabs.js';
 
 function escapeHtml(value) {
   return String(value == null ? '' : value)
@@ -195,19 +196,52 @@ function rowHtml(row) {
   '</div>';
 }
 
-function sectionHtml(sec) {
-  var hint = sec.hint ? ' <span class="hint">&mdash; ' + escapeHtml(sec.hint) + '</span>' : '';
-  var label = '<div class="rail-label">' + escapeHtml(sec.label) + hint + '</div>';
-  var ends = sec.endsText ? '<div class="q-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>' : '';
-  return label + sec.rows.map(rowHtml).join('') + ends;
+// TASK-238: a section drops its own rail-label — the TAB is the label. Tab mapping:
+// Queue = Play Next (your queued episodes), Next = From Series (rest of the source,
+// or the "Series ends" marker the model attaches here), Coming Up = Then (the
+// repeat wrap, present only under repeat).
+function hintHtml(hint) {
+  return hint ? '<div class="q-hint">' + escapeHtml(hint) + '</div>' : '';
+}
+function emptyHtml(text) {
+  return '<div class="q-empty">' + escapeHtml(text) + '</div>';
+}
+function rowsHtml(sec) {
+  return hintHtml(sec.hint) + sec.rows.map(rowHtml).join('');
+}
+function panelBody(sec, emptyText) {
+  if (sec && sec.rows.length > 0) return rowsHtml(sec);
+  return emptyHtml(emptyText);
+}
+// Next (From Series): rows, else the "Series ends" marker the model attaches here
+// (ordered + repeat off, nothing queued), else a plain note.
+function nextBody(sec, emptyText) {
+  if (sec && sec.rows.length > 0) return rowsHtml(sec);
+  if (sec && sec.endsText) return '<div class="q-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>';
+  return emptyHtml(emptyText);
+}
+function sectionByKey(model) {
+  var byKey = {};
+  model.sections.forEach(function (s) { byKey[s.key] = s; });
+  return byKey;
+}
+function videoPanels(m, rowEmpty, next, comingUp) {
+  var byKey = sectionByKey(m);
+  var playNext = byKey['play-next'];
+  var fromSeries = byKey['from-series'];
+  var then = byKey['then'];
+  return [
+    { tab: 'queue', label: 'Queue', html: rowEmpty(playNext, 'Nothing queued — add episodes with ＋'), empty: !(playNext && playNext.rows.length) },
+    { tab: 'next', label: 'Next', html: next(fromSeries, 'Nothing up next'), empty: !(fromSeries && fromSeries.rows.length) },
+    { tab: 'coming-up', label: 'Coming Up', html: comingUp(then, 'Nothing coming up'), empty: !(then && then.rows.length) }
+  ];
 }
 
-// Full overlay body markup for a snapshot. Empty/absent snapshot still renders a
-// stable shell (no now-playing, empty FROM SERIES, "Series ends").
+// FEAT-039 (TASK-238): Now Playing header + Queue / Next / Coming Up tabs (shared
+// shell). Empty/absent snapshot still renders a stable shell.
 export function videoQueueViewHtml(snap) {
   var m = videoQueueModel(snap);
-  return nowPlayingHtml(m.nowPlaying, m.repeat) +
-    m.sections.map(sectionHtml).join('');
+  return tabShellHtml(nowPlayingHtml(m.nowPlaying, m.repeat), videoPanels(m, panelBody, nextBody, panelBody));
 }
 
 // ── companion (phone) Queue View ───────────────────────────────────────────
@@ -274,16 +308,30 @@ function phRow(row) {
   '</div>';
 }
 
-function phSection(sec) {
-  var hint = sec.hint ? ' <span class="hint">' + escapeHtml(sec.hint) + '</span>' : '';
-  var label = '<div class="ph-section">' + escapeHtml(sec.label) + hint + '</div>';
-  var ends = sec.endsText ? '<div class="ph-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>' : '';
-  return label + sec.rows.map(phRow).join('') + ends;
+// Phone tab-panel bodies (mirror the TV helpers, `.ph-*` markup).
+function phHintHtml(hint) {
+  return hint ? '<div class="ph-qhint">' + escapeHtml(hint) + '</div>' : '';
+}
+function phEmptyHtml(text) {
+  return '<div class="ph-qempty">' + escapeHtml(text) + '</div>';
+}
+function phRowsHtml(sec) {
+  return phHintHtml(sec.hint) + sec.rows.map(phRow).join('');
+}
+function phPanelBody(sec, emptyText) {
+  if (sec && sec.rows.length > 0) return phRowsHtml(sec);
+  return phEmptyHtml(emptyText);
+}
+function phNextBody(sec, emptyText) {
+  if (sec && sec.rows.length > 0) return phRowsHtml(sec);
+  if (sec && sec.endsText) return '<div class="ph-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>';
+  return phEmptyHtml(emptyText);
 }
 
-// Full phone Queue View body for a snapshot. Empty/absent snapshot renders the
+// Full phone Video Queue View — Now Playing header + Queue / Next / Coming Up tabs
+// (same shell + tab mapping as the TV overlay). Empty/absent snapshot renders the
 // stable shell.
 export function companionVideoQueueHtml(snap) {
   var m = videoQueueModel(snap);
-  return phNowPlaying(m) + m.sections.map(phSection).join('');
+  return phTabShellHtml(phNowPlaying(m), videoPanels(m, phPanelBody, phNextBody, phPanelBody));
 }

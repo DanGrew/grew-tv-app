@@ -20,6 +20,7 @@ export function setupVideoQueue(config) {
   var lastSnap = null;
   var grid = [];                      // rows of focusable cells (DOM order)
   var pos  = { r: 0, c: 0 };
+  var activeTab = null;               // TASK-238: chosen Queue/Next/Coming-Up tab
   var crumb = config.crumb;           // overlay breadcrumb host (TASK-216)
 
   // A clickable breadcrumb in the overlay header: the back crumb closes the overlay
@@ -30,14 +31,28 @@ export function setupVideoQueue(config) {
     el.querySelector('#queue-crumb-back').addEventListener('click', function () { close(); });
   });
 
-  // Grid rows: the now-playing transport (Repeat) then each queue/source row.
-  // Only enabled buttons count — a queued row's inert name is a span (not a
-  // button), so source-only rows surface their play-item select, queued rows their
-  // ↑/↓/⊟; empty groups drop out.
+  // Grid rows (DOM order, empty groups drop out): the now-playing transport
+  // (Repeat), the tab bar (Queue/Next/Coming Up), then the ACTIVE tab's rows only
+  // (hidden panels' rows are excluded so the d-pad never lands on an off-tab row).
+  // Only enabled buttons count — a source row surfaces its play-item select, a
+  // queued row its ↑/↓/⊟.
   function buildGrid() {
-    grid = Array.prototype.slice.call(body.querySelectorAll('.np-transport, .q-row'))
+    grid = Array.prototype.slice.call(body.querySelectorAll('.np-transport, .qtab-bar, .qtab-panel.active .q-row'))
       .map(function (rowEl) { return Array.prototype.slice.call(rowEl.querySelectorAll('button:not([disabled])')); })
       .filter(function (cells) { return cells.length > 0; });
+  }
+
+  // Switch tabs in place (no re-render): toggle the active class on the tab + its
+  // panel, then rebuild the grid over the newly-visible rows and re-focus.
+  function applyTab(key) {
+    Array.prototype.slice.call(body.querySelectorAll('.qtab')).forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-tab') === key); });
+    Array.prototype.slice.call(body.querySelectorAll('.qtab-panel')).forEach(function (p) { p.classList.toggle('active', p.getAttribute('data-tab') === key); });
+  }
+  function switchTab(key) {
+    activeTab = key;
+    applyTab(key);
+    buildGrid();
+    focusCell();
   }
 
   function focusCell() {
@@ -58,7 +73,8 @@ export function setupVideoQueue(config) {
     },
     move:      function (b) { onAction('move-queue-entry', { entry_id: b.getAttribute('data-entry'), direction: b.getAttribute('data-dir') }); },
     remove:    function (b) { onAction('remove-queue-entry', { entry_id: b.getAttribute('data-entry') }); },
-    transport: function (b) { onAction(b.getAttribute('data-action'), {}); }
+    transport: function (b) { onAction(b.getAttribute('data-action'), {}); },
+    tab:       function (b) { switchTab(b.getAttribute('data-tab')); }
   };
 
   function wireButton(b) {
@@ -69,6 +85,9 @@ export function setupVideoQueue(config) {
     lastSnap = snap;
     body.innerHTML = videoQueueViewHtml(snap);
     Array.prototype.slice.call(body.querySelectorAll('button')).forEach(wireButton);
+    // Re-apply the chosen tab across repaints (a snapshot edit re-renders the body);
+    // null = first render, keep the view's default-open tab.
+    [activeTab].filter(Boolean).forEach(applyTab);
     buildGrid();
   }
 

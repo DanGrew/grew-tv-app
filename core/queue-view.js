@@ -14,6 +14,7 @@
 
 import { fmt } from './time.js';
 import { percent } from './progress.js';
+import { tabShellHtml, phTabShellHtml } from './queue-tabs.js';
 
 function escapeHtml(value) {
   return String(value == null ? '' : value)
@@ -158,19 +159,50 @@ function rowHtml(row) {
   '</div>';
 }
 
-function sectionHtml(sec) {
-  var hint = sec.hint ? ' <span class="hint">&mdash; ' + escapeHtml(sec.hint) + '</span>' : '';
-  var label = '<div class="rail-label">' + escapeHtml(sec.label) + hint + '</div>';
-  var ends = sec.endsText ? '<div class="q-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>' : '';
-  return label + sec.rows.map(rowHtml).join('') + ends;
+// TASK-238: a section now drops its own rail-label — the TAB is the label. A panel
+// body is the section's hint line + its rows; an empty section shows a placeholder.
+function hintHtml(hint) {
+  return hint ? '<div class="q-hint">' + escapeHtml(hint) + '</div>' : '';
+}
+function emptyHtml(text) {
+  return '<div class="q-empty">' + escapeHtml(text) + '</div>';
+}
+function panelBody(sec, emptyText) {
+  if (!sec || sec.rows.length === 0) return emptyHtml(emptyText);
+  return hintHtml(sec.hint) + sec.rows.map(rowHtml).join('');
+}
+// Coming Up (Then): rows when the source continues, the "Source ends" marker when
+// it doesn't (ordered + repeat off), else a plain note.
+function comingUpBody(sec) {
+  if (sec.rows.length > 0) return hintHtml(sec.hint) + sec.rows.map(rowHtml).join('');
+  if (sec.endsText) return '<div class="q-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>';
+  return emptyHtml('Nothing coming up');
+}
+function sectionByKey(model) {
+  var byKey = {};
+  model.sections.forEach(function (s) { byKey[s.key] = s; });
+  return byKey;
+}
+// The three tab panels (in play order) from the bucketed model: Queue = Play Next
+// (your queued picks), Next = From Source, Coming Up = Then. `empty` drives which
+// tab opens first (see queue-tabs).
+function tabPanels(m, body, comingUp) {
+  var byKey = sectionByKey(m);
+  var playNext = byKey['play-next'];
+  var fromSource = byKey['from-source'];
+  return [
+    { tab: 'queue', label: 'Queue', html: body(playNext, 'Nothing queued — add tracks with ＋'), empty: !(playNext && playNext.rows.length) },
+    { tab: 'next', label: 'Next', html: body(fromSource, 'Nothing up next'), empty: !(fromSource && fromSource.rows.length) },
+    { tab: 'coming-up', label: 'Coming Up', html: comingUp(byKey['then']), empty: byKey['then'].rows.length === 0 }
+  ];
 }
 
-// Full overlay body markup for a snapshot. Empty/absent snapshot still renders a
-// stable shell (no now-playing, empty FROM SOURCE, THEN "Source ends").
+// FEAT-039 (TASK-238): Now Playing header + Queue / Next / Coming Up tabs (shared
+// shell). Empty/absent snapshot still renders a stable shell (no now-playing, empty
+// tabs, "Source ends" under Coming Up).
 export function queueViewHtml(snap) {
   var m = queueModel(snap);
-  return nowPlayingHtml(m.nowPlaying, m.shuffle, m.repeat) +
-    m.sections.map(sectionHtml).join('');
+  return tabShellHtml(nowPlayingHtml(m.nowPlaying, m.shuffle, m.repeat), tabPanels(m, panelBody, comingUpBody));
 }
 
 // ── companion (phone) Queue View ───────────────────────────────────────────
@@ -247,16 +279,28 @@ function phRow(row) {
   '</div>';
 }
 
-function phSection(sec) {
-  var hint = sec.hint ? ' <span class="hint">' + escapeHtml(sec.hint) + '</span>' : '';
-  var label = '<div class="ph-section">' + escapeHtml(sec.label) + hint + '</div>';
-  var ends = sec.endsText ? '<div class="ph-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>' : '';
-  return label + sec.rows.map(phRow).join('') + ends;
+// Phone tab-panel bodies (mirror the TV helpers, `.ph-*` markup).
+function phHintHtml(hint) {
+  return hint ? '<div class="ph-qhint">' + escapeHtml(hint) + '</div>' : '';
+}
+function phEmptyHtml(text) {
+  return '<div class="ph-qempty">' + escapeHtml(text) + '</div>';
+}
+function phPanelBody(sec, emptyText) {
+  if (!sec || sec.rows.length === 0) return phEmptyHtml(emptyText);
+  return phHintHtml(sec.hint) + sec.rows.map(phRow).join('');
+}
+function phComingUpBody(sec) {
+  if (sec.rows.length > 0) return phHintHtml(sec.hint) + sec.rows.map(phRow).join('');
+  if (sec.endsText) return '<div class="ph-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>';
+  return phEmptyHtml('Nothing coming up');
 }
 
-// Full phone Queue View body for a snapshot. Empty/absent snapshot renders the
-// stable shell (no now-playing, empty FROM SOURCE, THEN "Source ends").
+// Full phone Queue View — Now Playing header + Queue / Next / Coming Up tabs (same
+// shell + tab mapping as the TV overlay). Empty/absent snapshot renders the stable
+// shell (no now-playing, empty tabs, "Source ends" under Coming Up).
 export function companionQueueHtml(snap) {
-  var m = queueModel(snap);
-  return phNowPlaying(snap || {}) + m.sections.map(phSection).join('');
+  var s = snap || {};
+  var m = queueModel(s);
+  return phTabShellHtml(phNowPlaying(s), tabPanels(m, phPanelBody, phComingUpBody));
 }

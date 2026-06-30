@@ -27,9 +27,10 @@ test('mirrors the four sections from the server snapshot', async ({ page }) => {
   const playNext = page.locator('.ph-qrow.queued');
   await expect(playNext).toHaveCount(1);
   await expect(playNext.locator('.nm')).toContainText('Sweet Talkin Woman');
-  // FROM SOURCE holds the rest of the permutation (ootb-02, ootb-03).
+  // Next (FROM SOURCE) holds the rest of the permutation (ootb-02, ootb-03).
+  await page.locator('.ph-qtab[data-tab="next"]').click();   // TASK-238: source rows live under the Next tab
   await expect(page.locator('.ph-qname[data-track="ootb-02"]')).toBeVisible();
-  // THEN: ordered + repeat off -> end-of-source marker, not rows.
+  // Coming Up (THEN): ordered + repeat off -> end-of-source marker, not rows.
   await expect(page.locator('.ph-ends')).toContainText('Source ends');
 });
 
@@ -54,6 +55,7 @@ test('toggling repeat POSTs the action and THEN gains the next permutation', asy
 test('tapping a queue row POSTs play-track — now-playing advances to it', async ({ page }) => {
   await setup(page);
   await expect(page.locator('.ph-np .nm')).toHaveText('Turn to Stone');
+  await page.locator('.ph-qtab[data-tab="next"]').click();   // TASK-238: the source track lives under the Next tab
   await page.locator('.ph-qname[data-track="ootb-02"]').click();
   await expect(page.locator('.ph-np .nm')).toHaveText('Mr. Blue Sky');
 });

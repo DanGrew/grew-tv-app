@@ -62,6 +62,7 @@ test('Queue button opens the overlay with the durable Play Next queue', async ({
 test('From Series lists the source items after the current one as play-to-jump rows', async ({ page }) => {
   await openPlayer(page);
   await openQueue(page);
+  await page.locator('.qtab[data-tab="next"]').click();   // TASK-238: source rows live under the Next tab
   await expect(page.locator('.q-select[data-act="select"][data-item="bluey-s1e02"]')).toBeVisible();
   await expect(page.locator('.q-select[data-act="select"][data-item="bluey-s1e03"]')).toBeVisible();
 });
@@ -79,6 +80,7 @@ test('removing a queued entry POSTs remove-queue-entry and the overlay repaints'
 test('a source row plays-to-jump via play-item', async ({ page }) => {
   await openPlayer(page);
   await openQueue(page);
+  await page.locator('.qtab[data-tab="next"]').click();   // TASK-238: source rows live under the Next tab
   const jumped = page.waitForRequest(req =>
     req.url().includes('/api/video-playback/play-item') && req.method() === 'POST');
   await page.locator('.q-select[data-act="select"][data-item="bluey-s1e02"]').click();

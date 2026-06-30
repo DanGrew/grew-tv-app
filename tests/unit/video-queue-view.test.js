@@ -89,6 +89,23 @@ describe('videoQueueModel — Then (repeat wrap)', () => {
 });
 
 describe('videoQueueViewHtml (TV)', () => {
+  // TASK-238: Now Playing header + Queue / Next / Coming Up tabs (Queue = Play Next,
+  // Next = From Series — which also carries the "Series ends" marker, Coming Up = Then).
+  it('lays the sections out as Queue / Next / Coming Up tabs', () => {
+    var html = videoQueueViewHtml(snap(0, true, [entry('q1', 'fz', 'Frozen')]));
+    ['queue', 'next', 'coming-up'].forEach(function (t) {
+      expect(html).toContain('data-act="tab" data-tab="' + t + '"');
+    });
+    expect(html).toContain('>Coming Up</button>');
+    // queued items -> opens on Queue.
+    expect(html).toContain('class="qtab active" data-act="tab" data-tab="queue"');
+  });
+
+  it('opens on Next when nothing is queued, and the Series-ends marker sits under Next', () => {
+    expect(videoQueueViewHtml(snap(0, false))).toContain('class="qtab active" data-act="tab" data-tab="next"');
+    expect(videoQueueViewHtml(snap(2, false))).toContain('Series ends');
+  });
+
   it('renders an editable PLAY NEXT row by entry_id, a play-to-jump source row by item_id', () => {
     var html = videoQueueViewHtml(snap(0, true, [entry('q1', 'fz', 'Frozen')]));
     expect(html).toContain('data-act="remove" data-entry="q1"');
