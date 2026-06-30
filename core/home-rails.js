@@ -273,21 +273,22 @@ export function albumsByArtist(cards, artist) {
   });
 }
 
-// The Music section's rails: Continue Listening (lead), then an Artists rail
-// (FEAT-029) of one tile per artist, then an Albums rail, then a Playlists rail
-// (FEAT-036) of the user-created playlist cards. Albums and Playlists both sit in
-// the music section but split on `collectionType` — a playlist routes to its own
-// detail (cardRoute), so it must not leak into the Albums rail. (No Singles rail —
-// a standalone song is a 1-track album; FEAT-027.) Square-art tiles are CSS; the
-// rail shape is identical to the video tabs so the browse screen renders it as-is.
+// The Music section's rails: Continue Listening (lead), then the Playlists rail
+// (FEAT-039 TASK-234 — owner wants it directly under Continue Listening), then an
+// Artists rail (FEAT-029) of one tile per artist, then an Albums rail. Albums and
+// Playlists both sit in the music section but split on `collectionType` — a
+// playlist routes to its own detail (cardRoute), so it must not leak into the
+// Albums rail. (No Singles rail — a standalone song is a 1-track album; FEAT-027.)
+// Square-art tiles are CSS; the rail shape is identical to the video tabs so the
+// browse screen renders it as-is.
 function musicRails(cards, cwRows, byId) {
   var music = cards.filter(function(c) { return sectionOf(c) === 'music'; });
   var albums = music.filter(function(c) { return c.collectionType !== 'playlist'; });
   var playlists = music.filter(function(c) { return c.collectionType === 'playlist'; });
   return continueListeningRail(cwRows, byId)
+    .concat(simpleRail('playlists', 'Playlists', playlists))
     .concat(simpleRail('artists', 'Artists', artistTiles(cards)))
-    .concat(simpleRail('albums', 'Albums', albums))
-    .concat(simpleRail('playlists', 'Playlists', playlists));
+    .concat(simpleRail('albums', 'Albums', albums));
 }
 
 // FEAT-036 (TASK-208) — the synthetic "＋ New Playlist" card. Not a catalog card
@@ -312,7 +313,12 @@ export function withCreatePlaylistTile(rails) {
     return { id: rail.id, title: rail.title, items: [card].concat(rail.items) };
   });
   if (hasRail) return withCard;
-  return withCard.concat([{ id: 'playlists', title: 'Playlists', items: [card] }]);
+  // Zero playlists: musicRails omitted the (empty) Playlists rail, so synthesise a
+  // create-only one and place it directly AFTER Continue Listening (TASK-234 order)
+  // — not appended last. With nothing in progress (no continue rail) it leads.
+  var newRail = { id: 'playlists', title: 'Playlists', items: [card] };
+  var at = withCard.findIndex(function(r) { return r.id === 'continue'; }) + 1;
+  return withCard.slice(0, at).concat([newRail]).concat(withCard.slice(at));
 }
 
 // The sidebar tabs to show: a tab per section that has browse content, in fixed

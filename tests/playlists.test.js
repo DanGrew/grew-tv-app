@@ -25,9 +25,9 @@ async function enterMusic(page) {
   await page.locator('.sidebar-tab[data-tab="music"]').click();
 }
 
-test('Music tab gains a Playlists rail (after Albums) listing playlists, including an empty one', async ({ page }) => {
+test('Music tab gains a Playlists rail (under Continue Listening, TASK-234) listing playlists, including an empty one', async ({ page }) => {
   await enterMusic(page);
-  await expect(page.locator('.rail-title')).toHaveText(['Artists', 'Albums', 'Playlists']);
+  await expect(page.locator('.rail-title')).toHaveText(['Playlists', 'Artists', 'Albums']);
   const rail = page.locator('.rail-row[data-rail="playlists"]');
   // TASK-208: a leading "＋ New Playlist" create tile precedes Road Trip + empty.
   await expect(rail.locator('.film-tile')).toHaveCount(3);

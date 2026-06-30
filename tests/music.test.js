@@ -30,12 +30,13 @@ test('a Music tab (titled Music) appears after the video tabs, only when music i
   await expect(page.locator('.sidebar-tab')).toHaveText(['TV Series', 'Films', 'Home Movies', 'Music']);
 });
 
-test('Music tab shows an Artists rail then an Albums rail with square (music) tiles, no Singles rail', async ({ page }) => {
+test('Music tab leads with a Playlists rail then Artists then Albums with square (music) tiles, no Singles rail', async ({ page }) => {
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   // TASK-208: the Music tab always offers a Playlists rail (create entry), even
   // with zero playlists — here it holds only the "＋ New Playlist" create tile.
-  await expect(page.locator('.rail-title')).toHaveText(['Artists', 'Albums', 'Playlists']);
+  // TASK-234: that Playlists rail leads, directly under Continue Listening.
+  await expect(page.locator('.rail-title')).toHaveText(['Playlists', 'Artists', 'Albums']);
   const plRail = page.locator('.rail-row[data-rail="playlists"] .film-tile');
   await expect(plRail).toHaveCount(1);
   await expect(plRail.first()).toHaveAttribute('data-id', 'create-playlist');
