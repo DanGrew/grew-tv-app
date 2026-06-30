@@ -4,8 +4,8 @@ import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { albumsByArtist } from '../../core/home-rails.js';
-import { buildCrumbs } from '../../core/breadcrumb.js';
-import { pushUnique as pushTrail, trimOnCrumb } from '../../core/nav-trail.js';
+import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
+import { pushUnique as pushTrail, trimOnCrumb, entries as entriesTrail } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
@@ -51,9 +51,17 @@ export function initPage() {
   els.playBtn.addEventListener('click', function() { api.sendIntent('playArtist'); });
   els.shuffleBtn.addEventListener('click', function() { api.sendIntent('shuffle'); });
 
-  // Breadcrumb trail (FEAT-021): Home > Albums (the Music tab) > Artist. Control:
-  // a crumb tap sends the `navigate` intent (TV teleports, companion follows).
-  // Browse: a local hop to the library.
+  // Breadcrumb trail (FEAT-021 / BUG-021): the artist page records its OWN
+  // artist.html entry (so a child album/player returns here), so the rail it was
+  // reached through is the browse.html entry sitting just BELOW that. Build the
+  // middle crumb from that rail entry (Home › Artists › Artist) so it retraces to
+  // the actual rail, not the generic Music tab. A deep-link / fresh session has no
+  // browse entry, so fall back to the static Home › Music › Artist. Control: a crumb
+  // tap sends the `navigate` intent (TV teleports, companion follows). Browse: a
+  // local hop to the library.
+  function railEntry() {
+    return entriesTrail().filter(function(e) { return e.page === 'browse.html'; }).slice(-1)[0];
+  }
   function localGo(page, params) { window.location.href = page + queryString(params); }
   function navigate(page, params) {
     // Trim the trail to the clicked ancestor (Home clears) so a later Back can't
@@ -62,7 +70,7 @@ export function initPage() {
     ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
   }
   function mountCrumbs(artistName) {
-    mountCompanionBreadcrumb('breadcrumb', buildCrumbs('artist', { artistName: artistName }), navigate);
+    mountCompanionBreadcrumb('breadcrumb', ({ true: trailCrumbs(railEntry(), artistName), false: buildCrumbs('artist', { artistName: artistName }) })[Boolean(railEntry())], navigate);
   }
 
   // Tapping an album: Control sends `select` (TV drives, companion follows);

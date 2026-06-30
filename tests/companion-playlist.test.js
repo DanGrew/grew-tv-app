@@ -75,6 +75,23 @@ test.describe('Road Trip playlist (2 tracks)', () => {
     await expect(page).toHaveURL(/companion\/browse\.html$/);
   });
 
+  // BUG-021: a playlist reached THROUGH a rail (trail top = the browse.html rail
+  // entry) showed only the static Home > playlist — the rail crumb was dropped and
+  // there was no rail crumb to retrace. It must show the rail and retrace to it.
+  test('BUG-021: a playlist reached via the Playlists rail shows the rail crumb and retraces to it', async ({ page }) => {
+    await page.addInitScript(() => {
+      sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
+        { page: 'browse.html', params: { tab: 'music', rail: 'playlists' }, label: 'Playlists' }
+      ]));
+    });
+    await page.goto('/companion/playlist.html');
+    await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home', 'Playlists']);
+    const railCrumb = page.locator('#breadcrumb .crumb-link', { hasText: 'Playlists' });
+    await expect(railCrumb).toHaveAttribute('data-params', /"rail":"playlists"/);
+    await railCrumb.click();
+    await expect(page).toHaveURL(/companion\/browse\.html$/);
+  });
+
   test('Play header sends the play_next intent — drives the TV into the playlist player', async ({ page }) => {
     await page.locator('#btn-play').click();
     await expect.poll(() => sentIntents).toContain('play_next');
