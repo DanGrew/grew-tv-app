@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+> **Working rules (process):** this is a **code repo**; it holds grew-tv-app code
+> specifics only. The shared process rules — modes, the workflow state machine,
+> worktrees, draft-PR / never-merge, hand-off — live in **claude-workflow**: read
+> `/Users/dan/dan-grew-repos/claude-workflow/grew-tv/CLAUDE.md` (the grew-tv entry)
+> → `WAYS-OF-WORKING.md`. Don't restate them here.
+
 ## Project
 
 grew-tv-app — browse + play web app for the Grew family home video system. Static files (HTML/JS/CSS) **served by the media-manager backend** (in the `grew-tv` repo) over the LAN — the same server also serves the API and the media. Not GitHub Pages; not a separate file server.
@@ -303,45 +309,25 @@ schema defined in the `grew-tv` private repo.
 
 ## Git and GitHub
 
-**All dev happens in a `git worktree`, never on a branch in the primary checkout.**
-The primary checkout (`/Users/dan/dan-grew-repos/grew-tv-app`) is shared by
-concurrent Claude sessions and the user's live `--app-dir` server, and it stays
-on `main`. For ANY change — feature, fix, doc — create a dedicated worktree off
-`origin/main` and work there:
-```bash
-git worktree add ../grew-tv-app-<topic>-wt origin/main -b <topic>/<descriptor>
-```
-Do NOT `git checkout -b`/branch-switch the primary tree. (A worktree pins HEAD
-per directory, so a stash/checkout slip can't silently drop your commit onto
-`main` in the shared tree — that exact failure happened once on the old
-"plain branch in primary" convention.) A fresh worktree has no `node_modules` —
-symlink the primary's for gate runs (`ln -s ../grew-tv-app/node_modules
-node_modules`); `.gitignore` lists `node_modules` (NO trailing slash) so the
-symlink is ignored and `git add -A` won't commit it — no manual `rm` step needed.
+Process rules — worktree off `origin/main` (never branch-switch the shared
+primary), `cd` into the repo/worktree before any `git` (never `git -C`, which
+breaks the per-verb perm allowlist), branch naming `<topic>/<descriptor>`,
+draft-PR / never-merge / commit-push-PR-autonomously, wait-for-merge,
+present-PRs — live in **claude-workflow** → `WAYS-OF-WORKING.md` (via the grew-tv
+entry `CLAUDE.md`). grew-tv-app specifics:
 
-**`cd` into the repo/worktree before any `git` — never `git -C <path>`.** A
-session's cwd starts at `/Users/dan` (above the repos), but the perm allowlist
-grants granular per-verb git rules (`Bash(git fetch:*)`, `Bash(git worktree
-add:*)`, `Bash(git commit:*)`, …). Inserting `-C <path>` between `git` and the
-verb breaks prefix-matching (`git -C /p fetch` ≠ `git fetch …`), so every call
-then prompts. `cd` is allowlisted — so `cd` into the primary checkout to create
-the worktree, then `cd` into the **worktree** and run bare git verbs there (commit
-/ push / status all match their rules, no `-C`, no prompts). Same for `gh`.
-**Branching:** off `main`. Naming: `<topic>/<descriptor>` — e.g. `feat/task-012-resume-screen`.
-**PRs:** Always draft (`--draft`), one per logical unit. Merge target: `main`.
-**Commit + push + open the draft PR without asking** (owner decision 2026-06-27).
-Once a change is built and its gates pass, commit, push, and open the draft PR
-autonomously — do NOT pause for commit/push/PR approval (the owner reviews and
-merges from the PR). Two things still hold: **WAIT for the user to merge before
-starting the next task**, and always present the PR link(s) prominently at the
-end of the reply.
-**Deploy:** no GitHub Pages. The app ships by updating the clone media-manager serves from (`--app-dir`, `~/grew-tv/repos/grew-tv-app` on the Mini) — pull `main` there + restart/reload. `setup-mac-mini.sh` clones it.
+- **Fresh worktree has no `node_modules`** — symlink the primary's for gate runs
+  (`ln -s ../grew-tv-app/node_modules node_modules`); `.gitignore` lists
+  `node_modules` (NO trailing slash) so the symlink is ignored and `git add -A`
+  won't commit it — no manual `rm` step needed.
+- **Deploy:** no GitHub Pages. The app ships by updating the clone media-manager
+  serves from (`--app-dir`, `~/grew-tv/repos/grew-tv-app` on the Mini) — pull
+  `main` there + restart/reload. `setup-mac-mini.sh` clones it.
 
 ## Tooling
 
-**gh CLI:** not on PATH in bash — always use full path.
-- macOS (Homebrew): `/opt/homebrew/bin/gh`
-- Windows: `"/c/Program Files/GitHub CLI/gh.exe"`
+**gh CLI** path + general prompt-minimising guidance: see claude-workflow
+`WAYS-OF-WORKING.md`. grew-tv-app tooling specifics:
 
 **Node:** lives at `~/.local/node/bin` (fallback `/opt/homebrew/bin`). Already on
 `PATH` via `~/.claude/settings.json` `env.PATH` on Dan's dev mac (see
