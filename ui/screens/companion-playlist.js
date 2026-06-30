@@ -3,7 +3,8 @@ import { wsUrl } from '../../core/server-config.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist } from '../../core/app-api.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
-import { buildCrumbs } from '../../core/breadcrumb.js';
+import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
+import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
@@ -131,16 +132,21 @@ export function initPage() {
   document.getElementById('btn-add-create').addEventListener('click', createNew);
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
 
-  // Breadcrumb trail (FEAT-021): Home > this playlist (current). A crumb tap sends
-  // the `navigate` intent so the app teleports the TV; the companion follows on
-  // the app's echoed context. Same `detail` trail the app's playlist detail mounts.
+  // Breadcrumb trail (FEAT-021 / BUG-021): build from the recorded nav-trail top so
+  // a playlist reached through a rail shows that rail (Home › Playlists › playlist)
+  // and the crumb retraces to it; an empty trail (deep-link / fresh session) falls
+  // back to the static Home › playlist. A crumb tap sends the `navigate` intent so
+  // the app teleports the TV; the companion follows on the app's echoed context.
   // Browse mode: crumb is a local hop (reach the library without driving the TV).
   function localGo(page, params) { window.location.href = page + queryString(params); }
   function navigate(page, params) {
+    // Trim the trail to the clicked ancestor (Home clears) so a later Back can't
+    // retrace past this jump (FEAT-032 stale-Back fix).
+    trimOnCrumb(page, params);
     ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
   }
   function mountCrumbs(title) {
-    mountCompanionBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesTitle: title }), navigate);
+    mountCompanionBreadcrumb('breadcrumb', ({ true: trailCrumbs(peekTrail(), title), false: buildCrumbs('detail', { seriesTitle: title }) })[Boolean(peekTrail())], navigate);
   }
 
   // A track plays on the TV via the id-addressed `play` intent the TV's playlist

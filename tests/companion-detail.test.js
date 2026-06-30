@@ -110,6 +110,30 @@ test('FEAT-032/TASK-243: album opened from an artist — no Back button, the art
   expect(intents.filter((i) => i.intent === 'back')).toHaveLength(0);
 });
 
+// BUG-021: a series/album reached through a RAIL records a `browse.html` rail
+// entry as the trail top (not artist.html). The breadcrumb gated the trail crumb
+// on artist.html, so a rail-origin fell back to the static Home > series — the
+// rail level was dropped and there was no rail crumb to retrace. The crumb must
+// build from whatever the trail top is, so the rail shows and tapping it returns
+// there.
+test('BUG-021: a detail reached via a rail shows the rail crumb and retraces it', async ({ page }) => {
+  const intents = [];
+  await installApi(page);
+  await mockAppRec(page, {
+    context: { context_id: 'detail', series_id: 'bluey' },
+    appState: { screen: 'detail', itemId: 'bluey', profile: 'kids' }
+  }, intents);
+  await page.addInitScript(() => {
+    sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
+      { page: 'browse.html', params: { tab: 'tv', rail: 'continue' }, label: 'Continue Watching' }
+    ]));
+  });
+  await page.goto('/companion/detail.html');
+  await expect(page.locator('#breadcrumb .crumb-link')).toContainText(['Continue Watching']);
+  await page.locator('#breadcrumb .crumb-link', { hasText: 'Continue Watching' }).click();
+  await expect.poll(() => intents.filter((i) => i.intent === 'navigate' && i.params.page === 'browse.html' && i.params.params.rail === 'continue').length).toBeGreaterThan(0);
+});
+
 test('FEAT-032/TASK-243: a series detail (no artist parent) — no Back button, breadcrumb Home returns to browse', async ({ page }) => {
   const intents = [];
   await installApi(page);

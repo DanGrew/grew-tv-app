@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { push, pop, peek, truncateTo, clear, pushUnique, entries, trimOnCrumb } from '../../core/nav-trail.js';
+import { push, pop, peek, truncateTo, truncateThrough, clear, pushUnique, entries, trimOnCrumb } from '../../core/nav-trail.js';
 
 // sessionStorage does not exist in the `node` vitest environment — back it with
 // a plain in-memory Map, the same vi.stubGlobal approach state.test.js uses for
@@ -98,17 +98,67 @@ describe('nav-trail', () => {
     });
   });
 
+  describe('truncateThrough (keep the clicked entry — BUG-021)', () => {
+    function deepTrail() {
+      push(entry('browse.html', { tab: 'films' }, 0, 'rail-1'));      // index 0 — rail grid
+      push(entry('rail-grid.html', { rail: 'r1' }, 100, 'boxset-7')); // index 1
+      push(entry('detail.html', { series: 'bx9' }, 200, 'series-2')); // index 2 — deeper
+    }
+
+    it('keeps the clicked entry as the top, dropping only deeper entries', () => {
+      deepTrail();
+      truncateThrough('rail-grid.html', { rail: 'r1' });
+      expect(peek()).toEqual(entry('rail-grid.html', { rail: 'r1' }, 100, 'boxset-7'));
+      pop();
+      expect(peek()).toEqual(entry('browse.html', { tab: 'films' }, 0, 'rail-1'));
+    });
+
+    it('keeps a single matching entry (nothing deeper) intact', () => {
+      push(entry('browse.html', { tab: 'music', rail: 'artists' }, 0, 'x'));
+      truncateThrough('browse.html', { tab: 'music', rail: 'artists' });
+      expect(peek()).toEqual(entry('browse.html', { tab: 'music', rail: 'artists' }, 0, 'x'));
+    });
+
+    it('matches params order-insensitively', () => {
+      push(entry('rail-grid.html', { rail: 'r1', tab: 'films' }, 0, 'x'));
+      push(entry('detail.html', { series: 's1' }, 0, 'y'));
+      truncateThrough('rail-grid.html', { tab: 'films', rail: 'r1' });
+      expect(peek()).toEqual(entry('rail-grid.html', { rail: 'r1', tab: 'films' }, 0, 'x'));
+      pop();
+      expect(peek()).toBe(null);
+    });
+
+    it('clears the trail when the target is not in it', () => {
+      deepTrail();
+      truncateThrough('audio.html', { artist: 'nobody' });
+      expect(peek()).toBe(null);
+    });
+  });
+
   describe('trimOnCrumb (the wired-in crumb handler — FEAT-032 stale-Back fix)', () => {
     function deepTrail() {
       push(entry('browse.html', { tab: 'music' }, 0, 'rail-1'));
       push(entry('artist.html', { artist: 'ELO' }, 0, 'album-2'));
     }
 
-    it('trims to the clicked ancestor so a later Back cannot retrace past it', () => {
+    it('keeps the clicked ancestor as the new top and drops only what is deeper', () => {
       deepTrail();
-      // Tap the "ELO" artist crumb: it (and anything deeper) is dropped, Home stays.
+      push(entry('detail.html', { series: 'bx9' }, 0, 'ep-3')); // a deeper level than the artist
+      // Tap the "ELO" artist crumb: the deeper detail entry is dropped, the artist
+      // entry SURVIVES as the new top (BUG-021 — the landed page restores from it).
       trimOnCrumb('artist.html', { artist: 'ELO' });
-      expect(peek()).toEqual(entry('browse.html', { tab: 'music' }, 0, 'rail-1'));
+      expect(peek()).toEqual(entry('artist.html', { artist: 'ELO' }, 0, 'album-2'));
+    });
+
+    it('BUG-021: tapping a browse rail crumb KEEPS that rail entry so browse can re-seed the grid', () => {
+      push(entry('browse.html', { tab: 'music', rail: 'playlists' }, 0, 'rail-pl'));
+      push(entry('artist.html', { artist: 'ELO' }, 0, 'album-2')); // a deeper level
+      // Back to the Playlists rail crumb: the deeper artist entry goes, the rail
+      // entry stays as the top — companion-browse restoreTrail seeds the grid from it.
+      trimOnCrumb('browse.html', { tab: 'music', rail: 'playlists' });
+      expect(peek()).toEqual(entry('browse.html', { tab: 'music', rail: 'playlists' }, 0, 'rail-pl'));
+      pop();
+      expect(peek()).toBe(null);
     });
 
     it('the Home crumb (empty params) clears the whole trail', () => {

@@ -112,6 +112,25 @@ export function truncateTo(page, params) {
   write(stack.slice(0, idx));
 }
 
+// Like truncateTo, but KEEPS the clicked entry as the new top (drops only what is
+// deeper). A breadcrumb crumb is where you are GOING, and for a recorded browse
+// rail entry that destination page (companion-browse) rebuilds its level by
+// reading the trail top — so the entry must survive the click, or browse reloads
+// at the sections root and the drill position is lost (BUG-021 "back; no nav
+// trail"). truncateTo drops the entry on the assumption the landed screen
+// re-records itself, but browse can only re-record AFTER it has restored from the
+// trail, so the entry has to remain. Not-in-trail clears (default load).
+export function truncateThrough(page, params) {
+  var stack = read();
+  var idx = -1;
+  var i;
+  for (i = 0; i < stack.length; i++) {
+    if (sameTarget(stack[i], page, params)) { idx = i; break; }
+  }
+  if (idx === -1) { write([]); return; }
+  write(stack.slice(0, idx + 1));
+}
+
 // Reset the trail — e.g. navigating Home, so the stack can't grow unbounded or
 // loop back on itself.
 export function clear() {
@@ -119,17 +138,20 @@ export function clear() {
 }
 
 // A breadcrumb ancestor CLICK (a sideways/up jump): trim the trail so a later
-// Back can't retrace PAST where you jumped. The Home crumb (empty params) clears
-// the whole trail; any other ancestor truncates to itself (drops it + everything
-// deeper). This is the one call every companion crumb handler must make — without
-// it the trail only ever grew or cleared wholesale, so a stale top entry (e.g. an
-// old artist.html level) survived a sideways jump and drove the next screen's Back
-// to the wrong place (FEAT-032 stale-Back bug). truncateTo was built for exactly
-// this but was never wired in.
+// Back can't retrace PAST where you jumped, but KEEP the clicked entry as the new
+// top so the landed page can restore from it. The Home crumb (empty params) clears
+// the whole trail; any other ancestor truncates THROUGH itself (keeps it, drops
+// everything deeper). This is the one call every companion crumb handler must
+// make — without it the trail only ever grew or cleared wholesale, so a stale top
+// entry (e.g. an old artist.html level) survived a sideways jump and drove the
+// next screen's Back to the wrong place (FEAT-032 stale-Back bug). BUG-021: it
+// used to drop the clicked entry too (truncateTo), which lost the browse rail
+// position on a back-to-rail click — now it keeps it (truncateThrough) so
+// companion-browse re-seeds the grid from the surviving entry.
 export function trimOnCrumb(page, params) {
   if (Object.keys(params || {}).length === 0) {
     clear();
     return;
   }
-  truncateTo(page, params);
+  truncateThrough(page, params);
 }

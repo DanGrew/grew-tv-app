@@ -96,6 +96,24 @@ test('FEAT-032: loading the artist page records it on the nav trail (so a child 
   expect(trail.some((e) => e.page === 'artist.html' && e.params.artist === 'ELO')).toBe(true);
 });
 
+// BUG-021: an artist reached THROUGH a rail records a browse.html rail entry under
+// its own artist.html entry. The breadcrumb built a static Home > Music > Artist,
+// dropping that rail — so the middle crumb went to the generic Music tab, not the
+// rail you came through. It must show the rail crumb and retrace to it.
+test('BUG-021: an artist reached via a rail shows that rail crumb (not the generic Music crumb) and retraces to it', async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
+      { page: 'browse.html', params: { tab: 'music', rail: 'artists' }, label: 'Artists' }
+    ]));
+  });
+  await page.goto('/companion/artist.html');
+  await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home', 'Artists']);
+  const railCrumb = page.locator('#breadcrumb .crumb-link', { hasText: 'Artists' });
+  await expect(railCrumb).toHaveAttribute('data-params', /"rail":"artists"/);
+  await railCrumb.click();
+  await expect(page).toHaveURL(/companion\/browse\.html$/);
+});
+
 // FEAT-038 (DSYNC-2c): opening an artist while Browsing. The page self-loads its
 // albums from ?id (the TV is elsewhere); album tiles open album detail LOCALLY
 // (they stay live — browsing into them is the point); play/shuffle grey out.

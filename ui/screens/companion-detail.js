@@ -37,16 +37,14 @@ export function initPage() {
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
 
-  // FEAT-032 (TASK-218): if this album was opened FROM an artist's albums page,
-  // the trail top is that artist entry — the breadcrumb shows that artist crumb so
-  // back returns there (not the default browse). For a series/boxset, or an album
-  // reached straight from a rail, the top is a browse entry (not artist.html).
+  // FEAT-032 (TASK-218) / BUG-021: the breadcrumb is built from the recorded nav
+  // trail's top — whatever it is. Opened from an artist's albums page, the top is
+  // that artist entry (Home › ELO › album); reached through a rail, the top is the
+  // browse rail entry (Home › Continue Watching › series). Either way trailCrumbs
+  // shows that level and a tap retraces it. Only an empty trail (deep-link / fresh
+  // session) falls back to the static Home › series.
   // TASK-243: there is no visible Back button on any detail screen — the breadcrumb
-  // is the sole on-screen back affordance (artist-parent aware via trailCrumbs).
-  function artistParent() {
-    return [peekTrail()].filter(Boolean).filter(function(e) { return e.page === 'artist.html'; })[0];
-  }
-
+  // is the sole on-screen back affordance.
   // FEAT-036/TASK-207 — "Add to playlist" on the companion, the PRACTICAL build
   // surface (a phone has a real keyboard + easy track browsing). The mirror of the
   // app's album-detail Add sheet (screen-album-detail-page): each ALBUM track row
@@ -185,7 +183,7 @@ export function initPage() {
     ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
   }
   function mountCrumbs(seriesTitle) {
-    mountCompanionBreadcrumb('breadcrumb', ({ true: trailCrumbs(artistParent(), seriesTitle), false: buildCrumbs('detail', { seriesTitle: seriesTitle }) })[Boolean(artistParent())], navigate);
+    mountCompanionBreadcrumb('breadcrumb', ({ true: trailCrumbs(peekTrail(), seriesTitle), false: buildCrumbs('detail', { seriesTitle: seriesTitle }) })[Boolean(peekTrail())], navigate);
   }
 
   // Poster <img> with a load-failure fallback: a missing/abortive poster hides
