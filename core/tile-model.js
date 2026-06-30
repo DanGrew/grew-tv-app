@@ -55,11 +55,18 @@ export function tileModel(card, ctx) {
     sub = card.clipCount === 1 ? '1' + (music ? ' track' : ' clip') : card.clipCount + noun;
   }
 
+  // FEAT-039/TASK-244: a playlist card carries up to 4 distinct member album-art
+  // refs (backend TASK-233 coverArt[]) so the tile renders a 2x2 cover mosaic
+  // instead of a single poster. Absent (albums, videos, old backend) -> [] ->
+  // the renderer falls back to the single poster / placeholder.
+  var coverArt = Array.isArray(card.coverArt) ? card.coverArt : [];
+
   return {
     id: card.id,
     kind: kind,
     title: card.title || '',
     poster: card.poster || null,
+    coverArt: coverArt,
     percent: pct,
     showBar: showBar,
     showCC: !!cc,
