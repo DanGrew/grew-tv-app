@@ -111,8 +111,11 @@ export function initBrowsePage() {
   // resolve series context and run Next/Prev even though the episode was opened
   // from a tile, not the series detail. A standalone film has no `series`; navTo
   // drops the undefined param so it stays seriesless.
+  // FEAT-039 (TASK-235): new-playlist creation moved off a rail tile onto the
+  // Playlists rail-heading ＋ (createPlaylist below, passed to renderBrowse) — so
+  // there is no 'create-playlist' select route any more.
+  function createPlaylist() { navTo('playlist-create.html'); }
   var SELECT = {
-    'create-playlist': function() { navTo('playlist-create.html'); },
     artist:   function(card) { navTo('artist.html', { artist: card.artist }); },
     album:    function(card) { navTo('album-detail.html', { album: card.id }); },
     playlist: function(card) { navTo('playlist-detail.html', { playlist: card.id }); },
@@ -148,7 +151,7 @@ export function initBrowsePage() {
       // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) wins
       // over the last-visited tab; renderBrowse falls back when neither matches.
       var initialTab = [getParam('tab')].filter(Boolean).concat([sessionStorage.getItem(LAST_TAB_KEY)]).filter(Boolean)[0];
-      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue);
+      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
       refreshQueue();
     })

@@ -27,13 +27,24 @@ async function enterMusic(page) {
 
 test('Music tab gains a Playlists rail (under Continue Listening, TASK-234) listing playlists, including an empty one', async ({ page }) => {
   await enterMusic(page);
-  await expect(page.locator('.rail-title')).toHaveText(['Playlists', 'Artists', 'Albums']);
+  // TASK-234: Playlists rail leads, directly under Continue Listening.
+  await expect(page.locator('.rail-row').nth(0)).toHaveAttribute('data-rail', 'playlists');
+  await expect(page.locator('.rail-row').nth(1)).toHaveAttribute('data-rail', 'artists');
+  await expect(page.locator('.rail-row').nth(2)).toHaveAttribute('data-rail', 'albums');
   const rail = page.locator('.rail-row[data-rail="playlists"]');
-  // TASK-208: a leading "＋ New Playlist" create tile precedes Road Trip + empty.
-  await expect(rail.locator('.film-tile')).toHaveCount(3);
-  await expect(rail.locator('.film-tile').first()).toHaveAttribute('data-id', 'create-playlist');
+  // TASK-235: body holds only real playlists (Road Trip + empty), no create tile.
+  await expect(rail.locator('.film-tile')).toHaveCount(2);
+  await expect(rail.locator('.film-tile[data-id="create-playlist"]')).toHaveCount(0);
   await expect(rail.locator('.film-tile[data-id="pl-roadtrip"] .tile-title')).toHaveText('Road Trip');
   await expect(rail.locator('.film-tile[data-id="pl-empty"]')).toHaveCount(1); // empty playlist still listed
+});
+
+test('the Playlists rail heading carries a ＋ that opens the create flow (TASK-235)', async ({ page }) => {
+  await enterMusic(page);
+  const plus = page.locator('.rail-title [data-create-playlist]');
+  await expect(plus).toBeVisible();
+  await plus.click();
+  await expect(page).toHaveURL(/playlist-create\.html/);
 });
 
 test('a playlist card does NOT leak into the Albums rail', async ({ page }) => {
@@ -138,16 +149,16 @@ async function typeName(page, text) {
   }
 }
 
-test('the create tile opens the create screen with an empty name placeholder', async ({ page }) => {
+test('the heading ＋ opens the create screen with an empty name placeholder', async ({ page }) => {
   await enterMusic(page);
-  await page.locator('.film-tile[data-id="create-playlist"]').click();
+  await page.locator('.rail-title [data-create-playlist]').click();
   await expect(page).toHaveURL(/playlist-create\.html/);
   await expect(page.locator('#pl-name')).toHaveClass(/placeholder/);
 });
 
 test('typing a name on the on-screen keyboard then Create opens the new playlist detail', async ({ page }) => {
   await enterMusic(page);
-  await page.locator('.film-tile[data-id="create-playlist"]').click();
+  await page.locator('.rail-title [data-create-playlist]').click();
   await typeName(page, 'ROADIES');
   await expect(page.locator('#pl-name')).toHaveText('ROADIES');
   await page.locator('#btn-create').click();
@@ -157,7 +168,7 @@ test('typing a name on the on-screen keyboard then Create opens the new playlist
 
 test('Create with a blank name is rejected with an error and stays on the create screen', async ({ page }) => {
   await enterMusic(page);
-  await page.locator('.film-tile[data-id="create-playlist"]').click();
+  await page.locator('.rail-title [data-create-playlist]').click();
   await page.locator('#btn-create').click();
   await expect(page.locator('#error-msg')).toBeVisible();
   await expect(page).toHaveURL(/playlist-create\.html/);
@@ -165,7 +176,7 @@ test('Create with a blank name is rejected with an error and stays on the create
 
 test('the create screen offers a kids/adults profile picker (active profile preselected)', async ({ page }) => {
   await enterMusic(page);
-  await page.locator('.film-tile[data-id="create-playlist"]').click();
+  await page.locator('.rail-title [data-create-playlist]').click();
   await expect(page.locator('#btn-profile-kids')).toHaveClass(/selected/);
   await page.locator('#btn-profile-adults').click();
   await expect(page.locator('#btn-profile-adults')).toHaveClass(/selected/);
