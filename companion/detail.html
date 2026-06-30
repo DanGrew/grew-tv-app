@@ -26,8 +26,6 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 #ctx-label { font-size: 12px; color: var(--text-muted); text-align: center; text-transform: uppercase; letter-spacing: 1px; flex-shrink: 0; min-height: 16px; }
 #ctx-title { font-size: 20px; color: var(--text); text-align: center; flex-shrink: 0; min-height: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #actions { flex: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-top: 4px; }
-.back-btn { align-self: flex-start; padding: 10px 16px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-size: 16px; cursor: pointer; flex-shrink: 0; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
-.back-btn:active { background: var(--surface-hi); border-color: var(--focus); color: var(--focus); }
 .no-actions { color: var(--text-muted); font-size: 16px; text-align: center; margin-top: 40px; }
 .detail-track-row { display: flex; align-items: center; gap: 12px; flex-shrink: 0; padding: 10px 12px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--surface); transition: border-color var(--dur) var(--ease); }
 .detail-track-row:has(.tile-btn:active) { border-color: var(--focus); }
@@ -94,7 +92,6 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 <div id="breadcrumb"></div>
 <div id="ctx-label"></div>
 <div id="ctx-title"></div>
-<button id="btn-back" class="back-btn">← Back</button>
 <div id="actions"></div>
 <div id="add-sheet" role="dialog" aria-modal="true">
   <div class="add-sheet-panel">

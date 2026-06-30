@@ -98,9 +98,10 @@ test('Backspace from detail returns to browse', async ({ page }) => {
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
 
-test('back button from detail returns to browse', async ({ page }) => {
+test('TASK-243: no Back button — breadcrumb Home returns to browse', async ({ page }) => {
   await openDetail(page);
-  await page.locator('#btn-back-detail').click();
+  await expect(page.locator('#btn-back-detail')).toHaveCount(0);
+  await page.locator('#breadcrumb .crumb-link').first().click();
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
 
