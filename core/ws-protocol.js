@@ -121,22 +121,14 @@ export function createListDevices() {
   return createMessage(MESSAGE_TYPES.LIST_DEVICES, {});
 }
 
-export function createPlayIntent(id) {
-  return createIntent(INTENTS.PLAY, { id: id != null ? id : null });
-}
 export function createSkipIntent(deltaSec) {
   return createIntent(INTENTS.SKIP, { deltaSec: deltaSec });
 }
-export function createNextIntent() { return createIntent(INTENTS.NEXT, {}); }
-export function createPrevIntent() { return createIntent(INTENTS.PREV, {}); }
 export function createSetProfileIntent(profile) {
   return createIntent(INTENTS.SET_PROFILE, { profile: profile });
 }
 export function createToggleCaptionsIntent() {
   return createIntent(INTENTS.TOGGLE_CAPTIONS, {});
-}
-export function createShuffleIntent() {
-  return createIntent(INTENTS.SHUFFLE, {});
 }
 export function createPlayAlbumIntent(id) {
   return createIntent(INTENTS.PLAY_ALBUM, { id: id != null ? id : null });

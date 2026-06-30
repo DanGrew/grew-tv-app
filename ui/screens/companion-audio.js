@@ -11,12 +11,17 @@ import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 
-// Companion audio context (FEAT-018 TASK-132). The music analogue of
-// companion-video: live transport (play/pause, prev/next track, graduated skip,
-// shuffle) + now-playing, plus the album track list — tap a row to teleport the
-// TV to that track. Progress is interpolated locally between 1 Hz app_state
-// snapshots; the shuffle pill reflects (and toggles) the snapshot flag. Every
-// control here already has a d-pad path on the TV (TASK-130/131).
+// Companion audio context (FEAT-018 TASK-132 / FEAT-037 TASK-245). The music
+// analogue of companion-video: live transport + now-playing, plus the album track
+// list — tap a row to teleport the TV to that track. SERVER-AUTHORITATIVE now
+// (TASK-245): prev / next / shuffle / play-track POST to the per-person
+// /api/playback engine (Plane B) — the SAME endpoint the TV audio page drives —
+// and now-playing, the shuffle pill, the current-track highlight and the track
+// list's source all repaint from the `playback` snapshot the server pushes back
+// (onPlayback), mirroring the TV. play/pause, graduated skip, volume and reset
+// have no server action (TV-local) so they stay on the legacy WS intent rail
+// (Plane A); the progress bar is still interpolated locally between 1 Hz app_state
+// snapshots. Every control here already has a d-pad path on the TV (TASK-130/131).
 var JUMP = [
   { d: -30, label: '-30s' }, { d: -10, label: '-10s' }, { d: 10, label: '+10s' }, { d: 30, label: '+30s' }
 ];
@@ -37,7 +42,7 @@ export function initPage() {
     tracks: document.getElementById('tracks'),
     reset: document.getElementById('c-reset')
   };
-  var state = { snap: null, sourceType: null, sourceId: null, person: null };
+  var state = { snap: null, psnap: null, sourceType: null, sourceId: null, person: null };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -95,15 +100,17 @@ export function initPage() {
     });
   }
 
+  // Play/pause stays on the 1 Hz app_state (Plane A — the <audio> is TV-local).
   function renderControls() {
     [state.snap].filter(Boolean).forEach(function(s) {
       els.toggle.textContent = PLAY_ICON[s.playing + ''];
-      els.shuffle.classList.toggle('on', !!s.shuffle);
     });
   }
 
+  // The live current track rides the `playback` snapshot's now-playing (the engine
+  // source of truth), not the 1 Hz app_state.
   function currentId() {
-    return [state.snap].filter(Boolean).map(function(s) { return s.episodeId; }).concat([null])[0];
+    return [state.psnap].filter(Boolean).map(function(s) { return s.now_playing; }).filter(Boolean).map(function(np) { return np.track_id; }).concat([null])[0];
   }
 
   // Highlight the row matching the live current track (episodeId). Scoped to the
@@ -114,12 +121,17 @@ export function initPage() {
     });
   }
 
-  // FEAT-031 (TASK-189) producer: queue a track to PLAY NEXT. Server-authoritative
-  // — POST queue-track straight to /api/playback for the active person; it lands
-  // in the override queue and shows up under PLAY NEXT on the Queue View + TV.
-  function queueTrack(id) {
-    playbackAction(server, 'queue-track', state.person, { track_id: id }).catch(noop);
-  }
+  // FEAT-037 (TASK-245) transport: every music action POSTs to the per-person
+  // /api/playback engine (Plane B), the SAME endpoint the TV audio page drives;
+  // the server applies the transition and broadcasts the resolved `playback`
+  // snapshot, which repaints BOTH surfaces (onPlayback). Mirrors companion-video's
+  // sendVideoAction. Keyed to the active person captured off app_state.
+  function sendPlayback(action, body) { playbackAction(server, action, state.person, body).catch(noop); }
+  function playTrack(id) { sendPlayback('play-track', { track_id: id }); }
+
+  // FEAT-031 (TASK-189) producer: queue a track to PLAY NEXT — it lands in the
+  // override queue and shows up under PLAY NEXT on the Queue View + TV.
+  function queueTrack(id) { sendPlayback('queue-track', { track_id: id }); }
 
   // A track row: the play button (tap = play now, keeps the .track-btn contract
   // the highlight + e2e key off) plus a ＋ Queue producer (FEAT-031 mockup).
@@ -133,7 +145,7 @@ export function initPage() {
     b.className = 'track-btn';
     b.setAttribute('data-id', v.id);
     b.insertAdjacentHTML('beforeend', '<span class="t-num">' + num + '</span><span class="t-name">' + v.title + '</span>');
-    b.addEventListener('click', function() { api.play(v.id); });
+    b.addEventListener('click', function() { playTrack(v.id); });
     return b;
   }
 
@@ -177,6 +189,8 @@ export function initPage() {
   // a playlist source loads via loadPlaylist, NOT loadAlbum). An artist source
   // must NOT loadAlbum(artistId) (a 404 that cleared the list AND set a bogus
   // album-detail Back target — BUG-018), and a lone single has no list at all.
+  // The source identity rides the `playback` snapshot (source_type / source_id) —
+  // the engine source of truth (TASK-245), not the 1 Hz app_state.
   var SOURCE_TRACKS = {
     album:    function(id) { loadTracks(id); },
     playlist: function(id) { loadPlaylistTracks(id); },
@@ -184,14 +198,14 @@ export function initPage() {
     track:    function() {}
   };
   function loadSource(s) {
-    state.sourceId = s.sourceId;
-    [SOURCE_TRACKS[s.sourceType]].filter(Boolean).forEach(function(fn) { fn(s.sourceId); });
+    state.sourceId = s.source_id;
+    [SOURCE_TRACKS[s.source_type]].filter(Boolean).forEach(function(fn) { fn(s.source_id); });
   }
   // Always reflect the source type so Back routes correctly even before any list
   // resolves; reload the track list only when the source id changes.
   function captureSource(s) {
-    state.sourceType = s.sourceType;
-    [s.sourceId].filter(function(id) { return id !== state.sourceId; }).forEach(function() { loadSource(s); });
+    state.sourceType = s.source_type;
+    [s.source_id].filter(function(id) { return id !== state.sourceId; }).forEach(function() { loadSource(s); });
   }
 
   // The active person rides the app_state (TASK-158); the ＋ Queue POSTs key per
@@ -205,6 +219,26 @@ export function initPage() {
     capturePerson(snap);
     renderControls();
     renderBar();
+  }
+
+  // ── server `playback` snapshot -> companion (the now-playing source of truth,
+  // mirroring the TV audio page's applySnapshot). Now-playing title + the breadcrumb
+  // leaf, the shuffle pill, the current-track highlight and the track list's source
+  // all read it; the progress bar and play/pause icon still ride app_state (Plane A).
+  function renderNowFromSnap(snap) {
+    [snap.now_playing].filter(Boolean).forEach(function(np) {
+      els.ctxLabel.textContent = 'Now playing';
+      els.title.textContent = np.title;
+      mountAudioCrumbs(np.title);
+    });
+  }
+  function renderShuffle(snap) {
+    els.shuffle.classList.toggle('on', !!snap.shuffle);
+  }
+  function onPlayback(snap) {
+    state.psnap = snap;
+    renderNowFromSnap(snap);
+    renderShuffle(snap);
     captureSource(snap);
     markCurrent();
   }
@@ -249,9 +283,9 @@ export function initPage() {
   }
 
   els.toggle.addEventListener('click', function() { api.sendIntent('toggle'); });
-  els.shuffle.addEventListener('click', function() { api.shuffle(); });
-  document.getElementById('c-prev').addEventListener('click', function() { api.prev(); });
-  document.getElementById('c-next').addEventListener('click', function() { api.next(); });
+  els.shuffle.addEventListener('click', function() { sendPlayback('toggle-shuffle'); });
+  document.getElementById('c-prev').addEventListener('click', function() { sendPlayback('previous'); });
+  document.getElementById('c-next').addEventListener('click', function() { sendPlayback('next'); });
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);
@@ -261,6 +295,6 @@ export function initPage() {
 
   mountSyncBar(mode, onModeChange);
   applyMode();
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
+  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode, onPlayback: onPlayback });
   updateBar = mountScreenBar(getApi, noop);
 }
