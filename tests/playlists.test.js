@@ -62,6 +62,43 @@ test('an empty playlist opens its detail with no track rows', async ({ page }) =
   await expect(page.locator('.detail-row')).toHaveCount(0);
 });
 
+// FEAT-039 (TASK-244) — playlist cover renders a 2x2 mosaic of member album art
+// (backend TASK-233 coverArt[]). Road Trip carries 2 refs (degrade-2: two cells);
+// the empty playlist has none -> the existing music placeholder, both on the rail
+// tile and the detail header.
+
+test('a playlist rail tile renders a cover mosaic of its member album art', async ({ page }) => {
+  await enterMusic(page);
+  const tile = page.locator('.rail-row[data-rail="playlists"] .film-tile[data-id="pl-roadtrip"]');
+  await expect(tile.locator('.cover-mosaic')).toHaveCount(1);
+  await expect(tile.locator('.cover-mosaic .cover-mosaic-cell')).toHaveCount(2); // 2 refs -> 2 cells
+});
+
+test('an empty playlist tile falls back to the placeholder (no mosaic)', async ({ page }) => {
+  await enterMusic(page);
+  const tile = page.locator('.rail-row[data-rail="playlists"] .film-tile[data-id="pl-empty"]');
+  await expect(tile.locator('.cover-mosaic')).toHaveCount(0);
+  await expect(tile.locator('.film-poster-placeholder')).toBeVisible();
+});
+
+test('the playlist detail header shows the cover mosaic', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="pl-roadtrip"]').click();
+  await expect(page.locator('.detail-row')).toHaveCount(2);
+  await expect(page.locator('#detail-header-mosaic')).toBeVisible();
+  await expect(page.locator('#detail-header-mosaic .cover-mosaic-cell')).toHaveCount(2);
+  await expect(page.locator('#detail-header-placeholder')).toBeHidden();
+});
+
+test('an empty playlist detail header shows the placeholder, not a mosaic', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="pl-empty"]').click();
+  await expect(page).toHaveURL(/playlist-detail\.html/);
+  await expect(page.locator('#detail-title')).toHaveText('Empty Mix');
+  await expect(page.locator('#detail-header-mosaic')).toBeHidden();
+  await expect(page.locator('#detail-header-placeholder')).toBeVisible();
+});
+
 test('selecting a playlist track plays it in the <audio> player as a queue source', async ({ page }) => {
   await enterMusic(page);
   await page.locator('.film-tile[data-id="pl-roadtrip"]').click();

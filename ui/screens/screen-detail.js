@@ -295,11 +295,15 @@ function applyPoster(img, ph, cands) {
   })[String(cands.length === 0)]();
 }
 
+// Optional-safe: the playlist detail (FEAT-039/TASK-244) has no single
+// #detail-header-poster — it renders a member-art mosaic itself — so this shared
+// builder skips the poster there (same pattern as renderChips on the album page).
 function renderHeaderPoster() {
-  var img = document.getElementById('detail-header-poster');
-  var ph = document.getElementById('detail-header-placeholder');
-  var seasonPoster = seasonPosterOf(state.seasons, state.activeSeason);
-  applyPoster(img, ph, posterCandidates(state.server, seasonPoster, state.series.poster));
+  [document.getElementById('detail-header-poster')].filter(Boolean).forEach(function(img) {
+    var ph = document.getElementById('detail-header-placeholder');
+    var seasonPoster = seasonPosterOf(state.seasons, state.activeSeason);
+    applyPoster(img, ph, posterCandidates(state.server, seasonPoster, state.series.poster));
+  });
 }
 
 function makeChip(s) {

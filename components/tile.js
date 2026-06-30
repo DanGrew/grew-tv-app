@@ -6,6 +6,7 @@
 
 import { mediaUrl } from '../core/app-api.js';
 import { tileModel } from '../core/tile-model.js';
+import { coverMosaicHtml } from '../core/cover-mosaic.js';
 
 var PLAY_KEYS = { Enter: true, ' ': true };
 
@@ -27,29 +28,44 @@ export function createTile(server, card, opts) {
   title.className = 'tile-title';
   title.textContent = m.title;
 
-  var img = document.createElement('img');
-  img.className = 'film-poster';
-  img.alt = '';
-  var placeholder = document.createElement('div');
-  placeholder.className = 'film-poster-placeholder';
-  var src = mediaUrl(server, m.poster);
-  ({
-    true: function() {
-      img.src = src;
-      placeholder.style.display = 'none';
-      img.addEventListener('error', function() {
+  // FEAT-039/TASK-244: a playlist tile renders a 2x2 cover mosaic of its member
+  // album art (m.coverArt -> resolved urls). Any other card (album/video, or a
+  // playlist whose backend sent no coverArt) takes the single-poster path, which
+  // also handles the placeholder fallback — so an old backend (no field) and an
+  // empty playlist both degrade to the existing placeholder.
+  var coverUrls = m.coverArt.map(function(ref) { return mediaUrl(server, ref); }).filter(Boolean);
+  function buildMosaic() {
+    var box = document.createElement('div');
+    box.className = 'film-poster';
+    box.innerHTML = coverMosaicHtml(coverUrls);
+    tile.appendChild(box);
+  }
+  function buildPoster() {
+    var img = document.createElement('img');
+    img.className = 'film-poster';
+    img.alt = '';
+    var placeholder = document.createElement('div');
+    placeholder.className = 'film-poster-placeholder';
+    var src = mediaUrl(server, m.poster);
+    ({
+      true: function() {
+        img.src = src;
+        placeholder.style.display = 'none';
+        img.addEventListener('error', function() {
+          img.style.display = 'none';
+          placeholder.style.display = 'flex';
+        });
+      },
+      false: function() {
         img.style.display = 'none';
         placeholder.style.display = 'flex';
-      });
-    },
-    false: function() {
-      img.style.display = 'none';
-      placeholder.style.display = 'flex';
-    }
-  })[String(!!src)]();
-  placeholder.textContent = ({ true: '💿', false: '🎬' })[String(!!m.music)];
-  tile.appendChild(img);
-  tile.appendChild(placeholder);
+      }
+    })[String(!!src)]();
+    placeholder.textContent = ({ true: '💿', false: '🎬' })[String(!!m.music)];
+    tile.appendChild(img);
+    tile.appendChild(placeholder);
+  }
+  ({ true: buildMosaic, false: buildPoster })[String(coverUrls.length > 0)]();
   tile.appendChild(title);
 
   [m.sub].filter(Boolean).forEach(function(text) {

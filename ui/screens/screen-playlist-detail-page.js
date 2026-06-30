@@ -3,7 +3,8 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
+import { coverMosaicHtml } from '../../core/cover-mosaic.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { playNextIndex } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -49,6 +50,27 @@ export function initPlaylistDetailPage() {
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
 
+  // FEAT-039/TASK-244: render the playlist's member album-art (TASK-233
+  // coverArt[]) as a 2x2 mosaic in the header; an empty playlist / old backend
+  // (no field) shows the existing music placeholder. Re-run after track edits
+  // (membership can change which arts show). cyclomatic-1: count -> dispatch.
+  var COVER = {
+    true: function() {
+      document.getElementById('detail-header-mosaic').style.display = 'block';
+      document.getElementById('detail-header-placeholder').style.display = 'none';
+    },
+    false: function() {
+      document.getElementById('detail-header-mosaic').style.display = 'none';
+      document.getElementById('detail-header-placeholder').style.display = 'flex';
+    }
+  };
+  function renderCover() {
+    var refs = [state.playlist.coverArt].filter(Boolean).concat([[]])[0];
+    var urls = refs.map(function(r) { return mediaUrl(SERVER, r); }).filter(Boolean);
+    document.getElementById('detail-header-mosaic').innerHTML = coverMosaicHtml(urls);
+    COVER[String(urls.length > 0)]();
+  }
+
   // Reorder + remove (TASK-211): per-track ↑ ↓ ✕ wired through buildDetailList.
   // Each POSTs by POSITION (move-track / remove-track), then reloads the playlist
   // and rebuilds the list so the order/membership reflects the server truth, and
@@ -57,6 +79,7 @@ export function initPlaylistDetailPage() {
   function reloadList(focusSel) {
     return loadPlaylist(SERVER, playlistId).then(function(pl) {
       state.playlist = pl;
+      renderCover();
       buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove);
       ([document.querySelector(focusSel)].filter(Boolean)
         .concat([document.querySelector('.detail-row')]).filter(Boolean)
@@ -229,6 +252,7 @@ export function initPlaylistDetailPage() {
     .then(function(res) {
       state.playlist = res[0];
       state.progress = progressMapFromCW(res[1].content);
+      renderCover();
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: playlistId, seriesTitle: state.playlist.title }));
       buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove);
       focusFirstDetailRow();

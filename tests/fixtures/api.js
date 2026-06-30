@@ -87,6 +87,7 @@ const ALBUMS = {
 const PLAYLISTS = {
   'pl-roadtrip': {
     id: 'pl-roadtrip', title: 'Road Trip', profile: 'kids', collectionType: 'playlist', poster: null, seasons: [],
+    coverArt: ['ootb.jpg', 'abba.jpg'],
     items: [
       { season: null, episode: null, video: VIDEOS['ootb-03'] },
       { season: null, episode: null, video: VIDEOS['ootb-01'] }
@@ -101,7 +102,7 @@ const PLAYLISTS = {
 // projects them into get_browse_list. Injected by the playlist e2e onto the music
 // browse so the Playlists rail renders; kept out of the default music cards.
 const PLAYLIST_CARDS = [
-  { kind: 'series', id: 'pl-roadtrip', title: 'Road Trip', poster: null, type: null, section: 'music', collectionType: 'playlist', artist: null, clipCount: 2, tags: null },
+  { kind: 'series', id: 'pl-roadtrip', title: 'Road Trip', poster: null, type: null, section: 'music', collectionType: 'playlist', artist: null, clipCount: 2, tags: null, coverArt: ['ootb.jpg', 'abba.jpg'] },
   { kind: 'series', id: 'pl-empty',    title: 'Empty Mix', poster: null, type: null, section: 'music', collectionType: 'playlist', artist: null, clipCount: 0, tags: null }
 ];
 
