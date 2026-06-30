@@ -52,8 +52,7 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 #topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
 #switch-profile { flex: 0 0 auto; font-size: 13px; padding: 8px 14px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #switch-profile:active, #switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-#btn-new-playlist { align-self: flex-start; flex-shrink: 0; font-size: 15px; padding: 11px 18px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
-#btn-new-playlist:active, #btn-new-playlist:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.chip-create { font-weight: 700; padding-left: 17px; padding-right: 17px; }
 #btn-play-queue { flex-shrink: 0; font-size: 15px; padding: 12px 16px; border-radius: var(--radius-sm); border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #btn-play-queue:active, #btn-play-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #breadcrumb { flex-shrink: 0; }
@@ -101,7 +100,6 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
     <div class="ph-section">Rails</div>
     <div id="rails-row" class="chip-row"></div>
   </div>
-  <button id="btn-new-playlist" type="button" style="display:none">&#43; New Playlist</button>
   <div id="grid-wrap">
     <div id="grid-count"></div>
     <div id="txtgrid"></div>

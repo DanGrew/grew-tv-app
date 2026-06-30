@@ -160,10 +160,11 @@ test('an in-progress section leads with a Continue rail; its grid tile shows the
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey-s1e01"]')).toHaveClass(/prog/);
 });
 
-// FEAT-036 (TASK-209) — the companion create-playlist affordance: a real button
-// (not a synthetic rail tile), shown only when the Music section is open and
-// reachable even with ZERO playlists (the Playlists rail is omitted when empty, so
-// a grid-level entry would strand the create-then-delete loop). Music cards are
+// FEAT-039 (TASK-236) — the companion create-playlist affordance is a subtle ＋
+// chip inside the Music section's rails row (was a standalone section-level
+// button, TASK-209). Shown only when the Music section is open and reachable even
+// with ZERO playlists (the Playlists rail chip is omitted when empty, so a
+// grid-level entry would strand the create-then-delete loop). Music cards are
 // injected so the Music section exists; no playlist cards, proving zero-state reach.
 test.describe('create-playlist affordance', () => {
   test.beforeEach(async ({ page }) => {
@@ -178,15 +179,15 @@ test.describe('create-playlist affordance', () => {
     await expect(page.locator('#sections-row .chip')).toContainText(['Music']);
   });
 
-  test('New Playlist is hidden until the Music section is open', async ({ page }) => {
-    await expect(page.locator('#btn-new-playlist')).toBeHidden();
+  test('the create ＋ chip is absent until the Music section is open, then lives in the rails row', async ({ page }) => {
+    await expect(page.locator('[data-create-playlist]')).toHaveCount(0);
     await page.locator('.chip[data-section="music"]').click();
-    await expect(page.locator('#btn-new-playlist')).toBeVisible();
+    await expect(page.locator('#rails-row [data-create-playlist]')).toBeVisible();
   });
 
-  test('New Playlist opens the companion create page even with zero playlists', async ({ page }) => {
+  test('the create ＋ chip opens the companion create page even with zero playlists', async ({ page }) => {
     await page.locator('.chip[data-section="music"]').click();
-    await page.locator('#btn-new-playlist').click();
+    await page.locator('#rails-row [data-create-playlist]').click();
     await expect(page).toHaveURL(/companion\/playlist-create\.html/);
   });
 });
