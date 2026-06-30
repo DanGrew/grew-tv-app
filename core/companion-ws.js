@@ -2,9 +2,9 @@ import {
   MESSAGE_TYPES, createIntent, createSnapshotRequest, isStaleContext,
   interpolatePosition,
   createListDevices, createRegisterCompanion, createActivatePerson,
-  createPlayIntent, createSkipIntent, createNextIntent, createPrevIntent,
+  createSkipIntent,
   createSetProfileIntent, createToggleCaptionsIntent,
-  createShuffleIntent, createPlayAlbumIntent
+  createPlayAlbumIntent
 } from './ws-protocol.js';
 
 // FEAT-026 Phase 2 (TASK-158): a companion targets ONE screen (device_id) and
@@ -187,13 +187,9 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices, opts)
     // (onPersonActive / onPersonBusy). device_id is the companion's target, so
     // the verdict returns to this companion — the take-over prompt shows here.
     activatePerson: function(personId, takeover) { send(createActivatePerson(targeted, personId, takeover)); },
-    play: gate(function(id) { send(createPlayIntent(id)); }),
     skip: gate(function(deltaSec) { send(createSkipIntent(deltaSec)); }),
-    next: gate(function() { send(createNextIntent()); }),
-    prev: gate(function() { send(createPrevIntent()); }),
     setProfile: gate(function(profile) { send(createSetProfileIntent(profile)); }),
     toggleCaptions: gate(function() { send(createToggleCaptionsIntent()); }),
-    shuffle: gate(function() { send(createShuffleIntent()); }),
     playAlbum: gate(function(id) { send(createPlayAlbumIntent(id)); })
   };
 }

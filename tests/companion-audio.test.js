@@ -1,12 +1,20 @@
 const { test, expect } = require('@playwright/test');
-const { installApi } = require('./fixtures/api.js');
+const { installApi, installPlaybackBackend } = require('./fixtures/api.js');
 
-// FEAT-018 (TASK-132) — the companion audio context: live transport
-// (play/pause, prev/next, graduated skip, shuffle) + now-playing, plus the album
-// track list with tap-to-teleport. The app side is mocked over the WS; the album
-// catalog is backend state from /api/album (installApi fixtures). The mock holds
-// a tiny app_state and echoes intents back as fresh snapshots — exactly the
-// app↔companion contract.
+// FEAT-018 (TASK-132) + FEAT-037 (TASK-245) — the companion audio context. The
+// music mirror of the persistent TV player: it drives prev / next / shuffle /
+// play-track over the per-person /api/playback engine (PLANE B) and repaints
+// now-playing, the shuffle pill, the current-track highlight and the track list's
+// source from the `playback` snapshot the server pushes — the SAME snapshot the TV
+// audio page renders (applySnapshot), so a track change the companion drives swaps
+// the TV in place. play/pause / graduated skip / volume / reset stay on the legacy
+// WS intent rail (PLANE A): the <audio>'s own transport has no server action.
+//
+// The backend is the installPlaybackBackend fixture (the HTTP-action -> WS-snapshot
+// loop the real server runs); the companion handshake (list/register/snapshot_
+// request) is answered there. An album source is seeded so the first snapshot has
+// content. The nav/breadcrumb tests use a lightweight WS-only mock that echoes the
+// `navigate` intent (those paths don't touch the playback engine).
 
 function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
@@ -14,35 +22,165 @@ function msg(type, payload) { return JSON.stringify({ type, payload }); }
 // artist.html echoes its own 'artist' context.
 const CTX_FOR = { 'album-detail': 'detail' };
 
-// An ALBUM-sourced player: itemId/sourceId is the album, sourceType 'album'.
-const ALBUM_ST = { screen: 'player', itemId: 'ootb', episodeId: 'ootb-02', positionSec: 110, durationSec: 245, playing: true, profile: 'kids', person: 'kids', shuffle: false, sourceType: 'album', sourceId: 'ootb' };
-// An ARTIST-sourced player (BUG-018): itemId/sourceId is the ARTIST id, not an
-// album, while a real track plays (episodeId). The companion must route Back to
-// the artist screen and never loadAlbum(artistId).
-const ARTIST_ST = { ...ALBUM_ST, itemId: 'ELO', sourceType: 'artist', sourceId: 'ELO' };
-// A PLAYLIST-sourced player (FEAT-036/TASK-205): the source is a playlist, so the
-// companion loads the track list via loadPlaylist (NOT loadAlbum), and Back routes
-// to the playlist detail. pl-roadtrip is a 2-track cross-album mix.
-const PLAYLIST_ST = { ...ALBUM_ST, itemId: 'pl-roadtrip', episodeId: 'ootb-01', sourceType: 'playlist', sourceId: 'pl-roadtrip' };
+// Spy on the per-person playback engine POSTs while letting the backend still
+// process them (route.fallback -> installPlaybackBackend), so an action is both
+// observed AND repaints the snapshot. Mirrors companion-video's spyVideoActions.
+function spyActions(page) {
+  const posts = [];
+  page.route('**/api/playback/*', function(route) {
+    posts.push({
+      action: decodeURIComponent(route.request().url().split('/api/playback/')[1].split('?')[0]),
+      url: route.request().url(),
+      body: JSON.parse(route.request().postData() || '{}')
+    });
+    route.fallback();
+  });
+  return posts;
+}
 
-function mockApp(page, st) {
+// ── transport + now-playing + track list (Plane B, real snapshot loop) ──────────
+test.describe('album source (Plane B)', () => {
+  test.beforeEach(async ({ page }) => {
+    await installApi(page);
+    const backend = await installPlaybackBackend(page);
+    // An album-sourced player parked on track 2 ('Mr. Blue Sky').
+    backend.seed('play-source', { source_type: 'album', source_id: 'ootb' });
+    backend.seed('play-track', { track_id: 'ootb-02' });
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
+  });
+
+  test('renders now-playing, the album track list and the current row from the snapshot', async ({ page }) => {
+    await expect(page.locator('#ctx-label')).toHaveText('Now playing');
+    await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
+    await expect(page.locator('.track-btn')).toHaveCount(3);
+    await expect(page.locator('.track-btn[data-id="ootb-01"] .t-name')).toHaveText('Turn to Stone');
+    // now_playing.track_id === ootb-02 -> that row is the current one.
+    await expect(page.locator('.track-btn[data-id="ootb-02"]')).toHaveClass(/cur/);
+    await expect(page.locator('.track-btn[data-id="ootb-01"]')).not.toHaveClass(/cur/);
+  });
+
+  test('Next drives the per-person engine (Plane B) and now-playing repaints from the snapshot', async ({ page }) => {
+    const posts = spyActions(page);
+    await page.locator('#c-next').click();
+    await expect(page.locator('#now-title')).toHaveText('Sweet Talkin Woman');
+    await expect(page.locator('.track-btn[data-id="ootb-03"]')).toHaveClass(/cur/);
+    expect(posts.map((p) => p.action)).toContain('next');
+    expect(posts[0].url).toContain('person=kids');
+  });
+
+  test('the shuffle pill toggles via toggle-shuffle (Plane B) and reflects the snapshot', async ({ page }) => {
+    const posts = spyActions(page);
+    await expect(page.locator('#c-shuffle')).not.toHaveClass(/on/);
+    await page.locator('#c-shuffle').click();
+    await expect(page.locator('#c-shuffle')).toHaveClass(/on/);
+    await page.locator('#c-shuffle').click();
+    await expect(page.locator('#c-shuffle')).not.toHaveClass(/on/);
+    expect(posts.map((p) => p.action)).toContain('toggle-shuffle');
+  });
+
+  test('tapping a track plays it via play-track (Plane B) and the highlight follows the snapshot', async ({ page }) => {
+    const posts = spyActions(page);
+    await expect(page.locator('.track-btn[data-id="ootb-02"]')).toHaveClass(/cur/);
+    await page.locator('.track-btn[data-id="ootb-03"]').click();
+    await expect(page.locator('.track-btn[data-id="ootb-03"]')).toHaveClass(/cur/);
+    await expect(page.locator('.track-btn[data-id="ootb-02"]')).not.toHaveClass(/cur/);
+    const play = posts.find((p) => p.action === 'play-track');
+    expect(play.url).toContain('person=kids');
+    expect(play.body.track_id).toBe('ootb-03');
+  });
+
+  test('+ Queue on a track POSTs queue-track for the active person (FEAT-031 producer)', async ({ page }) => {
+    const posts = spyActions(page);
+    // One ＋ producer control per track row, alongside the tap-to-play button.
+    await expect(page.locator('.queue-btn')).toHaveCount(3);
+    await page.locator('.queue-btn[data-queue="ootb-03"]').click();
+    await expect.poll(() => posts.filter((p) => p.action === 'queue-track').length).toBeGreaterThan(0);
+    const q = posts.find((p) => p.action === 'queue-track');
+    expect(q.url).toContain('person=kids');
+    expect(q.body.track_id).toBe('ootb-03');
+  });
+
+  // play/pause / skip / volume have no server action — they ride the legacy WS
+  // intent rail (Plane A), so NONE of them touch the per-person playback engine.
+  test('play/pause / skip / volume stay on the legacy intent rail — not playback actions', async ({ page }) => {
+    const posts = spyActions(page);
+    await page.locator('#c-toggle').click();
+    await page.locator('#c-vol-up').click();
+    await page.locator('.jump-btn', { hasText: '+30s' }).click();
+    expect(posts).toHaveLength(0);
+  });
+
+  test('a graduated skip grid is present (±10s / ±30s)', async ({ page }) => {
+    await expect(page.locator('.jump-btn')).toHaveText(['-30s', '-10s', '+10s', '+30s']);
+  });
+
+  test('a Queue button opens the companion Queue View', async ({ page }) => {
+    await page.locator('#c-queue').click();
+    await expect(page).toHaveURL(/companion\/queue\.html$/);
+  });
+});
+
+// BUG-018: an artist-sourced player. The source id is the ARTIST, not an album, so
+// the companion must never loadAlbum(artistId) and shows no track list (an artist
+// source has no companion list). The source rides the `playback` snapshot.
+test.describe('artist source (BUG-018)', () => {
+  test.beforeEach(async ({ page }) => {
+    await installApi(page);
+    const backend = await installPlaybackBackend(page);
+    backend.seed('play-source', { source_type: 'artist', source_id: 'ELO' });
+    backend.seed('play-track', { track_id: 'ootb-02' });
+  });
+
+  test('an artist source loads no track list and never mistakes the artist id for an album', async ({ page }) => {
+    const albumReqs = [];
+    page.on('request', (r) => { [r.url()].filter((u) => u.includes('/api/album/')).forEach((u) => albumReqs.push(u)); });
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
+    expect(albumReqs.filter((u) => u.includes('ELO'))).toHaveLength(0);
+    await expect(page.locator('.track-btn')).toHaveCount(0);
+    await expect(page.locator('#btn-back')).toHaveCount(0);
+  });
+});
+
+// FEAT-036 (TASK-205): a playlist-sourced player loads its list via loadPlaylist
+// (NOT loadAlbum), in stored order. The source rides the `playback` snapshot.
+test.describe('playlist source (TASK-205)', () => {
+  test.beforeEach(async ({ page }) => {
+    await installApi(page);
+    const backend = await installPlaybackBackend(page);
+    backend.seed('play-source', { source_type: 'playlist', source_id: 'pl-roadtrip' });
+  });
+
+  test('shows the playlist track list via loadPlaylist (never loadAlbum), in stored order', async ({ page }) => {
+    const albumReqs = [];
+    page.on('request', (r) => { [r.url()].filter((u) => u.includes('/api/album/')).forEach((u) => albumReqs.push(u)); });
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('.track-btn')).toHaveCount(2);
+    await expect(page.locator('.track-btn[data-id="ootb-03"] .t-name')).toHaveText('Sweet Talkin Woman');
+    await expect(page.locator('.track-btn[data-id="ootb-01"] .t-name')).toHaveText('Turn to Stone');
+    // The playlist id was never mistaken for an album (no /api/album/pl-roadtrip).
+    expect(albumReqs.filter((u) => u.includes('pl-roadtrip'))).toHaveLength(0);
+  });
+});
+
+// ── breadcrumb / mode nav (Plane A, WS-only) ────────────────────────────────────
+// These paths drive the breadcrumb's `navigate` intent (or local hops), not the
+// playback engine, so a lightweight WS mock that echoes navigate is enough. The
+// now-playing title rides the WS context here (followContext), no snapshot needed.
+function mockNav(page, st) {
   let version = 1;
   let ctx = 'audio';
   return page.routeWebSocket(/:8766/, (ws) => {
-    function pushState() { ws.send(msg('app_state', st)); }
     function pushCtx() {
       version += 1;
       ws.send(msg('context', { version: version, context_id: ctx, series_id: st.itemId, display: { id: st.episodeId, title: 'Mr. Blue Sky' } }));
-      pushState();
+      ws.send(msg('app_state', st));
     }
     ws.onMessage(function(raw) {
       const m = JSON.parse(raw);
-      // TASK-158: the companion lists screens, auto-targets the sole one, then snapshots.
       if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
       if (m.type === 'snapshot_request') pushCtx();
-      if (m.type === 'intent' && m.payload.intent === 'shuffle') { st.shuffle = !st.shuffle; pushState(); }
-      if (m.type === 'intent' && m.payload.intent === 'toggle') { st.playing = !st.playing; pushState(); }
-      if (m.type === 'intent' && m.payload.intent === 'play') { st.episodeId = m.payload.params.id; pushState(); }
       // navigate teleports the TV; the app echoes the target screen's context.
       if (m.type === 'intent' && m.payload.intent === 'navigate') {
         const p = m.payload.params.page.replace('.html', '');
@@ -53,107 +191,50 @@ function mockApp(page, st) {
   });
 }
 
-test.describe('album source', () => {
-test.beforeEach(async ({ page }) => {
-  await installApi(page);
-  await mockApp(page, { ...ALBUM_ST });
-  await page.goto('/companion/audio.html');
-});
-
-test('shows the now-playing track and the album track list, current row highlighted', async ({ page }) => {
-  await expect(page.locator('#ctx-label')).toHaveText('Now playing');
-  await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
-  await expect(page.locator('.track-btn')).toHaveCount(3);
-  await expect(page.locator('.track-btn[data-id="ootb-01"] .t-name')).toHaveText('Turn to Stone');
-  // app_state.episodeId === ootb-02 -> that row is the current one.
-  await expect(page.locator('.track-btn[data-id="ootb-02"]')).toHaveClass(/cur/);
-  await expect(page.locator('.track-btn[data-id="ootb-01"]')).not.toHaveClass(/cur/);
-});
-
-test('the play/pause icon reflects app_state.playing and toggles it', async ({ page }) => {
-  await expect(page.locator('#c-toggle')).toHaveText('⏸');
-  await page.locator('#c-toggle').click();
-  await expect(page.locator('#c-toggle')).toHaveText('▶');
-});
-
-test('the shuffle pill reflects app_state.shuffle and toggling it round-trips', async ({ page }) => {
-  await expect(page.locator('#c-shuffle')).not.toHaveClass(/on/);
-  await page.locator('#c-shuffle').click();
-  await expect(page.locator('#c-shuffle')).toHaveClass(/on/);
-  await page.locator('#c-shuffle').click();
-  await expect(page.locator('#c-shuffle')).not.toHaveClass(/on/);
-});
-
-test('tapping a track teleports the TV — the highlight follows the echoed snapshot', async ({ page }) => {
-  await expect(page.locator('.track-btn[data-id="ootb-02"]')).toHaveClass(/cur/);
-  await page.locator('.track-btn[data-id="ootb-03"]').click();
-  await expect(page.locator('.track-btn[data-id="ootb-03"]')).toHaveClass(/cur/);
-  await expect(page.locator('.track-btn[data-id="ootb-02"]')).not.toHaveClass(/cur/);
-});
-
-test('a graduated skip grid is present (±10s / ±30s)', async ({ page }) => {
-  await expect(page.locator('.jump-btn')).toHaveText(['-30s', '-10s', '+10s', '+30s']);
-});
-
-test('+ Queue on a track POSTs queue-track for the active person (FEAT-031 producer)', async ({ page }) => {
-  const posts = [];
-  await page.route('**/api/playback/*', (route) => {
-    posts.push({ url: route.request().url(), body: JSON.parse(route.request().postData() || '{}') });
-    route.fulfill({ status: 204, body: '' });
+// FEAT-032 (TASK-218): the player's way back is the breadcrumb, not a Back button.
+// With no recorded browse trail it is just Home > <track>; the Home crumb navigates
+// back to browse (the TV teleports, the companion follows the echoed browse context).
+test.describe('breadcrumb nav', () => {
+  test.beforeEach(async ({ page }) => {
+    await installApi(page);
+    await mockNav(page, { itemId: 'ootb', episodeId: 'ootb-02' });
+    await page.goto('/companion/audio.html');
   });
-  // One ＋ producer control per track row, alongside the tap-to-play button.
-  await expect(page.locator('.queue-btn')).toHaveCount(3);
-  await page.locator('.queue-btn[data-queue="ootb-03"]').click();
-  await expect.poll(() => posts.length).toBeGreaterThan(0);
-  expect(posts[0].url).toContain('/api/playback/queue-track');
-  expect(posts[0].url).toContain('person=kids');
-  expect(posts[0].body.track_id).toBe('ootb-03');
+
+  test('uses a breadcrumb (no Back button); the Home crumb returns to browse', async ({ page }) => {
+    await expect(page.locator('#btn-back')).toHaveCount(0);
+    await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Mr. Blue Sky');
+    await page.locator('#breadcrumb .crumb-link').first().click();
+    await expect(page).toHaveURL(/companion\/browse\.html$/);
+  });
+
+  // FEAT-038 (TASK-230): the player carries the Control/Browse switch. Browse ONLY
+  // changes mode (no jump): it greys the transport in place (body.browsing) so there
+  // are no dead clicks; the breadcrumb is a local hop to the library, keeping Browse.
+  test('Browse toggles mode in place (no jump) and greys the transport', async ({ page }) => {
+    await expect(page.locator('.seg-opt').filter({ hasText: 'Control' })).toHaveClass(/on/);
+    await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
+    await expect(page).toHaveURL(/companion\/audio\.html$/);     // stayed on the player
+    await expect(page.locator('body')).toHaveClass(/browsing/);  // transport greyed via CSS
+    await expect(page.locator('.seg-opt').filter({ hasText: 'Browse' })).toHaveClass(/on/);
+  });
+
+  test('in Browse mode the breadcrumb is a local hop to the library (stays desynced)', async ({ page }) => {
+    await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
+    await page.locator('#breadcrumb .crumb-link').first().click();
+    await expect(page).toHaveURL(/companion\/browse\.html$/);
+    const mode = await page.evaluate(() => sessionStorage.getItem('grew-tv:companion-mode'));
+    expect(mode).toBe('desynced');
+  });
 });
 
-test('a Queue button opens the companion Queue View', async ({ page }) => {
-  await page.locator('#c-queue').click();
-  await expect(page).toHaveURL(/companion\/queue\.html$/);
-});
-
-// FEAT-032 (TASK-218): the player's way back is the breadcrumb, not a Back
-// button. With no recorded browse trail it is just Home > <track>; the Home crumb
-// navigates back to browse (the TV teleports, the companion follows the echoed
-// browse context off the audio screen).
-test('uses a breadcrumb (no Back button); the Home crumb returns to browse', async ({ page }) => {
-  await expect(page.locator('#btn-back')).toHaveCount(0);
-  await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Mr. Blue Sky');
-  await page.locator('#breadcrumb .crumb-link').first().click();
-  await expect(page).toHaveURL(/companion\/browse\.html$/);
-});
-
-// FEAT-038 (TASK-230): the player carries the Control/Browse switch. It ONLY
-// changes mode (consistent on every page — no jump). Browse greys the transport
-// in place (body.browsing) so there are no dead clicks; the breadcrumb is a local
-// hop to the library, keeping Browse mode. The TV is never told to stop.
-test('Browse toggles mode in place (no jump) and greys the transport', async ({ page }) => {
-  await expect(page.locator('.seg-opt').filter({ hasText: 'Control' })).toHaveClass(/on/);
-  await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
-  await expect(page).toHaveURL(/companion\/audio\.html$/);     // stayed on the player
-  await expect(page.locator('body')).toHaveClass(/browsing/);  // transport greyed via CSS
-  await expect(page.locator('.seg-opt').filter({ hasText: 'Browse' })).toHaveClass(/on/);
-});
-
-test('in Browse mode the breadcrumb is a local hop to the library (stays desynced)', async ({ page }) => {
-  await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
-  await page.locator('#breadcrumb .crumb-link').first().click();
-  await expect(page).toHaveURL(/companion\/browse\.html$/);
-  const mode = await page.evaluate(() => sessionStorage.getItem('grew-tv:companion-mode'));
-  expect(mode).toBe('desynced');
-});
-});
-
-// FEAT-032 (TASK-218): when the user drilled browse before playing, that position
-// is recorded in nav-trail, so the player breadcrumb offers the items level they
-// came from (Home > Albums > <track>) and tapping it returns there.
+// FEAT-032 (TASK-218): when the user drilled browse before playing, that position is
+// recorded in nav-trail, so the player breadcrumb offers the items level they came
+// from (Home > Albums > <track>) and tapping it returns there.
 test.describe('with a recorded browse trail', () => {
   test.beforeEach(async ({ page }) => {
     await installApi(page);
-    await mockApp(page, { ...ALBUM_ST });
+    await mockNav(page, { itemId: 'ootb', episodeId: 'ootb-02' });
     await page.addInitScript(() => {
       sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([{ page: 'browse.html', params: { tab: 'music', rail: 'albums' }, label: 'Albums' }]));
     });
@@ -172,14 +253,12 @@ test.describe('with a recorded browse trail', () => {
   });
 });
 
-// FEAT-032 stale-Back regression: tapping a breadcrumb ANCESTOR must TRIM the
-// trail to that ancestor (drop it + anything deeper) so a later screen's Back
-// can't retrace past the jump. Before the fix the trail only cleared on the Home
-// crumb — an items crumb left deeper entries behind, and the next detail's Back
-// (which peeks the trail top) jumped to a stale level.
+// FEAT-032 stale-Back regression: tapping a breadcrumb ANCESTOR must TRIM the trail
+// to that ancestor (drop it + anything deeper) so a later screen's Back can't
+// retrace past the jump.
 test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () => {
   // A minimal app mock that does NOT echo the `navigate` intent — so the click's
-  // trail trim is observable in place (the shared mockApp would teleport to
+  // trail trim is observable in place (the shared mockNav would teleport to
   // artist.html, which legitimately re-pushes ELO and hides the trim).
   function mockNoNav(page, st) {
     return page.routeWebSocket(/:8766/, (ws) => {
@@ -196,7 +275,7 @@ test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () =
 
   test('tapping the items crumb drops it and everything deeper, keeping its ancestors', async ({ page }) => {
     await installApi(page);
-    await mockNoNav(page, { ...ARTIST_ST });
+    await mockNoNav(page, { itemId: 'ELO', episodeId: 'ootb-02' });
     // A two-level trail: Home > Albums(browse) > ELO(artist). The player peeks the
     // top (ELO) for its items crumb.
     await page.addInitScript(() => {
@@ -209,61 +288,9 @@ test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () =
     await page.locator('#breadcrumb .crumb-link', { hasText: 'ELO' }).waitFor();
     await page.locator('#breadcrumb .crumb-link', { hasText: 'ELO' }).click();
     // ELO (the clicked ancestor) + anything deeper is gone; only the browse level
-    // remains, so a later Back lands there, not on a stale ELO. (Old code only
-    // cleared on the Home crumb, so ELO survived -> stale Back.)
+    // remains, so a later Back lands there, not on a stale ELO.
     await expect.poll(() => page.evaluate(() => sessionStorage.getItem('grew-tv:nav-trail'))).toBe(
       JSON.stringify([{ page: 'browse.html', params: { tab: 'music', rail: 'albums' }, label: 'Albums' }])
     );
-  });
-});
-
-// BUG-018: an artist-sourced player. The source id is the ARTIST, not an album,
-// so Back must teleport the TV to artist.html (NOT album-detail.html?album=<id>,
-// which 404s -> error page), and the companion must never loadAlbum(artistId).
-test.describe('artist source (BUG-018)', () => {
-  test.beforeEach(async ({ page }) => {
-    await installApi(page);
-    await mockApp(page, { ...ARTIST_ST });
-  });
-
-  test('an artist source loads no track list and never mistakes the artist id for an album', async ({ page }) => {
-    const albumReqs = [];
-    page.on('request', (r) => { [r.url()].filter((u) => u.includes('/api/album/')).forEach((u) => albumReqs.push(u)); });
-    await page.goto('/companion/audio.html');
-    await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
-    // The artist id was never mistaken for an album: no /api/album/ELO fetch, and
-    // the album track list stays empty (an artist source has no companion list).
-    expect(albumReqs.filter((u) => u.includes('ELO'))).toHaveLength(0);
-    await expect(page.locator('.track-btn')).toHaveCount(0);
-    await expect(page.locator('#btn-back')).toHaveCount(0);
-  });
-});
-
-// FEAT-036 (TASK-205): a playlist-sourced player. The companion loads the track
-// list via loadPlaylist (NOT loadAlbum) and Back teleports the TV to the playlist
-// detail (playlist.html) — the music analogue of the album-source case.
-test.describe('playlist source (TASK-205)', () => {
-  test.beforeEach(async ({ page }) => {
-    await installApi(page);
-    await mockApp(page, { ...PLAYLIST_ST });
-  });
-
-  test('shows the playlist track list via loadPlaylist (never loadAlbum), in stored order', async ({ page }) => {
-    const albumReqs = [];
-    page.on('request', (r) => { [r.url()].filter((u) => u.includes('/api/album/')).forEach((u) => albumReqs.push(u)); });
-    await page.goto('/companion/audio.html');
-    await expect(page.locator('.track-btn')).toHaveCount(2);
-    await expect(page.locator('.track-btn[data-id="ootb-03"] .t-name')).toHaveText('Sweet Talkin Woman');
-    await expect(page.locator('.track-btn[data-id="ootb-01"] .t-name')).toHaveText('Turn to Stone');
-    // The playlist id was never mistaken for an album (no /api/album/pl-roadtrip).
-    expect(albumReqs.filter((u) => u.includes('pl-roadtrip'))).toHaveLength(0);
-  });
-
-  test('the playlist player uses the breadcrumb (no Back button); Home returns to browse', async ({ page }) => {
-    await page.goto('/companion/audio.html');
-    await expect(page.locator('.track-btn')).toHaveCount(2);
-    await expect(page.locator('#btn-back')).toHaveCount(0);
-    await page.locator('#breadcrumb .crumb-link').first().click();
-    await expect(page).toHaveURL(/companion\/browse\.html$/);
   });
 });

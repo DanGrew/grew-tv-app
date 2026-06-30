@@ -8,13 +8,9 @@ import {
   createSnapshotRequest,
   isStaleContext,
   createAppState,
-  createPlayIntent,
   createSkipIntent,
-  createNextIntent,
-  createPrevIntent,
   createSetProfileIntent,
   createToggleCaptionsIntent,
-  createShuffleIntent,
   createPlayAlbumIntent,
   createPlayArtistIntent,
   createRegisterDevice,
@@ -185,31 +181,16 @@ describe('createAppState', () => {
 });
 
 describe('intent builders', () => {
-  it('createPlayIntent carries id', () => {
-    const m = createPlayIntent('film-1');
-    expect(m.payload.intent).toBe('play');
-    expect(m.payload.params.id).toBe('film-1');
-  });
-  it('createPlayIntent defaults id to null', () => {
-    expect(createPlayIntent().payload.params.id).toBeNull();
-  });
   it('createSkipIntent carries deltaSec', () => {
     const m = createSkipIntent(-30);
     expect(m.payload.intent).toBe('skip');
     expect(m.payload.params.deltaSec).toBe(-30);
-  });
-  it('createNextIntent / createPrevIntent set intent', () => {
-    expect(createNextIntent().payload.intent).toBe('next');
-    expect(createPrevIntent().payload.intent).toBe('prev');
   });
   it('createSetProfileIntent carries profile', () => {
     expect(createSetProfileIntent('adults').payload.params.profile).toBe('adults');
   });
   it('createToggleCaptionsIntent sets intent', () => {
     expect(createToggleCaptionsIntent().payload.intent).toBe('toggleCaptions');
-  });
-  it('createShuffleIntent sets the shuffle intent', () => {
-    expect(createShuffleIntent().payload.intent).toBe('shuffle');
   });
   it('createPlayAlbumIntent carries the album id, defaulting to null', () => {
     expect(createPlayAlbumIntent('ootb').payload.intent).toBe('playAlbum');

@@ -267,24 +267,23 @@ describe('connect', () => {
     expect(api.position()).toBe(30);
   });
 
+  // TASK-245 swapped music play/next/prev/shuffle to the per-person /api/playback
+  // engine (Plane B HTTP), so those WS emitters are gone. The surviving Plane-A
+  // emitters (skip / setProfile / toggleCaptions / playAlbum) still cross the wire.
   it('new intent senders emit correct intents', () => {
     var api = connect('ws://host:8766', () => {}, () => {});
     MockWS.instances[0].onopen();
     var ws = MockWS.instances[0];
-    api.play('film-1');
-    expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('play');
-    expect(ws.sent[ws.sent.length - 1].payload.params.id).toBe('film-1');
     api.skip(-30);
     expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('skip');
     expect(ws.sent[ws.sent.length - 1].payload.params.deltaSec).toBe(-30);
-    api.next();
-    expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('next');
-    api.prev();
-    expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('prev');
     api.setProfile('kids');
     expect(ws.sent[ws.sent.length - 1].payload.params.profile).toBe('kids');
     api.toggleCaptions();
     expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('toggleCaptions');
+    api.playAlbum('ootb');
+    expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('playAlbum');
+    expect(ws.sent[ws.sent.length - 1].payload.params.id).toBe('ootb');
   });
 
   it('sendIntent passes params', () => {
@@ -343,13 +342,9 @@ describe('connect', () => {
       ws.onopen();
       ws.sent.length = 0;
       api.sendIntent('pause');
-      api.play('film-1');
       api.skip(-30);
-      api.next();
-      api.prev();
       api.setProfile('kids');
       api.toggleCaptions();
-      api.shuffle();
       api.playAlbum('album-1');
       expect(ws.sent).toHaveLength(0);
     });
@@ -374,11 +369,11 @@ describe('connect', () => {
       var ws = MockWS.instances[0];
       ws.onopen();
       ws.sent.length = 0;
-      api.next();
+      api.skip(-30);
       expect(ws.sent).toHaveLength(0);
       mode.sync();
-      api.next();
-      expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('next');
+      api.skip(-30);
+      expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('skip');
     });
 
     it('no mode passed => intents emit as before (unchanged default)', () => {
@@ -386,8 +381,8 @@ describe('connect', () => {
       var ws = MockWS.instances[0];
       ws.onopen();
       ws.sent.length = 0;
-      api.next();
-      expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('next');
+      api.skip(-30);
+      expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('skip');
     });
   });
 });
