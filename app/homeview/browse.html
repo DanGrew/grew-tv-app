@@ -54,6 +54,8 @@ button:hover { background: var(--surface-hi); }
 #profile-label:hover { color: var(--text); }
 #rails { display: flex; flex-direction: column; gap: 34px; }
 .rail-title { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); padding: 0 48px 14px; }
+.rail-create { display: inline-flex; align-items: center; justify-content: center; margin-left: 14px; vertical-align: middle; min-width: 30px; height: 30px; padding: 0 7px; font-size: 22px; line-height: 1; border: 2px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-muted); font-family: inherit; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease; }
+.rail-create:hover, .rail-create:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .rail-row { display: flex; gap: 16px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding: 12px 48px; scroll-padding-left: 48px; }
 .rail-row-music { padding-top: 24px; padding-bottom: 24px; }
 .home-empty { font-size: var(--fs-md); color: var(--text-muted); text-align: center; padding: 80px 0; }

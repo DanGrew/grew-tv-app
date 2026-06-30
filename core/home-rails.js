@@ -74,7 +74,6 @@ function sectionOf(card) { return card.section || 'films'; }
 // `section`/`collectionType`, never a type enum. Pure so the browse screen stays
 // DOM-only (no-pure-fn-outside-core).
 export function cardRoute(card) {
-  if (card.kind === 'create-playlist') return 'create-playlist';
   if (card.kind === 'artist') return 'artist';
   if (card.collectionType === 'playlist') return 'playlist';
   if (card.section === 'music') return 'album';
@@ -291,34 +290,20 @@ function musicRails(cards, cwRows, byId) {
     .concat(simpleRail('albums', 'Albums', albums));
 }
 
-// FEAT-036 (TASK-208) — the synthetic "＋ New Playlist" card. Not a catalog card
-// (it never enters /api/browse or the select catalog); it is injected into the TV
-// Music tab's Playlists rail by withCreatePlaylistTile (below) so the d-pad always
-// has a create entry. cardRoute maps its `kind` to the create screen.
-function createPlaylistCard() {
-  return { kind: 'create-playlist', id: 'create-playlist', title: '＋ New Playlist', section: 'music', poster: null };
-}
-
-// APP-ONLY: guarantee a Playlists rail on the Music tab and lead it with the
-// create-playlist card, so the TV always offers "＋ New Playlist" — even with zero
-// playlists, where musicRails (simpleRail) omits the empty rail. The companion has
-// its own create path (TASK-209) and does NOT call this, which keeps the create
-// tile off the companion browse. Pure (no DOM) so it lives in core; the TV browse
-// screen calls it after buildTabRails for the music tab.
-export function withCreatePlaylistTile(rails) {
-  var card = createPlaylistCard();
+// APP-ONLY: guarantee a Playlists rail on the TV Music tab even when there are no
+// playlists, so the browse screen always renders the "Playlists ＋" heading (the
+// create affordance lives on the heading now — TASK-235 — not as a rail tile). When
+// musicRails (simpleRail) omitted the empty rail, synthesise an empty one and place
+// it directly AFTER Continue Listening (TASK-234 order; leading when nothing is in
+// progress). The companion has its own create path (TASK-209/236) and does NOT call
+// this. Pure (no DOM) so it lives in core; the browse screen calls it for the music
+// tab after buildTabRails.
+export function withPlaylistsRail(rails) {
   var hasRail = rails.some(function(r) { return r.id === 'playlists'; });
-  var withCard = rails.map(function(rail) {
-    if (rail.id !== 'playlists') return rail;
-    return { id: rail.id, title: rail.title, items: [card].concat(rail.items) };
-  });
-  if (hasRail) return withCard;
-  // Zero playlists: musicRails omitted the (empty) Playlists rail, so synthesise a
-  // create-only one and place it directly AFTER Continue Listening (TASK-234 order)
-  // — not appended last. With nothing in progress (no continue rail) it leads.
-  var newRail = { id: 'playlists', title: 'Playlists', items: [card] };
-  var at = withCard.findIndex(function(r) { return r.id === 'continue'; }) + 1;
-  return withCard.slice(0, at).concat([newRail]).concat(withCard.slice(at));
+  if (hasRail) return rails;
+  var newRail = { id: 'playlists', title: 'Playlists', items: [] };
+  var at = rails.findIndex(function(r) { return r.id === 'continue'; }) + 1;
+  return rails.slice(0, at).concat([newRail]).concat(rails.slice(at));
 }
 
 // The sidebar tabs to show: a tab per section that has browse content, in fixed

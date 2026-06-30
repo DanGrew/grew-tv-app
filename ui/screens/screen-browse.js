@@ -1,6 +1,6 @@
 import { registerScreen } from '../../core/screen-registry.js';
 import { createTile } from '../../components/tile.js';
-import { buildTabs, buildTabRails, clampIndex, withCreatePlaylistTile } from '../../core/home-rails.js';
+import { buildTabs, buildTabRails, clampIndex, withPlaylistsRail } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { personGlyph } from '../../core/profile-config.js';
 
@@ -11,7 +11,7 @@ var PLAY_KEYS     = { Enter: true, ' ': true };
 // rails. Pure grouping/ordering lives in core/home-rails.js; this module owns
 // the DOM and the two-zone (sidebar / rails) d-pad focus model. Module state
 // holds the last-rendered data so a tab switch can rebuild the rails.
-var STATE = { server: null, cards: [], cw: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null };
+var STATE = { server: null, cards: [], cw: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null };
 
 function tilesIn(railEl) {
   return Array.from(railEl.querySelectorAll('.film-tile'));
@@ -158,12 +158,28 @@ export function browseArrow(e) {
   ZONE[zoneOf()](e);
 }
 
+// FEAT-039 (TASK-235) — the Playlists rail heading carries a subtle ＋ button to
+// the right of the title ("Playlists ＋"); the rail body now holds only real
+// playlists (the old "＋ New Playlist" tile is gone). A plain clickable button —
+// creation is driven by mouse (desktop) or the companion (TV), so it needs no
+// d-pad focus stop. Opens the existing create flow (STATE.onCreatePlaylist).
+function createPlaylistBtn() {
+  var b = document.createElement('button');
+  b.className = 'rail-create';
+  b.setAttribute('data-create-playlist', '');
+  b.setAttribute('aria-label', 'New playlist');
+  b.textContent = '＋';
+  b.addEventListener('click', STATE.onCreatePlaylist);
+  return b;
+}
+
 function railSection(rail) {
   var section = document.createElement('div');
   section.className = 'rail';
   var h = document.createElement('div');
   h.className = 'rail-title';
   h.textContent = rail.title;
+  [rail.id].filter(function(id) { return id === 'playlists'; }).forEach(function() { h.appendChild(createPlaylistBtn()); });
   section.appendChild(h);
   var row = document.createElement('div');
   row.className = 'rail-row';
@@ -193,13 +209,14 @@ function markActive(tabId) {
 
 // Show one tab's rails (does not move focus — the caller decides). Called both on
 // initial render and whenever a sidebar tab gains focus. The Music tab is
-// augmented with the app-only create-playlist tile (withCreatePlaylistTile) so the
-// TV always has a "＋ New Playlist" entry; other tabs render buildTabRails as-is.
+// augmented with an always-present (possibly empty) Playlists rail (withPlaylistsRail)
+// so the TV always renders the "Playlists ＋" heading; other tabs render
+// buildTabRails as-is.
 function selectTab(tabId) {
   STATE.activeTab = tabId;
   markActive(tabId);
   var rails = buildTabRails(tabId, STATE.cards, STATE.cw, STATE.labels);
-  renderRailRows(({ true: function() { return withCreatePlaylistTile(rails); }, false: function() { return rails; } })[tabId === 'music']());
+  renderRailRows(({ true: function() { return withPlaylistsRail(rails); }, false: function() { return rails; } })[tabId === 'music']());
 }
 
 function tabButton(tab) {
@@ -250,7 +267,7 @@ export function getActiveTab() {
 // handler, and an optional initialTab to land on (else the first tab). The CW
 // rows feed both the per-tab Continue Watching rail and the tiles' progress bars
 // (via progressMapFromCW).
-export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue) {
+export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue, onCreatePlaylist) {
   STATE.server = server;
   STATE.cards = cards;
   STATE.cw = cwRows;
@@ -259,6 +276,7 @@ export function renderBrowse(server, cards, cwRows, labels, profile, person, onS
   STATE.profile = profile;
   STATE.onSelect = onSelect;
   STATE.onQueue = onQueue;
+  STATE.onCreatePlaylist = onCreatePlaylist;
   document.getElementById('profile-label').textContent = personGlyph(person) + ' ' + person.name + ' ▸';
   var tabs = buildTabs(cards);
   var ids = tabs.map(function(t) { return t.id; });

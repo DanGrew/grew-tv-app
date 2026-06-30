@@ -1,31 +1,27 @@
-import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, albumsByArtist, withCreatePlaylistTile } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, albumsByArtist, withPlaylistsRail } from '../../core/home-rails.js';
 
-describe('cardRoute create tile', () => {
-  it('routes the synthetic create-playlist card to the create screen', () => {
-    expect(cardRoute({ kind: 'create-playlist', id: 'create-playlist' })).toBe('create-playlist');
-  });
-});
-
-describe('withCreatePlaylistTile', () => {
-  it('prepends a create card to an existing Playlists rail', () => {
+// TASK-235 — the create affordance is the Playlists rail-heading ＋ button (in the
+// browse screen), not a synthetic card. withPlaylistsRail just GUARANTEES the rail
+// exists (empty if no playlists) so the heading + ＋ always render.
+describe('withPlaylistsRail', () => {
+  it('leaves an existing Playlists rail untouched (no injected create card)', () => {
     const rails = [{ id: 'albums', title: 'Albums', items: [{ id: 'a1' }] }, { id: 'playlists', title: 'Playlists', items: [{ id: 'pl1' }] }];
-    const out = withCreatePlaylistTile(rails);
-    const pl = out.find(r => r.id === 'playlists');
-    expect(pl.items.map(i => i.id)).toEqual(['create-playlist', 'pl1']);
+    const out = withPlaylistsRail(rails);
+    expect(out.find(r => r.id === 'playlists').items.map(i => i.id)).toEqual(['pl1']);
     expect(out.find(r => r.id === 'albums').items.map(i => i.id)).toEqual(['a1']);
   });
-  it('adds a Playlists rail with just the create card when none exists (empty state)', () => {
-    const out = withCreatePlaylistTile([{ id: 'albums', title: 'Albums', items: [] }]);
+  it('adds an EMPTY Playlists rail when none exists (heading-only state)', () => {
+    const out = withPlaylistsRail([{ id: 'albums', title: 'Albums', items: [] }]);
     const pl = out.find(r => r.id === 'playlists');
-    expect(pl.items.map(i => i.id)).toEqual(['create-playlist']);
-    expect(pl.items[0].section).toBe('music');
+    expect(pl.items).toEqual([]);
+    expect(pl.title).toBe('Playlists');
   });
-  it('empty-state Playlists rail leads when nothing is in progress (TASK-234)', () => {
-    const out = withCreatePlaylistTile([{ id: 'artists', title: 'Artists', items: [] }, { id: 'albums', title: 'Albums', items: [] }]);
+  it('the synthesised Playlists rail leads when nothing is in progress (TASK-234)', () => {
+    const out = withPlaylistsRail([{ id: 'artists', title: 'Artists', items: [] }, { id: 'albums', title: 'Albums', items: [] }]);
     expect(out.map(r => r.id)).toEqual(['playlists', 'artists', 'albums']);
   });
-  it('empty-state Playlists rail sits directly after Continue Listening (TASK-234)', () => {
-    const out = withCreatePlaylistTile([{ id: 'continue', title: 'Continue Listening', items: [] }, { id: 'artists', title: 'Artists', items: [] }]);
+  it('the synthesised Playlists rail sits directly after Continue Listening (TASK-234)', () => {
+    const out = withPlaylistsRail([{ id: 'continue', title: 'Continue Listening', items: [] }, { id: 'artists', title: 'Artists', items: [] }]);
     expect(out.map(r => r.id)).toEqual(['continue', 'playlists', 'artists']);
   });
 });
