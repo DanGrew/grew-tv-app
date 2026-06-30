@@ -30,7 +30,6 @@ export function initPage() {
     ctxLabel: document.getElementById('ctx-label'),
     ctxTitle: document.getElementById('ctx-title'),
     gridEl: document.getElementById('txtgrid'),
-    backBtn: document.getElementById('btn-back'),
     playBtn: document.getElementById('btn-play'),
     shuffleBtn: document.getElementById('btn-shuffle')
   };
@@ -50,9 +49,6 @@ export function initPage() {
   function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
   // Back: Control drives the TV back; Browse is a local hop to the library.
-  function tvBack() { api.sendIntent('back'); }
-  function localBack() { window.location.href = 'browse.html'; }
-  els.backBtn.addEventListener('click', function() { ({ true: localBack, false: tvBack })[mode.isDesynced()](); });
 
   // Header Play / Shuffle: drive the TV's playlist detail. Play resumes the
   // playlist from its last-played track (`play_next`, the header's own action);

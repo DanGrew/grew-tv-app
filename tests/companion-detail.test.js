@@ -123,6 +123,18 @@ test('FEAT-032: a series detail (no artist parent) keeps the default Back intent
   expect(intents.filter((i) => i.intent === 'navigate' && i.params.page === 'artist.html')).toHaveLength(0);
 });
 
+test('TASK-243: a music album hides the Back button (the breadcrumb covers back); series keeps it', async ({ page }) => {
+  await installApi(page);
+  await mockAppRec(page, {
+    context: { context_id: 'detail', series_id: 'ootb-album' },
+    appState: { screen: 'detail', itemId: 'ootb-album', profile: 'kids' }
+  }, []);
+  await page.addInitScript(() => { sessionStorage.removeItem('grew-tv:nav-trail'); });
+  await page.goto('/companion/detail.html');
+  await expect(page.locator('.tile-btn').first()).toBeVisible();
+  await expect(page.locator('#btn-back')).toBeHidden();
+});
+
 // FEAT-038 (TASK-230) — desynced detail. The companion arrives via browse's local
 // link (detail.html?id=…) while the TV is elsewhere, so it self-loads the series
 // from the id instead of waiting for the TV's context echo; it does not follow the

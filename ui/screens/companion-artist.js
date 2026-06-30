@@ -28,7 +28,6 @@ export function initPage() {
     ctxLabel: document.getElementById('ctx-label'),
     ctxTitle: document.getElementById('ctx-title'),
     gridEl: document.getElementById('txtgrid'),
-    backBtn: document.getElementById('btn-back'),
     playBtn: document.getElementById('btn-play'),
     shuffleBtn: document.getElementById('btn-shuffle')
   };
@@ -45,10 +44,6 @@ export function initPage() {
   function reSync() { window.location.reload(); }
   function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
   function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
-
-  function tvBack() { api.sendIntent('back'); }
-  function localBack() { window.location.href = 'browse.html'; }
-  els.backBtn.addEventListener('click', function() { ({ true: localBack, false: tvBack })[mode.isDesynced()](); });
 
   // Play / Shuffle header (TASK-214): drive the TV's artist screen to the player
   // on this artist source. Play-all sends PLAY_ARTIST, Shuffle reuses SHUFFLE —

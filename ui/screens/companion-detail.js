@@ -178,6 +178,9 @@ export function initPage() {
     els.actionsEl.appendChild(b);
   }
   function maybeAddAll() { ({ 'true': appendAddAllBtn, 'false': noop })[isAlbum() + ''](); }
+  // TASK-243: music album detail drops the visible Back button (the breadcrumb is
+  // the on-screen back). A TV series keeps it — this detail screen is shared.
+  function setBackVisibility() { els.backBtn.style.display = ({ 'true': 'none', 'false': '' })[isAlbum() + '']; }
 
   // Breadcrumb trail (FEAT-021): Home (clickable) > this series (current). Home
   // sends the `navigate` intent so the app teleports the TV back to browse; the
@@ -293,6 +296,7 @@ export function initPage() {
   function trackNode(item) { return TRACK_NODE[isAlbum() + ''](item); }
 
   function renderSeries() {
+    setBackVisibility();
     els.actionsEl.appendChild(playNextBtn());
     maybeAddAll();
     renderSeasonChips();

@@ -217,8 +217,6 @@ export function initPlaylistDetailPage() {
   // companion and loadSeries(playlistId) 404s (TASK-205).
   wsApp.sendContext({ context_id: 'playlist', playlist: playlistId });
   wsApp.sendAppState({ screen: 'playlist', itemId: playlistId, profile: profile });
-
-  document.getElementById('btn-back-detail').addEventListener('click', goBack);
   document.getElementById('btn-play-next').addEventListener('click', playFromResume);
   document.getElementById('btn-shuffle').addEventListener('click', shufflePlay);
   document.getElementById('btn-add-all').addEventListener('click', openAddSheet);

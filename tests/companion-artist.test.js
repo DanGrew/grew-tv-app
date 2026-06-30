@@ -132,9 +132,10 @@ test.describe('desync mode (Browse)', () => {
     expect(sentIntents.filter((i) => i === 'select')).toHaveLength(0);
   });
 
-  test('Back is a local hop to browse — no back intent', async ({ page }) => {
+  test('TASK-243: no Back button — the breadcrumb Home is the local hop to browse', async ({ page }) => {
     await expect(page.locator('.ph-txt').first()).toBeVisible();
-    await page.locator('#btn-back').click();
+    await expect(page.locator('#btn-back')).toHaveCount(0);
+    await page.locator('#breadcrumb .crumb-link').first().click();
     await page.waitForURL('**/companion/browse.html');
     expect(sentIntents.filter((i) => i === 'back')).toHaveLength(0);
   });
