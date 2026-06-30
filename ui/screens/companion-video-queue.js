@@ -25,6 +25,7 @@ export function initPage() {
   };
   var state = { person: null };
   var api = {};
+  var activeTab = null;               // TASK-238: chosen Queue/Next/Coming-Up tab
   var mode = createCompanionMode();
   function noop() {}
   // FEAT-038 (TASK-230): the switch only changes mode. BROWSE greys the queue
@@ -51,16 +52,26 @@ export function initPage() {
     move:      function(b) { post('move-queue-entry', { entry_id: b.getAttribute('data-entry'), direction: b.getAttribute('data-dir') }); },
     remove:    function(b) { post('remove-queue-entry', { entry_id: b.getAttribute('data-entry') }); },
     transport: function(b) { post(b.getAttribute('data-action'), {}); },
-    toggle:    function() { api.sendIntent('toggle'); }
+    toggle:    function() { api.sendIntent('toggle'); },
+    tab:       function(b) { switchTab(b.getAttribute('data-tab')); }
   };
 
   function wireButton(b) {
     b.addEventListener('click', function() { ACT[b.getAttribute('data-act')](b); });
   }
 
+  // TASK-238: tap a tab to switch panels in place. Toggle the active class on the
+  // tab + its panel; `activeTab` is re-applied across snapshot repaints.
+  function applyTab(key) {
+    Array.prototype.slice.call(els.body.querySelectorAll('.ph-qtab')).forEach(function(t) { t.classList.toggle('active', t.getAttribute('data-tab') === key); });
+    Array.prototype.slice.call(els.body.querySelectorAll('.ph-qtab-panel')).forEach(function(p) { p.classList.toggle('active', p.getAttribute('data-tab') === key); });
+  }
+  function switchTab(key) { activeTab = key; applyTab(key); }
+
   function render(snap) {
     els.body.innerHTML = companionVideoQueueHtml(snap);
     Array.prototype.slice.call(els.body.querySelectorAll('button')).forEach(wireButton);
+    [activeTab].filter(Boolean).forEach(applyTab);
   }
 
   // The active person rides the app_state (TASK-158); the POSTs key per person off

@@ -32,6 +32,7 @@ test('mirrors the sections from the server snapshot (append order)', async ({ pa
   await expect(page.locator('.ph-qrow.queued')).toHaveCount(2);
   // append: first-queued (e1, Hammerbarn) is the front of Play Next.
   await expect(page.locator('.ph-qrow.queued .nm').first()).toContainText('Hammerbarn');
+  await page.locator('.ph-qtab[data-tab="next"]').click();   // TASK-238: source rows live under the Next tab
   await expect(page.locator('.ph-qname[data-act="select"][data-item="bluey-s1e02"]')).toBeVisible();
 });
 
@@ -68,6 +69,7 @@ test('tapping a queued row plays it now (play-video) + drops it from the queue',
 
 test('tapping a source row POSTs play-item — now-playing advances to it', async ({ page }) => {
   await setup(page);
+  await page.locator('.ph-qtab[data-tab="next"]').click();   // TASK-238: source rows live under the Next tab
   await page.locator('.ph-qname[data-act="select"][data-item="bluey-s1e02"]').click();
   await expect(page.locator('.ph-np .nm')).toHaveText('The Weekend');
 });

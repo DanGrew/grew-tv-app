@@ -20,6 +20,7 @@ export function setupQueue(config) {
   var lastSnap = null;
   var grid = [];                      // rows of focusable cells (DOM order)
   var pos  = { r: 0, c: 0 };
+  var activeTab = null;               // TASK-238: chosen Queue/Next/Coming-Up tab
   var crumb = config.crumb;           // overlay breadcrumb host (TASK-216)
 
   // TASK-216: a clickable breadcrumb in the overlay header. The back crumb
@@ -31,12 +32,27 @@ export function setupQueue(config) {
     el.querySelector('#queue-crumb-back').addEventListener('click', function () { close(); });
   });
 
-  // Grid rows: the now-playing transport (Shuffle/Repeat) then each queue row
-  // (select + ↑ + ↓ + ⊟). DOM order; empty groups drop out.
+  // Grid rows (DOM order, empty groups drop out): the now-playing transport
+  // (Shuffle/Repeat), the tab bar (Queue/Next/Coming Up), then the ACTIVE tab's
+  // queue rows only (hidden panels' rows are excluded so the d-pad never lands on
+  // an off-tab row).
   function buildGrid() {
-    grid = Array.prototype.slice.call(body.querySelectorAll('.np-transport, .q-row'))
+    grid = Array.prototype.slice.call(body.querySelectorAll('.np-transport, .qtab-bar, .qtab-panel.active .q-row'))
       .map(function (rowEl) { return Array.prototype.slice.call(rowEl.querySelectorAll('button:not([disabled])')); })
       .filter(function (cells) { return cells.length > 0; });
+  }
+
+  // Switch tabs in place (no re-render): toggle the active class on the tab + its
+  // panel, then rebuild the grid over the newly-visible rows and re-focus.
+  function applyTab(key) {
+    Array.prototype.slice.call(body.querySelectorAll('.qtab')).forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-tab') === key); });
+    Array.prototype.slice.call(body.querySelectorAll('.qtab-panel')).forEach(function (p) { p.classList.toggle('active', p.getAttribute('data-tab') === key); });
+  }
+  function switchTab(key) {
+    activeTab = key;
+    applyTab(key);
+    buildGrid();
+    focusCell();
   }
 
   function focusCell() {
@@ -50,7 +66,8 @@ export function setupQueue(config) {
     select:    function (b) { onAction('play-track', { track_id: b.getAttribute('data-track') }); },
     move:      function (b) { onAction('move-queue-entry', { entry_id: b.getAttribute('data-entry'), direction: b.getAttribute('data-dir') }); },
     remove:    function (b) { onAction('remove-queue-entry', { entry_id: b.getAttribute('data-entry') }); },
-    transport: function (b) { onAction(b.getAttribute('data-action'), {}); }
+    transport: function (b) { onAction(b.getAttribute('data-action'), {}); },
+    tab:       function (b) { switchTab(b.getAttribute('data-tab')); }
   };
 
   function wireButton(b) {
@@ -61,6 +78,9 @@ export function setupQueue(config) {
     lastSnap = snap;
     body.innerHTML = queueViewHtml(snap);
     Array.prototype.slice.call(body.querySelectorAll('button')).forEach(wireButton);
+    // Re-apply the chosen tab across repaints (a snapshot edit re-renders the body);
+    // null = first render, keep the view's default-open tab.
+    [activeTab].filter(Boolean).forEach(applyTab);
     buildGrid();
   }
 

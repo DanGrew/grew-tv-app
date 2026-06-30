@@ -101,6 +101,14 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
 .q-act.danger:focus { border-color: #ff6b6b; color: #ff6b6b; box-shadow: 0 0 0 1px rgba(255,107,107,0.5); }
 .q-act.is-disabled { opacity: 0.28; cursor: default; }
 .q-ends { font-size: 18px; color: var(--text-muted); font-style: italic; padding: 10px 14px; }
+.qtab-bar { display: flex; gap: 10px; margin: 26px 0 18px; border-bottom: 2px solid var(--border); }
+.qtab { font-size: 20px; padding: 10px 22px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--text-muted); margin-bottom: -2px; letter-spacing: 0.5px; }
+.qtab.active { color: var(--focus); border-bottom-color: var(--focus); }
+.qtab:focus { outline: none; color: var(--focus); border-radius: var(--radius-sm); box-shadow: var(--focus-glow); }
+.qtab-panel { display: none; }
+.qtab-panel.active { display: block; }
+.q-hint { font-size: 18px; color: var(--text-muted); margin: 0 0 14px; }
+.q-empty { font-size: 18px; color: var(--text-muted); font-style: italic; padding: 18px 14px; }
 #error-msg { display: none; }
 </style>
 </head>

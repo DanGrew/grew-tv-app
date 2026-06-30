@@ -57,6 +57,14 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .ph-ract.x { color: var(--danger); border-color: rgba(255,107,107,0.4); }
 .ph-ract.x:active, .ph-ract.x:focus { border-color: var(--danger); color: var(--danger); }
 .ph-ends { font-size: 12px; color: var(--text-muted); font-style: italic; padding: 6px 8px; }
+.ph-qtab-bar { display: flex; gap: 6px; border-bottom: 2px solid var(--border); margin-top: 4px; }
+.ph-qtab { flex: 1; font-size: 14px; padding: 10px 6px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; margin-bottom: -2px; }
+.ph-qtab.active { color: var(--focus); border-bottom-color: var(--focus); }
+.ph-qtab:active, .ph-qtab:focus { outline: none; color: var(--focus); }
+.ph-qtab-panel { display: none; flex-direction: column; gap: 8px; }
+.ph-qtab-panel.active { display: flex; }
+.ph-qhint { font-size: 11px; color: var(--text-muted); }
+.ph-qempty { font-size: 13px; color: var(--text-muted); font-style: italic; padding: 12px 8px; }
 #sync-bar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; padding: 2px; }
 .seg { display: inline-flex; flex: 0 0 auto; border: 2px solid var(--border); border-radius: 999px; overflow: hidden; }
 .seg-opt { font-size: 14px; padding: 8px 16px; border: none; background: transparent; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }

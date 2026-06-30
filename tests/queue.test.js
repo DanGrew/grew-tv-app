@@ -141,11 +141,24 @@ test('TASK-216: clicking the breadcrumb closes the overlay to the still-playing 
 test('d-pad navigates rows and Enter fires the focused remove control', async ({ page }) => {
   await enterPlayer(page, 'ootb-01', 'Turn to Stone');
   await openQueue(page);                              // focus lands on the now-playing transport (row 0)
-  await page.keyboard.press('ArrowDown');             // -> first queue row (Mr. Blue Sky), select cell
-  await page.keyboard.press('ArrowRight');            // -> shift up
-  await page.keyboard.press('ArrowRight');            // -> shift down
+  await page.keyboard.press('ArrowDown');             // -> row 1 = the tab bar (Queue/Next/Coming Up)
+  await page.keyboard.press('ArrowDown');             // -> first Next row (Mr. Blue Sky), select cell
+  await page.keyboard.press('ArrowRight');            // -> shift down (shift-up disabled on the first row)
   await page.keyboard.press('ArrowRight');            // -> remove
   await expect(row(page, 'Mr. Blue Sky')).toHaveCount(1);
   await page.keyboard.press('Enter');                 // remove the focused row
   await expect(row(page, 'Mr. Blue Sky')).toHaveCount(0);
+});
+
+// TASK-238: the sections live under Queue / Next / Coming Up tabs above a persistent
+// Now Playing header. With nothing queued the view opens on Next (the source list);
+// switching to Coming Up reveals the end-of-source marker.
+test('the Queue View lays the sections out as Queue / Next / Coming Up tabs', async ({ page }) => {
+  await enterPlayer(page, 'ootb-02', 'Mr. Blue Sky');   // ordered, nothing queued
+  await openQueue(page);
+  await expect(page.locator('.now-playing .np-title')).toHaveText('Mr. Blue Sky');   // persistent header
+  await expect(page.locator('.qtab')).toHaveText(['Queue', 'Next', 'Coming Up']);
+  await expect(page.locator('.qtab[data-tab="next"]')).toHaveClass(/active/);         // opens on Next
+  await page.locator('.qtab[data-tab="coming-up"]').click();
+  await expect(page.locator('.qtab-panel.active .q-ends')).toContainText('Source ends');
 });

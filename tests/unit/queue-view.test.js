@@ -78,6 +78,34 @@ describe('queueModel — empty override + THEN end', () => {
 });
 
 describe('queueViewHtml', () => {
+  // TASK-238: the sections render as a Now Playing header + Queue / Next / Coming Up
+  // tabs (Queue = Play Next, Next = From Source, Coming Up = Then).
+  it('lays the sections out as Queue / Next / Coming Up tabs', () => {
+    var html = queueViewHtml(shuffleSnap());
+    ['queue', 'next', 'coming-up'].forEach(function (t) {
+      expect(html).toContain('data-act="tab" data-tab="' + t + '"');
+    });
+    expect(html).toContain('>Queue</button>');
+    expect(html).toContain('>Next</button>');
+    expect(html).toContain('>Coming Up</button>');
+  });
+
+  it('opens on Queue when tracks are queued, on Next when none are', () => {
+    // shuffleSnap has a Play Next item -> the Queue tab opens active.
+    expect(queueViewHtml(shuffleSnap())).toContain('class="qtab active" data-act="tab" data-tab="queue"');
+    // orderedSnap has no override -> Queue is empty -> it opens on Next instead, and
+    // the end-of-source marker lives under Coming Up.
+    var ordered = queueViewHtml(orderedSnap());
+    expect(ordered).toContain('class="qtab active" data-act="tab" data-tab="next"');
+    expect(ordered).toContain('Source ends');
+  });
+
+  it('shows the empty-queue placeholder under the Queue tab when nothing is queued', () => {
+    var html = queueViewHtml(orderedSnap());
+    expect(html).toContain('class="q-empty"');
+    expect(html).toMatch(/Nothing queued/);
+  });
+
   it('emits per-row shift up/down (direction) + remove keyed on entry_id', () => {
     var html = queueViewHtml(shuffleSnap());
     expect(html).toContain('data-act="move" data-entry="s1" data-dir="up"');
@@ -123,14 +151,17 @@ describe('queueViewHtml', () => {
 // queueModel into the mockup's `.ph-*` markup, with each control carrying the
 // same TASK-186 action the companion POSTs.
 describe('companionQueueHtml — phone mirror', () => {
-  it('renders now-playing + the four sections from the snapshot', () => {
+  it('renders now-playing + the Queue / Next / Coming Up tabs from the snapshot', () => {
     var html = companionQueueHtml(shuffleSnap());
     expect(html).toContain('class="ph-np"');
     expect(html).toContain('Come Together');
-    expect(html).toContain('class="ph-section">Play Next');
-    expect(html).toContain('class="ph-section">From Source');
-    expect(html).toContain('class="ph-section">Then');
-    expect(html).toContain('Here Comes the Sun');
+    expect(html).toContain('data-act="tab" data-tab="queue"');
+    expect(html).toContain('data-act="tab" data-tab="next"');
+    expect(html).toContain('data-act="tab" data-tab="coming-up"');
+    expect(html).toContain('>Queue</button>');
+    expect(html).toContain('>Next</button>');
+    expect(html).toContain('>Coming Up</button>');
+    expect(html).toContain('Here Comes the Sun');   // the queued track, under the Queue tab
   });
 
   it('keys per-row edits on entry_id (select/move/remove) like the TV overlay', () => {
