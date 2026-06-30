@@ -254,8 +254,9 @@ test.describe('with a recorded browse trail', () => {
 });
 
 // FEAT-032 stale-Back regression: tapping a breadcrumb ANCESTOR must TRIM the trail
-// to that ancestor (drop it + anything deeper) so a later screen's Back can't
-// retrace past the jump.
+// so a later screen's Back can't retrace past the jump. BUG-021: the clicked
+// ancestor itself is now KEPT as the new top (it is the destination — the page you
+// land on restores from it); only entries DEEPER than it are dropped.
 test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () => {
   // A minimal app mock that does NOT echo the `navigate` intent — so the click's
   // trail trim is observable in place (the shared mockNav would teleport to
@@ -273,7 +274,7 @@ test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () =
     });
   }
 
-  test('tapping the items crumb drops it and everything deeper, keeping its ancestors', async ({ page }) => {
+  test('tapping the items crumb keeps that entry as the trail top (so the landed page restores from it)', async ({ page }) => {
     await installApi(page);
     await mockNoNav(page, { itemId: 'ELO', episodeId: 'ootb-02' });
     // A two-level trail: Home > Albums(browse) > ELO(artist). The player peeks the
@@ -287,10 +288,13 @@ test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () =
     await page.goto('/companion/audio.html');
     await page.locator('#breadcrumb .crumb-link', { hasText: 'ELO' }).waitFor();
     await page.locator('#breadcrumb .crumb-link', { hasText: 'ELO' }).click();
-    // ELO (the clicked ancestor) + anything deeper is gone; only the browse level
-    // remains, so a later Back lands there, not on a stale ELO.
+    // BUG-021: ELO is the destination (the artist page restores from it), so it
+    // SURVIVES as the new top rather than being dropped; nothing was deeper to trim.
     await expect.poll(() => page.evaluate(() => sessionStorage.getItem('grew-tv:nav-trail'))).toBe(
-      JSON.stringify([{ page: 'browse.html', params: { tab: 'music', rail: 'albums' }, label: 'Albums' }])
+      JSON.stringify([
+        { page: 'browse.html', params: { tab: 'music', rail: 'albums' }, label: 'Albums' },
+        { page: 'artist.html', params: { artist: 'ELO' }, label: 'ELO' }
+      ])
     );
   });
 });
