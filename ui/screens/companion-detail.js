@@ -26,8 +26,7 @@ export function initPage() {
     connStatus: document.getElementById('conn-status'),
     ctxLabel: document.getElementById('ctx-label'),
     ctxTitle: document.getElementById('ctx-title'),
-    actionsEl: document.getElementById('actions'),
-    backBtn: document.getElementById('btn-back')
+    actionsEl: document.getElementById('actions')
   };
   var state = { seriesId: null, profile: null, person: null, series: null, progress: {}, activeSeason: null };
   var addState = { add: null, createHref: '', statusTimer: null };
@@ -39,20 +38,14 @@ export function initPage() {
   function onDevices(devices) { updateBar(devices); }
 
   // FEAT-032 (TASK-218): if this album was opened FROM an artist's albums page,
-  // the trail top is that artist entry — Back returns there (not the default
-  // browse). For a series, or an album reached straight from a rail, the top is a
-  // browse entry (not artist.html) so Back keeps its existing behaviour.
+  // the trail top is that artist entry — the breadcrumb shows that artist crumb so
+  // back returns there (not the default browse). For a series/boxset, or an album
+  // reached straight from a rail, the top is a browse entry (not artist.html).
+  // TASK-243: there is no visible Back button on any detail screen — the breadcrumb
+  // is the sole on-screen back affordance (artist-parent aware via trailCrumbs).
   function artistParent() {
     return [peekTrail()].filter(Boolean).filter(function(e) { return e.page === 'artist.html'; })[0];
   }
-  function goArtistParent() { var e = artistParent(); api.sendIntent('navigate', { page: e.page, params: e.params }); }
-  function goDefaultBack() { api.sendIntent('back'); }
-  function tvBack() { ({ true: goArtistParent, false: goDefaultBack })[Boolean(artistParent())](); }
-  // Desynced, Back is a local hop to browse (we arrived here from browse's tile
-  // tap, carrying ?id); the TV is untouched.
-  function localBack() { window.location.href = 'browse.html'; }
-  function onBack() { ({ true: localBack, false: tvBack })[mode.isDesynced()](); }
-  els.backBtn.addEventListener('click', onBack);
 
   // FEAT-036/TASK-207 — "Add to playlist" on the companion, the PRACTICAL build
   // surface (a phone has a real keyboard + easy track browsing). The mirror of the

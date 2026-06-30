@@ -45,6 +45,17 @@ const SERIES = {
       { season: 1, episode: 2, video: VIDEOS['ib-s1e2'] },
       { season: 2, episode: 1, video: VIDEOS['ib-s2e1'] }
     ]
+  },
+  // TASK-243: an album series (collectionType 'album') reached through /api/series,
+  // so the shared companion detail screen can be driven into album context — where
+  // it hides the Back button (the breadcrumb covers back). TV series above keep it.
+  'ootb-album': {
+    id: 'ootb-album', title: 'Out of the Blue', profile: 'kids', poster: 'ootb.jpg', collectionType: 'album', artist: 'ELO', tags: { year: '1977' },
+    items: [
+      { episode: 1, video: VIDEOS['ootb-01'] },
+      { episode: 2, video: VIDEOS['ootb-02'] },
+      { episode: 3, video: VIDEOS['ootb-03'] }
+    ]
   }
 };
 

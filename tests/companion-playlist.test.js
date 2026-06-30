@@ -206,10 +206,11 @@ test.describe('desync mode (Browse) — playlist self-load + edit', () => {
     await expect(page.locator('.ph-txt')).toHaveCount(1);
   });
 
-  test('Back is a local hop to browse — no back intent to the TV', async ({ page }) => {
+  test('TASK-243: no Back button — the breadcrumb Home is the local hop to browse', async ({ page }) => {
     await page.goto('/companion/playlist.html?id=pl-roadtrip');
     await expect(page.locator('.ph-txt').first()).toBeVisible();
-    await page.locator('#btn-back').click();
+    await expect(page.locator('#btn-back')).toHaveCount(0);
+    await page.locator('#breadcrumb .crumb-link').first().click();
     await page.waitForURL('**/companion/browse.html');
     expect(sentIntents.filter((i) => i === 'back')).toHaveLength(0);
   });

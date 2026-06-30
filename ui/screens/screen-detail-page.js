@@ -74,7 +74,6 @@ export function initDetailPage() {
   // Live snapshot so the companion renders this series' context (TASK-118).
   wsApp.sendAppState({ screen: 'detail', itemId: seriesId, profile: profile });
 
-  document.getElementById('btn-back-detail').addEventListener('click', goBack);
   document.getElementById('btn-play-next').addEventListener('click', playNext);
   document.addEventListener('keydown', dispatchKey);
 

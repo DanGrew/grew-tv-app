@@ -163,8 +163,6 @@ export function initAlbumDetailPage() {
   });
   wsApp.sendContext({ context_id: 'detail', series_id: albumId });
   wsApp.sendAppState({ screen: 'detail', itemId: albumId, profile: profile });
-
-  document.getElementById('btn-back-detail').addEventListener('click', goBack);
   document.getElementById('btn-play-next').addEventListener('click', playFromResume);
   document.getElementById('btn-shuffle').addEventListener('click', shufflePlay);
   document.getElementById('btn-add-all').addEventListener('click', openAddSourceSheet);

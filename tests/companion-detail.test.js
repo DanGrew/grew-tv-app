@@ -89,7 +89,7 @@ function mockAppRec(page, ctx, intents) {
   });
 }
 
-test('FEAT-032: album opened from an artist — Back returns to that artist, breadcrumb shows it', async ({ page }) => {
+test('FEAT-032/TASK-243: album opened from an artist — no Back button, the artist breadcrumb returns there', async ({ page }) => {
   const intents = [];
   await installApi(page);
   await mockAppRec(page, {
@@ -103,13 +103,14 @@ test('FEAT-032: album opened from an artist — Back returns to that artist, bre
     ]));
   });
   await page.goto('/companion/detail.html');
+  await expect(page.locator('#btn-back')).toHaveCount(0);
   await expect(page.locator('#breadcrumb .crumb-link')).toContainText(['ELO']);
-  await page.locator('#btn-back').click();
+  await page.locator('#breadcrumb .crumb-link', { hasText: 'ELO' }).click();
   await expect.poll(() => intents.filter((i) => i.intent === 'navigate' && i.params.page === 'artist.html' && i.params.params.artist === 'elo').length).toBeGreaterThan(0);
   expect(intents.filter((i) => i.intent === 'back')).toHaveLength(0);
 });
 
-test('FEAT-032: a series detail (no artist parent) keeps the default Back intent', async ({ page }) => {
+test('FEAT-032/TASK-243: a series detail (no artist parent) — no Back button, breadcrumb Home returns to browse', async ({ page }) => {
   const intents = [];
   await installApi(page);
   await mockAppRec(page, {
@@ -118,9 +119,22 @@ test('FEAT-032: a series detail (no artist parent) keeps the default Back intent
   }, intents);
   await page.addInitScript(() => { sessionStorage.removeItem('grew-tv:nav-trail'); });
   await page.goto('/companion/detail.html');
-  await page.locator('#btn-back').click();
-  await expect.poll(() => intents.filter((i) => i.intent === 'back').length).toBeGreaterThan(0);
+  await expect(page.locator('#btn-back')).toHaveCount(0);
+  await page.locator('#breadcrumb .crumb-link').first().click();
+  await expect.poll(() => intents.filter((i) => i.intent === 'navigate' && i.params.page === 'browse.html').length).toBeGreaterThan(0);
   expect(intents.filter((i) => i.intent === 'navigate' && i.params.page === 'artist.html')).toHaveLength(0);
+});
+
+test('TASK-243: a music album detail also has no Back button (the breadcrumb covers back)', async ({ page }) => {
+  await installApi(page);
+  await mockAppRec(page, {
+    context: { context_id: 'detail', series_id: 'ootb-album' },
+    appState: { screen: 'detail', itemId: 'ootb-album', profile: 'kids' }
+  }, []);
+  await page.addInitScript(() => { sessionStorage.removeItem('grew-tv:nav-trail'); });
+  await page.goto('/companion/detail.html');
+  await expect(page.locator('.tile-btn').first()).toBeVisible();
+  await expect(page.locator('#btn-back')).toHaveCount(0);
 });
 
 // FEAT-038 (TASK-230) — desynced detail. The companion arrives via browse's local
@@ -158,14 +172,16 @@ test.describe('desync mode', () => {
     await expect(page.locator('.tile-btn').first()).toHaveClass(/desync-off/);
   });
 
-  test('Back is a local hop to browse — no back/navigate intent to the TV', async ({ page }) => {
+  test('TASK-243: no Back button — breadcrumb Home is a local hop to browse, no intent to the TV', async ({ page }) => {
     const intents = [];
     await installApi(page);
     await mockElsewhere(page, intents);
     await page.goto('/companion/detail.html?id=bluey');
     await expect(page.locator('.tile-btn').first()).toBeVisible();
-    await page.locator('#btn-back').click();
+    await expect(page.locator('#btn-back')).toHaveCount(0);
+    await page.locator('#breadcrumb .crumb-link').first().click();
     await page.waitForURL('**/companion/browse.html');
     expect(intents.filter((i) => i.intent === 'back')).toHaveLength(0);
+    expect(intents.filter((i) => i.intent === 'navigate')).toHaveLength(0);
   });
 });
