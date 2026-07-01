@@ -224,6 +224,42 @@ test.describe('season selector (TASK-123)', () => {
   });
 });
 
+// BUG-025: a companion-driven `play` intent must start the episode it names even
+// when the TV detail is showing a DIFFERENT season, whose rows are the only ones
+// rendered. The TV renders only the active season's rows (core/seasons.js), so the
+// old handler (click `.detail-row[data-id]`) missed a cross-season id and fell back
+// to `document.activeElement` = the focused Season-1 row → S1E1. The fix resolves
+// the episode from series state by id and plays it directly.
+test.describe('BUG-025 cross-season companion play', () => {
+  async function openInbetweeners(page) {
+    await page.goto('/app/homeview/detail.html?series=inbetweeners');
+    await expect(page.locator('#screen-detail')).toBeVisible();
+    await expect(page.locator('.detail-row[data-id="ib-s1e1"]')).toBeVisible();
+  }
+
+  test('play intent for an unrendered later-season episode starts THAT episode, not the focused S1 row', async ({ page }) => {
+    let appWs = null;
+    await page.routeWebSocket(/:8766/, function(ws) { appWs = ws; });
+    await openInbetweeners(page);
+    // TV is on Season 1; the Season-2 episode's row is not in the DOM.
+    await expect(page.locator('.detail-row[data-id="ib-s2e1"]')).toHaveCount(0);
+    await page.locator('.detail-row[data-id="ib-s1e1"]').focus();
+    await expect.poll(function() { return appWs !== null; }).toBe(true);
+    await appWs.send(JSON.stringify({ type: 'intent', payload: { intent: 'play', params: { id: 'ib-s2e1' } } }));
+    await expect(page).toHaveURL(/video\.html\?video=ib-s2e1/);
+  });
+
+  test('play intent with no id replays the focused row (legacy play-focused)', async ({ page }) => {
+    let appWs = null;
+    await page.routeWebSocket(/:8766/, function(ws) { appWs = ws; });
+    await openInbetweeners(page);
+    await page.locator('.detail-row[data-id="ib-s1e2"]').focus();
+    await expect.poll(function() { return appWs !== null; }).toBe(true);
+    await appWs.send(JSON.stringify({ type: 'intent', payload: { intent: 'play', params: {} } }));
+    await expect(page).toHaveURL(/video\.html\?video=ib-s1e2/);
+  });
+});
+
 test('Escape on browse does not crash or navigate away', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(page.locator('#screen-browse')).toBeVisible();
