@@ -1,7 +1,7 @@
 import { getParam, getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { createPlaylist, renamePlaylist, addToPlaylist, addSourceToPlaylist } from '../../core/app-api.js';
-import { CHAR_KEYS, KEY_COLS, appendChar, backspace, cleanName, isValidName, gridIndex, editorMode } from '../../core/playlist-name.js';
+import { CHAR_KEYS, KEY_COLS, appendChar, backspace, cleanName, isValidName, gridIndex, editorMode, typedChar } from '../../core/playlist-name.js';
 
 // FEAT-036 — the TV name screen, shared by create (TASK-208) and rename (TASK-210)
 // so the on-screen keyboard (the only text-entry a d-pad has) is built once. A
@@ -115,7 +115,15 @@ export function initPlaylistCreatePage() {
   cells = CELLS.map(buildCell);
   render();
 
+  // BUG-023 — route a hardware keyboard's printable keys through the same
+  // setName(appendChar(...)) path the on-screen grid uses (the d-pad grid stays the
+  // kiosk fallback). preventDefault stops a focused key button from also activating
+  // on the space bar (double-append); non-typing keys yield '' and drop out here.
+  function onTyping(e) {
+    [typedChar(e)].filter(Boolean).forEach(function(c) { e.preventDefault(); setName(appendChar(st.name, c)); });
+  }
   document.getElementById('btn-back-create').addEventListener('click', cancel);
+  document.addEventListener('keydown', onTyping);
   document.addEventListener('keydown', dispatchKey);
   initPage({
     onEnter: function() { moveTo(0); },

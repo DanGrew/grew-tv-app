@@ -39,6 +39,20 @@ export function isValidName(name) {
   return n.length >= 1 && n.length <= NAME_MAX;
 }
 
+// The character a hardware-keyboard keydown should type into the name, or '' for a
+// non-typing key (BUG-023: the create/rename name screen is a d-pad on-screen grid,
+// so a real keyboard was inert — only Escape/Backspace were routed). A printable key
+// is a single-character `e.key` (letters, digits, space, punctuation) pressed without
+// a Ctrl/Alt/Meta chord (those are shortcuts, not text). Returning the char lets the
+// screen route it through the exact same setName(appendChar(...)) path the on-screen
+// keys use, so hardware typing and the d-pad grid stay in lock-step; a '' result is
+// filtered out branch-free (arrows, Enter, Backspace, F-keys all have multi-char keys).
+export function typedChar(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return '';
+  if (e.key.length !== 1) return '';
+  return e.key;
+}
+
 // Next focus index after an arrow over a `cols`-wide grid of `len` cells, clamped
 // to [0, len-1]. Left/Right step one cell (wrapping across rows is fine on a TV
 // keyboard); Up/Down step a full row. A non-arrow key keeps the index (Enter then
