@@ -144,18 +144,21 @@ function appendRestart(row, mid, onPlayItem, item, i) {
   });
 }
 
-// A per-track "+ Playlist" control (FEAT-036/TASK-206), present only on available
-// rows AND only when the page wired an onAddToPlaylist handler (album / artist
-// track contexts — never series episodes or the playlist's own detail). Like
-// Restart it stops propagation so it never also fires the row's play handler, and
-// carries `detail-row-action` so Left/Right reach it.
+// The single per-track "＋" control (TASK-253, was "＋ Playlist"), present only on
+// available rows AND only when the page wired an onAddToPlaylist handler (album /
+// artist track contexts — never series episodes or the playlist's own detail). It
+// opens the add sheet, whose top option is now "▶ Play Next" (queue) with the
+// playlist choices below — so one control replaces the old side-by-side
+// ＋ Playlist / ＋ Queue pair that crowded the track text. Like Restart it stops
+// propagation so it never also fires the row's play handler, and carries
+// `detail-row-action` so Left/Right reach it.
 function appendAdd(row, available, item) {
   [available].filter(Boolean).forEach(function() {
     [state.onAddToPlaylist].filter(Boolean).forEach(function(onAdd) {
       var btn = document.createElement('button');
       btn.className = 'detail-add detail-row-action';
       btn.tabIndex = 0;
-      btn.textContent = '＋ Playlist';
+      btn.textContent = '＋';
       btn.addEventListener('click', function(e) { e.stopPropagation(); onAdd(item); });
       btn.addEventListener('keydown', function(e) {
         [e.key].filter(function(k) { return PLAY_KEYS[k]; }).forEach(function() { e.preventDefault(); e.stopPropagation(); onAdd(item); });
@@ -165,15 +168,18 @@ function appendAdd(row, available, item) {
   });
 }
 
-// A per-track "+ Queue" control (FEAT-040/TASK-248): queue this track to PLAY
-// NEXT, present on the same rows as "+ Playlist" (the page wired onQueue — album /
-// artist track contexts) and only on available rows. Sits beside + Playlist; like
-// it, stops propagation so it never also fires the row's play handler, and carries
-// `detail-row-action` so Left/Right reach it. onQueue(item) POSTs queue-track per
-// person — durable across source swaps (TASK-246), so it outlives the album.
+// A per-track "＋ Queue" control (FEAT-040/TASK-248): queue this track to PLAY
+// NEXT. TASK-253 folded the MUSIC "Play Next" into the ＋ add sheet, so this
+// standalone control now renders ONLY on VIDEO series rows — the ones that wire
+// onQueue but NOT onAddToPlaylist (a video episode has no playlist target). On an
+// album row (onAddToPlaylist set) the single ＋ owns queueing via the sheet, so
+// this is suppressed. Present only on available rows; stops propagation so it never
+// also fires the row's play handler, and carries `detail-row-action` so Left/Right
+// reach it. onQueue(item) POSTs queue-video per person — durable across source
+// swaps (TASK-247), so it outlives the source.
 function appendQueue(row, available, item) {
   [available].filter(Boolean).forEach(function() {
-    [state.onQueue].filter(Boolean).forEach(function(onQueue) {
+    [state.onQueue].filter(Boolean).filter(function() { return !state.onAddToPlaylist; }).forEach(function(onQueue) {
       var btn = document.createElement('button');
       btn.className = 'detail-queue detail-row-action';
       btn.tabIndex = 0;
@@ -370,10 +376,11 @@ function renderList() {
 // 'resume' (row default) or 'restart'. onAddToPlaylist(item) is OPTIONAL
 // (FEAT-036/TASK-206): when supplied (album / artist track contexts) each
 // available row gains a "+ Playlist" control; omitted (series / playlist detail)
-// no add control renders. onQueue(item) is OPTIONAL (FEAT-040/TASK-248): supplied
-// on the same album / artist track contexts as onAddToPlaylist, it adds a per-track
-// "+ Queue" (play next) control beside "+ Playlist"; omitted (series / playlist
-// detail) no queue control renders. onMoveItem(item, i, 'up'|'down') +
+// no add control renders. onQueue(item) is OPTIONAL (FEAT-040/TASK-248): it adds a
+// standalone per-track "＋ Queue" (play next) control, but ONLY on rows that wire
+// onQueue WITHOUT onAddToPlaylist — i.e. VIDEO series episodes (TASK-253). On an
+// album row (onAddToPlaylist set) the single ＋ owns queueing via the sheet, so a
+// passed onQueue is suppressed; omitted entirely (playlist detail) no queue renders. onMoveItem(item, i, 'up'|'down') +
 // onRemoveItem(item, i) are OPTIONAL (FEAT-036/TASK-211): supplied only by the
 // playlist detail, they add per-track ↑ ↓ (reorder by position) and ✕ (remove)
 // controls; omitted elsewhere (album / artist / series) no reorder/remove renders.
