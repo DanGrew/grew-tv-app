@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { videoQueueModel, videoQueueViewHtml, companionVideoQueueHtml } from '../../core/video-queue-view.js';
 
-function item(id, title, dur) { return { item_id: id, title: title, duration: dur }; }
-function entry(eid, id, title, dur) { return { entry_id: eid, item_id: id, title: title, duration: dur }; }
+function item(id, title, dur, poster) { return { item_id: id, title: title, duration: dur, poster: poster }; }
+function entry(eid, id, title, dur, poster) { return { entry_id: eid, item_id: id, title: title, duration: dur, poster: poster }; }
 
 // A 3-item series snapshot at `idx`, optional override queue + repeat (TASK-247
 // build_snapshot shape — index-based, NOT pre-bucketed like the music snapshot).
 function snap(idx, repeat, queue) {
-  var items = [item('e1', 'Daddy Putdown', 420), item('e2', 'The Weekend', 480), item('e3', 'Hammerbarn', 600)];
+  var items = [item('e1', 'Daddy Putdown', 420, 'e1.jpg'), item('e2', 'The Weekend', 480, 'e2.jpg'), item('e3', 'Hammerbarn', 600, 'e3.jpg')];
   return {
     now_playing: items[idx],
     current_item_index: idx,
@@ -141,5 +141,42 @@ describe('companionVideoQueueHtml (phone)', () => {
   });
   it('renders a stable shell for an empty snapshot', () => {
     expect(typeof companionVideoQueueHtml(null)).toBe('string');
+  });
+});
+
+// BUG-022: the video queue shows the poster artwork (backend sends `poster` on
+// now_playing / items / override_queue entries). The view-model carries it and
+// the markup renders a same-origin /media/ <img> (hidden on load failure),
+// falling back to the film-clapper glyph when no poster is present.
+describe('videoQueueModel — poster', () => {
+  it('carries the now-playing poster', () => {
+    expect(videoQueueModel(snap(1, false)).nowPlaying.poster).toBe('e2.jpg');
+  });
+  it('carries the poster on queued (Play Next) rows', () => {
+    var sec = sectionByKey(videoQueueModel(snap(0, false, [entry('q1', 'fz', 'Frozen', 90, 'frozen.jpg')])), 'play-next');
+    expect(sec.rows[0].poster).toBe('frozen.jpg');
+  });
+  it('carries the poster on From Series rows', () => {
+    var sec = sectionByKey(videoQueueModel(snap(0, false)), 'from-series');
+    expect(sec.rows.map(function (r) { return r.poster; })).toEqual(['e2.jpg', 'e3.jpg']);
+  });
+});
+
+describe('video queue artwork markup', () => {
+  it('renders the now-playing poster as a same-origin /media/ img on both surfaces', () => {
+    expect(videoQueueViewHtml(snap(1, false))).toContain('src="/media/e2.jpg"');
+    expect(videoQueueViewHtml(snap(1, false))).toContain('onerror');
+    expect(companionVideoQueueHtml(snap(1, false))).toContain('src="/media/e2.jpg"');
+  });
+  it('renders row posters (queued + source) as imgs', () => {
+    var html = videoQueueViewHtml(snap(0, false, [entry('q1', 'fz', 'Frozen', 90, 'frozen.jpg')]));
+    expect(html).toContain('src="/media/frozen.jpg"');
+    expect(html).toContain('src="/media/e2.jpg"');
+  });
+  it('falls back to the clapper glyph when a poster is missing', () => {
+    var noArt = { now_playing: { item_id: 'x', title: 'No Art', duration: 10 }, current_item_index: 0, items: [{ item_id: 'x', title: 'No Art', duration: 10 }], override_queue: [], repeat: false };
+    var html = videoQueueViewHtml(noArt);
+    expect(html).not.toContain('<img');
+    expect(html).toContain('&#127916;');
   });
 });
