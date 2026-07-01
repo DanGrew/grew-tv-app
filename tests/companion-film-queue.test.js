@@ -60,7 +60,7 @@ test('＋ Queue POSTs queue-video for the active person and confirms with a toas
 test('the film play tile still opens — ＋ Queue does not hijack it', async ({ page }) => {
   await openFilmsGrid(page);
   await page.locator('.ph-txt[data-id="toy-story-main"]').click();
-  await expect.poll(() => page.url()).toContain('detail.html');
+  await expect(page).toHaveURL(/detail\.html/, { timeout: 10000 });
 });
 
 test('series tiles get NO ＋ Queue control (they queue per episode on the detail page)', async ({ page }) => {
