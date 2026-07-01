@@ -129,8 +129,11 @@ test('Shuffle from playlist detail starts the player with shuffle engaged', asyn
   await page.locator('.film-tile[data-id="pl-roadtrip"]').click();
   await expect(page.locator('.detail-row')).toHaveCount(2); // wait for load (shuffle no-ops on empty items)
   await page.locator('#btn-shuffle').click();
-  await expect(page).toHaveURL(/audio\.html/);
-  await expect(page.locator('#btn-shuffle.on')).toBeVisible();
+  // TASK-237: shuffle rides the audio.html shuffle=1 param (applied server-side);
+  // the player no longer carries a shuffle pill.
+  await expect(page).toHaveURL(/audio\.html.*shuffle=1/);
+  await expect(page.locator('#screen-audio')).toBeVisible();
+  await expect(page.locator('#btn-shuffle')).toHaveCount(0);
 });
 
 test('Back from the playlist detail returns to browse', async ({ page }) => {

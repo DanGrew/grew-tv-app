@@ -6,7 +6,8 @@ import { logEvent, makeSeekCoalescer, SOURCE_TV } from '../../core/log.js';
 
 // FEAT-018 (TASK-130) audio player. The <audio> analogue of the FEAT-017 video
 // player: same transport (play/pause, prev/next track, graduated skip, range
-// seek via the Jump grid) minus CC/frame-drop telemetry, plus a Shuffle toggle.
+// seek via the Jump grid) minus CC/frame-drop telemetry. Shuffle/repeat live on
+// the Queue (TASK-237), not the player.
 // Media resolves to {id}.{ext} (ext from the record, e.g. m4a) — never the
 // video player's hardcoded .mp4. Progress + the app_state snapshot reuse the
 // backend source of truth; the snapshot carries `shuffle` for the companion
@@ -20,8 +21,8 @@ var QUICK_SKIP   = 10;          // d-pad left/right one-press skip
 var BACKEND_SAVE_MS = 5000;
 
 // BUG-016: d-pad up/down follows the new visual order — transport (prev/play/next)
-// then the pill row beneath the progress bar (queue, jump, shuffle, repeat, lyrics, reset).
-var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-queue', 'btn-jump', 'btn-shuffle', 'btn-repeat', 'btn-lyrics', 'btn-reset'];
+// then the pill row beneath the progress bar (queue, jump, lyrics, reset).
+var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-queue', 'btn-jump', 'btn-lyrics', 'btn-reset'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 // App-side log (TASK-213): start from a saved position logs `resume`, else `play`.
 var PLAY_EVENT    = { 'true': 'resume', 'false': 'play' };
@@ -36,10 +37,8 @@ export function setup(config) {
   var onEnded  = [config.onEnded ].filter(Boolean).concat([function() { stopPlayback(); }])[0];
   var onNext   = [config.onNext  ].filter(Boolean).concat([function() {}])[0];
   var onPrev   = [config.onPrev  ].filter(Boolean).concat([function() {}])[0];
-  var onShuffle = [config.onShuffle].filter(Boolean).concat([function() {}])[0];
-  // FEAT-031 (TASK-188): repeat is server-owned like shuffle (toggle-repeat
-  // action); Queue opens the full-screen Queue View overlay (owned by the page).
-  var onRepeat = [config.onRepeat].filter(Boolean).concat([function() {}])[0];
+  // Queue opens the full-screen Queue View overlay (owned by the page); shuffle +
+  // repeat are toggled there now, not on the player (TASK-237).
   var onQueue  = [config.onQueue ].filter(Boolean).concat([function() {}])[0];
   // FEAT-031 (TASK-187): debounced position report — the page relays it to the
   // server `position` action (playback_state is the audio resume source now).
@@ -53,7 +52,6 @@ export function setup(config) {
   var returnPage      = null;
   var lastBackendSave = 0;
   var jumpPopup       = null;
-  var shuffleOn       = false;
   var lyricsOn        = true;          // ambient lyrics shown by default
   var pendingResume   = false;
   var _currentDisplay = {};
@@ -72,7 +70,7 @@ export function setup(config) {
   }
 
   // app -> companion snapshot (FEAT-017): static context from the page + live
-  // fields here. `shuffle` is the FEAT-018 addition the companion mirrors.
+  // fields here. Shuffle rides the server `playback` snapshot now, not app_state.
   function buildSnapshot() {
     var ctx = appContext();
     return {
@@ -80,8 +78,7 @@ export function setup(config) {
       sourceType: ctx.sourceType, sourceId: ctx.sourceId,
       positionSec: audio.currentTime,
       durationSec: [audio.duration].filter(function(d) { return !isNaN(d); }).concat([null])[0],
-      playing: !audio.paused,
-      shuffle: shuffleOn
+      playing: !audio.paused
     };
   }
   function emitState() { emitSnapshot(buildSnapshot()); }
@@ -312,29 +309,8 @@ export function setup(config) {
     ['btn-prev', 'btn-next'].forEach(function(id) { document.getElementById(id).classList[QUEUE_MODE[multi + '']]('hidden'); });
   }
 
-  // Shuffle is SERVER-owned now (FEAT-031/TASK-187). setShuffle only REFLECTS the
-  // flag from the incoming `playback` snapshot (the page calls it) + pushes the
-  // companion mirror. toggleShuffle just fires the toggle-shuffle action and waits
-  // for the snapshot to flip the button — no local guess at the new order.
-  function setShuffle(on) {
-    shuffleOn = !!on;
-    document.getElementById('btn-shuffle').classList.toggle('on', shuffleOn);
-    emitState();
-  }
-  function toggleShuffle() {
-    onShuffle();
-  }
-
-  // Repeat mirrors shuffle: SERVER-owned (FEAT-031/TASK-188). setRepeat only
-  // REFLECTS the flag from the incoming `playback` snapshot; toggleRepeat fires
-  // the toggle-repeat action and waits for the snapshot to flip the button.
-  function setRepeat(on) {
-    document.getElementById('btn-repeat').classList.toggle('on', !!on);
-  }
-  function toggleRepeat() {
-    onRepeat();
-  }
-
+  // Shuffle + repeat are SERVER-owned (FEAT-031) and toggled from the Queue View
+  // now (TASK-237) — the player no longer carries those pills.
   function openQueue() {
     onQueue();
   }
@@ -363,8 +339,6 @@ export function setup(config) {
   remote.toggle   = function() { AUDIO_TOGGLE[audio.paused](); };
   remote.next     = function() { emit('next'); onNext(); };
   remote.prev     = function() { onPrev(); };
-  remote.shuffle  = function() { toggleShuffle(); };
-  remote.repeat   = function() { toggleRepeat(); };
   remote.queue    = function() { openQueue(); };
   remote.lyrics   = function() { toggleLyrics(); };
   remote.skip     = function(params) { executeSkip([params].filter(Boolean).map(function(p) { return p.deltaSec; }).filter(Boolean).concat([0])[0]); };
@@ -411,13 +385,11 @@ export function setup(config) {
   document.getElementById('btn-play-pause').addEventListener('click', togglePlayPause);
   document.getElementById('btn-prev').addEventListener('click', function() { onPrev(); });
   document.getElementById('btn-next').addEventListener('click', function() { emit('next'); onNext(); });
-  document.getElementById('btn-shuffle').addEventListener('click', toggleShuffle);
-  document.getElementById('btn-repeat').addEventListener('click', toggleRepeat);
   document.getElementById('btn-queue').addEventListener('click', openQueue);
   document.getElementById('btn-lyrics').addEventListener('click', toggleLyrics);
   document.getElementById('btn-jump').addEventListener('click', openJumpPopup);
   document.getElementById('btn-reset').addEventListener('click', function() { fireReset(document.getElementById('btn-reset')); });
   document.getElementById('btn-reset').addEventListener('blur', disarmReset);
 
-  return { playTrack, handleAudioKey, setQueueMode, setShuffle, setRepeat, setLyrics, currentTrackDisplay, stop: stopPlayback, remote };
+  return { playTrack, handleAudioKey, setQueueMode, setLyrics, currentTrackDisplay, stop: stopPlayback, remote };
 }

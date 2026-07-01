@@ -54,7 +54,10 @@ test('Shuffle opens the player on the artist source with shuffle engaged', async
   const body = JSON.parse((await post).postData());
   expect(body.source_type).toBe('artist');
   expect(body.shuffle).toBe(true);
-  await expect(page.locator('#btn-shuffle.on')).toBeVisible();
+  // TASK-237: shuffle is engaged server-side (play-source shuffle:true) — the
+  // player carries no shuffle pill to reflect it any more.
+  await expect(page.locator('#screen-audio')).toBeVisible();
+  await expect(page.locator('#btn-shuffle')).toHaveCount(0);
 });
 
 test('the grid is reachable below the header — Up from the first tile lands on the actions', async ({ page }) => {

@@ -111,10 +111,10 @@ test('toggling repeat fills THEN with the next permutation (no Source-ends)', as
   await enterPlayer(page, 'ootb-02', 'Mr. Blue Sky');
   await openQueue(page);
   await expect(page.locator('.q-ends')).toContainText('Source ends');
-  await page.keyboard.press('Escape');              // close overlay -> keys drive the player
-  await page.keyboard.press('ArrowDown');
-  await page.locator('#btn-repeat').click();         // BUG-015: repeat (not shuffle) populates THEN
-  await openQueue(page);
+  // TASK-237 removed the player's repeat pill — repeat is toggled inside the Queue
+  // View now (live, no exit), like Shuffle above. BUG-015: repeat (not shuffle)
+  // populates THEN.
+  await page.locator('.np-pill', { hasText: 'Repeat' }).click();
   await expect(page.locator('.q-ends')).toHaveCount(0);
 });
 

@@ -146,8 +146,8 @@ export function initAudioPage() {
   }
 
   function applySnapshot(snap) {
-    player.setShuffle(snap.shuffle);
-    player.setRepeat(snap.repeat);
+    // Shuffle/repeat are reflected on the Queue View now (TASK-237); the player
+    // dropped those pills, so only the queue + now-playing repaint here.
     queue.applySnapshot(snap);
     [snap.now_playing].filter(Boolean).forEach(renderNowPlaying);
   }
@@ -180,8 +180,6 @@ export function initAudioPage() {
     onEnded: function() { sendAction('next', {}); },
     onNext: function() { sendAction('next', {}); },
     onPrev: function() { sendAction('previous', {}); },
-    onShuffle: function() { sendAction('toggle-shuffle', {}); },
-    onRepeat: function() { sendAction('toggle-repeat', {}); },
     onQueue: function() { queue.open(); },
     onLyrics: onLyrics,
     reportPosition: function(sec) { sendAction('position', { current_position: sec }); },
@@ -297,7 +295,6 @@ export function initAudioPage() {
       title = res[1];
       lyricsEnabled = getLyrics();
       player.setQueueMode(QUEUE_MODE[kind]);
-      player.setShuffle(shuffleParam);
       player.setLyrics(lyricsEnabled);
       mountBreadcrumb('breadcrumb', buildCrumbs('video', { videoTitle: title }));
       fireEntry();
