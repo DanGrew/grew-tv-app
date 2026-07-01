@@ -68,6 +68,16 @@ test('a seasons-less series shows no chips (flat list)', async ({ page }) => {
   await expect(page.locator('.tile-btn')).toHaveCount(3);
 });
 
+// TASK-252 — the companion detail page no longer shows the literal "Series"
+// context label above the title (owner feedback: visual noise; the title already
+// names the thing). The #ctx-label element is gone entirely.
+test('companion detail shows no "Series" context label', async ({ page }) => {
+  await openSeasons(page);
+  await expect(page.locator('#ctx-title')).toHaveText('The Inbetweeners');
+  await expect(page.locator('#ctx-label')).toHaveCount(0);
+  await expect(page.getByText('Series', { exact: true })).toHaveCount(0);
+});
+
 // FEAT-032 (TASK-218): when an album was opened from an artist's albums page, the
 // nav trail's top is that artist entry, so Back returns there (not the default
 // browse). A series, or an album reached straight from a rail, has no artist top

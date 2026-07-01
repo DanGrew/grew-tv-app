@@ -24,7 +24,6 @@ export function initPage() {
   var server = 'http://' + host + ':8765';
   var els = {
     connStatus: document.getElementById('conn-status'),
-    ctxLabel: document.getElementById('ctx-label'),
     ctxTitle: document.getElementById('ctx-title'),
     actionsEl: document.getElementById('actions')
   };
@@ -323,7 +322,6 @@ export function initPage() {
   }
 
   function captureSeries(payload) {
-    els.ctxLabel.textContent = 'Series';
     [payload.series_id].filter(Boolean).filter(function(id) { return id !== state.seriesId; }).forEach(function(id) {
       state.seriesId = id;
       loadSeriesData(id);
@@ -365,7 +363,6 @@ export function initPage() {
   // ourselves rather than waiting for the TV's context echo (which won't come).
   [new URLSearchParams(window.location.search).get('id')].filter(Boolean).forEach(function(id) {
     state.seriesId = id;
-    els.ctxLabel.textContent = 'Series';
     loadSeriesData(id);
   });
   api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
