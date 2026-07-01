@@ -61,9 +61,17 @@ export function initDetailPage() {
       navigate_down: function() { detailArrow({ key: 'ArrowDown', preventDefault: function() {} }); },
       play_next:     function() { playNext(); },
       play:          function() {
+        // Resolve the episode from series state by id and play it directly, so a
+        // companion-driven play works regardless of the TV's active season (BUG-025):
+        // the TV renders only the active season's rows, so clicking a `.detail-row`
+        // missed a cross-season id and fell back to activeElement = S1E1. id + member
+        // -> play it; no id -> play focused (legacy); id but not a member -> no-op.
         var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
-        var target = [id].filter(Boolean).map(function(i) { return document.querySelector('.detail-row[data-id="' + i + '"]'); }).filter(Boolean)[0];
-        ([target].filter(Boolean).concat([document.activeElement]))[0].click();
+        var item = state.series.items.filter(function(it) { return it.video.id === id; })[0];
+        ({
+          true:  function() { [item].filter(Boolean).forEach(function(it) { play(it, 'resume'); }); },
+          false: function() { document.activeElement.click(); }
+        })[Boolean(id)]();
       },
       back:          function() { goBack(null); },
       navigate:      function() { navTo(params.page, params.params); }
