@@ -39,7 +39,8 @@ export function initPage() {
     toggle: document.getElementById('c-toggle'),
     jump: document.getElementById('jump'),
     tracks: document.getElementById('tracks'),
-    reset: document.getElementById('c-reset')
+    reset: document.getElementById('c-reset'),
+    lyrics: document.getElementById('c-lyrics')
   };
   var state = { snap: null, psnap: null, sourceType: null, sourceId: null, person: null };
   var api = {};
@@ -104,6 +105,13 @@ export function initPage() {
     [state.snap].filter(Boolean).forEach(function(s) {
       els.toggle.textContent = PLAY_ICON[s.playing + ''];
     });
+  }
+
+  // TASK-239: the Lyrics pill is a control-only mirror — it drives the TV's ambient
+  // lyrics layer (the phone renders none) and reflects the server-backed `lyricsOn`
+  // pref carried on app_state, exactly the way play/pause mirrors the TV. Lit = on.
+  function reflectLyrics(snap) {
+    els.lyrics.classList.toggle('on', !!snap.lyricsOn);
   }
 
   // The live current track rides the `playback` snapshot's now-playing (the engine
@@ -218,6 +226,7 @@ export function initPage() {
     capturePerson(snap);
     renderControls();
     renderBar();
+    reflectLyrics(snap);
   }
 
   // ── server `playback` snapshot -> companion (the now-playing source of truth,
@@ -283,6 +292,10 @@ export function initPage() {
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);
+  // TASK-239: tap sends the `lyrics` intent; the TV audio page falls it through to
+  // player.remote.lyrics (toggleLyrics), which flips the ambient layer + server pref
+  // and echoes the new lyricsOn back on app_state — reflectLyrics repaints the pill.
+  els.lyrics.addEventListener('click', function() { api.sendIntent('lyrics'); });
   document.getElementById('c-queue').addEventListener('click', function() { window.location.href = 'queue.html'; });
   buildJump();
   setInterval(renderBar, 250);

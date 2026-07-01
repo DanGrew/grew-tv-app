@@ -117,6 +117,63 @@ test.describe('album source (Plane B)', () => {
   });
 });
 
+// TASK-239: the companion Lyrics toggle. Control-only — it drives the TV's ambient
+// lyrics layer via the `lyrics` WS intent (the TV falls it through to
+// player.remote.lyrics) and mirrors the server-backed `lyricsOn` pref carried on
+// app_state; the phone renders NO lyrics text. A lightweight WS mock stands in for
+// the TV: it answers the handshake, seeds app_state with lyricsOn, captures the
+// `lyrics` intent and echoes the flipped pref back so the round-trip is observable.
+test.describe('lyrics toggle (TASK-239)', () => {
+  function mockLyrics(page, initialOn) {
+    const intents = [];
+    return page.routeWebSocket(/:8766/, (ws) => {
+      let lyricsOn = initialOn;
+      function pushState() { ws.send(msg('app_state', { person: 'kids', profile: 'kids', screen: 'player', lyricsOn })); }
+      ws.onMessage(function(raw) {
+        const m = JSON.parse(raw);
+        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+        if (m.type === 'snapshot_request') { ws.send(msg('context', { version: 1, context_id: 'audio' })); pushState(); }
+        if (m.type === 'intent' && m.payload.intent === 'lyrics') { intents.push(m.payload.intent); lyricsOn = !lyricsOn; pushState(); }
+      });
+    }).then(() => intents);
+  }
+
+  test('shows a Lyrics toggle in the control row', async ({ page }) => {
+    await installApi(page);
+    await mockLyrics(page, false);
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#c-lyrics')).toHaveText(/Lyrics/);
+  });
+
+  test('renders no lyrics text on the companion itself (control-only)', async ({ page }) => {
+    await installApi(page);
+    await mockLyrics(page, true);
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#c-lyrics')).toBeVisible();
+    // No ambient-lyrics layer on the phone — that lives on the TV audio page only.
+    await expect(page.locator('#amb-cur')).toHaveCount(0);
+  });
+
+  test('reflects lyricsOn from app_state — the pill is lit when on', async ({ page }) => {
+    await installApi(page);
+    await mockLyrics(page, true);
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#c-lyrics')).toHaveClass(/on/);
+  });
+
+  test('tapping sends the lyrics intent and the pill reflects the echoed pref', async ({ page }) => {
+    await installApi(page);
+    const intents = await mockLyrics(page, false);
+    await page.goto('/companion/audio.html');
+    // Seeded OFF -> not lit yet.
+    await expect(page.locator('#c-lyrics')).not.toHaveClass(/on/);
+    await page.locator('#c-lyrics').click();
+    // The intent reached the TV; the echoed app_state flip lights the pill.
+    await expect(page.locator('#c-lyrics')).toHaveClass(/on/);
+    expect(intents).toContain('lyrics');
+  });
+});
+
 // BUG-018: an artist-sourced player. The source id is the ARTIST, not an album, so
 // the companion must never loadAlbum(artistId) and shows no track list (an artist
 // source has no companion list). The source rides the `playback` snapshot.

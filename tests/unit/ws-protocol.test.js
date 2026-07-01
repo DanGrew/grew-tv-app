@@ -156,16 +156,16 @@ describe('createAppState', () => {
     expect(createAppState({}).type).toBe('app_state');
   });
 
-  it('passes through all snapshot fields (incl. FEAT-018 shuffle, FEAT-026 person)', () => {
+  it('passes through all snapshot fields (incl. FEAT-018 shuffle, FEAT-026 person, TASK-239 lyricsOn)', () => {
     const p = createAppState({
       screen: 'player', itemId: 'ootb', episodeId: 'ootb-02',
       positionSec: 42, durationSec: 380, playing: true,
-      profile: 'kids', person: 'mom', captionsOn: true, shuffle: true
+      profile: 'kids', person: 'mom', captionsOn: true, shuffle: true, lyricsOn: true
     }).payload;
     expect(p).toEqual({
       screen: 'player', itemId: 'ootb', episodeId: 'ootb-02',
       positionSec: 42, durationSec: 380, playing: true,
-      profile: 'kids', person: 'mom', captionsOn: true, shuffle: true
+      profile: 'kids', person: 'mom', captionsOn: true, shuffle: true, lyricsOn: true
     });
   });
 
@@ -177,6 +177,7 @@ describe('createAppState', () => {
     expect(p.playing).toBe(false);
     expect(p.captionsOn).toBe(false);
     expect(p.shuffle).toBe(false);
+    expect(p.lyricsOn).toBe(false);
   });
 });
 
