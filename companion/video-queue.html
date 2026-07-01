@@ -33,7 +33,8 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .ph-section .hint { text-transform: none; letter-spacing: 0; opacity: 0.7; margin-left: 6px; }
 
 .ph-np { display: flex; gap: 12px; align-items: center; background: var(--surface-hi); border: 2px solid var(--focus); border-radius: var(--radius-sm); padding: 10px; }
-.ph-np .art { width: 52px; height: 52px; border-radius: 6px; background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--text-muted); flex-shrink: 0; }
+.ph-np .art { width: 52px; height: 52px; border-radius: 6px; background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--text-muted); flex-shrink: 0; overflow: hidden; }
+.ph-np .art .poster-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ph-np-body { flex: 1; min-width: 0; }
 .ph-np .nm { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ph-np .by { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -47,7 +48,8 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .ph-qrow.queued { border-left: 4px solid var(--focus); }
 .ph-qname { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; background: none; border: 2px solid transparent; border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: 15px; text-align: left; padding: 0; cursor: pointer; touch-action: manipulation; }
 .ph-qname:active, .ph-qname:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-.ph-qname .grip { width: 48px; height: 48px; border-radius: var(--radius-sm); background: var(--surface-hi); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 22px; flex-shrink: 0; }
+.ph-qname .grip { width: 48px; height: 48px; border-radius: var(--radius-sm); background: var(--surface-hi); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 22px; flex-shrink: 0; overflow: hidden; }
+.ph-qname .grip .poster-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ph-qname .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ph-qname .nm .by { color: var(--text-muted); font-size: 12px; }
 .acts { display: flex; gap: 6px; flex-shrink: 0; }

@@ -36,6 +36,17 @@ function durationText(secs) {
   return fmt(secs);
 }
 
+// BUG-022: poster artwork. Posters are bare content names served same-origin by
+// media-manager's /media/ route (the app derives its origin, no host/port here),
+// so a relative /media/<name> resolves on both the TV app page and the companion.
+// A missing/abortive poster hides the <img> (onerror), so no broken-image icon —
+// matching companion-detail's posterImg. No poster -> the film-clapper glyph.
+function artHtml(poster, cls, glyph) {
+  return [poster].filter(Boolean)
+    .map(function (p) { return '<img class="' + cls + '" alt="" loading="lazy" src="/media/' + escapeHtml(p) + '" onerror="this.style.display=\'none\'">'; })
+    .concat([glyph])[0];
+}
+
 // A queued (override-queue) entry -> an editable row. Shift up/down are single
 // neighbour swaps (the engine's `direction` move); canUp/canDown gate the edges so
 // the d-pad never lands on a disabled control. queued + editable; selecting a
@@ -46,6 +57,7 @@ function queueRow(entry, canUp, canDown) {
     entryId: entry.entry_id,
     itemId: entry.item_id,
     title: entry.title,
+    poster: entry.poster,
     durationText: durationText(entry.duration),
     queued: true,
     editable: true,
@@ -62,6 +74,7 @@ function sourceRow(item) {
     entryId: null,
     itemId: item.item_id,
     title: item.title,
+    poster: item.poster,
     durationText: durationText(item.duration),
     queued: false,
     editable: false,
@@ -81,6 +94,7 @@ function nowPlayingModel(snap) {
   return {
     itemId: np.item_id,
     title: np.title,
+    poster: np.poster,
     durationText: durationText(np.duration)
   };
 }
@@ -147,7 +161,7 @@ function nowPlayingHtml(np, repeat) {
   if (!np) return '';
   return '<div class="rail-label">Now Playing</div>' +
     '<div class="now-playing">' +
-      '<div class="np-art">&#127916;</div>' +
+      '<div class="np-art">' + artHtml(np.poster, 'poster-thumb', '&#127916;') + '</div>' +
       '<div class="np-body">' +
         '<div class="np-title">' + escapeHtml(np.title) + '</div>' +
         '<div class="np-status">' +
@@ -182,7 +196,7 @@ function actionsHtml(row) {
 // play-video it, so it doesn't replay from the queue afterwards); a source row's
 // name jumps within the source (play-item by item_id).
 function nameHtml(row) {
-  var inner = '<span class="q-grip">' + (row.queued ? '&#10239;' : '&#127916;') + '</span>' +
+  var inner = '<span class="q-grip">' + artHtml(row.poster, 'poster-thumb', row.queued ? '&#10239;' : '&#127916;') + '</span>' +
     '<span class="q-name">' + escapeHtml(row.title) + '</span>' +
     '<span class="q-dur">' + escapeHtml(row.durationText) + '</span>';
   if (row.editable) return '<button type="button" class="q-select" data-act="play-now" data-entry="' + escapeHtml(row.entryId) + '" data-item="' + escapeHtml(row.itemId) + '">' + inner + '</button>';
@@ -269,7 +283,7 @@ function phNowPlaying(m) {
   if (!np) return '';
   return '<div class="ph-section">Now Playing</div>' +
     '<div class="ph-np">' +
-      '<div class="art">&#127916;</div>' +
+      '<div class="art">' + artHtml(np.poster, 'poster-thumb', '&#127916;') + '</div>' +
       '<div class="ph-np-body">' +
         '<div class="nm">' + escapeHtml(np.title) + '</div>' +
         '<div class="by">' + escapeHtml(np.durationText) + '</div>' +
@@ -295,7 +309,7 @@ function phRowActions(row) {
 }
 
 function phName(row) {
-  var inner = '<span class="grip">' + (row.queued ? '&#10239;' : '&#127916;') + '</span>' +
+  var inner = '<span class="grip">' + artHtml(row.poster, 'poster-thumb', row.queued ? '&#10239;' : '&#127916;') + '</span>' +
     '<span class="nm">' + escapeHtml(row.title) + ' <span class="by">&middot; ' + escapeHtml(row.durationText) + '</span></span>';
   if (row.editable) return '<button type="button" class="ph-qname" data-act="play-now" data-entry="' + escapeHtml(row.entryId) + '" data-item="' + escapeHtml(row.itemId) + '">' + inner + '</button>';
   return '<button type="button" class="ph-qname" data-act="select" data-item="' + escapeHtml(row.itemId) + '">' + inner + '</button>';
