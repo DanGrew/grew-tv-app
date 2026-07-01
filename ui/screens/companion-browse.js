@@ -141,14 +141,14 @@ export function initPage() {
       .catch(noop);
   }
 
-  // FEAT-040 (Play Queue): when the override queue is non-empty, offer a quick
-  // "▶ Play Queue (N)" — tapping it drives the TV player to start the queue head
+  // FEAT-040 (Play Queue): when the video override queue is non-empty, offer a quick
+  // "🎬 Video Queue (N)" — tapping it drives the TV player to start the queue head
   // (?playQueue), so you don't have to open a random video to reach the queue. The
   // count is read from the read-only GET snapshot (refreshed on person-load + after
   // queueing here). It drives the TV, so it greys while desynced (Browse).
   function showPlayQueue(count) {
     var btn = document.getElementById('btn-play-queue');
-    btn.textContent = '▶ Play Queue (' + count + ')';
+    btn.textContent = '🎬 Video Queue (' + count + ')';
     btn.style.display = ({ 'true': 'block', 'false': 'none' })[(count > 0) + ''];
   }
   function refreshQueue() {
@@ -161,14 +161,14 @@ export function initPage() {
   }
 
   // FEAT-040/TASK-255 — the MUSIC twin of the Play-Queue button, sitting beside the
-  // video one. Count read from the read-only GET /api/playback snapshot (music
-  // override queue = play_next). Distinct label (♪ Music Queue) so which queue each
-  // resumes is obvious. Tapping drives the TV audio page to start the music queue
-  // head (audio.html?playQueue); like the video button it drives the TV, so it greys
-  // while desynced (Browse).
+  // video one (side-by-side in #queue-actions). Count read from the read-only GET
+  // /api/playback snapshot (music override queue = play_next). Distinct label
+  // (🎵 Music Queue vs 🎬 Video Queue) so which queue each resumes is obvious. Tapping
+  // drives the TV audio page to start the music queue head (audio.html?playQueue);
+  // like the video button it drives the TV, so it greys while desynced (Browse).
   function showPlayQueueMusic(count) {
     var btn = document.getElementById('btn-play-queue-music');
-    btn.textContent = '♪ Music Queue (' + count + ')';
+    btn.textContent = '🎵 Music Queue (' + count + ')';
     btn.style.display = ({ 'true': 'block', 'false': 'none' })[(count > 0) + ''];
   }
   function refreshQueueMusic() {

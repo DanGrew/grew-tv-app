@@ -330,7 +330,7 @@ test.describe('music Play Queue button', () => {
     const intents2 = [];
     await musicMock(page, intents2, [{ track_id: 'a' }, { track_id: 'b' }]);
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#btn-play-queue-music')).toHaveText('♪ Music Queue (2)');
+    await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 Music Queue (2)');
     await page.locator('#btn-play-queue-music').click();
     await expect.poll(() => {
       const nav = intents2.find((i) => i.intent === 'navigate' && i.params.page === 'audio.html');

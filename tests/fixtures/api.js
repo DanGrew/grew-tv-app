@@ -421,11 +421,17 @@ async function installPlaybackBackend(page) {
     if (state.repeat) return order.map(mkEntry);
     return [];
   }
+  // Pending "Play Next" hides the durable playing head (front when it is the
+  // now-playing track) — it is playing, not pending (FEAT-040, mirrors the backend).
+  function pendingOverride() {
+    var q = state.override.slice();
+    return (q[0] && q[0].track_id === state.now) ? q.slice(1) : q;
+  }
   function snapshot() {
     return {
       person_id: 'kids',
       now_playing: [state.now].filter(Boolean).map(resolve).concat([null])[0],
-      play_next: state.override.map(resolveEntry),
+      play_next: pendingOverride().map(resolveEntry),
       from_source: state.source.map(resolveEntry),
       then: state.then.map(resolveEntry),
       shuffle: state.shuffle, repeat: state.repeat,
@@ -475,12 +481,16 @@ async function installPlaybackBackend(page) {
         state.source = sourceOrder(state.sourceType, state.sourceId).slice(x + 1).map(mkEntry);
       });
     },
-    // Advance: drain the override queue first, else the source permutation.
+    // Advance (durable head, FEAT-040): drop the finished head (override front when
+    // it is now-playing), then the new front (override, kept) or the source head
+    // becomes now-playing — a played override entry STAYS in the queue (consumed
+    // only when it finishes), a source entry is consumed as before.
     'next': function() {
+      [state.override[0]].filter(function(e) { return e && e.track_id === state.now; })
+        .forEach(function(e) { state.override = dropEntry(state.override, e.entry_id); });
       var nextEntry = state.override.concat(state.source)[0];
       [nextEntry].filter(Boolean).forEach(function(e) {
         state.now = e.track_id;
-        state.override = dropEntry(state.override, e.entry_id);
         state.source = dropEntry(state.source, e.entry_id);
       });
     },
@@ -488,13 +498,10 @@ async function installPlaybackBackend(page) {
     'toggle-shuffle': function() { state.shuffle = !state.shuffle; state.then = computeThen(sourceOrder(state.sourceType, state.sourceId)); },
     'toggle-repeat':  function() { state.repeat = !state.repeat; state.then = computeThen(sourceOrder(state.sourceType, state.sourceId)); },
     'queue-track':        function(b) { state.override.unshift(mkEntry(b.track_id)); },
-    // FEAT-040/TASK-254: pop+play the override-queue head — music CONSUMES it
-    // (matches api/playback play-queue, unlike video which keeps its head). Empty
-    // queue -> no-op.
+    // FEAT-040/TASK-254: play the override-queue head WITHOUT consuming it (durable
+    // head, resumable on re-entry — matches api/playback play-queue). Empty -> no-op.
     'play-queue':         function() {
-      [state.override[0]].filter(Boolean).forEach(function(e) {
-        state.now = e.track_id; state.override = dropEntry(state.override, e.entry_id);
-      });
+      [state.override[0]].filter(Boolean).forEach(function(e) { state.now = e.track_id; });
     },
     'remove-queue-entry': function(b) {
       state.override = dropEntry(state.override, b.entry_id);
