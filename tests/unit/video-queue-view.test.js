@@ -144,6 +144,73 @@ describe('companionVideoQueueHtml (phone)', () => {
   });
 });
 
+// BUG-024: Repeat is a backend no-op on a non-repeatable (single-item) source, so
+// the queue Repeat pill must be greyed + untappable there — mirroring the player,
+// which already greys its transport Repeat via `.single`. Only a multi-item source
+// (series / boxset) is repeatable. Coming Up follows Repeat (ON -> filled tail,
+// OFF -> empty) — locked here so it can't regress.
+function filmSnap(repeat) {
+  var items = [item('f1', 'Solo Film', 5400, 'f1.jpg')];
+  return {
+    now_playing: items[0],
+    current_item_index: 0,
+    items: items,
+    override_queue: [],
+    source_type: 'film',
+    source_id: 'solo',
+    repeat: repeat,
+    shuffle: false
+  };
+}
+
+describe('videoQueueModel — repeatable predicate (BUG-024)', () => {
+  it('is false for a single-item (film) source', () => {
+    expect(videoQueueModel(filmSnap(false)).repeatable).toBe(false);
+  });
+  it('is true for a multi-item (series) source', () => {
+    expect(videoQueueModel(snap(1, false)).repeatable).toBe(true);
+  });
+  it('is false for an empty / absent snapshot', () => {
+    expect(videoQueueModel(null).repeatable).toBe(false);
+    expect(videoQueueModel({}).repeatable).toBe(false);
+  });
+});
+
+describe('BUG-024 — Repeat greyed on a non-repeatable source', () => {
+  it('greys + disables the TV Repeat pill for a film (no toggle-repeat action)', () => {
+    var html = videoQueueViewHtml(filmSnap(false));
+    expect(html).toContain('np-pill is-disabled');
+    expect(html).toContain('disabled');
+    expect(html).not.toContain('data-action="toggle-repeat"');
+  });
+  it('keeps the TV Repeat pill active + tappable for a series', () => {
+    var html = videoQueueViewHtml(snap(1, false));
+    expect(html).not.toContain('np-pill is-disabled');
+    expect(html).toContain('data-action="toggle-repeat"');
+  });
+  it('greys + disables the companion Repeat button for a film', () => {
+    var html = companionVideoQueueHtml(filmSnap(false));
+    expect(html).toContain('ph-tbtn is-disabled');
+    expect(html).not.toContain('data-action="toggle-repeat"');
+  });
+  it('keeps the companion Repeat button active for a series', () => {
+    var html = companionVideoQueueHtml(snap(1, false));
+    expect(html).not.toContain('ph-tbtn is-disabled');
+    expect(html).toContain('data-action="toggle-repeat"');
+  });
+});
+
+describe('BUG-024 — Coming Up follows Repeat', () => {
+  it('Coming Up is empty when repeat is off', () => {
+    expect(videoQueueViewHtml(snap(1, false))).toContain('Nothing coming up');
+  });
+  it('Coming Up carries the wrap-tail rows when repeat is on mid-source', () => {
+    var html = videoQueueViewHtml(snap(2, true));
+    expect(html).not.toContain('Nothing coming up');
+    expect(html).toContain('data-act="select" data-item="e1"');
+  });
+});
+
 // BUG-022: the video queue shows the poster artwork (backend sends `poster` on
 // now_playing / items / override_queue entries). The view-model carries it and
 // the markup renders a same-origin /media/ <img> (hidden on load failure),

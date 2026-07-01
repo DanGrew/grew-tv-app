@@ -143,7 +143,7 @@ export function videoQueueModel(snap) {
     fromSeriesSection(after, queue.length, repeat),
     thenSection(before, repeat)
   ].filter(Boolean);
-  return { nowPlaying: nowPlayingModel(s), repeat: repeat, sections: sections };
+  return { nowPlaying: nowPlayingModel(s), repeat: repeat, repeatable: items.length > 1, sections: sections };
 }
 
 // ── TV overlay markup ───────────────────────────────────────────────────────
@@ -157,7 +157,19 @@ function pill(label, on, action, name) {
   return '<button type="button" class="np-pill' + (on ? ' on' : '') + '" data-act="transport" data-action="' + action + '" aria-label="' + name + '">' + label + '</button>';
 }
 
-function nowPlayingHtml(np, repeat) {
+// BUG-024: on a non-repeatable (single-item) source, toggle-repeat is a backend
+// no-op, so the pill is greyed + disabled and carries NO data-act — a tap can't
+// fire the action. Mirrors the player transport's `.single` treatment.
+function disabledPill(label, name) {
+  return '<button type="button" class="np-pill is-disabled" disabled aria-label="' + name + '">' + label + '</button>';
+}
+
+function repeatPill(repeat, repeatable) {
+  if (!repeatable) return disabledPill('&#128257; Repeat', 'Repeat');
+  return pill('&#128257; Repeat', repeat, 'toggle-repeat', 'Repeat');
+}
+
+function nowPlayingHtml(np, repeat, repeatable) {
   if (!np) return '';
   return '<div class="rail-label">Now Playing</div>' +
     '<div class="now-playing">' +
@@ -166,7 +178,7 @@ function nowPlayingHtml(np, repeat) {
         '<div class="np-title">' + escapeHtml(np.title) + '</div>' +
         '<div class="np-status">' +
           '<div class="np-transport">' +
-            pill('&#128257; Repeat', repeat, 'toggle-repeat', 'Repeat') +
+            repeatPill(repeat, repeatable) +
           '</div>' +
           '<span class="np-time">' + escapeHtml(np.durationText) + '</span>' +
         '</div>' +
@@ -255,7 +267,7 @@ function videoPanels(m, rowEmpty, next, comingUp) {
 // shell). Empty/absent snapshot still renders a stable shell.
 export function videoQueueViewHtml(snap) {
   var m = videoQueueModel(snap);
-  return tabShellHtml(nowPlayingHtml(m.nowPlaying, m.repeat), videoPanels(m, panelBody, nextBody, panelBody));
+  return tabShellHtml(nowPlayingHtml(m.nowPlaying, m.repeat, m.repeatable), videoPanels(m, panelBody, nextBody, panelBody));
 }
 
 // ── companion (phone) Queue View ───────────────────────────────────────────
@@ -269,12 +281,23 @@ function phTransportBtn(act, action, glyph, on, label) {
   return '<button type="button" class="ph-tbtn' + cls + '" data-act="' + act + '" data-action="' + action + '" aria-label="' + label + '">' + glyph + '</button>';
 }
 
-function phTransport(repeat) {
+// BUG-024: mirror of the TV disabledPill — a non-repeatable source greys the
+// companion Repeat button and strips its data-act so a tap can't fire it.
+function phDisabledRepeat() {
+  return '<button type="button" class="ph-tbtn is-disabled" disabled aria-label="Repeat">&#128257;</button>';
+}
+
+function phRepeatBtn(repeat, repeatable) {
+  if (!repeatable) return phDisabledRepeat();
+  return phTransportBtn('transport', 'toggle-repeat', '&#128257;', repeat, 'Repeat');
+}
+
+function phTransport(repeat, repeatable) {
   return '<div class="ph-transport">' +
     phTransportBtn('transport', 'previous', '&#9198;', false, 'Previous') +
     phTransportBtn('toggle', '', '&#9199;', false, 'Play / pause') +
     phTransportBtn('transport', 'next', '&#9197;', false, 'Next') +
-    phTransportBtn('transport', 'toggle-repeat', '&#128257;', repeat, 'Repeat') +
+    phRepeatBtn(repeat, repeatable) +
   '</div>';
 }
 
@@ -289,7 +312,7 @@ function phNowPlaying(m) {
         '<div class="by">' + escapeHtml(np.durationText) + '</div>' +
       '</div>' +
     '</div>' +
-    phTransport(m.repeat);
+    phTransport(m.repeat, m.repeatable);
 }
 
 function phAct(entry, act, dir, enabled, glyph, label) {
