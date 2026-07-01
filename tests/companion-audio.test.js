@@ -2,9 +2,9 @@ const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend } = require('./fixtures/api.js');
 
 // FEAT-018 (TASK-132) + FEAT-037 (TASK-245) — the companion audio context. The
-// music mirror of the persistent TV player: it drives prev / next / shuffle /
+// music mirror of the persistent TV player: it drives prev / next /
 // play-track over the per-person /api/playback engine (PLANE B) and repaints
-// now-playing, the shuffle pill, the current-track highlight and the track list's
+// now-playing, the current-track highlight and the track list's
 // source from the `playback` snapshot the server pushes — the SAME snapshot the TV
 // audio page renders (applySnapshot), so a track change the companion drives swaps
 // the TV in place. play/pause / graduated skip / volume / reset stay on the legacy
@@ -69,14 +69,10 @@ test.describe('album source (Plane B)', () => {
     expect(posts[0].url).toContain('person=kids');
   });
 
-  test('the shuffle pill toggles via toggle-shuffle (Plane B) and reflects the snapshot', async ({ page }) => {
-    const posts = spyActions(page);
-    await expect(page.locator('#c-shuffle')).not.toHaveClass(/on/);
-    await page.locator('#c-shuffle').click();
-    await expect(page.locator('#c-shuffle')).toHaveClass(/on/);
-    await page.locator('#c-shuffle').click();
-    await expect(page.locator('#c-shuffle')).not.toHaveClass(/on/);
-    expect(posts.map((p) => p.action)).toContain('toggle-shuffle');
+  // TASK-237: the companion player dropped its shuffle pill (shuffle is toggled on
+  // the Queue View now). The control is gone entirely.
+  test('the companion player has no shuffle pill', async ({ page }) => {
+    await expect(page.locator('#c-shuffle')).toHaveCount(0);
   });
 
   test('tapping a track plays it via play-track (Plane B) and the highlight follows the snapshot', async ({ page }) => {

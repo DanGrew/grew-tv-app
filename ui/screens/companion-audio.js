@@ -14,9 +14,9 @@ import { mountSyncBar } from './companion-sync-bar.js';
 // Companion audio context (FEAT-018 TASK-132 / FEAT-037 TASK-245). The music
 // analogue of companion-video: live transport + now-playing, plus the album track
 // list — tap a row to teleport the TV to that track. SERVER-AUTHORITATIVE now
-// (TASK-245): prev / next / shuffle / play-track POST to the per-person
+// (TASK-245): prev / next / play-track POST to the per-person
 // /api/playback engine (Plane B) — the SAME endpoint the TV audio page drives —
-// and now-playing, the shuffle pill, the current-track highlight and the track
+// and now-playing, the current-track highlight and the track
 // list's source all repaint from the `playback` snapshot the server pushes back
 // (onPlayback), mirroring the TV. play/pause, graduated skip, volume and reset
 // have no server action (TV-local) so they stay on the legacy WS intent rail
@@ -37,7 +37,6 @@ export function initPage() {
     barFill: document.getElementById('bar-fill'),
     time: document.getElementById('time'),
     toggle: document.getElementById('c-toggle'),
-    shuffle: document.getElementById('c-shuffle'),
     jump: document.getElementById('jump'),
     tracks: document.getElementById('tracks'),
     reset: document.getElementById('c-reset')
@@ -223,7 +222,7 @@ export function initPage() {
 
   // ── server `playback` snapshot -> companion (the now-playing source of truth,
   // mirroring the TV audio page's applySnapshot). Now-playing title + the breadcrumb
-  // leaf, the shuffle pill, the current-track highlight and the track list's source
+  // leaf, the current-track highlight and the track list's source
   // all read it; the progress bar and play/pause icon still ride app_state (Plane A).
   function renderNowFromSnap(snap) {
     [snap.now_playing].filter(Boolean).forEach(function(np) {
@@ -232,13 +231,9 @@ export function initPage() {
       mountAudioCrumbs(np.title);
     });
   }
-  function renderShuffle(snap) {
-    els.shuffle.classList.toggle('on', !!snap.shuffle);
-  }
   function onPlayback(snap) {
     state.psnap = snap;
     renderNowFromSnap(snap);
-    renderShuffle(snap);
     captureSource(snap);
     markCurrent();
   }
@@ -283,7 +278,6 @@ export function initPage() {
   }
 
   els.toggle.addEventListener('click', function() { api.sendIntent('toggle'); });
-  els.shuffle.addEventListener('click', function() { sendPlayback('toggle-shuffle'); });
   document.getElementById('c-prev').addEventListener('click', function() { sendPlayback('previous'); });
   document.getElementById('c-next').addEventListener('click', function() { sendPlayback('next'); });
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });

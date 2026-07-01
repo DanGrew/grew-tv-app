@@ -122,7 +122,10 @@ test('selecting a track plays it in the <audio> player from {id}.m4a', async ({ 
   await expect(page.locator('#btn-next')).toBeVisible();
 });
 
-test('Shuffle from album detail starts the player with shuffle engaged', async ({ page }) => {
+// TASK-237: the player dropped its shuffle/repeat pills — shuffle is engaged from
+// album detail (shuffle=1 in the audio.html URL, applied server-side by
+// play-source) and toggled thereafter on the Queue View, not on the player.
+test('Shuffle from album detail opens the player with shuffle engaged (shuffle param)', async ({ page }) => {
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();
@@ -130,25 +133,11 @@ test('Shuffle from album detail starts the player with shuffle engaged', async (
   // clicking before the rows render races the load and the player never opens.
   await expect(page.locator('.detail-row')).toHaveCount(3);
   await page.locator('#btn-shuffle').click();
-  await expect(page).toHaveURL(/audio\.html/);
-  await expect(page.locator('#btn-shuffle.on')).toBeVisible();
-});
-
-test('the player Shuffle button toggles the engaged state', async ({ page }) => {
-  await enterKids(page);
-  await page.locator('.sidebar-tab[data-tab="music"]').click();
-  await page.locator('.film-tile[data-id="ootb"]').click();
-  await page.locator('.detail-row[data-id="ootb-01"]').click();
+  await expect(page).toHaveURL(/audio\.html.*shuffle=1/);
   await expect(page.locator('#screen-audio')).toBeVisible();
-  // Wait for load to finish (#audio-title populated) — the page's load .then
-  // calls setShuffle(shuffleParam), which would otherwise race a too-early click
-  // and reset the toggle.
-  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
-  await expect(page.locator('#btn-shuffle')).not.toHaveClass(/on/);
-  await page.locator('#btn-shuffle').click();
-  await expect(page.locator('#btn-shuffle')).toHaveClass(/on/);
-  await page.locator('#btn-shuffle').click();
-  await expect(page.locator('#btn-shuffle')).not.toHaveClass(/on/);
+  // The player carries no shuffle/repeat pills any more.
+  await expect(page.locator('#btn-shuffle')).toHaveCount(0);
+  await expect(page.locator('#btn-repeat')).toHaveCount(0);
 });
 
 // REGRESSION (TASK-187): playback is server-authoritative — Next must POST the
@@ -263,13 +252,13 @@ async function openPlayer(page) {
   await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
 }
 
-// BUG-016 (relayout): the six pills live on their own row BELOW the progress bar,
-// in the order queue, jump, shuffle, repeat, lyrics, reset. The transport row keeps
-// only prev/play/next + the progress bar + time. Red on the old single-row markup.
+// BUG-016 (relayout): the pills live on their own row BELOW the progress bar, in
+// the order queue, jump, lyrics, reset (shuffle/repeat removed in TASK-237). The
+// transport row keeps only prev/play/next + the progress bar + time.
 test('the pills sit on their own row below the progress bar in the BUG-016 order', async ({ page }) => {
   await openPlayer(page);
   const ids = await page.locator('#pill-row button').evaluateAll(els => els.map(e => e.id));
-  expect(ids).toEqual(['btn-queue', 'btn-jump', 'btn-shuffle', 'btn-repeat', 'btn-lyrics', 'btn-reset']);
+  expect(ids).toEqual(['btn-queue', 'btn-jump', 'btn-lyrics', 'btn-reset']);
   // Progress bar + time stay on the transport row; no pills there.
   await expect(page.locator('#transport #progress')).toHaveCount(1);
   await expect(page.locator('#transport #time-display')).toHaveCount(1);
@@ -285,9 +274,9 @@ test('after the idle window pointer activity wakes the bar so controls are click
   await expect(page.locator('#controls')).toHaveClass(/controls-hidden/, { timeout: 6000 });
   await page.mouse.move(400, 400);
   await expect(page.locator('#controls')).not.toHaveClass(/controls-hidden/);
-  // And a control now fires (server-authoritative shuffle echoes the on state).
-  await page.locator('#btn-shuffle').click();
-  await expect(page.locator('#btn-shuffle')).toHaveClass(/on/);
+  // And a control now fires (the Queue pill opens the Queue View overlay).
+  await page.locator('#btn-queue').click();
+  await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
 });
 
 // BUG-018: an artist-sourced player carries from='artist'; pressing Back returns
