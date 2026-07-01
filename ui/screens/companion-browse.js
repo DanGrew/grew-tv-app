@@ -1,7 +1,8 @@
 import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
-import { loadBrowse, loadContinueWatching, videoPlaybackAction, loadVideoPlayback } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, videoPlaybackAction, loadVideoPlayback, loadPlayback } from '../../core/app-api.js';
 import { queueCount } from '../../core/video-player-router.js';
+import { playNextCount } from '../../core/queue-view.js';
 import { screenPage, filterByTitle, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
@@ -140,14 +141,14 @@ export function initPage() {
       .catch(noop);
   }
 
-  // FEAT-040 (Play Queue): when the override queue is non-empty, offer a quick
-  // "▶ Play Queue (N)" — tapping it drives the TV player to start the queue head
+  // FEAT-040 (Play Queue): when the video override queue is non-empty, offer a quick
+  // "🎬 Video Queue (N)" — tapping it drives the TV player to start the queue head
   // (?playQueue), so you don't have to open a random video to reach the queue. The
   // count is read from the read-only GET snapshot (refreshed on person-load + after
   // queueing here). It drives the TV, so it greys while desynced (Browse).
   function showPlayQueue(count) {
     var btn = document.getElementById('btn-play-queue');
-    btn.textContent = '▶ Play Queue (' + count + ')';
+    btn.textContent = '🎬 Video Queue (' + count + ')';
     btn.style.display = ({ 'true': 'block', 'false': 'none' })[(count > 0) + ''];
   }
   function refreshQueue() {
@@ -157,6 +158,26 @@ export function initPage() {
   }
   function onPlayQueue() {
     api.sendIntent('navigate', { page: 'video.html', params: { playQueue: 1, from: 'browse' } });
+  }
+
+  // FEAT-040/TASK-255 — the MUSIC twin of the Play-Queue button, sitting beside the
+  // video one (side-by-side in #queue-actions). Count read from the read-only GET
+  // /api/playback snapshot (music override queue = play_next). Distinct label
+  // (🎵 Music Queue vs 🎬 Video Queue) so which queue each resumes is obvious. Tapping
+  // drives the TV audio page to start the music queue head (audio.html?playQueue);
+  // like the video button it drives the TV, so it greys while desynced (Browse).
+  function showPlayQueueMusic(count) {
+    var btn = document.getElementById('btn-play-queue-music');
+    btn.textContent = '🎵 Music Queue (' + count + ')';
+    btn.style.display = ({ 'true': 'block', 'false': 'none' })[(count > 0) + ''];
+  }
+  function refreshQueueMusic() {
+    [state.person].filter(Boolean).forEach(function(p) {
+      loadPlayback(server, p).then(function(snap) { showPlayQueueMusic(playNextCount(snap)); }).catch(noop);
+    });
+  }
+  function onPlayQueueMusic() {
+    api.sendIntent('navigate', { page: 'audio.html', params: { playQueue: 1, from: 'browse' } });
   }
 
   // Bare text-label tile: title + an optional resume-percent badge, no poster.
@@ -313,12 +334,14 @@ export function initPage() {
     window.location.href = 'playlist-create.html?profile=' + encodeURIComponent([state.profile].filter(Boolean).concat(['adults'])[0]);
   }
   document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
+  document.getElementById('btn-play-queue-music').addEventListener('click', onPlayQueueMusic);
 
   // Switch-profile drives the TV, so it greys out while desynced (the WS layer
   // already no-ops its intent; this is the visible half — no dead click).
   function applyMode() {
     document.getElementById('switch-profile').classList.toggle('desync-off', mode.isDesynced());
     document.getElementById('btn-play-queue').classList.toggle('desync-off', mode.isDesynced());
+    document.getElementById('btn-play-queue-music').classList.toggle('desync-off', mode.isDesynced());
   }
 
   function render() {
@@ -440,7 +463,7 @@ export function initPage() {
     // Read the queue once the person is known (first app_state) — drives the
     // "Play Queue" button's count.
     [state.person].filter(Boolean).filter(function() { return !state.queueFetched; }).forEach(function() {
-      state.queueFetched = true; refreshQueue();
+      state.queueFetched = true; refreshQueue(); refreshQueueMusic();
     });
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(loadCatalog);
     // Following the TV's deep position is the inbound nav seam — gated when

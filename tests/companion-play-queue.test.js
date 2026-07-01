@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { installApi } = require('./fixtures/api.js');
 
-// FEAT-040 (Play Queue) — the companion browse "▶ Play Queue (N)" button. When the
+// FEAT-040 (Play Queue) — the companion browse "🎬 Video Queue (N)" button. When the
 // video override queue is non-empty (read from GET /api/video-playback), the
 // button appears; tapping it drives the TV player to start the queue head via a
 // `navigate` intent to video.html?playQueue=1. Solves: "to reach the queue you had
@@ -42,7 +42,7 @@ test('Play Queue button shows the count and drives the TV to start the queue', a
   await mockQueue(page, 2);
   await page.goto('/companion/browse.html');
   await expect(page.locator('#sections-row .chip').first()).toBeVisible();
-  await expect(page.locator('#btn-play-queue')).toHaveText('▶ Play Queue (2)');
+  await expect(page.locator('#btn-play-queue')).toHaveText('🎬 Video Queue (2)');
   await page.locator('#btn-play-queue').click();
   await expect.poll(() => intents.find(i => i.intent === 'navigate' && i.params.page === 'video.html')).toBeTruthy();
   const nav = intents.find(i => i.intent === 'navigate' && i.params.page === 'video.html');
