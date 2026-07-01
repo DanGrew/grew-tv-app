@@ -84,6 +84,15 @@ function nowPlayingModel(snap) {
   };
 }
 
+// FEAT-040/TASK-255 (music Play Queue): how many tracks are queued ("Play Next")
+// in the MUSIC snapshot — the twin of video-player-router.queueCount, reading the
+// music snapshot shape (`play_next` = the resolved override queue). A non-player
+// screen (browse) reads this from GET /api/playback to decide whether to offer a
+// music "Play Queue" button (start the queue head without opening a track first).
+export function playNextCount(snap) {
+  return ((snap || {}).play_next || []).length;
+}
+
 // The bucketed view-model. PLAY NEXT is omitted entirely when the override queue
 // is empty (so the section never renders an empty header); FROM SOURCE + THEN are
 // always present. PLAY NEXT always precedes FROM SOURCE — the "why is this next"

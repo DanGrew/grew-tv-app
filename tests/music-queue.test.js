@@ -59,3 +59,20 @@ test('＋ Queue is reachable from the row via Right (d-pad)', async ({ page }) =
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.detail-row[data-id="ootb-01"] .detail-queue')).toBeFocused();
 });
+
+// FEAT-040/TASK-255 — entering the audio page with ?playQueue (no album/track)
+// fires the music play-queue action, so the TV starts the override-queue head
+// without opening a track first (the audio twin of the video page's ?playQueue).
+test('audio.html?playQueue starts the music queue head (play-queue, no track opened first)', async ({ page }) => {
+  await openAlbum(page);
+  await page.locator('.detail-row[data-id="ootb-01"] .detail-queue').click();   // -> Play Next: ootb-01
+  await page.locator('.detail-row[data-id="ootb-02"] .detail-queue').click();   // -> front: ootb-02
+  const posted = page.waitForRequest(req =>
+    req.url().includes('/api/playback/play-queue') && req.method() === 'POST');
+  await page.goto('/app/homeview/audio.html?playQueue=1&from=browse');
+  const req = await posted;
+  expect(req.url()).toContain('person=kids');
+  await expect(page.locator('#screen-audio')).toBeVisible();
+  // The queue head (most-recently queued lands at the front) is now playing.
+  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
+});

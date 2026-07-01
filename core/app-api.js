@@ -81,6 +81,15 @@ export function loadVideoPlayback(serverUrl, person) {
   return getJson(serverUrl + '/api/video-playback?person=' + encodeURIComponent(person || ''));
 }
 
+// FEAT-040/TASK-255 (music Play Queue): read-only MUSIC playback snapshot for a
+// person — the twin of loadVideoPlayback, backed by the TASK-254 GET route. Lets a
+// non-player screen (browse) read the music override ("Play Next") queue to offer a
+// music "Play Queue" button. The snapshot shape differs from video (play_next holds
+// the resolved override queue) — read its length via queue-view.playNextCount.
+export function loadPlayback(serverUrl, person) {
+  return getJson(serverUrl + '/api/playback?person=' + encodeURIComponent(person || ''));
+}
+
 export function loadVideo(serverUrl, id) {
   return getJson(serverUrl + '/api/video/' + encodeURIComponent(id));
 }

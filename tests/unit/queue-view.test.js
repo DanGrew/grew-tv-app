@@ -1,4 +1,4 @@
-import { queueModel, queueViewHtml, companionQueueHtml } from '../../core/queue-view.js';
+import { queueModel, queueViewHtml, companionQueueHtml, playNextCount } from '../../core/queue-view.js';
 
 function entry(id, title, eid, dur) {
   return { track_id: id, title: title, artist: 'The Beatles', entry_id: eid, duration: dur };
@@ -202,5 +202,19 @@ describe('companionQueueHtml — phone mirror', () => {
     var html = companionQueueHtml(null);
     expect(html).toContain('Source ends');
     expect(html).not.toContain('ph-np"');
+  });
+});
+
+// FEAT-040/TASK-255 — the music Play-Queue count helper (browse reads it from GET
+// /api/playback to decide whether to offer a music "Play Queue" button).
+describe('playNextCount — music override-queue length', () => {
+  it('counts the resolved play_next entries', () => {
+    expect(playNextCount(shuffleSnap())).toBe(1);
+  });
+
+  it('is 0 for an empty / absent override queue', () => {
+    expect(playNextCount(orderedSnap())).toBe(0);
+    expect(playNextCount({})).toBe(0);
+    expect(playNextCount(null)).toBe(0);
   });
 });

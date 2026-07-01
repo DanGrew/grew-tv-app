@@ -263,10 +263,16 @@ export function initAudioPage() {
   // on the resolved source POST serialises the two so the tapped track wins. The
   // `track` (no-source) kind returns undefined ⇒ Promise.resolve fires play-track
   // immediately.
+  // FEAT-040/TASK-255 (music Play Queue): entered with ?playQueue (no album/artist/
+  // playlist/track) — fire play-queue (the server pops+plays the override-queue head)
+  // and render from the broadcast snapshot like the others, so the TV starts the
+  // music queue without opening a track first (the audio twin of the video page's
+  // startQueue). No jumpToTrack (no trackId), no source title.
   var SOURCE_BASE = {
     album:    function() { return sendAction('play-source', { source_type: 'album', source_id: albumId, shuffle: shuffleParam }); },
     artist:   function() { return sendAction('play-source', { source_type: 'artist', source_id: artistId, shuffle: shuffleParam }); },
     playlist: function() { return sendAction('play-source', { source_type: 'playlist', source_id: playlistId, shuffle: shuffleParam }); },
+    queue:    function() { return sendAction('play-queue', {}); },
     track:    function() {}
   };
   function jumpToTrack() {
@@ -276,17 +282,18 @@ export function initAudioPage() {
     Promise.resolve(SOURCE_BASE[kind]()).then(jumpToTrack);
   }
   function sourceKind() {
-    return [['album'].filter(function() { return !!albumId; })[0], ['artist'].filter(function() { return !!artistId; })[0], ['playlist'].filter(function() { return !!playlistId; })[0]]
+    return [['queue'].filter(function() { return !!getParam('playQueue'); })[0], ['album'].filter(function() { return !!albumId; })[0], ['artist'].filter(function() { return !!artistId; })[0], ['playlist'].filter(function() { return !!playlistId; })[0]]
       .filter(Boolean).concat(['track'])[0];
   }
   var kind = sourceKind();
-  var QUEUE_MODE = { album: true, artist: true, playlist: true, track: false };
+  var QUEUE_MODE = { album: true, artist: true, playlist: true, queue: true, track: false };
   // Breadcrumb title is collection-level: the album title (fetched), the artist
   // name (already the param), or the single track's title.
   var TITLE_FOR = {
     album:    function() { return loadAlbum(SERVER, albumId).then(function(a) { return a.title; }); },
     artist:   function() { return Promise.resolve(artistId); },
     playlist: function() { return loadPlaylist(SERVER, playlistId).then(function(p) { return p.title; }); },
+    queue:    function() { return Promise.resolve('Play Queue'); },
     track:    function() { return loadVideo(SERVER, trackId).then(function(v) { return v.title; }); }
   };
 

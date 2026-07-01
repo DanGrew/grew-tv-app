@@ -488,6 +488,14 @@ async function installPlaybackBackend(page) {
     'toggle-shuffle': function() { state.shuffle = !state.shuffle; state.then = computeThen(sourceOrder(state.sourceType, state.sourceId)); },
     'toggle-repeat':  function() { state.repeat = !state.repeat; state.then = computeThen(sourceOrder(state.sourceType, state.sourceId)); },
     'queue-track':        function(b) { state.override.unshift(mkEntry(b.track_id)); },
+    // FEAT-040/TASK-254: pop+play the override-queue head — music CONSUMES it
+    // (matches api/playback play-queue, unlike video which keeps its head). Empty
+    // queue -> no-op.
+    'play-queue':         function() {
+      [state.override[0]].filter(Boolean).forEach(function(e) {
+        state.now = e.track_id; state.override = dropEntry(state.override, e.entry_id);
+      });
+    },
     'remove-queue-entry': function(b) {
       state.override = dropEntry(state.override, b.entry_id);
       state.source = dropEntry(state.source, b.entry_id);
@@ -529,6 +537,11 @@ async function installPlaybackBackend(page) {
       };
       [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
     });
+  });
+  // GET /api/playback?person= -> read-only music snapshot (FEAT-040/TASK-254 Play
+  // Queue). Registered before the action route; matched first for the query URL.
+  await page.route(/\/api\/playback\?/, function(route) {
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(snapshot()) });
   });
   await page.route('**/api/playback/*', function(route) {
     var action = decodeURIComponent(route.request().url().split('/api/playback/')[1].split('?')[0]);
