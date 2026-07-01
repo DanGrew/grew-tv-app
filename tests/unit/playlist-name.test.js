@@ -1,4 +1,4 @@
-import { NAME_MAX, KEY_COLS, CHAR_KEYS, appendChar, backspace, cleanName, isValidName, gridIndex, editorMode } from '../../core/playlist-name.js';
+import { NAME_MAX, KEY_COLS, CHAR_KEYS, appendChar, backspace, cleanName, isValidName, gridIndex, editorMode, typedChar } from '../../core/playlist-name.js';
 
 describe('CHAR_KEYS / layout', () => {
   it('exposes A-Z then 0-9 as single-character cells', () => {
@@ -54,6 +54,27 @@ describe('isValidName', () => {
   });
   it('rejects an over-NAME_MAX name', () => {
     expect(isValidName('x'.repeat(NAME_MAX + 1))).toBe(false);
+  });
+});
+
+describe('typedChar', () => {
+  it('returns a printable letter/digit/space/punctuation key', () => {
+    expect(typedChar({ key: 'a' })).toBe('a');
+    expect(typedChar({ key: 'Z' })).toBe('Z');
+    expect(typedChar({ key: '7' })).toBe('7');
+    expect(typedChar({ key: ' ' })).toBe(' ');
+    expect(typedChar({ key: '-' })).toBe('-');
+  });
+  it('ignores non-printable / multi-char keys (arrows, Enter, Backspace, F-keys)', () => {
+    expect(typedChar({ key: 'ArrowLeft' })).toBe('');
+    expect(typedChar({ key: 'Enter' })).toBe('');
+    expect(typedChar({ key: 'Backspace' })).toBe('');
+    expect(typedChar({ key: 'F5' })).toBe('');
+  });
+  it('ignores a printable key held with a Ctrl/Alt/Meta chord (shortcut, not text)', () => {
+    expect(typedChar({ key: 'a', ctrlKey: true })).toBe('');
+    expect(typedChar({ key: 'v', metaKey: true })).toBe('');
+    expect(typedChar({ key: 'x', altKey: true })).toBe('');
   });
 });
 

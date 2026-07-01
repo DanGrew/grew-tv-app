@@ -169,6 +169,17 @@ test('typing a name on the on-screen keyboard then Create opens the new playlist
   await expect(page.locator('#detail-title')).toHaveText('ROADIES');
 });
 
+test('typing a name on a hardware keyboard (not the on-screen keys) then Create opens the new playlist detail (BUG-023)', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.rail-title [data-create-playlist]').click();
+  await expect(page.locator('#pl-keys button').first()).toBeVisible();
+  await page.keyboard.type('ROADIES');
+  await expect(page.locator('#pl-name')).toHaveText('ROADIES');
+  await page.locator('#btn-create').click();
+  await expect(page).toHaveURL(/playlist-detail\.html\?playlist=pl-roadies/);
+  await expect(page.locator('#detail-title')).toHaveText('ROADIES');
+});
+
 test('Create with a blank name is rejected with an error and stays on the create screen', async ({ page }) => {
   await enterMusic(page);
   await page.locator('.rail-title [data-create-playlist]').click();
