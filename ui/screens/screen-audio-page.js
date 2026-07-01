@@ -219,8 +219,9 @@ export function initAudioPage() {
 
   // Companion `play` carries a track id -> teleport via the server play-track
   // action (no id -> resume local <audio>). `playAlbum`/`playArtist` jump the TV
-  // to a different source. `shuffle`/`toggle`/`next`/`prev`/`skip` fall through to
-  // player.remote (which now fire server actions).
+  // to a different source. `lyrics`/`toggle`/`next`/`prev`/`skip` fall through to
+  // player.remote — `lyrics` (TASK-239) hits player.remote.lyrics -> toggleLyrics,
+  // flipping the ambient layer + server pref exactly like the on-screen pill.
   var PLAY_BY_ID = {
     'true':  function(id) { sendAction('play-track', { track_id: id }); },
     'false': function() { player.remote.play(); }

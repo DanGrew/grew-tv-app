@@ -94,7 +94,10 @@ export function createAppState(state) {
     // TASK-155 carry-forward — CW was left without ?person=).
     person: s.person != null ? s.person : null,
     captionsOn: !!s.captionsOn,
-    shuffle: !!s.shuffle
+    shuffle: !!s.shuffle,
+    // TASK-239: the ambient-lyrics pref rides the snapshot so the companion audio
+    // player's Lyrics pill seeds + stays in sync with the TV (mirrors shuffle).
+    lyricsOn: !!s.lyricsOn
   });
 }
 

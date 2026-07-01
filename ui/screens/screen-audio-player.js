@@ -78,7 +78,9 @@ export function setup(config) {
       sourceType: ctx.sourceType, sourceId: ctx.sourceId,
       positionSec: audio.currentTime,
       durationSec: [audio.duration].filter(function(d) { return !isNaN(d); }).concat([null])[0],
-      playing: !audio.paused
+      playing: !audio.paused,
+      // TASK-239: reflect the ambient-lyrics pref so the companion pill mirrors it.
+      lyricsOn: lyricsOn
     };
   }
   function emitState() { emitSnapshot(buildSnapshot()); }
@@ -322,9 +324,13 @@ export function setup(config) {
     lyricsOn = !!on;
     document.getElementById('btn-lyrics').classList.toggle('on', lyricsOn);
   }
+  // A press flips the pill + the page's ambient layer, then emits app_state at once
+  // (TASK-239) so a companion-driven toggle round-trips its Lyrics pill immediately
+  // — the heartbeat is paused-track-silent, so don't wait on the next 1 Hz tick.
   function toggleLyrics() {
     setLyrics(!lyricsOn);
     onLyrics(lyricsOn);
+    emitState();
   }
 
   var remote = {};
