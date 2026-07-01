@@ -28,16 +28,22 @@ async function openAlbum(page) {
   await expect(page.locator('.detail-row')).toHaveCount(3);
 }
 
-test('every available album track row carries a ＋ Playlist control', async ({ page }) => {
+// TASK-253 — one consolidated "＋" per row (was "＋ Playlist"), opening the sheet.
+test('every available album track row carries a single ＋ control', async ({ page }) => {
   await openAlbum(page);
   await expect(page.locator('.detail-row .detail-add')).toHaveCount(3);
-  await expect(page.locator('.detail-row[data-id="ootb-01"] .detail-add')).toHaveText('＋ Playlist');
+  await expect(page.locator('.detail-row[data-id="ootb-01"] .detail-add')).toHaveText('＋');
+  // The old standalone ＋ Queue is gone — queueing is now the sheet's top option.
+  await expect(page.locator('.detail-row .detail-queue')).toHaveCount(0);
 });
 
-test('the ＋ Playlist control opens a sheet listing the active profile\'s playlists + New playlist', async ({ page }) => {
+test('the ＋ control opens a sheet with Play Next on top, then the profile\'s playlists + New playlist', async ({ page }) => {
   await openAlbum(page);
   await page.locator('.detail-row[data-id="ootb-01"] .detail-add').click();
   await expect(page.locator('#add-sheet')).toBeVisible();
+  // Play Next is the first sheet cell (top of the list), distinct from the playlist choices.
+  await expect(page.locator('#add-sheet-list > *').first()).toHaveClass(/add-queue/);
+  await expect(page.locator('#add-sheet-list .add-queue')).toHaveText('▶ Play Next');
   // Only the active (kids) profile's playlists are offered — both fixture playlists.
   await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['Road Trip', 'Empty Mix']);
   await expect(page.locator('#btn-add-create')).toBeVisible();

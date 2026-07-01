@@ -29,7 +29,7 @@ export function initPage() {
     actionsEl: document.getElementById('actions')
   };
   var state = { seriesId: null, profile: null, person: null, series: null, progress: {}, activeSeason: null };
-  var addState = { add: null, createHref: '', statusTimer: null };
+  var addState = { add: null, queue: null, createHref: '', statusTimer: null };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -90,9 +90,21 @@ export function initPage() {
     b.addEventListener('click', function() { addExisting(card.id, card.title); });
     return b;
   }
+  // TASK-253 — the sheet's top option: "▶ Play Next" (queue the track), above the
+  // playlist cards. Present only for the per-TRACK sheet (openAddSheet sets
+  // addState.queue); the album-level "Add all" sheet leaves it null. NOT `.add-choice`
+  // so the playlist-list assertions stay clean.
+  function queueChoiceBtn() {
+    var b = document.createElement('button');
+    b.className = 'add-queue';
+    b.textContent = '▶ Play Next';
+    b.addEventListener('click', addState.queue);
+    return b;
+  }
   function showAddSheet(cards) {
     var list = document.getElementById('add-sheet-list');
     list.innerHTML = '';
+    [addState.queue].filter(Boolean).forEach(function() { list.appendChild(queueChoiceBtn()); });
     cards.forEach(function(c) { list.appendChild(choiceBtn(c)); });
     document.getElementById('add-sheet').style.display = 'flex';
   }
@@ -101,17 +113,21 @@ export function initPage() {
       .then(function(res) { showAddSheet(playlistCards([res.content].filter(Boolean).concat([[]])[0])); })
       .catch(function() { showStatus('Could not load playlists.'); });
   }
-  // Per-track: add ONE track (TASK-207).
+  // Per-track: the single ＋ opens the sheet for ONE track — Play Next on top, then
+  // the playlist cards (TASK-207 + TASK-253).
   function openAddSheet(item) {
     addState.add = function(id) { return addToPlaylist(server, id, item.video.id); };
+    addState.queue = function() { queueThenClose(item); };
     addState.createHref = 'playlist-create.html?addTrack=' + encodeURIComponent(item.video.id) +
       '&profile=' + encodeURIComponent(activeProfile());
     loadAndShowSheet();
   }
   // Album-level "Add all to playlist" (TASK-212): snapshot the WHOLE album as a
-  // source. Same sheet, but each pick POSTs add-source instead of add-track.
+  // source. Same sheet, but each pick POSTs add-source instead of add-track, and no
+  // Play Next option (queue null — a per-track action).
   function openAddAllSheet() {
     addState.add = function(id) { return addSourceToPlaylist(server, id, 'album', state.seriesId); };
+    addState.queue = null;
     addState.createHref = 'playlist-create.html?addSourceType=album&addSourceId=' + encodeURIComponent(state.seriesId) +
       '&profile=' + encodeURIComponent(activeProfile());
     loadAndShowSheet();
@@ -120,27 +136,21 @@ export function initPage() {
     var b = document.createElement('button');
     b.className = 'detail-add-btn';
     b.setAttribute('data-add', item.video.id);
-    b.textContent = '＋ Playlist';
+    b.textContent = '＋';
     b.addEventListener('click', function() { openAddSheet(item); });
     return b;
   }
-  // FEAT-040/TASK-248 — per-track "+ Queue" (play next). A per-person POST
-  // (queue-track), so it works in BOTH modes: in Browse the play tile greys but
-  // this stays live (like + Playlist). The durable override queue (TASK-246) keeps
-  // it across album swaps.
+  // FEAT-040/TASK-248 — queue a track to PLAY NEXT. A per-person POST (queue-track),
+  // so it works in BOTH modes: in Browse the play tile greys but this stays live
+  // (like the sheet itself). The durable override queue (TASK-246) keeps it across
+  // album swaps. TASK-253: now the sheet's top "▶ Play Next" action (no standalone
+  // per-row button) — closes the sheet first, then POSTs.
   function queueTrack(item) {
     playbackAction(server, 'queue-track', state.person, { track_id: item.video.id })
       .then(function() { showStatus('Queued to Play Next'); })
       .catch(function() { showStatus('Could not queue track.'); });
   }
-  function queueBtn(item) {
-    var b = document.createElement('button');
-    b.className = 'detail-queue-btn';
-    b.setAttribute('data-queue', item.video.id);
-    b.textContent = '＋ Queue';
-    b.addEventListener('click', function() { queueTrack(item); });
-    return b;
-  }
+  function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
   // FEAT-040/TASK-249 — the VIDEO ＋ Queue: a series episode queues to the separate
   // video queue (queue-video, distinct from the music queue-track above). Same
   // per-person POST ⇒ works in BOTH modes (the play tile greys in Browse, this
@@ -260,15 +270,15 @@ export function initPage() {
     ({ 'true': appendChipRow, 'false': noop })[hasSeasonChips(state.series) + '']();
   }
 
-  // An album track is rendered as a row: the play tile + ＋ Playlist and ＋ Queue
-  // (music) controls beside it (a <button> can't nest, so they are siblings in a
-  // row, as companion-audio does for ＋ Queue).
+  // An album track row: the play tile + a single ＋ control beside it (TASK-253,
+  // was ＋ Playlist and ＋ Queue side by side — they crowded the track text). The ＋
+  // opens the add sheet whose top option is ▶ Play Next (queue), playlist cards
+  // below. A <button> can't nest, so they are siblings in a row.
   function albumTrackNode(item) {
     var row = document.createElement('div');
     row.className = 'detail-track-row';
     row.appendChild(episodeBtn(item));
     row.appendChild(addBtn(item));
-    row.appendChild(queueBtn(item));
     return row;
   }
   // A video series episode is the play tile + a ＋ Queue (VIDEO queue) beside it —

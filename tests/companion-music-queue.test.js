@@ -1,12 +1,14 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, VIDEOS, BROWSE } = require('./fixtures/api.js');
 
-// FEAT-040 (TASK-248) — the companion mirror of the album-detail "＋ Queue" (Play
-// Next). Each ALBUM track row carries a ＋ Queue control beside ＋ Playlist; tapping
-// it POSTs queue-track per person to /api/playback. Because it is a per-person POST
-// (not a WS intent), it works in BOTH modes — in Browse the play tile greys but the
-// ＋ Queue control stays live, exactly like ＋ Playlist. The durable override queue
-// (TASK-246) keeps it across album swaps. Absorbs FEAT-038 TASK-231 (music half).
+// FEAT-040 (TASK-248) + TASK-253 — the companion mirror of album-detail queueing.
+// The old standalone "＋ Queue" per-row button folded into the single "＋" add sheet:
+// each ALBUM track row has one ＋ opening a sheet whose TOP option is "▶ Play Next".
+// Picking it POSTs queue-track per person to /api/playback (then closes the sheet).
+// Because it is a per-person POST (not a WS intent), it works in BOTH modes — in
+// Browse the play tile greys but the ＋ / sheet stays live, exactly like the playlist
+// add. The durable override queue (TASK-246) keeps it across album swaps. Absorbs
+// FEAT-038 TASK-231 (music half).
 
 function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
@@ -75,38 +77,49 @@ async function openDesynced(page, sent) {
   await expect(page.locator('.detail-track-row').first()).toBeVisible();
 }
 
-test('every album track row carries a ＋ Queue control beside ＋ Playlist', async ({ page }) => {
+// Open the ＋ sheet for a row and tap its top "▶ Play Next" option.
+async function playNext(page, id) {
+  await page.locator('.detail-add-btn[data-add="' + id + '"]').click();
+  await expect(page.locator('#add-sheet')).toBeVisible();
+  await page.locator('#add-sheet-list .add-queue').click();
+}
+
+test('each album track row carries a single ＋; the sheet\'s top option is ▶ Play Next', async ({ page }) => {
   await openSynced(page, []);
-  await expect(page.locator('.detail-queue-btn')).toHaveCount(3);
-  await expect(page.locator('.detail-queue-btn[data-queue="ootb-01"]')).toHaveText('＋ Queue');
-  await expect(page.locator('.detail-track-row').first().locator('.detail-add-btn')).toHaveCount(1);
+  await expect(page.locator('.detail-queue-btn')).toHaveCount(0);   // no standalone ＋ Queue
+  await expect(page.locator('.detail-add-btn')).toHaveCount(3);
+  await expect(page.locator('.detail-add-btn[data-add="ootb-01"]')).toHaveText('＋');
+  await page.locator('.detail-add-btn[data-add="ootb-01"]').click();
+  await expect(page.locator('#add-sheet-list > *').first()).toHaveClass(/add-queue/);
+  await expect(page.locator('#add-sheet-list .add-queue')).toHaveText('▶ Play Next');
 });
 
-test('Control mode: ＋ Queue POSTs queue-track for the active person and confirms', async ({ page }) => {
+test('Control mode: Play Next POSTs queue-track for the active person, confirms, and closes', async ({ page }) => {
   await openSynced(page, []);
   const queued = page.waitForRequest(req =>
     req.url().includes('/api/playback/queue-track') && req.method() === 'POST');
-  await page.locator('.detail-queue-btn[data-queue="ootb-02"]').click();
+  await playNext(page, 'ootb-02');
   const req = await queued;
   expect(req.url()).toContain('person=mom');
   expect(JSON.parse(req.postData())).toEqual({ track_id: 'ootb-02' });
   await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+  await expect(page.locator('#add-sheet')).toBeHidden();
 });
 
-test('Browse mode: the play tile greys but ＋ Queue stays live and still POSTs', async ({ page }) => {
+test('Browse mode: the play tile greys but the ＋ / Play Next stays live and still POSTs', async ({ page }) => {
   await openDesynced(page, []);
-  // Play is greyed (drives the TV), ＋ Queue is not (per-person POST).
+  // Play is greyed (drives the TV); the ＋ add control is not (per-person POST).
   await expect(page.locator('.tile-btn[data-id="ootb-02"]')).toHaveClass(/desync-off/);
-  await expect(page.locator('.detail-queue-btn[data-queue="ootb-02"]')).not.toHaveClass(/desync-off/);
+  await expect(page.locator('.detail-add-btn[data-add="ootb-02"]')).not.toHaveClass(/desync-off/);
   const queued = page.waitForRequest(req =>
     req.url().includes('/api/playback/queue-track') && req.method() === 'POST');
-  await page.locator('.detail-queue-btn[data-queue="ootb-02"]').click();
+  await playNext(page, 'ootb-02');
   const req = await queued;
   expect(JSON.parse(req.postData())).toEqual({ track_id: 'ootb-02' });
   await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
 });
 
-test('the play tile still plays — ＋ Queue does not hijack the row (Control mode)', async ({ page }) => {
+test('the play tile still plays — opening the ＋ sheet does not hijack the row (Control mode)', async ({ page }) => {
   const sent = [];
   await openSynced(page, sent);
   await page.locator('.tile-btn[data-id="ootb-02"]').click();
