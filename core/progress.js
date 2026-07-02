@@ -33,6 +33,15 @@ export function isMidWatch(resumePositionSec, durationSec) {
   return !isFinished(resumePositionSec, durationSec);
 }
 
+// Whether a detail row shows the mid-watch treatment (progress bar, RESUME tag,
+// restart affordance). Music tracks never do (TASK-276: audio has no mid-song
+// resume — a track always loads at 0), so an audio row reads clean regardless of
+// its saved position. Video episodes keep the mid-watch treatment.
+export function rowMidWatch(video, resumePositionSec) {
+  if (!video || video.mediaType === 'audio') return false;
+  return isMidWatch(resumePositionSec, video.duration);
+}
+
 // Resume value to persist after a position update — clears to 0 once finished.
 export function resumeAfter(resumePositionSec, durationSec) {
   if (isFinished(resumePositionSec, durationSec)) return 0;

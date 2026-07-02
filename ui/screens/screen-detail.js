@@ -1,6 +1,6 @@
 import { registerScreen } from '../../core/screen-registry.js';
 import { mediaUrl } from '../../core/app-api.js';
-import { percent, isMidWatch } from '../../core/progress.js';
+import { percent, rowMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, durationMarkup, progressBarMarkup, detailTagMarkup } from '../../core/detail-view.js';
 import { primaryAction } from '../../core/series-detail.js';
 import { seasonsOf, seasonLabel, chipClass, visibleItems, defaultSeason, seasonPosterOf, posterCandidates } from '../../core/seasons.js';
@@ -261,7 +261,7 @@ function buildRow(server, series, progress, onPlayItem, item, i, isNext) {
   row.setAttribute('data-id', video.id);
 
   var resume = resumeOf(progress[video.id]);
-  var mid = isMidWatch(resume, video.duration);
+  var mid = rowMidWatch(video, resume);
   [mid].filter(Boolean).forEach(function() { row.classList.add('has-resume'); });
 
   var posterName = [video.poster, series.poster].filter(Boolean)[0];

@@ -3,6 +3,7 @@ import {
   percent,
   isFinished,
   isMidWatch,
+  rowMidWatch,
   resumeAfter,
   continueWatching,
   progressMapFromCW,
@@ -38,6 +39,18 @@ describe('isMidWatch', () => {
   });
   it('true partway through', () => expect(isMidWatch(120, 600)).toBe(true));
   it('false once finished', () => expect(isMidWatch(599, 600)).toBe(false));
+});
+
+describe('rowMidWatch', () => {
+  it('mirrors isMidWatch for a video row', () => {
+    expect(rowMidWatch({ duration: 600 }, 120)).toBe(true);
+    expect(rowMidWatch({ duration: 600 }, 0)).toBe(false);
+    expect(rowMidWatch({ duration: 600 }, 599)).toBe(false);
+  });
+  it('always false for a music track (TASK-276: audio never mid-song resumes)', () => {
+    expect(rowMidWatch({ mediaType: 'audio', duration: 600 }, 120)).toBe(false);
+  });
+  it('false when the video is missing', () => expect(rowMidWatch(null, 120)).toBe(false));
 });
 
 describe('resumeAfter', () => {
