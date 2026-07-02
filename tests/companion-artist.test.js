@@ -150,6 +150,15 @@ test.describe('desync mode (Browse)', () => {
     expect(sentIntents.filter((i) => i === 'select')).toHaveLength(0);
   });
 
+  // BUG-029: companion browse opens the artist page with the prefixed rail-tile id
+  // (`?id=artist:ELO`), not the clean name. The page must strip the prefix — else
+  // the title shows "artist:ELO" and albumsByArtist misses (0 albums → "No albums").
+  test('BUG-029: a prefixed ?id=artist:<name> resolves to the clean name and its albums', async ({ page }) => {
+    await page.goto('/companion/artist.html?id=artist:ELO');
+    await expect(page.locator('#ctx-title')).toHaveText('ELO');
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+  });
+
   test('TASK-243: no Back button — the breadcrumb Home is the local hop to browse', async ({ page }) => {
     await expect(page.locator('.ph-txt').first()).toBeVisible();
     await expect(page.locator('#btn-back')).toHaveCount(0);
