@@ -32,14 +32,14 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 #grid-wrap { flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; padding-top: 4px; }
 #grid-wrap::-webkit-scrollbar { display: none; }
 #txtgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-.ph-txt { background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 12px 11px; font-size: 14px; min-height: 48px; display: flex; align-items: center; gap: 7px; color: var(--text); font-family: inherit; cursor: pointer; text-align: left; touch-action: manipulation; transition: border-color var(--dur) var(--ease); }
+.ph-txt { flex: 1; min-width: 0; background: none; border: none; border-radius: 0; padding: 0; font-size: 14px; min-height: 44px; display: flex; align-items: center; gap: 7px; color: var(--text); font-family: inherit; cursor: pointer; text-align: left; touch-action: manipulation; transition: color var(--dur) var(--ease); }
 .ph-txt .nm { flex: 1; line-height: 1.2; }
 .ph-txt .pct { font-size: 11px; color: var(--focus); }
-.ph-txt.prog { border-color: var(--focus); }
-.ph-txt:active, .ph-txt:focus { outline: none; border-color: var(--focus); }
-.ph-row { grid-column: 1 / -1; display: flex; gap: 7px; align-items: stretch; }
-.ph-row .ph-txt { flex: 1; }
-.ph-edit { flex-shrink: 0; min-width: 46px; padding: 0 12px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 18px; font-family: inherit; line-height: 1; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.ph-txt:active, .ph-txt:focus { outline: none; color: var(--focus); }
+.ph-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--surface); transition: border-color var(--dur) var(--ease); }
+.ph-row:has(.ph-txt:active) { border-color: var(--focus); }
+.ph-row:has(.ph-txt.prog) { border-color: var(--focus); }
+.ph-edit { flex-shrink: 0; align-self: center; min-width: 46px; padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-hi); color: var(--text); font-size: 18px; font-family: inherit; line-height: 1; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .ph-edit:active, .ph-edit:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .ph-edit.x { border-color: rgba(255,135,135,0.5); color: #ff8787; }
 .ph-edit.x:active, .ph-edit.x:focus { outline: none; border-color: #ff8787; }
