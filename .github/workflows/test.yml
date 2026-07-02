@@ -387,6 +387,18 @@ jobs:
           name: report-companion-in-layers
           path: reports/companion-in-layers.txt
 
+  no-logic-in-inline-callbacks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p reports
+      - run: node scripts/arch-check.js no-logic-in-inline-callbacks reports/no-logic-in-inline-callbacks.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-no-logic-in-inline-callbacks
+          path: reports/no-logic-in-inline-callbacks.txt
+
   pr-report:
     runs-on: ubuntu-latest
     permissions:
@@ -412,6 +424,7 @@ jobs:
       - max-inline-script-lines
       - no-multi-screen-html
       - companion-in-layers
+      - no-logic-in-inline-callbacks
       - ui-cyclomatic
       - tv-focus-rings
       - tv-min-font-size
@@ -457,6 +470,7 @@ jobs:
             row "max-inline-script-lines" "$(smry reports/max-inline-script-lines.txt)"
             row "no-multi-screen-html" "$(smry reports/no-multi-screen-html.txt)"
             row "companion-in-layers" "$(smry reports/companion-in-layers.txt)"
+            row "no-logic-in-inline-callbacks" "$(smry reports/no-logic-in-inline-callbacks.txt)"
             row "ui-cyclomatic" "$(smry reports/ui-cyclomatic.txt)"
             row "tv-focus-rings" "$(smry reports/tv-focus-rings.txt)"
             row "tv-min-font-size" "$(smry reports/tv-min-font-size.txt)"

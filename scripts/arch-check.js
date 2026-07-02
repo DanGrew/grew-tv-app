@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { extractInlineScripts } = require('./html-utils');
+const { findInlineCallbackLogic } = require('./inline-callback-logic');
 
 const rule = process.argv[2];
 const outputFile = process.argv[3];
@@ -438,6 +439,20 @@ if (rule === 'companion-in-layers') {
   } else if (!layersMatch[1].includes("'companion'")) {
     violations.push(`scripts/arch-check.js — 'companion' missing from LAYERS set in no-stray-files rule`);
   }
+}
+
+if (rule === 'no-logic-in-inline-callbacks') {
+  getAppAndCompanionHtml().forEach(file => {
+    const html = read(file);
+    const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+    extractInlineScripts(html).forEach((script, i) => {
+      const label = `${rel} (block ${i + 1})`;
+      scanned.push(label);
+      findInlineCallbackLogic(script).forEach(({ line }) => {
+        violations.push(`${rel} (block ${i + 1}):${line} — transform callback with pure logic; extract to core/ + unit test`);
+      });
+    });
+  });
 }
 
 let output = `## ${rule}\n`;
