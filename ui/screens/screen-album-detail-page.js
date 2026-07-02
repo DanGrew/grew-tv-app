@@ -223,7 +223,7 @@ export function initAlbumDetailPage() {
       state.album = res[0];
       state.progress = progressMapFromCW(res[1].content);
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: albumId, seriesTitle: state.album.title }));
-      buildDetailList(SERVER, state.album, state.progress, onPlayItem, openAddSheet, null);
+      buildDetailList(SERVER, state.album, state.progress, onPlayItem, openAddSheet, null, null, null, { suppressResume: true });
       focusFirstDetailRow();
     })
     .catch(function() { navTo('error.html'); });

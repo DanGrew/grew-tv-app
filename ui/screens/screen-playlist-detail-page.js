@@ -84,7 +84,7 @@ export function initPlaylistDetailPage() {
     return loadPlaylist(SERVER, playlistId).then(function(pl) {
       state.playlist = pl;
       renderCover();
-      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove);
+      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove, { suppressResume: true });
       ([document.querySelector(focusSel)].filter(Boolean)
         .concat([document.querySelector('.detail-row')]).filter(Boolean)
         .concat([document.getElementById('btn-play-next')]))[0].focus();
@@ -256,7 +256,7 @@ export function initPlaylistDetailPage() {
       state.progress = progressMapFromCW(res[1].content);
       renderCover();
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: playlistId, seriesTitle: state.playlist.title }));
-      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove);
+      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove, { suppressResume: true });
       focusFirstDetailRow();
     })
     .catch(function() { navTo('error.html'); });

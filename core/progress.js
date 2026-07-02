@@ -34,12 +34,14 @@ export function isMidWatch(resumePositionSec, durationSec) {
 }
 
 // Whether a detail row shows the mid-watch treatment (progress bar, RESUME tag,
-// restart affordance). Music tracks never do (TASK-276: audio has no mid-song
-// resume — a track always loads at 0), so an audio row reads clean regardless of
-// its saved position. Video episodes keep the mid-watch treatment.
-export function rowMidWatch(video, resumePositionSec) {
-  if (!video || video.mediaType === 'audio') return false;
-  return isMidWatch(resumePositionSec, video.duration);
+// restart affordance). Music surfaces (album / playlist detail, app + companion)
+// pass suppress=true — audio has no mid-song resume (TASK-276), so a track row
+// reads clean regardless of its saved position. Video episodes pass suppress=false
+// and keep the treatment. The caller decides "is this music", not a per-item field
+// (backend album items don't reliably carry a media-type flag).
+export function rowMidWatch(suppress, resumePositionSec, durationSec) {
+  if (suppress) return false;
+  return isMidWatch(resumePositionSec, durationSec);
 }
 
 // Resume value to persist after a position update — clears to 0 once finished.

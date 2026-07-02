@@ -15,7 +15,7 @@ var AVAILABLE_ROW = {
 // Per-render context for the detail screen: the series + progress + the active
 // season chip (TASK-123). null activeSeason = no season chips (legacy single
 // list). Reset on each buildDetailList.
-var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, onAddToPlaylist: null, onQueue: null, onMoveItem: null, onRemoveItem: null, seasons: [], activeSeason: null };
+var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, onAddToPlaylist: null, onQueue: null, onMoveItem: null, onRemoveItem: null, seasons: [], activeSeason: null, suppressResume: false };
 
 // Up/Down move between vertical stops: clickable breadcrumb crumbs (top), then
 // the header Play-next action, the shuffle button, the active season chip, then
@@ -261,7 +261,7 @@ function buildRow(server, series, progress, onPlayItem, item, i, isNext) {
   row.setAttribute('data-id', video.id);
 
   var resume = resumeOf(progress[video.id]);
-  var mid = rowMidWatch(video, resume);
+  var mid = rowMidWatch(state.suppressResume, resume, video.duration);
   [mid].filter(Boolean).forEach(function() { row.classList.add('has-resume'); });
 
   var posterName = [video.poster, series.poster].filter(Boolean)[0];
@@ -386,7 +386,10 @@ function renderList() {
 // controls; omitted elsewhere (album / artist / series) no reorder/remove renders.
 // With seasons[] the header carries a season chip row that filters the list + swaps
 // the poster (TASK-123); without it the legacy single list + inline dividers render.
-export function buildDetailList(server, series, progress, onPlayItem, onAddToPlaylist, onQueue, onMoveItem, onRemoveItem) {
+// opts.suppressResume (TASK-276): music surfaces (album / playlist detail) pass true
+// so track rows never show the mid-watch treatment (progress bar / RESUME tag /
+// Restart) — audio has no mid-song resume. Video series/film detail omits it.
+export function buildDetailList(server, series, progress, onPlayItem, onAddToPlaylist, onQueue, onMoveItem, onRemoveItem, opts) {
   state = {
     server: server, series: series, progress: progress, onPlayItem: onPlayItem,
     onAddToPlaylist: [onAddToPlaylist].filter(Boolean).concat([null])[0],
@@ -394,7 +397,8 @@ export function buildDetailList(server, series, progress, onPlayItem, onAddToPla
     onMoveItem: [onMoveItem].filter(Boolean).concat([null])[0],
     onRemoveItem: [onRemoveItem].filter(Boolean).concat([null])[0],
     seasons: seasonsOf(series),
-    activeSeason: defaultSeason(series.items, progress, seasonsOf(series))
+    activeSeason: defaultSeason(series.items, progress, seasonsOf(series)),
+    suppressResume: Boolean([opts].filter(Boolean).concat([{}])[0].suppressResume)
   };
   document.getElementById('detail-title').textContent = series.title;
   renderChips();

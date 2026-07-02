@@ -156,7 +156,7 @@ export function initPage() {
   // Bare text-label tile: track title + an optional resume-percent badge, no
   // poster (posters live on the TV — matches the companion browse / artist grids).
   function trackTile(card) {
-    var hint = tileHint(state.progress, card);
+    var hint = tileHint(state.progress, card, true);
     var el = document.createElement('button');
     el.className = 'ph-txt';
     el.setAttribute('data-id', card.id);

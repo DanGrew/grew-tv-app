@@ -42,15 +42,14 @@ describe('isMidWatch', () => {
 });
 
 describe('rowMidWatch', () => {
-  it('mirrors isMidWatch for a video row', () => {
-    expect(rowMidWatch({ duration: 600 }, 120)).toBe(true);
-    expect(rowMidWatch({ duration: 600 }, 0)).toBe(false);
-    expect(rowMidWatch({ duration: 600 }, 599)).toBe(false);
+  it('mirrors isMidWatch when not suppressed (video rows)', () => {
+    expect(rowMidWatch(false, 120, 600)).toBe(true);
+    expect(rowMidWatch(false, 0, 600)).toBe(false);
+    expect(rowMidWatch(false, 599, 600)).toBe(false);
   });
-  it('always false for a music track (TASK-276: audio never mid-song resumes)', () => {
-    expect(rowMidWatch({ mediaType: 'audio', duration: 600 }, 120)).toBe(false);
+  it('always false when suppressed (music — no mid-song resume, TASK-276)', () => {
+    expect(rowMidWatch(true, 120, 600)).toBe(false);
   });
-  it('false when the video is missing', () => expect(rowMidWatch(null, 120)).toBe(false));
 });
 
 describe('resumeAfter', () => {

@@ -42,6 +42,21 @@ function mockApp(page, playlistId) {
   });
 }
 
+// TASK-276: music has no mid-song resume, so a companion playlist track never
+// shows a resume-percent badge, even with a saved position. Red on the old code,
+// which rendered the .pct badge for a mid-watch track.
+test('TASK-276: a part-played playlist track shows no resume badge', async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: [{ item_id: 'ootb-01', position_secs: 100, duration_secs: 227, last_watched: 1000 }] })
+  }));
+  await mockApp(page, 'pl-roadtrip');
+  await page.goto('/companion/playlist.html');
+  await expect(page.locator('.ph-txt[data-id="ootb-01"]')).toBeVisible();
+  await expect(page.locator('.ph-txt[data-id="ootb-01"] .pct')).toHaveCount(0);
+});
+
 test.describe('Road Trip playlist (2 tracks)', () => {
   test.beforeEach(async ({ page }) => {
     sentIntents = [];
