@@ -404,7 +404,11 @@ async function installPlaybackBackend(page) {
   // permutation), so the Queue View renders all four sections and edits round
   // trip. Each row carries a STABLE entry_id (a counter, survives reorder) — the
   // contract the overlay keys remove/move on.
-  var state = { now: null, shuffle: false, repeat: false, sourceType: null, sourceId: null, override: [], source: [], then: [] };
+  // nowPos mirrors the backend `current_position` (updated by the `position`
+  // action, echoed as now_playing.position, reset to 0 whenever now-playing
+  // changes — like db/playback_engine.py). Only the now-playing track carries it;
+  // queue entries stay at 0.
+  var state = { now: null, nowPos: 0, shuffle: false, repeat: false, sourceType: null, sourceId: null, override: [], source: [], then: [] };
   var live = null;
   var seq = 0;
   function mkEntry(id) { seq += 1; return { entry_id: 'e' + seq, track_id: id }; }
@@ -430,7 +434,7 @@ async function installPlaybackBackend(page) {
   function snapshot() {
     return {
       person_id: 'kids',
-      now_playing: [state.now].filter(Boolean).map(resolve).concat([null])[0],
+      now_playing: [state.now].filter(Boolean).map(resolve).map(function(np) { np.position = state.nowPos; return np; }).concat([null])[0],
       play_next: pendingOverride().map(resolveEntry),
       from_source: state.source.map(resolveEntry),
       then: state.then.map(resolveEntry),
@@ -465,7 +469,7 @@ async function installPlaybackBackend(page) {
     'play-source': function(b) {
       var order = sourceOrder(b.source_type, b.source_id);
       state.sourceType = b.source_type; state.sourceId = b.source_id; state.shuffle = !!b.shuffle;
-      state.now = order[0] || null;
+      state.now = order[0] || null; state.nowPos = 0;
       state.source = order.slice(1).map(mkEntry);
       state.then = computeThen(order); state.override = [];
     },
@@ -473,7 +477,7 @@ async function installPlaybackBackend(page) {
     // a skip into the source advances the permutation past that track (so the
     // now-playing track never also sits in from_source).
     'play-track': function(b) {
-      state.now = b.track_id;
+      state.now = b.track_id; state.nowPos = 0;
       var queued = state.override.filter(function(e) { return e.track_id === b.track_id; })[0];
       [queued].filter(Boolean).forEach(function(e) { state.override = dropEntry(state.override, e.entry_id); });
       var i = sourceOrder(state.sourceType, state.sourceId).indexOf(b.track_id);
@@ -490,7 +494,7 @@ async function installPlaybackBackend(page) {
         .forEach(function(e) { state.override = dropEntry(state.override, e.entry_id); });
       var nextEntry = state.override.concat(state.source)[0];
       [nextEntry].filter(Boolean).forEach(function(e) {
-        state.now = e.track_id;
+        state.now = e.track_id; state.nowPos = 0;
         state.source = dropEntry(state.source, e.entry_id);
       });
     },
@@ -501,7 +505,7 @@ async function installPlaybackBackend(page) {
     // FEAT-040/TASK-254: play the override-queue head WITHOUT consuming it (durable
     // head, resumable on re-entry — matches api/playback play-queue). Empty -> no-op.
     'play-queue':         function() {
-      [state.override[0]].filter(Boolean).forEach(function(e) { state.now = e.track_id; });
+      [state.override[0]].filter(Boolean).forEach(function(e) { state.now = e.track_id; state.nowPos = 0; });
     },
     'remove-queue-entry': function(b) {
       state.override = dropEntry(state.override, b.entry_id);
@@ -514,7 +518,7 @@ async function installPlaybackBackend(page) {
         moveIn(state.override, b.entry_id, ti) || moveIn(state.source, b.entry_id, ti) || moveIn(state.then, b.entry_id, ti);
       });
     },
-    'position':           function() {}
+    'position':           function(b) { state.nowPos = b.current_position; }
   };
   var NO_BROADCAST = { position: true };
 

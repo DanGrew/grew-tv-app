@@ -128,13 +128,14 @@ export function initAudioPage() {
   audioEl.addEventListener('timeupdate', renderLyrics);
 
   // ── server `playback` snapshot -> UI (the single source of truth) ───────────
-  // A new now-playing track loads into <audio> at the server's position + pulls
-  // its lyrics; the same track just keeps playing (position lives client-side).
+  // A new now-playing track loads into <audio> at 0 (TASK-276: no mid-song
+  // resume — a paused/left track restarts on return) + pulls its lyrics; the
+  // same track just keeps playing (position lives client-side).
   function swapTrack(np) {
     loadedTrackId = np.track_id;
     setArt(np.poster);
     loadVideo(SERVER, np.track_id).then(loadTrackLyrics).catch(clearLyrics);
-    player.playTrack({ id: np.track_id, title: np.title, artist: np.artist, ext: np.ext, poster: np.poster }, from, np.position);
+    player.playTrack({ id: np.track_id, title: np.title, artist: np.artist, ext: np.ext, poster: np.poster }, from, 0);
   }
 
   var TRACK_CHANGED = {
