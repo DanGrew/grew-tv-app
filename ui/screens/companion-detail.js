@@ -2,7 +2,7 @@ import { connect } from '../../core/companion-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, videoPlaybackAction } from '../../core/app-api.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
-import { progressMapFromCW, percent, isMidWatch } from '../../core/progress.js';
+import { progressMapFromCW, percent, rowMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
 import { fmt } from '../../core/time.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
@@ -216,7 +216,7 @@ export function initPage() {
   function episodeBtn(item) {
     var video = item.video;
     var resume = resumeOf(state.progress[video.id]);
-    var mid = isMidWatch(resume, video.duration);
+    var mid = rowMidWatch(isAlbum(), resume, video.duration);
     var posterName = [video.poster, state.series.poster].filter(Boolean)[0];
     var btn = document.createElement('button');
     btn.className = 'tile-btn';

@@ -16,6 +16,9 @@ describe('tileHint', () => {
   it('tolerates a null map and a duration-less card', () => {
     expect(tileHint(null, { id: 'x' })).toBe('');
   });
+  it('is blank when suppressed, even mid-watch (music — no mid-song resume, TASK-276)', () => {
+    expect(tileHint({ bluey: { resumePositionSec: 168 } }, { id: 'bluey', durationSec: 420 }, true)).toBe('');
+  });
 });
 
 describe('seriesIdFromSnap', () => {

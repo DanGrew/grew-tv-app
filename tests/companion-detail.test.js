@@ -171,6 +171,25 @@ test('TASK-243: a music album detail also has no Back button (the breadcrumb cov
   await expect(page.locator('#btn-back')).toHaveCount(0);
 });
 
+// TASK-276: music has no mid-song resume, so a companion album track row never
+// shows the mid-watch progress bar, even with a saved position. Video series
+// episodes keep it (companion-detail gates on the album context). Red on the old
+// code, which rendered ep-progress for the audio row too.
+test('TASK-276: a part-played music album track shows no progress bar', async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: [{ item_id: 'ootb-02', position_secs: 90, duration_secs: 245, last_watched: 1000 }] })
+  }));
+  await mockAppRec(page, {
+    context: { context_id: 'detail', series_id: 'ootb-album' },
+    appState: { screen: 'detail', itemId: 'ootb-album', profile: 'kids' }
+  }, []);
+  await page.goto('/companion/detail.html');
+  await expect(page.locator('.tile-btn[data-id="ootb-02"]')).toBeVisible();
+  await expect(page.locator('.tile-btn[data-id="ootb-02"] .ep-progress')).toHaveCount(0);
+});
+
 // FEAT-038 (TASK-230) — desynced detail. The companion arrives via browse's local
 // link (detail.html?id=…) while the TV is elsewhere, so it self-loads the series
 // from the id instead of waiting for the TV's context echo; it does not follow the

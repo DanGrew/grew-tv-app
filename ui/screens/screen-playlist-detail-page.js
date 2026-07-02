@@ -6,7 +6,7 @@ import { wsUrl } from '../../core/server-config.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
 import { coverMosaicHtml } from '../../core/cover-mosaic.js';
 import { progressMapFromCW } from '../../core/progress.js';
-import { playNextIndex } from '../../core/series-detail.js';
+import { primaryAction } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 import { playlistCards } from '../../core/playlist-pick.js';
@@ -34,9 +34,13 @@ export function initPlaylistDetailPage() {
   function play(item, mode) { navTo('audio.html', PLAY_PARAMS[mode](item.video.id)); }
   function onPlayItem(item, i, mode) { play(item, mode); }
 
-  // Header Play: the track after the most-recently-played one (wraps), resumed.
+  // Header Play: continue the playlist at the right track (TASK-276). A track left
+  // part-played resumes THAT track (from 0 — no mid-song resume); a finished track
+  // advances to the next (wrapping last->first). primaryAction encodes that
+  // continue/next/again choice; playNextIndex would always skip forward, dropping
+  // a half-heard track.
   function playFromResume() {
-    var idx = playNextIndex(state.playlist.items, state.progress);
+    var idx = primaryAction(state.playlist.items, state.progress).index;
     [state.playlist.items[idx]].filter(Boolean).forEach(function(item) { play(item, 'resume'); });
   }
 
@@ -80,7 +84,7 @@ export function initPlaylistDetailPage() {
     return loadPlaylist(SERVER, playlistId).then(function(pl) {
       state.playlist = pl;
       renderCover();
-      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove);
+      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove, { suppressResume: true });
       ([document.querySelector(focusSel)].filter(Boolean)
         .concat([document.querySelector('.detail-row')]).filter(Boolean)
         .concat([document.getElementById('btn-play-next')]))[0].focus();
@@ -252,7 +256,7 @@ export function initPlaylistDetailPage() {
       state.progress = progressMapFromCW(res[1].content);
       renderCover();
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: playlistId, seriesTitle: state.playlist.title }));
-      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove);
+      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove, { suppressResume: true });
       focusFirstDetailRow();
     })
     .catch(function() { navTo('error.html'); });

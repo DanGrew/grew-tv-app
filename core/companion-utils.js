@@ -9,7 +9,11 @@ export function screenPage(contextId) {
 // Pure so the companion grid stays DOM-only (no-pure-fn-outside-core) and "which
 // tiles flag progress" is provable without a browser. progressMap is keyed by
 // item id -> { resumePositionSec } (core/progress.js progressMapFromCW).
-export function tileHint(progressMap, card) {
+// suppress=true drops the hint entirely — music surfaces (the companion playlist
+// track list) have no mid-song resume (TASK-276), so a track never shows a
+// resume-percent badge regardless of its saved position.
+export function tileHint(progressMap, card, suppress) {
+  if (suppress) return '';
   var entry = (progressMap || {})[card.id];
   var resume = entry ? (entry.resumePositionSec || 0) : 0;
   if (!isMidWatch(resume, card.durationSec)) return '';

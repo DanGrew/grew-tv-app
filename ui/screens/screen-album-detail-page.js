@@ -5,7 +5,7 @@ import { connectApp } from '../../core/app-ws.js';
 import { wsUrl } from '../../core/server-config.js';
 import { loadAlbum, loadContinueWatching, addToPlaylist, addSourceToPlaylist, loadBrowse, playbackAction } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
-import { playNextIndex } from '../../core/series-detail.js';
+import { primaryAction } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 import { playlistCards } from '../../core/playlist-pick.js';
@@ -33,9 +33,13 @@ export function initAlbumDetailPage() {
   function play(item, mode) { navTo('audio.html', PLAY_PARAMS[mode](item.video.id)); }
   function onPlayItem(item, i, mode) { play(item, mode); }
 
-  // Header Play: the track after the most-recently-played one (wraps), resumed.
+  // Header Play: continue the album at the right track (TASK-276). A track left
+  // part-played resumes THAT track (from 0 — no mid-song resume); a finished
+  // track advances to the next (wrapping last->first). primaryAction encodes
+  // that continue/next/again choice; playNextIndex would always skip forward,
+  // dropping a half-heard track.
   function playFromResume() {
-    var idx = playNextIndex(state.album.items, state.progress);
+    var idx = primaryAction(state.album.items, state.progress).index;
     [state.album.items[idx]].filter(Boolean).forEach(function(item) { play(item, 'resume'); });
   }
 
@@ -219,7 +223,7 @@ export function initAlbumDetailPage() {
       state.album = res[0];
       state.progress = progressMapFromCW(res[1].content);
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: albumId, seriesTitle: state.album.title }));
-      buildDetailList(SERVER, state.album, state.progress, onPlayItem, openAddSheet, null);
+      buildDetailList(SERVER, state.album, state.progress, onPlayItem, openAddSheet, null, null, null, { suppressResume: true });
       focusFirstDetailRow();
     })
     .catch(function() { navTo('error.html'); });

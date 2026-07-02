@@ -65,6 +65,24 @@ test('selecting a playlist opens the playlist detail (not album detail) with its
   await expect(page.locator('#btn-shuffle')).toBeVisible();
 });
 
+// TASK-276: the playlist header Play continues at the part-played track (from 0),
+// not the following one. Road Trip is [ootb-03, ootb-01]; ootb-03 is left
+// mid-song, so Play resumes "Sweet Talkin Woman" — the old playNextIndex wiring
+// advanced to ootb-01 ("Turn to Stone"), the red-on-old assertion.
+test('playlist header Play continues at a part-played track, not the next one (TASK-276)', async ({ page }) => {
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: [{ item_id: 'ootb-03', position_secs: 100, duration_secs: 228, last_watched: 2000 }] })
+  }));
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="pl-roadtrip"]').click();
+  await expect(page).toHaveURL(/playlist-detail\.html/);
+  await expect(page.locator('.detail-row')).toHaveCount(2);
+  await page.locator('#btn-play-next').click();
+  await expect(page).toHaveURL(/audio\.html/);
+  await expect(page.locator('#audio-title')).toHaveText('Sweet Talkin Woman');
+});
+
 test('an empty playlist opens its detail with no track rows', async ({ page }) => {
   await enterMusic(page);
   await page.locator('.film-tile[data-id="pl-empty"]').click();

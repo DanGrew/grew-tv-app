@@ -106,6 +106,42 @@ test('albums route to the album detail (not series detail)', async ({ page }) =>
   await expect(page.locator('#btn-shuffle')).toBeVisible();
 });
 
+// TASK-276: music has no mid-song resume, so a track row NEVER shows the
+// mid-watch treatment (progress bar / Restart control), even with a saved
+// position_secs. The shared detail screen still shows it for video episodes
+// (detail-resume.test.js). Red on the old code (the bar rendered for audio too).
+test('a music track left mid-song shows no progress bar or Restart control (TASK-276)', async ({ page }) => {
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: [{ item_id: 'ootb-01', position_secs: 90, duration_secs: 227, last_watched: 1000 }] })
+  }));
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="ootb"]').click();
+  await expect(page.locator('.detail-row')).toHaveCount(3);
+  const row = page.locator('.detail-row[data-id="ootb-01"]');
+  await expect(row.locator('.detail-progress')).toHaveCount(0);
+  await expect(row.locator('.detail-restart')).toHaveCount(0);
+});
+
+// TASK-276: the album header Play continues at the part-played track (from 0),
+// it does NOT skip to the following track. ootb-02 is left mid-song, so Play
+// resumes "Mr. Blue Sky" — the old playNextIndex wiring advanced to the next
+// track ("Sweet Talkin Woman"), the red-on-old assertion.
+test('album header Play continues at a part-played track, not the next one (TASK-276)', async ({ page }) => {
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: [{ item_id: 'ootb-02', position_secs: 90, duration_secs: 245, last_watched: 2000 }] })
+  }));
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="ootb"]').click();
+  await expect(page.locator('.detail-row')).toHaveCount(3);
+  await page.locator('#btn-play-next').click();
+  await expect(page).toHaveURL(/audio\.html/);
+  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
+});
+
 test('selecting a track plays it in the <audio> player from {id}.m4a', async ({ page }) => {
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="music"]').click();
