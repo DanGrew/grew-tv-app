@@ -52,7 +52,7 @@ test('Add all opens a sheet listing the active profile\'s playlists + New playli
   await openAlbum(page);
   await page.locator('#btn-add-all').click();
   await expect(page.locator('#add-sheet')).toBeVisible();
-  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['Road Trip', 'Empty Mix']);
+  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['♪ Road Trip', '♪ Empty Mix']);
   await expect(page.locator('#btn-add-create')).toBeVisible();
   await expect(page.locator('#btn-add-cancel')).toBeVisible();
 });
@@ -109,7 +109,7 @@ test('the sheet excludes the current playlist (no self-add)', async ({ page }) =
   await page.locator('#btn-add-all').click();
   await expect(page.locator('#add-sheet')).toBeVisible();
   // pl-roadtrip itself is dropped; only the other playlist is offered.
-  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['Empty Mix']);
+  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['♪ Empty Mix']);
 });
 
 test('picking a target POSTs add-source for this whole playlist (snapshot)', async ({ page }) => {

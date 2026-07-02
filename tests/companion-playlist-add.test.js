@@ -98,8 +98,8 @@ test('＋ opens a sheet with Play Next on top, then the profile\'s playlists + N
   await expect(page.locator('#add-sheet')).toBeVisible();
   // Play Next is the first sheet cell, distinct from the playlist choices.
   await expect(page.locator('#add-sheet-list > *').first()).toHaveClass(/add-queue/);
-  await expect(page.locator('#add-sheet-list .add-queue')).toHaveText('▶ Play Next');
-  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['Road Trip', 'Empty Mix']);
+  await expect(page.locator('#add-sheet-list .add-queue')).toHaveText('☰ Play Next');
+  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['♪ Road Trip', '♪ Empty Mix']);
   await expect(page.locator('#btn-add-create')).toBeVisible();
   await expect(page.locator('#btn-add-cancel')).toBeVisible();
 });

@@ -175,7 +175,7 @@ export function initPlaylistDetailPage() {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'add-choice';
-    b.textContent = card.title;
+    b.textContent = '♪ ' + card.title;
     b.setAttribute('data-id', card.id);
     b.addEventListener('click', function() { addExisting(card.id, card.title); });
     b.addEventListener('keydown', onAddKey);
