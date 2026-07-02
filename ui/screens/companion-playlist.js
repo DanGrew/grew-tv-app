@@ -211,9 +211,10 @@ export function initPage() {
     });
   }
 
-  // A full-width row: the play tile (tap = play on the TV) plus the ↑ ↓ ✕ edit
-  // controls as siblings (a <button> can't nest, so the tile stays a button and
-  // the controls sit beside it — same shape as companion-audio's ＋ Queue row).
+  // A full-width row styled as ONE rounded box (TASK-263, the album-companion
+  // .detail-track-row model): a borderless play tile (tap = play on the TV) plus
+  // the ↑ ↓ ✕ edit controls as inner chips. A <button> can't nest, so the tile
+  // stays a button and the chips sit beside it inside the .ph-row box.
   function trackRow(card, i, total) {
     var row = document.createElement('div');
     row.className = 'ph-row';
