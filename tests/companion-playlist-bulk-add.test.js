@@ -81,7 +81,7 @@ test('Add all opens a sheet and a pick POSTs add-source for the whole album', as
   await openAlbum(page);
   await page.locator('#btn-add-all').click();
   await expect(page.locator('#add-sheet')).toBeVisible();
-  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['Road Trip', 'Empty Mix']);
+  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['♪ Road Trip', '♪ Empty Mix']);
   const add = page.waitForRequest(req =>
     req.url().includes('/api/playlists/add-source') && req.method() === 'POST');
   await page.locator('#add-sheet-list .add-choice[data-id="pl-roadtrip"]').click();

@@ -85,7 +85,7 @@ export function initPage() {
     var b = document.createElement('button');
     b.className = 'add-choice';
     b.setAttribute('data-id', card.id);
-    b.textContent = card.title;
+    b.textContent = '♪ ' + card.title;
     b.addEventListener('click', function() { addExisting(card.id, card.title); });
     return b;
   }
@@ -96,7 +96,7 @@ export function initPage() {
   function queueChoiceBtn() {
     var b = document.createElement('button');
     b.className = 'add-queue';
-    b.textContent = '▶ Play Next';
+    b.textContent = '☰ Play Next';
     b.addEventListener('click', addState.queue);
     return b;
   }

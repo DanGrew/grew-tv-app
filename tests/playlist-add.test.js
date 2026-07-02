@@ -43,9 +43,9 @@ test('the ＋ control opens a sheet with Play Next on top, then the profile\'s p
   await expect(page.locator('#add-sheet')).toBeVisible();
   // Play Next is the first sheet cell (top of the list), distinct from the playlist choices.
   await expect(page.locator('#add-sheet-list > *').first()).toHaveClass(/add-queue/);
-  await expect(page.locator('#add-sheet-list .add-queue')).toHaveText('▶ Play Next');
+  await expect(page.locator('#add-sheet-list .add-queue')).toHaveText('☰ Play Next');
   // Only the active (kids) profile's playlists are offered — both fixture playlists.
-  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['Road Trip', 'Empty Mix']);
+  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['♪ Road Trip', '♪ Empty Mix']);
   await expect(page.locator('#btn-add-create')).toBeVisible();
   await expect(page.locator('#btn-add-cancel')).toBeVisible();
 });

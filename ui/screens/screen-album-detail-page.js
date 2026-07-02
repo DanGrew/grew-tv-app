@@ -107,7 +107,7 @@ export function initAlbumDetailPage() {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'add-queue';
-    b.textContent = '▶ Play Next';
+    b.textContent = '☰ Play Next';
     b.addEventListener('click', addState.queue);
     b.addEventListener('keydown', onAddKey);
     document.getElementById('add-sheet-list').appendChild(b);
@@ -119,7 +119,7 @@ export function initAlbumDetailPage() {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'add-choice';
-    b.textContent = card.title;
+    b.textContent = '♪ ' + card.title;
     b.setAttribute('data-id', card.id);
     b.addEventListener('click', function() { addExisting(card.id, card.title); });
     b.addEventListener('keydown', onAddKey);
