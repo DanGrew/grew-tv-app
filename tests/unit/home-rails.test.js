@@ -1,4 +1,4 @@
-import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, albumsByArtist, withPlaylistsRail } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, albumsByArtist, artistFromId, withPlaylistsRail } from '../../core/home-rails.js';
 
 // TASK-235 — the create affordance is the Playlists rail-heading ＋ button (in the
 // browse screen), not a synthetic card. withPlaylistsRail just GUARANTEES the rail
@@ -328,6 +328,15 @@ describe('Artists rail + drill-down (FEAT-029)', () => {
     ];
     // 2000, 1990, then the two yearless A-Z (Acme, Zed).
     expect(albumsByArtist(mixed, 'X').map(c => c.id)).toEqual(['a-2000', 'c-1990', 'd-none', 'b-none']);
+  });
+
+  // BUG-029: companion browse opens the artist page with the prefixed rail-tile
+  // id (`artist:NF`); the page must resolve it to the clean artist key.
+  it('artistFromId strips a leading artist: prefix, passthrough otherwise', () => {
+    expect(artistFromId('artist:NF')).toBe('NF');
+    expect(artistFromId('NF')).toBe('NF');
+    expect(artistFromId('artist:Simon & Garfunkel')).toBe('Simon & Garfunkel');
+    expect(artistFromId('')).toBe('');
   });
 });
 

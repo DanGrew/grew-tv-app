@@ -3,7 +3,7 @@ import { wsUrl } from '../../core/server-config.js';
 import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
-import { albumsByArtist } from '../../core/home-rails.js';
+import { albumsByArtist, artistFromId } from '../../core/home-rails.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { pushUnique as pushTrail, trimOnCrumb, entries as entriesTrail } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
@@ -180,7 +180,7 @@ export function initPage() {
   applyMode();
   // Browse-mode entry: browse linked here with ?id=<artist>, so seed the artist
   // ourselves (captureArtist loads its albums once the profile arrives).
-  [new URLSearchParams(window.location.search).get('id')].filter(Boolean).forEach(function(id) { captureArtist({ artist: id }); });
+  [new URLSearchParams(window.location.search).get('id')].filter(Boolean).forEach(function(id) { captureArtist({ artist: artistFromId(id) }); });
   api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }

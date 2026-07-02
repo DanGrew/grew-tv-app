@@ -256,6 +256,16 @@ function albumYear(card) {
   return isNaN(y) ? null : y;
 }
 
+// The artist name from a routing id. Artist rail tiles carry a prefixed id
+// (`artist:NF`, see artistTiles) but a clean `artist` field; companion browse
+// opens the artist page with the prefixed id (`?id=artist:NF`) while the TV/WS
+// path passes the clean name. Strip a leading `artist:` so the artist page
+// resolves both to the clean key (BUG-029). Pure → unit-tested.
+export function artistFromId(id) {
+  var s = id || '';
+  return s.indexOf('artist:') === 0 ? s.slice('artist:'.length) : s;
+}
+
 // The albums of one artist for the artist drill-down page (FEAT-029), newest
 // first by release year, then A-Z by title (yearless albums sort last). Pure so
 // the page stays DOM-only (no-pure-fn-outside-core).
