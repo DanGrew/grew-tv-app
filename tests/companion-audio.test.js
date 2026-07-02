@@ -60,6 +60,13 @@ test.describe('album source (Plane B)', () => {
     await expect(page.locator('.track-btn[data-id="ootb-01"]')).not.toHaveClass(/cur/);
   });
 
+  // TASK-273: an album track carries its episode number, so the number column
+  // still shows the number (the ♪ fallback is playlist-only).
+  test('an album track keeps its number in the number column (not the ♪ fallback)', async ({ page }) => {
+    await expect(page.locator('.track-btn[data-id="ootb-01"] .t-num')).toHaveText('1');
+    await expect(page.locator('.track-btn[data-id="ootb-03"] .t-num')).toHaveText('3');
+  });
+
   test('Next drives the per-person engine (Plane B) and now-playing repaints from the snapshot', async ({ page }) => {
     const posts = spyActions(page);
     await page.locator('#c-next').click();
@@ -214,6 +221,15 @@ test.describe('playlist source (TASK-205)', () => {
     await expect(page.locator('.track-btn[data-id="ootb-01"] .t-name')).toHaveText('Turn to Stone');
     // The playlist id was never mistaken for an album (no /api/album/pl-roadtrip).
     expect(albumReqs.filter((u) => u.includes('pl-roadtrip'))).toHaveLength(0);
+  });
+
+  // TASK-273: a playlist track carries episode:null, so its number column would
+  // otherwise render blank (a ~32px gap the owner read as a missing cover). Fill
+  // it with a muted music-note glyph (♪) so rows stay aligned with the album view.
+  test('a numberless (playlist) track shows a ♪ in the number column, not a blank slot', async ({ page }) => {
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('.track-btn[data-id="ootb-03"] .t-num')).toHaveText('♪');
+    await expect(page.locator('.track-btn[data-id="ootb-01"] .t-num')).toHaveText('♪');
   });
 });
 

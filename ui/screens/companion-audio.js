@@ -144,10 +144,12 @@ export function initPage() {
   // the highlight + e2e key off) plus a ＋ Queue producer (FEAT-031 mockup).
   function playBtn(item) {
     var v = item.video;
-    // A flat playlist track carries no episode number (episode:null) — show a
-    // blank slot rather than the literal "null" (FEAT-036/TASK-205); an album
-    // track keeps its number.
-    var num = [item.episode].filter(Boolean).concat([''])[0];
+    // A flat playlist track carries no episode number (episode:null) — fill the
+    // 20px number column with a muted music-note glyph (&#9834; = ♪) so rows stay
+    // aligned with the album view rather than leaving a blank gap the owner reads
+    // as a missing cover (FEAT-036/TASK-205, TASK-273); an album track keeps its
+    // number.
+    var num = [item.episode].filter(Boolean).concat(['&#9834;'])[0];
     var b = document.createElement('button');
     b.className = 'track-btn';
     b.setAttribute('data-id', v.id);
