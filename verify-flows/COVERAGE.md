@@ -26,6 +26,7 @@ Legend: ✅ covered · ⚠️ partial · ❌ gap · ➖ low-value (skip)
 | `music` | companion remote — audio | `companion-music.cjs` | Music → Albums → album detail → audio play/pause → queue → back |
 | `playlists` | companion — playlists | `companion-playlists.cjs` | create form → created tile → album detail → add-sheet → added toast |
 | `tv-app` | **TV** app-side | `tv-app.cjs` | profile → browse → detail → video play/pause → breadcrumb |
+| `tv-music` | **TV** app-side — music | `tv-music.cjs` | profile → Music tab (Artists/Albums rails) → album detail → audio play/pause |
 
 Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MASK`).
 
@@ -61,8 +62,8 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 | browse | film tiles + rails | tv-app | ✅ | |
 | browse | Continue Watching/Listening rail (mid-play) | — | ❌ | FEAT-044 (TASK-285) |
 | detail | TV-series detail + NEXT tag | tv-app | ✅ | |
-| album-detail | album detail (music) | — | ❌ | |
-| audio | TV music player controls | — | ❌ | TASK-288 (two-row), BUG-034 (volume), TASK-283 (startAt/endAt) |
+| album-detail | album detail (music) | tv-music | ✅ | |
+| audio | TV music player controls | tv-music | ✅ | TASK-288 (two-row), BUG-034 (volume), TASK-283 (startAt/endAt) |
 | artist | TV artist / album-by-year | — | ❌ | FEAT-029 |
 | playlist-detail | TV playlist detail + per-track ＋ | — | ❌ | TASK-262, BUG-033 |
 | rail-grid | "see all" rail grid | — | ❌ | |
@@ -84,8 +85,8 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 
 Ranked by churn. Extend where the surface sits on an existing path; else new flow.
 
-1. **`tv-music`** *(new)* — TV: profile → Music → Albums → album detail → play audio → player.
-   Closes TV `audio`, `album-detail`. Highest churn: TASK-288, BUG-034, TASK-283.
+1. ~~**`tv-music`** *(new)* — TV: profile → Music → Albums → album detail → play audio → player.
+   Closes TV `audio`, `album-detail`. Highest churn: TASK-288, BUG-034, TASK-283.~~ ✅ **landed** (`tv-music.cjs`).
 2. **`companion-artist`** *(new)* — companion: Music → Artists rail → artist → album → detail.
    Closes companion `artist`. BUG-035, TASK-274.
 3. **`video-queue`** *(new)* — build a video queue → open queue view → snap greyed Repeat pill
