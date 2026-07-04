@@ -72,7 +72,7 @@ if (rule === 'no-ui-imports') {
 }
 
 if (rule === 'no-stray-files') {
-  const EXCLUDED = new Set(['scripts', 'tests', '.github', '.githooks', 'node_modules', 'coverage', 'reports', '.claude']);
+  const EXCLUDED = new Set(['scripts', 'tests', '.github', '.githooks', 'node_modules', 'coverage', 'reports', '.claude', 'verify-flows']);
   const LAYERS = new Set(['core', 'ui', 'app', 'companion', 'components', 'styles', 'assets', 'content']);
   const allFiles = getAllFiles(ROOT);
   allFiles.forEach(file => {
@@ -250,7 +250,7 @@ if (rule === 'no-css-outside-styles') {
 
 if (rule === 'no-md-outside-docs') {
   const ALLOWED_ROOT_FILES = new Set(['README.md', 'CLAUDE.md', 'LICENCE', 'LICENSE']);
-  const EXCLUDED_DIRS = new Set(['node_modules', 'docs', 'coverage', 'reports', '.claude', '.github', '.githooks', 'test-results']);
+  const EXCLUDED_DIRS = new Set(['node_modules', 'docs', 'coverage', 'reports', '.claude', '.github', '.githooks', 'test-results', 'verify-flows']);
   function walkMd(dir, depth) {
     if (!fs.existsSync(dir)) return;
     fs.readdirSync(dir, { withFileTypes: true }).forEach(entry => {
