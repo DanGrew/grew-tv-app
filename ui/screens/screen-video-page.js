@@ -3,7 +3,6 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { setupVideoQueue } from './screen-video-queue.js';
 import { connectApp } from '../../core/app-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { loadSeries, loadProgress, videoPlaybackAction } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
@@ -174,7 +173,7 @@ export function initVideoPage() {
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
-  wsApp = connectApp(wsUrl(window.location.hostname), appIntent, { onVideoPlayback: applySnapshot });
+  wsApp = connectApp(window.location.origin, appIntent, { onVideoPlayback: applySnapshot });
 
   document.addEventListener('keydown', dispatchKey);
 

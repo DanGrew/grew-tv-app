@@ -2,7 +2,6 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { loadSeries, loadContinueWatching, videoPlaybackAction } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { primaryAction, playNextLabel } from '../../core/series-detail.js';
@@ -55,7 +54,7 @@ export function initDetailPage() {
       .catch(function() { showStatus('Could not queue.'); });
   }
 
-  var wsApp = connectApp(wsUrl(window.location.hostname), function(intent, params) {
+  var wsApp = connectApp(window.location.origin, function(intent, params) {
     var INTENTS = {
       navigate_up:   function() { detailArrow({ key: 'ArrowUp',   preventDefault: function() {} }); },
       navigate_down: function() { detailArrow({ key: 'ArrowDown', preventDefault: function() {} }); },

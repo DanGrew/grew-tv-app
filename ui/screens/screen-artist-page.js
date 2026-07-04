@@ -2,7 +2,6 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { gridArrow, renderGrid, focusFirstGridTile } from './screen-rail-grid.js';
 import { connectApp } from '../../core/app-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
@@ -40,7 +39,7 @@ export function initArtistPage() {
     navTo('browse.html', { tab: 'music' });
   }
 
-  var wsApp = connectApp(wsUrl(window.location.hostname), function(intent, params) {
+  var wsApp = connectApp(window.location.origin, function(intent, params) {
     var INTENTS = {
       navigate_up:    function() { gridArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
       navigate_down:  function() { gridArrow({ key: 'ArrowDown',  preventDefault: function() {} }); },
