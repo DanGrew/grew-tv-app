@@ -27,6 +27,7 @@ Legend: ✅ covered · ⚠️ partial · ❌ gap · ➖ low-value (skip)
 | `playlists` | companion — playlists | `companion-playlists.cjs` | create form → created tile → album detail → add-sheet → added toast |
 | `tv-app` | **TV** app-side | `tv-app.cjs` | profile → browse → detail → video play/pause → breadcrumb |
 | `tv-music` | **TV** app-side — music | `tv-music.cjs` | profile → Music tab (Artists/Albums rails) → album detail → audio play/pause |
+| `companion-artist` | companion — artist drill | `companion-artist.cjs` | Music → Artists rail → artist → albums grid → album detail |
 
 Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MASK`).
 
@@ -42,7 +43,7 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 | detail | TV-series tracklist | companion | ⚠️ | list snaps; NEXT tag not asserted — BUG-033 |
 | detail | album tracklist | music | ✅ | |
 | detail | add-to-playlist sheet | playlists | ✅ | |
-| artist | artist drill → albums grid | — | ❌ | BUG-035 (crumb), TASK-274 (covers) |
+| artist | artist drill → albums grid | companion-artist | ✅ | BUG-035 (crumb), TASK-274 (covers) |
 | audio | remote play / pause | music | ✅ | |
 | audio | ＋Queue toast confirmation | — | ❌ | BUG-030 (state) |
 | video | remote play / pause | companion | ✅ | |
@@ -87,8 +88,8 @@ Ranked by churn. Extend where the surface sits on an existing path; else new flo
 
 1. ~~**`tv-music`** *(new)* — TV: profile → Music → Albums → album detail → play audio → player.
    Closes TV `audio`, `album-detail`. Highest churn: TASK-288, BUG-034, TASK-283.~~ ✅ **landed** (`tv-music.cjs`).
-2. **`companion-artist`** *(new)* — companion: Music → Artists rail → artist → album → detail.
-   Closes companion `artist`. BUG-035, TASK-274.
+2. ~~**`companion-artist`** *(new)* — companion: Music → Artists rail → artist → album → detail.
+   Closes companion `artist`. BUG-035, TASK-274.~~ ✅ **landed** (`companion-artist.cjs`).
 3. **`video-queue`** *(new)* — build a video queue → open queue view → snap greyed Repeat pill
    (companion + TV). Closes the TASK-289 blind spot; BUG-024.
 4. **`tv-artist-playlist`** *(new)* — TV: Music → Artists → album-by-year → playlist-detail.
