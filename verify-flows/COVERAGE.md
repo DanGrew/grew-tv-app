@@ -25,7 +25,7 @@ Legend: ✅ covered · ⚠️ partial · ❌ gap · ➖ low-value (skip)
 | `companion` | companion remote — video journey | `companion-journey.cjs` | browse → TV-series → grid → detail → video play/pause → breadcrumb → films |
 | `music` | companion remote — audio | `companion-music.cjs` | Music → Albums → album detail → audio play/pause → queue → back |
 | `playlists` | companion — playlists | `companion-playlists.cjs` | create form → created tile → album detail → add-sheet → added toast → **populated playlist view** |
-| `tv-app` | **TV** app-side | `tv-app.cjs` | profile → browse → detail → video play/pause → breadcrumb |
+| `tv-app` | **TV** app-side | `tv-app.cjs` | profile → browse → detail → video play/pause → breadcrumb → **Continue Watching rail** |
 | `tv-music` | **TV** app-side — music | `tv-music.cjs` | profile → Music tab (Artists/Albums rails) → album detail → audio play/pause |
 | `companion-artist` | companion — artist drill | `companion-artist.cjs` | Music → Artists rail → artist → albums grid → album detail |
 | `tv-video-queue` | **TV** — video queue view | `tv-video-queue.cjs` | play a film (single-item) → Queue overlay → greyed Repeat pill |
@@ -64,7 +64,7 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 |---------|------------------|---------|--------|----------------|
 | profile | profile pick + PIN | tv-app | ✅ | |
 | browse | film tiles + rails | tv-app | ✅ | |
-| browse | Continue Watching/Listening rail (mid-play) | — | ❌ | FEAT-044 (TASK-285) |
+| browse | Continue Watching rail (mid-play) | tv-app | ✅ | FEAT-044; tv-app seeks a video to ~30% then snaps the rail (Continue **Listening** / playlist tiles still ❌ — TASK-285) |
 | detail | TV-series detail + NEXT tag | tv-app | ✅ | |
 | album-detail | album detail (music) | tv-music | ✅ | |
 | audio | TV music player controls | tv-music | ✅ | TASK-288 (two-row), BUG-034 (volume), TASK-283 (startAt/endAt) |
@@ -102,7 +102,16 @@ Ranked by churn. Extend where the surface sits on an existing path; else new flo
 5. ~~**populated `playlist.html`** *(extend `playlists`)* — already flagged as a follow-on in
    `companion-playlists.cjs`: after add, view the populated companion playlist (thumbs + NEXT).
    TASK-287, BUG-033.~~ ✅ **landed** — `playlists` step 07 (playlist.html back-nav now sorted, TASK-297).
-6. **Continue rail** *(extend `tv-app` tail)* — play partway → back to browse → snap the
-   Continue Watching/Listening rail. FEAT-044.
+6. ~~**Continue rail** *(extend `tv-app` tail)* — play partway → back to browse → snap the
+   Continue Watching/Listening rail. FEAT-044.~~ ✅ **landed** — `tv-app` steps 08–09 (seek a
+   video to ~30%, back to browse, snap the Continue Watching rail; tile progress-fill masked).
 
 When a flow lands, flip its `(surface, state)` rows to ✅ and name it in Flow(s).
+
+---
+
+**TASK-299 batch complete** — all six ranked flows landed (7 flow files total):
+`tv-music`, `companion-artist`, `tv-video-queue` + `companion-video-queue`,
+`tv-artist-playlist`, populated-playlist (extended `companion-playlists`), Continue-rail
+(extended `tv-app`). Remaining ❌ rows above are follow-ons outside this batch (e.g. the
+companion browse Continue rail, companion ＋Queue toast, audio ＋Queue toast).
