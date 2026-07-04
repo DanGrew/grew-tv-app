@@ -30,6 +30,7 @@ Legend: ✅ covered · ⚠️ partial · ❌ gap · ➖ low-value (skip)
 | `companion-artist` | companion — artist drill | `companion-artist.cjs` | Music → Artists rail → artist → albums grid → album detail |
 | `tv-video-queue` | **TV** — video queue view | `tv-video-queue.cjs` | play a film (single-item) → Queue overlay → greyed Repeat pill |
 | `companion-video-queue` | companion — video queue view | `companion-video-queue.cjs` | play a film (single-item) → Video Queue View → greyed Repeat button |
+| `tv-artist-playlist` | **TV** — artist + playlist detail | `tv-artist-playlist.cjs` | Music → Artists rail → artist (rail-grid) → album → build playlist → populated playlist-detail |
 
 Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MASK`).
 
@@ -67,9 +68,9 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 | detail | TV-series detail + NEXT tag | tv-app | ✅ | |
 | album-detail | album detail (music) | tv-music | ✅ | |
 | audio | TV music player controls | tv-music | ✅ | TASK-288 (two-row), BUG-034 (volume), TASK-283 (startAt/endAt) |
-| artist | TV artist / album-by-year | — | ❌ | FEAT-029 |
-| playlist-detail | TV playlist detail + per-track ＋ | — | ❌ | TASK-262, BUG-033 |
-| rail-grid | "see all" rail grid | — | ❌ | |
+| artist | TV artist / album-by-year | tv-artist-playlist | ✅ | FEAT-029 |
+| playlist-detail | TV playlist detail + per-track ＋ | tv-artist-playlist | ✅ | TASK-262, BUG-033 |
+| rail-grid | "see all" rail grid | tv-artist-playlist | ✅ | artist page renders via screen-rail-grid.js (same grid renderer) |
 | playlist-create | create form | — | ➖ | companion create covers the path |
 | video | TV player play / pause | tv-app | ✅ | video frame hidden for determinism |
 | video-queue | TV video queue + greyed Repeat pill | tv-video-queue | ✅ | TASK-289 gap closed, BUG-024 |
@@ -95,8 +96,9 @@ Ranked by churn. Extend where the surface sits on an existing path; else new flo
 3. ~~**`video-queue`** *(new)* — build a video queue → open queue view → snap greyed Repeat pill
    (companion + TV). Closes the TASK-289 blind spot; BUG-024.~~ ✅ **landed** — two files, one per surface
    (`tv-video-queue.cjs` + `companion-video-queue.cjs`); a single-item film is the non-repeatable source.
-4. **`tv-artist-playlist`** *(new)* — TV: Music → Artists → album-by-year → playlist-detail.
-   Closes TV `artist`, `playlist-detail`, `rail-grid`.
+4. ~~**`tv-artist-playlist`** *(new)* — TV: Music → Artists → album-by-year → playlist-detail.
+   Closes TV `artist`, `playlist-detail`, `rail-grid`.~~ ✅ **landed** (`tv-artist-playlist.cjs`) — one
+   journey; playlist built via a Queen album's Add-all → New playlist (catalog seeds none).
 5. **populated `playlist.html`** *(extend `playlists`)* — already flagged as a follow-on in
    `companion-playlists.cjs`: after add, view the populated companion playlist (thumbs + NEXT).
    TASK-287, BUG-033.
