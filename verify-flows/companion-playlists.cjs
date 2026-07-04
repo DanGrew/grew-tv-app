@@ -22,8 +22,21 @@ runFlow({
     { name: '04-album-detail', fn: async p => { await rail(p, 'Albums').click(); await p.locator('#txtgrid .ph-txt').first().waitFor(); await p.locator('#txtgrid .ph-txt').first().click(); await p.waitForURL(/detail\.html/, { timeout: 15000 }); await p.locator('button').filter({ hasText: /^\s*1\.\s/ }).first().waitFor(); } },
     { name: '05-add-sheet', fn: async p => { await p.locator('button').filter({ hasText: /^＋$/ }).first().click(); await p.locator('#add-sheet').waitFor({ state: 'visible' }); await p.locator('#add-sheet-list', { hasText: NAME }).first().waitFor(); } },
     { name: '06-added', fn: async p => { await p.locator('#add-sheet-list').getByText(NAME, { exact: false }).first().click(); await p.locator('#add-status').waitFor({ state: 'visible' }); } },
+    // 07 (TASK-299 flow 5): now that a track is added, open the POPULATED playlist —
+    // Home → Music → Playlists rail → the playlist → companion/playlist.html — and snap
+    // its track list. This is the surface TASK-287 (cover thumb per row) and BUG-033
+    // (NEXT-to-play tag) land on; today the rows are text-only with no NEXT, so this
+    // snap is the baseline those changes will diff against. (playlist.html's own
+    // back-nav is sorted now — TASK-297 — so the earlier follow-on note no longer holds.)
+    { name: '07-view-populated', fn: async p => {
+      await crumb(p, 'Home').click();
+      await p.waitForURL(/browse\.html/, { timeout: 15000 });
+      await p.locator('#sections-row .chip', { hasText: 'Music' }).first().click();
+      await rail(p, 'Playlists').click();
+      await p.locator('#txtgrid .ph-txt', { hasText: NAME }).first().click();
+      await p.waitForURL(/playlist\.html/, { timeout: 15000 });
+      await p.locator('#ctx-title').waitFor();
+      await p.locator('#txtgrid .ph-row').first().waitFor();
+    } },
   ],
 });
-// Note: `view` of the created playlist is snap 03 (grid); the album detail + add-sheet
-// (04/05/06) cover the add path. A dedicated populated-playlist detail snap is a
-// follow-on once playlist.html's own back-nav is sorted.

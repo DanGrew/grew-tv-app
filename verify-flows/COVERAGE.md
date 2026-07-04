@@ -24,7 +24,7 @@ Legend: ✅ covered · ⚠️ partial · ❌ gap · ➖ low-value (skip)
 |----|---------|------|-------|
 | `companion` | companion remote — video journey | `companion-journey.cjs` | browse → TV-series → grid → detail → video play/pause → breadcrumb → films |
 | `music` | companion remote — audio | `companion-music.cjs` | Music → Albums → album detail → audio play/pause → queue → back |
-| `playlists` | companion — playlists | `companion-playlists.cjs` | create form → created tile → album detail → add-sheet → added toast |
+| `playlists` | companion — playlists | `companion-playlists.cjs` | create form → created tile → album detail → add-sheet → added toast → **populated playlist view** |
 | `tv-app` | **TV** app-side | `tv-app.cjs` | profile → browse → detail → video play/pause → breadcrumb |
 | `tv-music` | **TV** app-side — music | `tv-music.cjs` | profile → Music tab (Artists/Albums rails) → album detail → audio play/pause |
 | `companion-artist` | companion — artist drill | `companion-artist.cjs` | Music → Artists rail → artist → albums grid → album detail |
@@ -52,7 +52,7 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 | video | remote play / pause | companion | ✅ | |
 | queue | audio queue list | music | ✅ | minimal (body-only snap) |
 | video-queue | video queue list + greyed Repeat pill | companion-video-queue | ✅ | **TASK-289** gap closed (single-item source drives the greyed pill), BUG-024 |
-| playlist | populated tracklist + cover thumbs + NEXT | — | ⚠️ | grid tile only — TASK-287, BUG-033 |
+| playlist | populated tracklist + cover thumbs + NEXT | playlists | ✅ | populated view snapped (playlists step 07); text-only baseline — TASK-287 (thumbs), BUG-033 (NEXT) land here |
 | playlist-create | create form | playlists | ✅ | |
 | profile | profile pick | — | ➖ | low visual value |
 | error | error state | — | ➖ | |
@@ -99,9 +99,9 @@ Ranked by churn. Extend where the surface sits on an existing path; else new flo
 4. ~~**`tv-artist-playlist`** *(new)* — TV: Music → Artists → album-by-year → playlist-detail.
    Closes TV `artist`, `playlist-detail`, `rail-grid`.~~ ✅ **landed** (`tv-artist-playlist.cjs`) — one
    journey; playlist built via a Queen album's Add-all → New playlist (catalog seeds none).
-5. **populated `playlist.html`** *(extend `playlists`)* — already flagged as a follow-on in
+5. ~~**populated `playlist.html`** *(extend `playlists`)* — already flagged as a follow-on in
    `companion-playlists.cjs`: after add, view the populated companion playlist (thumbs + NEXT).
-   TASK-287, BUG-033.
+   TASK-287, BUG-033.~~ ✅ **landed** — `playlists` step 07 (playlist.html back-nav now sorted, TASK-297).
 6. **Continue rail** *(extend `tv-app` tail)* — play partway → back to browse → snap the
    Continue Watching/Listening rail. FEAT-044.
 
