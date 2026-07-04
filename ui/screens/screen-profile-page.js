@@ -11,7 +11,6 @@
 import { setProfile, setPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { connectApp } from '../../core/app-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { loadConfig, mediaUrl } from '../../core/app-api.js';
 import {
   defaultConfig, parseConfig, isLocked, pinMatches, personById, personByProfile,
@@ -279,7 +278,7 @@ export function initProfilePage() {
   // person_active / person_busy gate finish() — only act on a user-initiated pick
   // (pendingPerson set); the on-connect lock re-assert (pendingPerson null) is a
   // no-op here so a stale localStorage person can't skip the picker.
-  var wsApp = connectApp(wsUrl(window.location.hostname), function(intent, params) {
+  var wsApp = connectApp(window.location.origin, function(intent, params) {
     var INTENTS = {
       setProfile: function() { [params].filter(Boolean).map(function(p) { return personById(config, p.profile); }).filter(Boolean).forEach(finish); },
       kids: function() { [personByProfile(config, 'kids')].filter(Boolean).forEach(finish); },

@@ -3,7 +3,6 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-audio-player.js';
 import { setupQueue } from './screen-queue.js';
 import { connectApp } from '../../core/app-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { loadAlbum, loadPlaylist, loadVideo, loadLyrics, mediaUrl, playbackAction } from '../../core/app-api.js';
 import { parseLrc, indexAt, windowAt } from '../../core/lrc.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -242,7 +241,7 @@ export function initAudioPage() {
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
-  wsApp = connectApp(wsUrl(window.location.hostname), appIntent, { onPlayback: applySnapshot });
+  wsApp = connectApp(window.location.origin, appIntent, { onPlayback: applySnapshot });
   wsApp.sendContext({ context_id: 'audio' });
   wsApp.sendAppState({ screen: 'player', itemId: [albumId].filter(Boolean).concat([artistId, playlistId, trackId]).filter(Boolean)[0], profile: profile });
 

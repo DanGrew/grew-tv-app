@@ -280,19 +280,20 @@ python3 media-manager/core/media-manager.py --app-dir <path-to-grew-tv-app> --co
 # Companion at http://localhost:8765/companion/
 # WebSocket at ws://localhost:8766
 ```
-**Reproducing multi-device/companion bugs in isolation:** the **companion** pages
-now derive both the API origin (`window.location.origin`) and the WS port
-(`/api/config.wsPort` via `core/server-config.js fetchWsUrl`, TASK-297), so a
-companion served off `--port <p> --ws-port <q>` reaches THAT server for both —
-no copy/`sed` needed. The **TV app** (`screen-*-page.js` via `core/app-ws.js`
-`connectApp(wsUrl(hostname))`) still **hardcodes `WS_PORT = 8766`**, so a TV
-booted on a non-default `--ws-port` still opens `ws://host:8766` and registers on
-the live registry (stale devices + `person_busy` lock contention). To isolate a
-TV-side WS bug until that's fixed too: copy the app
-(`rsync -a --exclude node_modules --exclude .git`), `sed WS_PORT 8766→<your-port>`
-in the copy's `core/server-config.js`, run media-manager `--app-dir <copy>
---ws-port <your-port> --content-root ~/rips` (rips has `config.json`), and assert
-every page's WS url uses your port. Zombie instances ignore SIGTERM — `kill -9`.
+**Reproducing multi-device/companion bugs in isolation (TASK-297 — now trivial):**
+both surfaces derive their ports from the server the page was loaded from — the
+API origin from `window.location.origin`, and the WS port from `/api/config.wsPort`
+(via `core/server-config.js fetchWsUrl`). The companion pages
+(`ui/screens/companion-*.js`) and the TV app screens (`ui/screens/screen-*-page.js`
+via `core/app-ws.js connectApp`) both take the origin now — no more hardcoded
+`:8765` / `WS_PORT = 8766`. So booting your own media-manager on `--port <p>
+--ws-port <q>` fully isolates: every page (TV **and** companion) reaches THAT
+server for HTTP + WS, and they share its device/person registry so the companion
+can bind + drive the TV. No app copy / `sed` needed — just run media-manager
+`--app-dir <this repo> --port <p> --ws-port <q> --content-root ~/rips` (rips has
+`config.json`) and open both TV + companion on `<p>`. (`core/server-config.js`
+still exports `WS_PORT = 8766` as the fetch fallback only.) Zombie instances
+ignore SIGTERM — `kill -9`.
 
 Standalone (no WebSocket — UI only):
 ```bash

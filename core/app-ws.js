@@ -4,13 +4,19 @@ import {
 } from './ws-protocol.js';
 import { ensureDevice, getDeviceLabel, getPerson, navTo } from './state.js';
 import { switchProfileTarget } from './switch-profile.js';
+import { fetchWsUrl } from './server-config.js';
 
-// connectApp(wsUrl, onIntent, opts?) — opts carries the FEAT-026 Phase 2
-// (TASK-158) verdict callbacks without breaking the (wsUrl, onIntent) callers:
+// connectApp(serverOrigin, onIntent, opts?) — opts carries the FEAT-026 Phase 2
+// (TASK-158) verdict callbacks without breaking the (origin, onIntent) callers:
 //   opts.onDeactivated()           — this screen was taken over elsewhere
 //   opts.onPersonActive(payload)   — activate_person succeeded (picker proceeds)
 //   opts.onPersonBusy(payload)     — person is live on another screen (take-over)
-export function connectApp(wsUrl, onIntent, opts) {
+// TASK-297: takes the server origin (the http origin the page was loaded from),
+// not a prebuilt ws url. The WS port is resolved from that server's /api/config
+// (fetchWsUrl) so a TV served off any port reaches THAT server's WS, not a
+// hardcoded 8766. Connection is deferred until the port resolves (send() no-ops
+// until the socket opens, as before it connected).
+export function connectApp(serverOrigin, onIntent, opts) {
   var o = opts != null ? opts : {};
   var ws = null;
   var lastPingTime = Date.now();
@@ -109,6 +115,7 @@ export function connectApp(wsUrl, onIntent, opts) {
     activatePerson(getPerson(), false);
   }
 
+  var wsUrl = null;   // resolved from /api/config before the first connect (TASK-297)
   function doConnect() {
     ws = new WebSocket(wsUrl);
     ws.onopen    = function() {
@@ -128,6 +135,8 @@ export function connectApp(wsUrl, onIntent, opts) {
     });
   }, 5000);
 
-  doConnect();
+  // Resolve the WS port from the server, then open the socket. On failure
+  // fetchWsUrl falls back to the default port, so this always connects.
+  fetchWsUrl(serverOrigin).then(function(url) { wsUrl = url; doConnect(); });
   return { sendContext: sendContext, sendAppState: sendAppState, activatePerson: activatePerson };
 }
