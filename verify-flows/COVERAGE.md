@@ -28,6 +28,8 @@ Legend: ✅ covered · ⚠️ partial · ❌ gap · ➖ low-value (skip)
 | `tv-app` | **TV** app-side | `tv-app.cjs` | profile → browse → detail → video play/pause → breadcrumb |
 | `tv-music` | **TV** app-side — music | `tv-music.cjs` | profile → Music tab (Artists/Albums rails) → album detail → audio play/pause |
 | `companion-artist` | companion — artist drill | `companion-artist.cjs` | Music → Artists rail → artist → albums grid → album detail |
+| `tv-video-queue` | **TV** — video queue view | `tv-video-queue.cjs` | play a film (single-item) → Queue overlay → greyed Repeat pill |
+| `companion-video-queue` | companion — video queue view | `companion-video-queue.cjs` | play a film (single-item) → Video Queue View → greyed Repeat button |
 
 Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MASK`).
 
@@ -48,7 +50,7 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 | audio | ＋Queue toast confirmation | — | ❌ | BUG-030 (state) |
 | video | remote play / pause | companion | ✅ | |
 | queue | audio queue list | music | ✅ | minimal (body-only snap) |
-| video-queue | video queue list + greyed Repeat pill | — | ❌ | **TASK-289**, BUG-024 |
+| video-queue | video queue list + greyed Repeat pill | companion-video-queue | ✅ | **TASK-289** gap closed (single-item source drives the greyed pill), BUG-024 |
 | playlist | populated tracklist + cover thumbs + NEXT | — | ⚠️ | grid tile only — TASK-287, BUG-033 |
 | playlist-create | create form | playlists | ✅ | |
 | profile | profile pick | — | ➖ | low visual value |
@@ -70,7 +72,7 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 | rail-grid | "see all" rail grid | — | ❌ | |
 | playlist-create | create form | — | ➖ | companion create covers the path |
 | video | TV player play / pause | tv-app | ✅ | video frame hidden for determinism |
-| video-queue | TV video queue + greyed Repeat pill | — | ❌ | TASK-289, BUG-024 |
+| video-queue | TV video queue + greyed Repeat pill | tv-video-queue | ✅ | TASK-289 gap closed, BUG-024 |
 | error | error state | — | ➖ | |
 
 ## Cross-cutting
@@ -90,8 +92,9 @@ Ranked by churn. Extend where the surface sits on an existing path; else new flo
    Closes TV `audio`, `album-detail`. Highest churn: TASK-288, BUG-034, TASK-283.~~ ✅ **landed** (`tv-music.cjs`).
 2. ~~**`companion-artist`** *(new)* — companion: Music → Artists rail → artist → album → detail.
    Closes companion `artist`. BUG-035, TASK-274.~~ ✅ **landed** (`companion-artist.cjs`).
-3. **`video-queue`** *(new)* — build a video queue → open queue view → snap greyed Repeat pill
-   (companion + TV). Closes the TASK-289 blind spot; BUG-024.
+3. ~~**`video-queue`** *(new)* — build a video queue → open queue view → snap greyed Repeat pill
+   (companion + TV). Closes the TASK-289 blind spot; BUG-024.~~ ✅ **landed** — two files, one per surface
+   (`tv-video-queue.cjs` + `companion-video-queue.cjs`); a single-item film is the non-repeatable source.
 4. **`tv-artist-playlist`** *(new)* — TV: Music → Artists → album-by-year → playlist-detail.
    Closes TV `artist`, `playlist-detail`, `rail-grid`.
 5. **populated `playlist.html`** *(extend `playlists`)* — already flagged as a follow-on in
