@@ -19,6 +19,11 @@ var store;
 beforeEach(() => {
   MockWS.instances = [];
   global.WebSocket = MockWS;
+  // TASK-297: connect() now resolves the WS port from <origin>/api/config
+  // (server-config.fetchWsUrl) before opening the socket. Mock that fetch + the
+  // page host so the resolved url is ws://host:8766 — what the tests assert.
+  global.location = { hostname: 'host' };
+  global.fetch = vi.fn(() => Promise.resolve({ json: () => Promise.resolve({ wsPort: 8766 }) }));
   store = {};
   vi.stubGlobal('localStorage', {
     getItem:    (k) => (k in store ? store[k] : null),
@@ -31,28 +36,53 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  delete global.location;
+  delete global.fetch;
 });
 
 function deviceMsg(devices) {
   return { data: JSON.stringify({ type: 'devices', payload: { devices: devices } }) };
 }
 
+// The socket opens only after the /api/config fetch chain resolves — flush the
+// microtask queue so MockWS.instances[0] exists before we drive it.
+async function tick() {
+  for (var i = 0; i < 20; i++) await Promise.resolve();
+}
+
+// connect() + wait for the deferred socket; returns { api, ws }.
+async function boot(...args) {
+  var api = connect(...args);
+  await tick();
+  return { api: api, ws: MockWS.instances[0] };
+}
+
 describe('connect', () => {
-  it('creates WebSocket with given URL', () => {
-    connect('ws://host:8766', () => {}, () => {});
-    expect(MockWS.instances[0].url).toBe('ws://host:8766');
+  it('creates WebSocket with the URL resolved from /api/config', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
+    expect(ws.url).toBe('ws://host:8766');
   });
 
-  it('asks for the screen list on open (list_devices first)', () => {
-    connect('ws://host:8766', () => {}, () => {});
-    MockWS.instances[0].onopen();
-    expect(MockWS.instances[0].sent[0].type).toBe('list_devices');
+  // TASK-297: the origin is passed to connect, and the WS port is read from that
+  // origin's /api/config (not hardcoded), so a companion served off :8770 gets
+  // whatever port the server reports.
+  it('reads the WS port from the served origin (not hardcoded 8766)', async () => {
+    global.location = { hostname: 'host' };
+    global.fetch = vi.fn(() => Promise.resolve({ json: () => Promise.resolve({ wsPort: 8770 }) }));
+    var { ws } = await boot('http://host:8770', () => {}, () => {});
+    expect(global.fetch).toHaveBeenCalledWith('http://host:8770/api/config');
+    expect(ws.url).toBe('ws://host:8770');
+  });
+
+  it('asks for the screen list on open (list_devices first)', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
+    ws.onopen();
+    expect(ws.sent[0].type).toBe('list_devices');
   });
 
   // FEAT-026 Phase 2 (TASK-158): target a screen, then snapshot_request.
-  it('auto-targets a sole screen: register_companion then snapshot_request', () => {
-    connect('ws://host:8766', () => {}, () => {});
-    var ws = MockWS.instances[0];
+  it('auto-targets a sole screen: register_companion then snapshot_request', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
     ws.onopen();
     ws.onmessage(deviceMsg([{ device_id: 'devA', label: 'Living Room', active_person: 'mom' }]));
     var types = ws.sent.map(m => m.type);
@@ -62,18 +92,16 @@ describe('connect', () => {
     expect(localStorage.getItem('grew-tv-companion-target')).toBe('devA');
   });
 
-  it('does NOT auto-target when several screens and none persisted', () => {
-    connect('ws://host:8766', () => {}, () => {});
-    var ws = MockWS.instances[0];
+  it('does NOT auto-target when several screens and none persisted', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
     ws.onopen();
     ws.onmessage(deviceMsg([{ device_id: 'devA' }, { device_id: 'devB' }]));
     expect(ws.sent.find(m => m.type === 'register_companion')).toBeFalsy();
   });
 
-  it('honours a persisted target among several screens', () => {
+  it('honours a persisted target among several screens', async () => {
     store['grew-tv-companion-target'] = 'devB';
-    connect('ws://host:8766', () => {}, () => {});
-    var ws = MockWS.instances[0];
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
     ws.onopen();
     ws.onmessage(deviceMsg([{ device_id: 'devA' }, { device_id: 'devB' }]));
     expect(ws.sent.find(m => m.type === 'register_companion').payload.device_id).toBe('devB');
@@ -84,10 +112,9 @@ describe('connect', () => {
   // fail over to the other (now sole) screen — the old `ids.length === 1`
   // fallback grabbed devA here, mis-binding the companion (empty browse +
   // intents routed to the wrong TV).
-  it('does NOT fail over to the other sole screen while its persisted target is transiently absent', () => {
+  it('does NOT fail over to the other sole screen while its persisted target is transiently absent', async () => {
     store['grew-tv-companion-target'] = 'devB';
-    connect('ws://host:8766', () => {}, () => {});
-    var ws = MockWS.instances[0];
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
     ws.onopen();
     // devB momentarily gone (its screen is reconnecting); only devA is visible.
     ws.onmessage(deviceMsg([{ device_id: 'devA' }]));
@@ -98,9 +125,8 @@ describe('connect', () => {
     expect(reg.payload.device_id).toBe('devB');
   });
 
-  it('api.target registers + snapshot_requests the chosen screen', () => {
-    var api = connect('ws://host:8766', () => {}, () => {});
-    var ws = MockWS.instances[0];
+  it('api.target registers + snapshot_requests the chosen screen', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
     ws.onopen();
     ws.onmessage(deviceMsg([{ device_id: 'devA' }, { device_id: 'devB' }]));
     ws.sent.length = 0;
@@ -113,9 +139,8 @@ describe('connect', () => {
 
   // TASK-179: the screen chooser reads the live target to show the current
   // screen. Null before any (auto)target, the device id once bound.
-  it('currentTarget() reflects the live target', () => {
-    var api = connect('ws://host:8766', () => {}, () => {});
-    var ws = MockWS.instances[0];
+  it('currentTarget() reflects the live target', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
     ws.onopen();
     expect(api.currentTarget()).toBe(null);
     ws.onmessage(deviceMsg([{ device_id: 'devA' }]));   // sole screen auto-targets
@@ -128,10 +153,9 @@ describe('connect', () => {
   // emit register_companion (+ snapshot_request) ONLY. No person-plane traffic
   // (activate_person / setProfile), so the previously-driven app keeps running
   // untouched.
-  it('re-target emits register_companion + snapshot_request ONLY — no person switch', () => {
+  it('re-target emits register_companion + snapshot_request ONLY — no person switch', async () => {
     store['grew-tv-companion-target'] = 'devA';
-    var api = connect('ws://host:8766', () => {}, () => {});
-    var ws = MockWS.instances[0];
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
     ws.onopen();
     ws.onmessage(deviceMsg([{ device_id: 'devA' }, { device_id: 'devB' }]));   // bound to devA
     ws.sent.length = 0;
@@ -142,9 +166,8 @@ describe('connect', () => {
     expect(ws.sent.find(m => m.payload && m.payload.intent === 'setProfile')).toBeFalsy();
   });
 
-  it('survives the target screen person-switch with NO re-register', () => {
-    connect('ws://host:8766', () => {}, () => {});
-    var ws = MockWS.instances[0];
+  it('survives the target screen person-switch with NO re-register', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
     ws.onopen();
     ws.onmessage(deviceMsg([{ device_id: 'devA', active_person: 'mom' }]));   // auto-target + register
     ws.sent.length = 0;
@@ -153,116 +176,114 @@ describe('connect', () => {
     expect(ws.sent.find(m => m.type === 'register_companion')).toBeFalsy();
   });
 
-  it('reconnect re-registers the persisted target', () => {
-    connect('ws://host:8766', () => {}, () => {});
-    var ws = MockWS.instances[0];
+  it('reconnect re-registers the persisted target', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
     ws.onopen();
     ws.onmessage(deviceMsg([{ device_id: 'devA' }]));   // target persisted
     ws.onclose();
-    vi.advanceTimersByTime(2001);
+    vi.advanceTimersByTime(2001);   // reconnect reuses the resolved url — no re-fetch
     var ws2 = MockWS.instances[1];
     ws2.onopen();
     ws2.onmessage(deviceMsg([{ device_id: 'devA' }]));
     expect(ws2.sent.find(m => m.type === 'register_companion').payload.device_id).toBe('devA');
   });
 
-  it('onDevices callback receives the live screen list', () => {
+  it('onDevices callback receives the live screen list', async () => {
     var seen = null;
-    connect('ws://host:8766', () => {}, () => {}, () => {}, function(d) { seen = d; });
-    var ws = MockWS.instances[0];
+    var { ws } = await boot('http://host:8766', () => {}, () => {}, () => {}, function(d) { seen = d; });
     ws.onopen();
     ws.onmessage(deviceMsg([{ device_id: 'devA', label: 'Living Room' }]));
     expect(seen[0].label).toBe('Living Room');
   });
 
-  it('calls onStatus connected on open', () => {
+  it('calls onStatus connected on open', async () => {
     var statuses = [];
-    connect('ws://host:8766', () => {}, function(s) { statuses.push(s); });
-    MockWS.instances[0].onopen();
+    var { ws } = await boot('http://host:8766', () => {}, function(s) { statuses.push(s); });
+    ws.onopen();
     expect(statuses[0]).toBe('connected');
   });
 
-  it('calls onContext for snapshot message', () => {
+  it('calls onContext for snapshot message', async () => {
     var received = [];
-    connect('ws://host:8766', function(p) { received.push(p); }, () => {});
-    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'snapshot', payload: { version: 1 } }) });
+    var { ws } = await boot('http://host:8766', function(p) { received.push(p); }, () => {});
+    ws.onmessage({ data: JSON.stringify({ type: 'snapshot', payload: { version: 1 } }) });
     expect(received).toHaveLength(1);
     expect(received[0].version).toBe(1);
   });
 
-  it('calls onContext for context message', () => {
+  it('calls onContext for context message', async () => {
     var received = [];
-    connect('ws://host:8766', function(p) { received.push(p); }, () => {});
-    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'context', payload: { version: 1 } }) });
+    var { ws } = await boot('http://host:8766', function(p) { received.push(p); }, () => {});
+    ws.onmessage({ data: JSON.stringify({ type: 'context', payload: { version: 1 } }) });
     expect(received).toHaveLength(1);
   });
 
-  it('ignores stale snapshot', () => {
+  it('ignores stale snapshot', async () => {
     var received = [];
-    connect('ws://host:8766', function(p) { received.push(p); }, () => {});
-    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'snapshot', payload: { version: 5 } }) });
-    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'snapshot', payload: { version: 3 } }) });
+    var { ws } = await boot('http://host:8766', function(p) { received.push(p); }, () => {});
+    ws.onmessage({ data: JSON.stringify({ type: 'snapshot', payload: { version: 5 } }) });
+    ws.onmessage({ data: JSON.stringify({ type: 'snapshot', payload: { version: 3 } }) });
     expect(received).toHaveLength(1);
     expect(received[0].version).toBe(5);
   });
 
-  it('sends pong on ping', () => {
-    connect('ws://host:8766', () => {}, () => {});
-    MockWS.instances[0].onopen();
-    var before = MockWS.instances[0].sent.length;
-    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'ping' }) });
-    expect(MockWS.instances[0].sent[before].type).toBe('pong');
+  it('sends pong on ping', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
+    ws.onopen();
+    var before = ws.sent.length;
+    ws.onmessage({ data: JSON.stringify({ type: 'ping' }) });
+    expect(ws.sent[before].type).toBe('pong');
   });
 
-  it('calls onStatus reconnecting on close', () => {
+  it('calls onStatus reconnecting on close', async () => {
     var statuses = [];
-    connect('ws://host:8766', () => {}, function(s) { statuses.push(s); });
-    MockWS.instances[0].onclose();
-    expect(statuses).toContain('reconnecting\u2026');
+    var { ws } = await boot('http://host:8766', () => {}, function(s) { statuses.push(s); });
+    ws.onclose();
+    expect(statuses).toContain('reconnecting…');
   });
 
-  it('calls onStatus error on error', () => {
+  it('calls onStatus error on error', async () => {
     var statuses = [];
-    connect('ws://host:8766', () => {}, function(s) { statuses.push(s); });
-    MockWS.instances[0].onerror();
+    var { ws } = await boot('http://host:8766', () => {}, function(s) { statuses.push(s); });
+    ws.onerror();
     expect(statuses).toContain('error');
   });
 
-  it('sendIntent sends intent message when open', () => {
-    var api = connect('ws://host:8766', () => {}, () => {});
-    MockWS.instances[0].onopen();
-    var before = MockWS.instances[0].sent.length;
+  it('sendIntent sends intent message when open', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
+    ws.onopen();
+    var before = ws.sent.length;
     api.sendIntent('pause');
-    expect(MockWS.instances[0].sent[before].type).toBe('intent');
-    expect(MockWS.instances[0].sent[before].payload.intent).toBe('pause');
+    expect(ws.sent[before].type).toBe('intent');
+    expect(ws.sent[before].payload.intent).toBe('pause');
   });
 
-  it('calls onAppState for app_state message', () => {
+  it('calls onAppState for app_state message', async () => {
     var received = [];
-    connect('ws://host:8766', () => {}, () => {}, function(p) { received.push(p); });
-    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'app_state', payload: { itemId: 'ollie-car', positionSec: 5, playing: true } }) });
+    var { ws } = await boot('http://host:8766', () => {}, () => {}, function(p) { received.push(p); });
+    ws.onmessage({ data: JSON.stringify({ type: 'app_state', payload: { itemId: 'ollie-car', positionSec: 5, playing: true } }) });
     expect(received).toHaveLength(1);
     expect(received[0].itemId).toBe('ollie-car');
   });
 
-  it('appState() returns the last snapshot payload', () => {
-    var api = connect('ws://host:8766', () => {}, () => {});
-    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'app_state', payload: { itemId: 'film-3', playing: false } }) });
+  it('appState() returns the last snapshot payload', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
+    ws.onmessage({ data: JSON.stringify({ type: 'app_state', payload: { itemId: 'film-3', playing: false } }) });
     expect(api.appState().itemId).toBe('film-3');
   });
 
-  it('position() interpolates while playing using local clock', () => {
+  it('position() interpolates while playing using local clock', async () => {
     var t = 1000;
     vi.setSystemTime(t);
-    var api = connect('ws://host:8766', () => {}, () => {});
-    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'app_state', payload: { positionSec: 30, durationSec: 600, playing: true } }) });
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
+    ws.onmessage({ data: JSON.stringify({ type: 'app_state', payload: { positionSec: 30, durationSec: 600, playing: true } }) });
     vi.setSystemTime(t + 10000);   // +10s local
     expect(api.position()).toBe(40);
   });
 
-  it('position() holds steady when paused', () => {
-    var api = connect('ws://host:8766', () => {}, () => {});
-    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'app_state', payload: { positionSec: 30, playing: false } }) });
+  it('position() holds steady when paused', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
+    ws.onmessage({ data: JSON.stringify({ type: 'app_state', payload: { positionSec: 30, playing: false } }) });
     vi.advanceTimersByTime(10000);
     expect(api.position()).toBe(30);
   });
@@ -270,10 +291,9 @@ describe('connect', () => {
   // TASK-245 swapped music play/next/prev/shuffle to the per-person /api/playback
   // engine (Plane B HTTP), so those WS emitters are gone. The surviving Plane-A
   // emitters (skip / setProfile / toggleCaptions / playAlbum) still cross the wire.
-  it('new intent senders emit correct intents', () => {
-    var api = connect('ws://host:8766', () => {}, () => {});
-    MockWS.instances[0].onopen();
-    var ws = MockWS.instances[0];
+  it('new intent senders emit correct intents', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
+    ws.onopen();
     api.skip(-30);
     expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('skip');
     expect(ws.sent[ws.sent.length - 1].payload.params.deltaSec).toBe(-30);
@@ -286,36 +306,35 @@ describe('connect', () => {
     expect(ws.sent[ws.sent.length - 1].payload.params.id).toBe('ootb');
   });
 
-  it('sendIntent passes params', () => {
-    var api = connect('ws://host:8766', () => {}, () => {});
-    MockWS.instances[0].onopen();
-    var before = MockWS.instances[0].sent.length;
+  it('sendIntent passes params', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
+    ws.onopen();
+    var before = ws.sent.length;
     api.sendIntent('select', { id: 'film-1' });
-    expect(MockWS.instances[0].sent[before].payload.params).toEqual({ id: 'film-1' });
+    expect(ws.sent[before].payload.params).toEqual({ id: 'film-1' });
   });
 
   // Companion-initiated take-over (the fix): a companion that activates a person
   // on its target screen receives the busy/active verdict HERE, so it can raise
   // its own take-over prompt instead of the verdict surfacing only on the TV.
-  it('calls opts.onPersonBusy for a person_busy verdict', () => {
+  it('calls opts.onPersonBusy for a person_busy verdict', async () => {
     var busy = [];
-    connect('ws://host:8766', () => {}, () => {}, () => {}, () => {}, { onPersonBusy: (p) => busy.push(p) });
-    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'person_busy', payload: { person_id: 'mom', device_id: 'devB', label: 'Living Room' } }) });
+    var { ws } = await boot('http://host:8766', () => {}, () => {}, () => {}, () => {}, { onPersonBusy: (p) => busy.push(p) });
+    ws.onmessage({ data: JSON.stringify({ type: 'person_busy', payload: { person_id: 'mom', device_id: 'devB', label: 'Living Room' } }) });
     expect(busy).toHaveLength(1);
     expect(busy[0].label).toBe('Living Room');
   });
 
-  it('calls opts.onPersonActive for a person_active verdict', () => {
+  it('calls opts.onPersonActive for a person_active verdict', async () => {
     var active = [];
-    connect('ws://host:8766', () => {}, () => {}, () => {}, () => {}, { onPersonActive: (p) => active.push(p) });
-    MockWS.instances[0].onmessage({ data: JSON.stringify({ type: 'person_active', payload: { person_id: 'mom' } }) });
+    var { ws } = await boot('http://host:8766', () => {}, () => {}, () => {}, () => {}, { onPersonActive: (p) => active.push(p) });
+    ws.onmessage({ data: JSON.stringify({ type: 'person_active', payload: { person_id: 'mom' } }) });
     expect(active).toHaveLength(1);
     expect(active[0].person_id).toBe('mom');
   });
 
-  it('api.activatePerson sends activate_person for the targeted screen', () => {
-    var api = connect('ws://host:8766', () => {}, () => {});
-    var ws = MockWS.instances[0];
+  it('api.activatePerson sends activate_person for the targeted screen', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
     ws.onopen();
     ws.onmessage(deviceMsg([{ device_id: 'devA' }]));   // sole screen auto-targets
     ws.sent.length = 0;
@@ -335,10 +354,9 @@ describe('connect', () => {
       return { intentsAllowed: () => !desynced, sync: () => { desynced = false; } };
     }
 
-    it('suppresses ALL nav/transport intents while desynced', () => {
+    it('suppresses ALL nav/transport intents while desynced', async () => {
       var mode = desyncMode();
-      var api = connect('ws://host:8766', () => {}, () => {}, () => {}, () => {}, { mode: mode });
-      var ws = MockWS.instances[0];
+      var { api, ws } = await boot('http://host:8766', () => {}, () => {}, () => {}, () => {}, { mode: mode });
       ws.onopen();
       ws.sent.length = 0;
       api.sendIntent('pause');
@@ -349,10 +367,9 @@ describe('connect', () => {
       expect(ws.sent).toHaveLength(0);
     });
 
-    it('still registers + snapshots its target while desynced (registration plane ungated)', () => {
+    it('still registers + snapshots its target while desynced (registration plane ungated)', async () => {
       var mode = desyncMode();
-      var api = connect('ws://host:8766', () => {}, () => {}, () => {}, () => {}, { mode: mode });
-      var ws = MockWS.instances[0];
+      var { api, ws } = await boot('http://host:8766', () => {}, () => {}, () => {}, () => {}, { mode: mode });
       ws.onopen();
       ws.onmessage(deviceMsg([{ device_id: 'devA' }]));   // auto-target still works
       var types = ws.sent.map(m => m.type);
@@ -363,10 +380,9 @@ describe('connect', () => {
       expect(ws.sent.find(m => m.type === 'activate_person')).toBeTruthy();
     });
 
-    it('re-emits intents once re-synced', () => {
+    it('re-emits intents once re-synced', async () => {
       var mode = desyncMode();
-      var api = connect('ws://host:8766', () => {}, () => {}, () => {}, () => {}, { mode: mode });
-      var ws = MockWS.instances[0];
+      var { api, ws } = await boot('http://host:8766', () => {}, () => {}, () => {}, () => {}, { mode: mode });
       ws.onopen();
       ws.sent.length = 0;
       api.skip(-30);
@@ -376,9 +392,8 @@ describe('connect', () => {
       expect(ws.sent[ws.sent.length - 1].payload.intent).toBe('skip');
     });
 
-    it('no mode passed => intents emit as before (unchanged default)', () => {
-      var api = connect('ws://host:8766', () => {}, () => {});
-      var ws = MockWS.instances[0];
+    it('no mode passed => intents emit as before (unchanged default)', async () => {
+      var { api, ws } = await boot('http://host:8766', () => {}, () => {});
       ws.onopen();
       ws.sent.length = 0;
       api.skip(-30);

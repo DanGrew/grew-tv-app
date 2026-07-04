@@ -6,6 +6,7 @@ import {
   createSetProfileIntent, createToggleCaptionsIntent,
   createPlayAlbumIntent
 } from './ws-protocol.js';
+import { fetchWsUrl } from './server-config.js';
 
 // FEAT-026 Phase 2 (TASK-158): a companion targets ONE screen (device_id) and
 // survives that screen's person-switch — routing is by the live
@@ -13,7 +14,13 @@ import {
 // when the TV flips person. The chosen target persists per device.
 var TARGET_KEY = 'grew-tv-companion-target';
 
-export function connect(wsUrl, onContext, onStatus, onAppState, onDevices, opts) {
+// TASK-297: takes the server origin (the http origin the companion was loaded
+// from) rather than a prebuilt ws url. The WS port is resolved from that server's
+// /api/config (fetchWsUrl) so a companion served off any port reaches THAT
+// server's WS, not a hardcoded 8766. Connection is deferred until the port
+// resolves; the returned api is safe to hold in the meantime (send() no-ops
+// until the socket opens, exactly as before it connected).
+export function connect(serverOrigin, onContext, onStatus, onAppState, onDevices, opts) {
   var o = opts != null ? opts : {};
   // FEAT-038 (TASK-229): the outbound nav/transport seam. When a desync mode is
   // passed (o.mode, a core/companion-mode.js instance) and it is desynced, the
@@ -147,6 +154,7 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices, opts)
     [HANDLERS[msg.type]].filter(Boolean).forEach(function(fn) { fn(); });
   }
 
+  var wsUrl = null;   // resolved from /api/config before the first connect (TASK-297)
   function doConnect() {
     ws = new WebSocket(wsUrl);
     ws.onopen = function() {
@@ -172,7 +180,9 @@ export function connect(wsUrl, onContext, onStatus, onAppState, onDevices, opts)
     });
   }, 5000);
 
-  doConnect();
+  // Resolve the WS port from the server, then open the socket. On failure
+  // fetchWsUrl falls back to the default port, so this always connects.
+  fetchWsUrl(serverOrigin).then(function(url) { wsUrl = url; doConnect(); });
   // Nav/transport emitters are wrapped in gate() — suppressed while desynced
   // (FEAT-038). The registration plane (target/activatePerson) and the read-only
   // accessors are NOT gated.

@@ -1,5 +1,4 @@
 import { connect } from '../../core/companion-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist } from '../../core/app-api.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
@@ -24,8 +23,7 @@ import { mountSyncBar } from './companion-sync-bar.js';
 // lists + opens. The TV teleports and echoes context — same per-person relay the
 // browse / detail / artist companions ride.
 export function initPage() {
-  var host = window.location.hostname;
-  var server = 'http://' + host + ':8765';
+  var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
     ctxLabel: document.getElementById('ctx-label'),
@@ -299,6 +297,6 @@ export function initPage() {
     els.ctxLabel.textContent = 'Playlist';
     loadTracks();
   });
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
+  api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }

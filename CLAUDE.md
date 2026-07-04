@@ -280,11 +280,15 @@ python3 media-manager/core/media-manager.py --app-dir <path-to-grew-tv-app> --co
 # Companion at http://localhost:8765/companion/
 # WebSocket at ws://localhost:8766
 ```
-**Reproducing multi-device/companion bugs in isolation:** `core/server-config.js`
-**hardcodes `WS_PORT = 8766`** (the app ignores `/api/config.wsPort`), so booting
-your own media-manager on a different `--ws-port` does NOT isolate — pages still
-open `ws://host:8766` and register on the live registry (stale devices +
-`person_busy` lock contention). To truly isolate: copy the app
+**Reproducing multi-device/companion bugs in isolation:** the **companion** pages
+now derive both the API origin (`window.location.origin`) and the WS port
+(`/api/config.wsPort` via `core/server-config.js fetchWsUrl`, TASK-297), so a
+companion served off `--port <p> --ws-port <q>` reaches THAT server for both —
+no copy/`sed` needed. The **TV app** (`screen-*-page.js` via `core/app-ws.js`
+`connectApp(wsUrl(hostname))`) still **hardcodes `WS_PORT = 8766`**, so a TV
+booted on a non-default `--ws-port` still opens `ws://host:8766` and registers on
+the live registry (stale devices + `person_busy` lock contention). To isolate a
+TV-side WS bug until that's fixed too: copy the app
 (`rsync -a --exclude node_modules --exclude .git`), `sed WS_PORT 8766→<your-port>`
 in the copy's `core/server-config.js`, run media-manager `--app-dir <copy>
 --ws-port <your-port> --content-root ~/rips` (rips has `config.json`), and assert

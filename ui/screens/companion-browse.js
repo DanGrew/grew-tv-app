@@ -1,5 +1,4 @@
 import { connect } from '../../core/companion-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { loadBrowse, loadContinueWatching, videoPlaybackAction, loadVideoPlayback, loadPlayback } from '../../core/app-api.js';
 import { queueCount } from '../../core/video-player-router.js';
 import { playNextCount } from '../../core/queue-view.js';
@@ -46,8 +45,7 @@ var SECTION_LEVEL = { true: 'rails', false: 'sections' };
 var DRILL_CTX = { browse: true, 'rail-grid': true };
 
 export function initPage() {
-  var host = window.location.hostname;
-  var server = 'http://' + host + ':8765';
+  var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
     search: document.getElementById('search'),
@@ -503,6 +501,6 @@ export function initPage() {
 
   restoreTrail();
   mountSyncBar(mode, onToggle);
-  api = connect(wsUrl(host), onContext, function(s) { els.connStatus.textContent = s; }, onAppState, onDevices, { mode: mode });
+  api = connect(server, onContext, function(s) { els.connStatus.textContent = s; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, setBound);
 }

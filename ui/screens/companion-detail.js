@@ -1,5 +1,4 @@
 import { connect } from '../../core/companion-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, videoPlaybackAction } from '../../core/app-api.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, rowMidWatch } from '../../core/progress.js';
@@ -20,8 +19,7 @@ import { mountSyncBar } from './companion-sync-bar.js';
 // on, and the profile — arrives over WS. Tapping a row plays it on the TV
 // (resume by default); Play next teleports to the next-in-order episode.
 export function initPage() {
-  var host = window.location.hostname;
-  var server = 'http://' + host + ':8765';
+  var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
     ctxTitle: document.getElementById('ctx-title'),
@@ -365,6 +363,6 @@ export function initPage() {
     state.seriesId = id;
     loadSeriesData(id);
   });
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
+  api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }
