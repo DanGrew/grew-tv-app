@@ -19,8 +19,7 @@ import { cleanName, isValidName, editorMode } from '../../core/playlist-name.js'
 // present, the new playlist is created, that track is added, then we return to the
 // list — so the new playlist starts holding the track.
 export function initPage() {
-  var host = window.location.hostname;
-  var server = 'http://' + host + ':8765';
+  var server = window.location.origin;
   var params = new URLSearchParams(window.location.search);
   var renameId = params.get('rename');
   var cfg = editorMode(renameId, params.get('name'));

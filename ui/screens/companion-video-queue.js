@@ -1,5 +1,4 @@
 import { connect } from '../../core/companion-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { videoPlaybackAction } from '../../core/app-api.js';
 import { companionVideoQueueHtml } from '../../core/video-queue-view.js';
 import { screenPage } from '../../core/companion-utils.js';
@@ -16,8 +15,7 @@ import { mountSyncBar } from './companion-sync-bar.js';
 // next/prev/repeat are server actions. Play/pause is the one device-local control —
 // it toggles the TV's <video> via the existing `toggle` WS intent, not a snapshot.
 export function initPage() {
-  var host = window.location.hostname;
-  var server = 'http://' + host + ':8765';
+  var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
     back: document.getElementById('btn-back'),
@@ -98,5 +96,5 @@ export function initPage() {
   render(null);
   mountSyncBar(mode, onModeChange);
   applyMode();
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, noop, { onVideoPlayback: render, mode: mode });
+  api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, noop, { onVideoPlayback: render, mode: mode });
 }

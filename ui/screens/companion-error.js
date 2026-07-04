@@ -1,5 +1,4 @@
 import { connect } from '../../core/companion-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { screenPage, titleCase, displayTitle, displayLabel } from '../../core/companion-utils.js';
 
 function renderAction(action, actionsEl, sendIntent) {
@@ -26,7 +25,6 @@ function render(payload, actionsEl, sendIntent) {
 }
 
 export function initPage() {
-  var host = window.location.hostname;
   var els = {
     connStatus: document.getElementById('conn-status'),
     ctxLabel: document.getElementById('ctx-label'),
@@ -47,5 +45,5 @@ export function initPage() {
     })[page !== 'error']();
   }
 
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; });
+  api = connect(window.location.origin, onContext, function(status) { els.connStatus.textContent = status; });
 }

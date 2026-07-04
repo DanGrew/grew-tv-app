@@ -1,5 +1,4 @@
 import { connect } from '../../core/companion-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
@@ -21,8 +20,7 @@ import { mountSyncBar } from './companion-sync-bar.js';
 // the TV to its album detail via the existing id-addressed `select` intent
 // (BUG-008 — resolve against the catalog, not a rendered tile).
 export function initPage() {
-  var host = window.location.hostname;
-  var server = 'http://' + host + ':8765';
+  var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
     ctxLabel: document.getElementById('ctx-label'),
@@ -181,6 +179,6 @@ export function initPage() {
   // Browse-mode entry: browse linked here with ?id=<artist>, so seed the artist
   // ourselves (captureArtist loads its albums once the profile arrives).
   [new URLSearchParams(window.location.search).get('id')].filter(Boolean).forEach(function(id) { captureArtist({ artist: artistFromId(id) }); });
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
+  api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }

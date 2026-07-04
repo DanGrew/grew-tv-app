@@ -344,6 +344,13 @@ async function installApi(page) {
   await page.route('**/media/config.json', function(route) {
     return json(route, 200, CONFIG);
   });
+  // TASK-297: companion pages now resolve the WS port from /api/config.wsPort
+  // (core/server-config.js fetchWsUrl) instead of hardcoding 8766. Serve 8766 here
+  // so the resolved ws url stays ws://host:8766 and the routeWebSocket(/:8766/)
+  // stub below still matches. (The TV app still hardcodes 8766 via connectApp.)
+  await page.route('**/api/config', function(route) {
+    return json(route, 200, { wsPort: 8766, contentBase: '' });
+  });
   // Default WebSocket stub (FEAT-026). Every screen boots connectApp(ws://:8766),
   // a port the app HARDCODES (core/server-config.js WS_PORT). With no route these
   // connect to whatever real media-manager is live on :8766 and register on its

@@ -7,11 +7,24 @@
 // host from `location.hostname` instead of hardcoding `localhost` is what lets
 // the app reach the WS from a second device on the LAN.
 //
-// The port lives here, in one tested place, rather than pasted at ~12 call
-// sites. TASK-133 serves it at /api/config so a future change can drive it from
-// the server; until ports actually vary, the home setup's default is enough.
+// The port lives here as the fallback default. TASK-133 serves the live port at
+// /api/config; TASK-297 reads it (fetchWsUrl) so a companion served off a
+// non-default port reaches THAT server's WS, not a hardcoded 8766.
 export var WS_PORT = 8766;
 
-export function wsUrl(hostname) {
-  return 'ws://' + hostname + ':' + WS_PORT;
+export function wsUrl(hostname, port) {
+  return 'ws://' + hostname + ':' + (port != null ? port : WS_PORT);
+}
+
+// TASK-297: resolve the WS URL from the server the page was loaded from. The WS
+// runs on its own port — the one host detail a page can't read off its own URL —
+// so ask the server for it via /api/config.wsPort (authoritative) instead of
+// hardcoding 8766. The host still comes from location.hostname (what lets a LAN
+// device reach the WS, TASK-134). Falls back to WS_PORT if the endpoint or the
+// field is absent, so an older server or a fetch failure still connects.
+export function fetchWsUrl(serverOrigin) {
+  return fetch(serverOrigin + '/api/config')
+    .then(function(r) { return r.json(); })
+    .then(function(c) { return wsUrl(location.hostname, c.wsPort); })
+    .catch(function() { return wsUrl(location.hostname); });
 }

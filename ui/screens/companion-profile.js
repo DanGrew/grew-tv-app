@@ -6,7 +6,6 @@
 // both devices to Home. View-model logic lives in core/.
 
 import { connect } from '../../core/companion-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { screenPage } from '../../core/companion-utils.js';
 import { screenColour, screenLabel } from '../../core/screen-chooser.js';
 import { loadConfig, mediaUrl } from '../../core/app-api.js';
@@ -27,8 +26,7 @@ export function initPage() {
   // the new profile's browse loads, jumping you to Music instead of Home.
   createCompanionMode().setSynced();
   clearTrail();
-  var host = window.location.hostname;
-  var server = 'http://' + host + ':8765';
+  var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
     ctxLabel: document.getElementById('ctx-label'),
@@ -240,7 +238,7 @@ export function initPage() {
   els.takeoverConfirm.addEventListener('click', confirmTakeover);
   els.takeoverCancel.addEventListener('click', cancelTakeover);
 
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, noop, onDevices,
+  api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, noop, onDevices,
     { onPersonActive: onPersonActive, onPersonBusy: onPersonBusy });
   // Config may land after the picker first renders (default config) — re-render
   // so real photos/labels appear. Skips a rebuild when not on the profile view.

@@ -1,5 +1,4 @@
 import { connect } from '../../core/companion-ws.js';
-import { wsUrl } from '../../core/server-config.js';
 import { loadAlbum, loadPlaylist, playbackAction } from '../../core/app-api.js';
 import { screenPage, displayTitle, queryString } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
@@ -28,8 +27,7 @@ var JUMP = [
 var PLAY_ICON = { 'true': '⏸', 'false': '▶' };
 
 export function initPage() {
-  var host = window.location.hostname;
-  var server = 'http://' + host + ':8765';
+  var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
     ctxLabel: document.getElementById('ctx-label'),
@@ -304,6 +302,6 @@ export function initPage() {
 
   mountSyncBar(mode, onModeChange);
   applyMode();
-  api = connect(wsUrl(host), onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode, onPlayback: onPlayback });
+  api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode, onPlayback: onPlayback });
   updateBar = mountScreenBar(getApi, noop);
 }
