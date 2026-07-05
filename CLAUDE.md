@@ -247,11 +247,17 @@ Runs automatically on `git push`. Checks in order:
 
 1. **Arch checks** — layer boundaries, no DOM in core, no stray files, no pure fns outside core, etc.
 2. **TV checks** — focus rings, min font size, error screen presence
-3. **Untested check** — every `core/` file referenced in `tests/unit/`
-4. **Cyclomatic complexity** — UI screens
-5. **Unit tests** — `npm run test:unit`
+3. **Cyclomatic complexity** — UI screens
+4. **Unit tests** — `npm run test:unit`
 
-E2E tests run in CI only.
+E2E tests run in CI only. **Per-file `core/` coverage is a CI-only gate too** —
+the `coverage` job runs `npm run test:coverage`, whose `vitest.config.js`
+`coverage.thresholds` (perFile, over `core/**`) fail if any `core/` file drops
+below the floor (TASK-307 replaced the old `check-untested` string-match — a real
+coverage floor now enforces that every `core/` file is genuinely exercised, not
+merely name-matched). It's **advisory** (a red floor never blocks a merge or a
+local push); lift uncovered files via a follow-up rather than gold-plating to
+green.
 
 ### Running the gates by hand
 
@@ -273,8 +279,8 @@ done
 for r in tv-focus-rings tv-min-font-size tv-no-blank-screen; do
   node scripts/tv-check.js $r /tmp/$r.txt || echo "FAIL $r"; done
 node scripts/check-ui-cyclomatic.js /tmp/cyclo.txt
-node scripts/check-untested.js
 npm run test:unit
+npm run test:coverage   # per-file core/ coverage floor (CI `coverage` job; advisory)
 ```
 **Cyclomatic gate false-passes on a fresh branch** (its touched-file set goes
 empty when `origin/main` is stale). Verify your own edited `ui/**` files
