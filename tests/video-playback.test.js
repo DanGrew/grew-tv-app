@@ -22,6 +22,19 @@ test('plays the chosen series member from the snapshot, transport live', async (
   await expect(page.locator('#btn-next')).toBeVisible();
 });
 
+// TASK-288: controls read as two rows (matching the music player) — prev/play/next
+// inline with a wide progress bar in #transport, the Jump/CC/Queue/Reset pills on a
+// separate #pill-row underneath. Guard the grouping AND the vertical stacking.
+test('controls are two rows: wide progress bar above, pills underneath', async ({ page }) => {
+  await expect(page.locator('#transport #progress')).toBeVisible();
+  await expect(page.locator('#pill-row #btn-jump')).toBeVisible();
+  await expect(page.locator('#pill-row #btn-queue')).toBeVisible();
+  await expect(page.locator('#pill-row #btn-reset')).toBeVisible();
+  const bar = await page.locator('#progress').boundingBox();
+  const pills = await page.locator('#pill-row').boundingBox();
+  expect(pills.y).toBeGreaterThanOrEqual(bar.y + bar.height);
+});
+
 test('Next advances in place — the document persists (no reload)', async ({ page }) => {
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/);
   // Tag the live document. A page reload (the old per-item flow) would wipe it;
