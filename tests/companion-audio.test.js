@@ -104,6 +104,15 @@ test.describe('album source (Plane B)', () => {
     expect(q.body.track_id).toBe('ootb-03');
   });
 
+  // BUG-030: the ＋ queued silently — no toast, no highlight — so it read as broken.
+  // Tapping ＋ must flash a "Queued to Play Next" confirmation (mirrors the add-sheet).
+  test('+ Queue flashes a "Queued to Play Next" confirmation toast (BUG-030)', async ({ page }) => {
+    await expect(page.locator('#add-status')).toBeHidden();
+    await page.locator('.queue-btn[data-queue="ootb-03"]').click();
+    await expect(page.locator('#add-status')).toBeVisible();
+    await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+  });
+
   // play/pause / skip / volume have no server action — they ride the legacy WS
   // intent rail (Plane A), so NONE of them touch the per-person playback engine.
   test('play/pause / skip / volume stay on the legacy intent rail — not playback actions', async ({ page }) => {

@@ -73,6 +73,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; overflow
 .seg-opt.on { background: var(--surface-hi); color: var(--focus); }
 .seg-opt:active { color: var(--focus); }
 .seg-opt:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
+#add-status { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 .desync-off { opacity: 0.35; pointer-events: none; }
 .browsing .transport, .browsing #jump, .browsing #c-reset, .browsing #c-lyrics, .browsing .track-btn { opacity: 0.35; pointer-events: none; }
 </style>
@@ -101,6 +102,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; overflow
 <button id="c-queue" class="reset-btn" aria-label="Open queue">&#9776; Queue</button>
 <button id="c-reset" class="reset-btn" aria-label="Reset progress">Reset progress</button>
 <div id="tracks"></div>
+<div id="add-status"></div>
 <script type="module">
 import { initPage } from '../ui/screens/companion-audio.js';
 initPage();

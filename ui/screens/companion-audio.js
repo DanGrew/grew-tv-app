@@ -40,7 +40,7 @@ export function initPage() {
     reset: document.getElementById('c-reset'),
     lyrics: document.getElementById('c-lyrics')
   };
-  var state = { snap: null, psnap: null, sourceType: null, sourceId: null, person: null };
+  var state = { snap: null, psnap: null, sourceType: null, sourceId: null, person: null, statusTimer: null };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -134,9 +134,24 @@ export function initPage() {
   function sendPlayback(action, body) { playbackAction(server, action, state.person, body).catch(noop); }
   function playTrack(id) { sendPlayback('play-track', { track_id: id }); }
 
+  // BUG-030: transient confirmation toast — mirrors the companion add-sheet's
+  // #add-status (companion-detail.js). Hidden by default; fades after 2.5s, a fresh
+  // toast restarts the clock. Without it the ＋ queued silently and read as dead.
+  function hideStatus() { document.getElementById('add-status').style.display = 'none'; }
+  function showStatus(text) {
+    var el = document.getElementById('add-status');
+    el.textContent = text;
+    el.style.display = 'block';
+    clearTimeout(state.statusTimer);
+    state.statusTimer = setTimeout(hideStatus, 2500);
+  }
+
   // FEAT-031 (TASK-189) producer: queue a track to PLAY NEXT — it lands in the
-  // override queue and shows up under PLAY NEXT on the Queue View + TV.
-  function queueTrack(id) { sendPlayback('queue-track', { track_id: id }); }
+  // override queue and shows up under PLAY NEXT on the Queue View + TV. BUG-030:
+  // call the engine directly (not via sendPlayback) so we can chain a confirmation
+  // toast on success — the remote no longer looks dead. Direct call keeps the toast
+  // chain here without giving sendPlayback a top-level return (no-pure-fn gate).
+  function queueTrack(id) { playbackAction(server, 'queue-track', state.person, { track_id: id }).then(function() { showStatus('Queued to Play Next'); }).catch(noop); }
 
   // A track row: the play button (tap = play now, keeps the .track-btn contract
   // the highlight + e2e key off) plus a ＋ Queue producer (FEAT-031 mockup).
