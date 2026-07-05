@@ -3,6 +3,7 @@ import { mediaUrl, resetProgress } from '../../core/app-api.js';
 import { getPerson } from '../../core/state.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
 import { logEvent, makeSeekCoalescer, SOURCE_TV } from '../../core/log.js';
+import { readVolume, writeVolume } from '../../core/volume-store.js';
 
 // FEAT-018 (TASK-130) audio player. The <audio> analogue of the FEAT-017 video
 // player: same transport (play/pause, prev/next track, graduated skip, range
@@ -32,6 +33,7 @@ var EXT_OF = { 'true': function(r) { return r.ext; }, 'false': function() { retu
 
 export function setup(config) {
   var audio  = config.audio;
+  audio.volume = readVolume();   // BUG-034: re-apply the remembered level to this fresh element
   var server = config.server;
   var onStop = config.onStop;
   var onEnded  = [config.onEnded ].filter(Boolean).concat([function() { stopPlayback(); }])[0];
@@ -348,8 +350,8 @@ export function setup(config) {
   remote.queue    = function() { openQueue(); };
   remote.lyrics   = function() { toggleLyrics(); };
   remote.skip     = function(params) { executeSkip([params].filter(Boolean).map(function(p) { return p.deltaSec; }).filter(Boolean).concat([0])[0]); };
-  remote.vol_up   = function() { audio.volume = Math.min(1, audio.volume + 0.1); };   // companion volume (TASK-198)
-  remote.vol_down = function() { audio.volume = Math.max(0, audio.volume - 0.1); };
+  remote.vol_up   = function() { audio.volume = Math.min(1, audio.volume + 0.1); writeVolume(audio.volume); };   // companion volume (TASK-198)
+  remote.vol_down = function() { audio.volume = Math.max(0, audio.volume - 0.1); writeVolume(audio.volume); };
   remote.reset    = function() { resetAndExit(); };   // companion Reset intent (TASK-142)
 
   audio.addEventListener('timeupdate', function() {

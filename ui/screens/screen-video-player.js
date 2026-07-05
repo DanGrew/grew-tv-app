@@ -3,6 +3,7 @@ import { logEvent, makeSeekCoalescer, SOURCE_TV } from '../../core/log.js';
 import { mediaUrl, saveProgress, resetProgress } from '../../core/app-api.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
 import { getCaptions, setCaptions, getPerson } from '../../core/state.js';
+import { readVolume, writeVolume } from '../../core/volume-store.js';
 
 // Graduated relative skips (FEAT-017): ±10s / 30s / 2m / 10m / 30m. The Jump
 // popup is a 5-column grid: back row then forward row. No absolute seek / scrub.
@@ -25,6 +26,7 @@ var SEEK_SETTLE_MS = 500;        // coalesce a scrub burst into one `seek` log
 
 export function setup(config) {
   var video    = config.video;
+  video.volume = readVolume();   // BUG-034: re-apply the remembered level to this fresh element
   var server   = config.server;
   var onStop   = config.onStop;
   var onEnded  = [config.onEnded ].filter(Boolean).concat([function() { stopPlayback(); }])[0];
@@ -495,8 +497,8 @@ export function setup(config) {
   remote.next     = function() { emit('next'); onNext(); };
   remote.prev     = function() { onPrev(); };
   remote.skip     = function(params) { executeSkip([params].filter(Boolean).map(function(p) { return p.deltaSec; }).filter(Boolean).concat([0])[0]); };
-  remote.vol_up   = function() { video.volume = Math.min(1, video.volume + 0.1); showControls(); };
-  remote.vol_down = function() { video.volume = Math.max(0, video.volume - 0.1); showControls(); };
+  remote.vol_up   = function() { video.volume = Math.min(1, video.volume + 0.1); writeVolume(video.volume); showControls(); };
+  remote.vol_down = function() { video.volume = Math.max(0, video.volume - 0.1); writeVolume(video.volume); showControls(); };
   remote.toggleCaptions = function() { [ccVisible()].filter(Boolean).forEach(toggleSubtitles); };
   remote.cc       = function() { [ccVisible()].filter(Boolean).forEach(toggleSubtitles); };
   remote.reset    = function() { resetAndExit(); };   // companion Reset intent (TASK-142)

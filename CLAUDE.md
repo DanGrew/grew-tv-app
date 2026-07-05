@@ -54,6 +54,7 @@ module or a screen** — this index rots otherwise (it did).
 - `log.js` — app-side logging emitter (POST /log) + seek coalescer (TASK-213)
 - `error-reporter.js` — global browser-error capture → /log (TASK-213)
 - `state.js` — durable device identity (which screen this is; FEAT-026)
+- `volume-store.js` — one remembered session volume, shared by both players (BUG-034)
 - `time.js` — time format helpers (`pad`, `fmt`)
 
 **Model / view helpers (pure markup + view-models)**
