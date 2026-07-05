@@ -2,7 +2,8 @@ import { connect } from '../../core/companion-ws.js';
 import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, videoPlaybackAction } from '../../core/app-api.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, rowMidWatch } from '../../core/progress.js';
-import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
+import { resumeOf, episodeLabel, progressBarMarkup, detailTagMarkup } from '../../core/detail-view.js';
+import { primaryAction } from '../../core/series-detail.js';
 import { fmt } from '../../core/time.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
@@ -211,7 +212,11 @@ export function initPage() {
     return img;
   }
 
-  function episodeBtn(item) {
+  // BUG-033: the next-to-play row carries the app's NEXT/RESUME tag + an is-next
+  // highlight, driven by the SAME core the TV detail uses (detailTagMarkup). mid
+  // is album-suppressed (music has no resume, TASK-276), so an album/music
+  // continue row reads NEXT; a mid-watch video-series row reads RESUME.
+  function episodeBtn(item, isNext) {
     var video = item.video;
     var resume = resumeOf(state.progress[video.id]);
     var mid = rowMidWatch(isAlbum(), resume, video.duration);
@@ -223,10 +228,12 @@ export function initPage() {
     // click; the WS layer also no-ops the intent). The ＋ Playlist button beside
     // it stays live (per-person add, both modes).
     btn.classList.toggle('desync-off', mode.isDesynced());
+    btn.classList.toggle('is-next', isNext);
     var subHtml = [video.duration].filter(Boolean).map(function(d) { return '<span class="t-sub">' + fmt(d) + '</span>'; }).concat([''])[0];
     btn.appendChild(posterImg(posterName));
     btn.insertAdjacentHTML('beforeend',
       '<div class="t-info"><span class="t-label">' + episodeLabel(item) + '</span>' + subHtml +
+      detailTagMarkup(mid, video.duration - resume, isNext) +
       progressBarMarkup(mid, percent(resume, video.duration), 'ep-progress') + '</div>');
     btn.addEventListener('click', function() { api.sendIntent('play', { id: video.id }); });
     return btn;
@@ -271,30 +278,34 @@ export function initPage() {
   // was ＋ Playlist and ＋ Queue side by side — they crowded the track text). The ＋
   // opens the add sheet whose top option is ▶ Play Next (queue), playlist cards
   // below. A <button> can't nest, so they are siblings in a row.
-  function albumTrackNode(item) {
+  function albumTrackNode(item, isNext) {
     var row = document.createElement('div');
     row.className = 'detail-track-row';
-    row.appendChild(episodeBtn(item));
+    row.appendChild(episodeBtn(item, isNext));
     row.appendChild(addBtn(item));
     return row;
   }
   // A video series episode is the play tile + a ＋ Queue (VIDEO queue) beside it —
   // no ＋ Playlist (playlists are music-only). FEAT-040/TASK-249.
-  function videoTrackNode(item) {
+  function videoTrackNode(item, isNext) {
     var row = document.createElement('div');
     row.className = 'detail-track-row';
-    row.appendChild(episodeBtn(item));
+    row.appendChild(episodeBtn(item, isNext));
     row.appendChild(videoQueueBtn(item));
     return row;
   }
   var TRACK_NODE = { 'true': albumTrackNode, 'false': videoTrackNode };
-  function trackNode(item) { return TRACK_NODE[isAlbum() + ''](item); }
+  function trackNode(item, isNext) { return TRACK_NODE[isAlbum() + ''](item, isNext); }
 
+  // BUG-033: nextIdx indexes the FULL items[] (primaryAction, the app's source of
+  // truth); visibleItems carries each item's original idx, so the season filter
+  // never shifts which row is tagged.
   function renderSeries() {
     els.actionsEl.appendChild(playNextBtn());
     maybeAddAll();
     renderSeasonChips();
-    visibleItems(state.series.items, state.activeSeason).forEach(function(e) { els.actionsEl.appendChild(trackNode(e.item)); });
+    var nextIdx = primaryAction(state.series.items, state.progress).index;
+    visibleItems(state.series.items, state.activeSeason).forEach(function(e) { els.actionsEl.appendChild(trackNode(e.item, e.idx === nextIdx)); });
   }
 
   function renderNoContent() {

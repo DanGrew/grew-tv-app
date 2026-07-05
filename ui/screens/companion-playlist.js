@@ -2,6 +2,8 @@ import { connect } from '../../core/companion-ws.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
+import { primaryAction } from '../../core/series-detail.js';
+import { detailTagMarkup } from '../../core/detail-view.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { playlistCards } from '../../core/playlist-pick.js';
@@ -174,12 +176,13 @@ export function initPage() {
   // Track tile: a cover thumbnail (TASK-287), the track title, and an optional
   // resume-percent badge. The thumbnail sits left of the title inside the same
   // single-column row (posters otherwise live on the TV).
-  function trackTile(card) {
+  function trackTile(card, isNext) {
     var hint = tileHint(state.progress, card, true);
     var el = document.createElement('button');
     el.className = 'ph-txt';
     el.setAttribute('data-id', card.id);
     el.classList.toggle('prog', Boolean(hint));
+    el.classList.toggle('is-next', isNext);
     el.appendChild(posterImg(card.poster));
     var nm = document.createElement('span');
     nm.className = 'nm';
@@ -191,6 +194,9 @@ export function initPage() {
       b.textContent = h;
       el.appendChild(b);
     });
+    // BUG-033: the next-to-play track carries the app's NEXT tag (music has no
+    // resume, TASK-276 tileHint suppress -> NEXT only, never RESUME).
+    el.insertAdjacentHTML('beforeend', detailTagMarkup(false, 0, isNext));
     el.addEventListener('click', function() { playTrack(card); });
     return el;
   }
@@ -235,19 +241,22 @@ export function initPage() {
   // .detail-track-row model): a borderless play tile (tap = play on the TV) plus
   // the ↑ ↓ ✕ edit controls as inner chips. A <button> can't nest, so the tile
   // stays a button and the chips sit beside it inside the .ph-row box.
-  function trackRow(card, i, total) {
+  function trackRow(card, i, total, isNext) {
     var row = document.createElement('div');
     row.className = 'ph-row';
-    row.appendChild(trackTile(card));
+    row.appendChild(trackTile(card, isNext));
     appendUp(row, i);
     appendDown(row, i, total);
     row.appendChild(editBtn('&#10005;', 'x', 'Remove', function() { removeTrack(i); }));
     return row;
   }
 
+  // BUG-033: primaryAction over the flat playlist items resolves the continue
+  // track (the shared core the app's detail NEXT tag uses); i === nextIdx tags it.
   function renderTracks() {
     var cards = trackCards();
-    cards.forEach(function(card, i) { els.gridEl.appendChild(trackRow(card, i, cards.length)); });
+    var nextIdx = primaryAction(state.tracks, state.progress).index;
+    cards.forEach(function(card, i) { els.gridEl.appendChild(trackRow(card, i, cards.length, i === nextIdx)); });
   }
 
   function renderEmpty() {

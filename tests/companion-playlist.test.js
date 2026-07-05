@@ -57,6 +57,30 @@ test('TASK-276: a part-played playlist track shows no resume badge', async ({ pa
   await expect(page.locator('.ph-txt[data-id="ootb-01"] .pct')).toHaveCount(0);
 });
 
+// BUG-033: the companion playlist detail highlights the next-to-play track the app
+// tags NEXT, via the SAME core (primaryAction + detailTagMarkup). Music has no
+// resume, so the continue track reads NEXT only. Red on the old untagged list.
+test('BUG-033: the continue track carries the NEXT tag', async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: [{ item_id: 'ootb-01', position_secs: 100, duration_secs: 227, last_watched: 1000 }] })
+  }));
+  await mockApp(page, 'pl-roadtrip');
+  await page.goto('/companion/playlist.html');
+  await expect(page.locator('.ph-txt[data-id="ootb-01"] .detail-tag')).toHaveText('NEXT');
+  await expect(page.locator('.ph-txt[data-id="ootb-01"]')).toHaveClass(/is-next/);
+  await expect(page.locator('.ph-txt[data-id="ootb-03"] .detail-tag')).toHaveCount(0);
+});
+
+test('BUG-033: a fresh playlist (no progress) tags track 1 NEXT', async ({ page }) => {
+  await installApi(page);
+  await mockApp(page, 'pl-roadtrip');
+  await page.goto('/companion/playlist.html');
+  await expect(page.locator('.ph-txt[data-id="ootb-03"] .detail-tag')).toHaveText('NEXT');
+  await expect(page.locator('.ph-txt[data-id="ootb-01"] .detail-tag')).toHaveCount(0);
+});
+
 test.describe('Road Trip playlist (2 tracks)', () => {
   test.beforeEach(async ({ page }) => {
     sentIntents = [];

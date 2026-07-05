@@ -36,6 +36,8 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .ph-txt img { flex: 0 0 auto; width: 42px; height: 42px; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface-hi); }
 .ph-txt .nm { flex: 1; line-height: 1.2; }
 .ph-txt .pct { font-size: 11px; color: var(--focus); }
+.ph-txt .detail-tag { font-size: 11px; color: var(--focus); letter-spacing: 1px; font-weight: 700; }
+.ph-txt.is-next .nm { color: var(--focus); }
 .ph-txt:active, .ph-txt:focus { outline: none; color: var(--focus); }
 .ph-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--surface); transition: border-color var(--dur) var(--ease); }
 .ph-row:has(.ph-txt:active) { border-color: var(--focus); }

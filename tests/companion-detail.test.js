@@ -190,6 +190,68 @@ test('TASK-276: a part-played music album track shows no progress bar', async ({
   await expect(page.locator('.tile-btn[data-id="ootb-02"] .ep-progress')).toHaveCount(0);
 });
 
+// BUG-033 — the companion album/playlist detail highlights the next-to-play track
+// the app tags NEXT, driven by the SAME core (primaryAction + detailTagMarkup). On
+// an album, music has no resume (TASK-276 suppress), so the continue row reads
+// NEXT; a video-series mid-watch row reads RESUME, its next row NEXT — app parity.
+// All red on the old untagged companion.
+test('BUG-033: a part-played music album tags the continue track NEXT (no RESUME)', async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: [{ item_id: 'ootb-02', position_secs: 90, duration_secs: 245, last_watched: 1000 }] })
+  }));
+  await mockAppRec(page, {
+    context: { context_id: 'detail', series_id: 'ootb-album' },
+    appState: { screen: 'detail', itemId: 'ootb-album', profile: 'kids', person: 'kids' }
+  }, []);
+  await page.goto('/companion/detail.html');
+  await expect(page.locator('.tile-btn[data-id="ootb-02"] .detail-tag')).toHaveText('NEXT');
+  await expect(page.locator('.tile-btn[data-id="ootb-02"]')).toHaveClass(/is-next/);
+  await expect(page.locator('.tile-btn[data-id="ootb-01"] .detail-tag')).toHaveCount(0);
+});
+
+test('BUG-033: a fresh album (no progress) tags track 1 NEXT', async ({ page }) => {
+  await installApi(page);
+  await mockAppRec(page, {
+    context: { context_id: 'detail', series_id: 'ootb-album' },
+    appState: { screen: 'detail', itemId: 'ootb-album', profile: 'kids' }
+  }, []);
+  await page.goto('/companion/detail.html');
+  await expect(page.locator('.tile-btn[data-id="ootb-01"] .detail-tag')).toHaveText('NEXT');
+  await expect(page.locator('.tile-btn[data-id="ootb-01"]')).toHaveClass(/is-next/);
+  await expect(page.locator('.tile-btn[data-id="ootb-02"] .detail-tag')).toHaveCount(0);
+});
+
+test('BUG-033: a mid-watch video-series episode shows RESUME (video keeps resume)', async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: [{ item_id: 'bluey-s1e01', position_secs: 100, duration_secs: 420, last_watched: 1000 }] })
+  }));
+  await mockAppRec(page, {
+    context: { context_id: 'detail', series_id: 'bluey' },
+    appState: { screen: 'detail', itemId: 'bluey', profile: 'kids', person: 'kids' }
+  }, []);
+  await page.goto('/companion/detail.html');
+  await expect(page.locator('.tile-btn[data-id="bluey-s1e01"] .detail-tag')).toContainText('RESUME');
+});
+
+test('BUG-033: a finished video episode tags the FOLLOWING episode NEXT', async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: [{ item_id: 'bluey-s1e01', position_secs: 419, duration_secs: 420, last_watched: 1000 }] })
+  }));
+  await mockAppRec(page, {
+    context: { context_id: 'detail', series_id: 'bluey' },
+    appState: { screen: 'detail', itemId: 'bluey', profile: 'kids', person: 'kids' }
+  }, []);
+  await page.goto('/companion/detail.html');
+  await expect(page.locator('.tile-btn[data-id="bluey-s1e02"] .detail-tag')).toHaveText('NEXT');
+  await expect(page.locator('.tile-btn[data-id="bluey-s1e01"] .detail-tag')).toHaveCount(0);
+});
+
 // FEAT-038 (TASK-230) — desynced detail. The companion arrives via browse's local
 // link (detail.html?id=…) while the TV is elsewhere, so it self-loads the series
 // from the id instead of waiting for the TV's context echo; it does not follow the
