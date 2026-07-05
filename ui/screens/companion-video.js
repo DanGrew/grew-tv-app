@@ -4,7 +4,8 @@ import { screenPage, displayTitle, seriesIdFromSnap, queryString } from '../../c
 import { nowPlaying, upNextLine, seriesMode } from '../../core/video-player-router.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
-import { buildCrumbs } from '../../core/breadcrumb.js';
+import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
+import { trimOnCrumb, entries as entriesTrail } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
@@ -57,19 +58,36 @@ export function initPage() {
   function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
   function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
-  // Breadcrumb trail (FEAT-021): Home > Series > Episode (film: Home > Title).
-  // Ancestor crumbs send the `navigate` intent — the app teleports the TV and
-  // echoes context back, which onContext follows. The episode title arrives in
-  // the WS context; the series id/title are derived from the app_state snapshot
-  // (itemId is the series for an episode, the video itself for a film) and the
-  // series title is fetched once, mirroring the detail screen.
+  // Breadcrumb trail (FEAT-021 / BUG-037): Home > Series > Episode for a series;
+  // film: Home > Grid > Title (from the FEAT-032 nav-trail); Home > Title only on
+  // deep-link. Ancestor crumbs send the `navigate` intent — the app teleports the
+  // TV and echoes context back, which onContext follows. The episode/film title
+  // arrives in the WS context; the series id/title are derived from the app_state
+  // snapshot (itemId is the series for an episode, the video itself for a film) and
+  // the series title is fetched once, mirroring the detail screen. A film has no
+  // seriesId, so it reads the recorded genre-grid entry off the nav-trail (the
+  // same retrace companion-artist builds) rather than collapsing to Home > Title.
   // Browse mode: crumb is a local hop (reach the library without driving the TV).
+  function railEntry() {
+    return entriesTrail().filter(function(e) { return e.page === 'browse.html'; }).slice(-1)[0];
+  }
   function localGo(page, params) { window.location.href = page + queryString(params); }
   function navigate(page, params) {
+    // Trim the trail to the clicked ancestor (Home clears) so a later Back can't
+    // retrace past this jump (FEAT-032 stale-Back fix).
+    trimOnCrumb(page, params);
     ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
   }
+  // Film branch: the recorded genre grid retrace when the nav-trail holds a browse
+  // entry, else the minimal deep-link crumb. Series branch: the unchanged
+  // Home > Series > Episode. Nested boolean dispatch tables keep both cyclomatic-1.
+  function filmCrumbs() {
+    return ({ true: trailCrumbs(railEntry(), state.crumb.videoTitle), false: buildCrumbs('video', state.crumb) })[Boolean(railEntry())];
+  }
+  function seriesCrumbs() { return buildCrumbs('video', state.crumb); }
+  var VIDEO_CRUMBS = { true: seriesCrumbs, false: filmCrumbs };
   function mountVideoCrumbs() {
-    mountCompanionBreadcrumb('breadcrumb', buildCrumbs('video', state.crumb), navigate);
+    mountCompanionBreadcrumb('breadcrumb', VIDEO_CRUMBS[Boolean(state.crumb.seriesId)](), navigate);
   }
   function loadSeriesTitle(seriesId) {
     loadSeries(server, seriesId)

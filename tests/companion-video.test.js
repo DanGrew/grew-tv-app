@@ -78,3 +78,83 @@ test('play/pause stays on the legacy intent rail — it is NOT a video-playback 
   // none of the Plane-A controls touch the per-person video engine.
   expect(posts).toHaveLength(0);
 });
+
+// BUG-037 — the Plane-A breadcrumb (a standalone film has no video_playback engine
+// source, so its title + context arrive over the legacy WS intent rail, not a
+// snapshot). Before the fix the film player collapsed to `Home › Title` (the only
+// way back was Home), losing the genre grid the film was reached through. It now
+// mirrors companion-artist's FEAT-032 nav-trail retrace: a film reached via a genre
+// grid reads `Home › <grid> › Title` and steps back to that grid. A series episode
+// (has a seriesId) is untouched — it keeps `Home › Series › Episode`.
+test.describe('BUG-037: film player breadcrumb retraces to the genre grid', () => {
+  function msg(type, payload) { return JSON.stringify({ type, payload }); }
+
+  // Drive the player over the WS the way the app does for a standalone film: push a
+  // `video` context carrying the display title, plus an app_state whose itemId ===
+  // episodeId (seriesIdFromSnap -> undefined -> film) or itemId !== episodeId (a
+  // series episode). Registered AFTER the fixture routes so it wins (most-recent).
+  function mockPlayer(page, appState, title) {
+    return page.routeWebSocket(/:8766/, (ws) => {
+      function push() {
+        ws.send(msg('context', { version: 2, context_id: 'video', display: { title } }));
+        ws.send(msg('app_state', appState));
+      }
+      ws.onMessage((raw) => {
+        const m = JSON.parse(raw);
+        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+        if (m.type === 'snapshot_request') push();
+        // A crumb tap sends `navigate`; the TV teleports and echoes the new context,
+        // which the companion follows to that page.
+        if (m.type === 'intent' && m.payload.intent === 'navigate') {
+          ws.send(msg('context', { version: 3, context_id: m.payload.params.page.replace('.html', '') }));
+        }
+      });
+    });
+  }
+
+  const FILM_STATE = { person: 'kids', profile: 'kids', screen: 'player', itemId: 'toy-story-main', episodeId: 'toy-story-main' };
+  const SERIES_STATE = { person: 'kids', profile: 'kids', screen: 'player', itemId: 'bluey', episodeId: 'bluey-s1e01' };
+
+  function seedGridTrail(page) {
+    return page.addInitScript(() => {
+      sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
+        { page: 'browse.html', params: { tab: 'films', rail: 'animation' }, label: 'Animation' }
+      ]));
+    });
+  }
+
+  test('a film reached via a genre grid shows Home › Grid › Title (3 crumbs) that retrace to the grid', async ({ page }) => {
+    await seedGridTrail(page);
+    await mockPlayer(page, FILM_STATE, 'Toy Story');
+    await page.goto('/companion/video.html');
+    await expect(page.locator('#now-title')).toHaveText('Toy Story');
+    // 3 crumbs: Home, the genre grid, the (inert) film title.
+    await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'Animation', 'Toy Story']);
+    await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home', 'Animation']);
+    const grid = page.locator('#breadcrumb .crumb-link', { hasText: 'Animation' });
+    await expect(grid).toHaveAttribute('data-page', 'browse.html');
+    await expect(grid).toHaveAttribute('data-params', /"rail":"animation"/);
+    // tapping the grid crumb teleports the TV back to the grid; the companion follows.
+    await grid.click();
+    await expect(page).toHaveURL(/companion\/browse\.html$/);
+  });
+
+  test('a deep-linked film (no browse trail) falls back to Home › Title', async ({ page }) => {
+    await mockPlayer(page, FILM_STATE, 'Toy Story');
+    await page.goto('/companion/video.html');
+    await expect(page.locator('#now-title')).toHaveText('Toy Story');
+    await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'Toy Story']);
+    await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home']);
+  });
+
+  test('a series episode is unchanged — Home › Series › Episode (guards no regression)', async ({ page }) => {
+    await seedGridTrail(page);
+    await mockPlayer(page, SERIES_STATE, 'Daddy Putdown');
+    await page.goto('/companion/video.html');
+    await expect(page.locator('#now-title')).toHaveText('Daddy Putdown');
+    await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'Bluey', 'Daddy Putdown']);
+    const series = page.locator('#breadcrumb .crumb-link', { hasText: 'Bluey' });
+    await expect(series).toHaveAttribute('data-page', 'detail.html');
+    await expect(series).toHaveAttribute('data-params', /"series":"bluey"/);
+  });
+});
