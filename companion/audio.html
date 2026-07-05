@@ -51,7 +51,8 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; overflow
 .track-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-size: 15px; cursor: pointer; touch-action: manipulation; text-align: left; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .track-btn:active, .track-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .queue-btn { flex-shrink: 0; width: 48px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface-hi); color: var(--text); font-size: 20px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
-.queue-btn:active, .queue-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.queue-btn:active { border-color: var(--focus); color: var(--focus); }
+.queue-btn:focus-visible { outline: 2px solid var(--focus); }
 .track-btn.cur { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
 .track-btn .t-num { color: var(--text-muted); width: 20px; text-align: center; font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .track-btn.cur .t-num { color: var(--focus); }
