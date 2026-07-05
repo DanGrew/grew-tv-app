@@ -2,7 +2,7 @@ import { connect } from '../../core/companion-ws.js';
 import { loadBrowse, loadContinueWatching, videoPlaybackAction, loadVideoPlayback, loadPlayback } from '../../core/app-api.js';
 import { queueCount } from '../../core/video-player-router.js';
 import { playNextCount } from '../../core/queue-view.js';
-import { screenPage, filterByTitle, tileHint } from '../../core/companion-utils.js';
+import { screenPage, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -48,7 +48,6 @@ export function initPage() {
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
-    search: document.getElementById('search'),
     drill: document.getElementById('drill'),
     sectionsRow: document.getElementById('sections-row'),
     railsWrap: document.getElementById('rails-wrap'),
@@ -61,7 +60,7 @@ export function initPage() {
   var state = {
     profile: null, person: null,
     cards: [], cw: [], labels: {}, progress: {},
-    query: '', level: 'sections', section: null, rail: null
+    level: 'sections', section: null, rail: null
   };
   var api = {};
   var updateBar = null;
@@ -230,18 +229,18 @@ export function initPage() {
 
   function renderSections() {
     els.sectionsRow.innerHTML = '';
-    filterByTitle(buildTabs(state.cards), state.query).forEach(function(s) { els.sectionsRow.appendChild(sectionChip(s)); });
+    buildTabs(state.cards).forEach(function(s) { els.sectionsRow.appendChild(sectionChip(s)); });
   }
 
   function renderRails() {
     els.railsRow.innerHTML = '';
-    filterByTitle(railList(), state.query).forEach(function(r) { els.railsRow.appendChild(railChip(r)); });
+    railList().forEach(function(r) { els.railsRow.appendChild(railChip(r)); });
     [state.section].filter(function(s) { return s === 'music'; }).forEach(function() { els.railsRow.appendChild(createChip()); });
   }
 
   function renderGrid() {
     els.txtgrid.innerHTML = '';
-    var items = filterByTitle(activeRail().items, state.query);
+    var items = activeRail().items;
     els.gridCount.textContent = items.length + ' items';
     items.forEach(function(c) { els.txtgrid.appendChild(txtTile(c)); });
   }
@@ -429,16 +428,10 @@ export function initPage() {
     ]).then(function(r) { applyCatalog(r[0], r[1]); });
   }
 
-  els.search.addEventListener('input', function() {
-    state.query = els.search.value;
-    render();
-  });
-
   // While the companion targets no live screen, hide the drill content and let
   // the screen chooser take over — never a blank page (TASK-179 A2, BUG-013).
   function setBound(bound) {
     var disp = ({ true: '', false: 'none' })[bound];
-    els.search.style.display = disp;
     els.drill.style.display = disp;
   }
 

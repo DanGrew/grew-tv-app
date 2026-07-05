@@ -1,4 +1,4 @@
-import { screenPage, titleCase, skipLabel, displayTitle, displayLabel, getContentBasePath, filterByTitle, seriesIdFromSnap, tileHint, queryString } from '../../core/companion-utils.js';
+import { screenPage, titleCase, skipLabel, displayTitle, displayLabel, getContentBasePath, seriesIdFromSnap, tileHint, queryString } from '../../core/companion-utils.js';
 
 describe('tileHint', () => {
   it('returns the rounded resume percent for a mid-watch item', () => {
@@ -27,29 +27,6 @@ describe('seriesIdFromSnap', () => {
   });
   it('returns undefined for a film (itemId === episodeId)', () => {
     expect(seriesIdFromSnap({ itemId: 'toy-story-main', episodeId: 'toy-story-main' })).toBeUndefined();
-  });
-});
-
-describe('filterByTitle', () => {
-  const cards = [
-    { id: 'a', title: 'Toy Story' },
-    { id: 'b', title: 'The Dark Knight' },
-    { id: 'c', title: 'toy soldiers' }
-  ];
-  it('returns all cards for an empty query', () => {
-    expect(filterByTitle(cards, '').map(c => c.id)).toEqual(['a', 'b', 'c']);
-    expect(filterByTitle(cards, '   ').map(c => c.id)).toEqual(['a', 'b', 'c']);
-  });
-  it('matches a case-insensitive substring', () => {
-    expect(filterByTitle(cards, 'toy').map(c => c.id)).toEqual(['a', 'c']);
-    expect(filterByTitle(cards, 'KNIGHT').map(c => c.id)).toEqual(['b']);
-  });
-  it('returns empty when nothing matches', () => {
-    expect(filterByTitle(cards, 'zzz')).toEqual([]);
-  });
-  it('tolerates null cards and missing titles', () => {
-    expect(filterByTitle(null, 'x')).toEqual([]);
-    expect(filterByTitle([{ id: 'n' }], 'x')).toEqual([]);
   });
 });
 

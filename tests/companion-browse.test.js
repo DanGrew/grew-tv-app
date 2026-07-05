@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 const { installApi, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 
 // FEAT-028 / TASK-168 — the companion drill-down browse (replaces the flat
-// FEAT-020/TASK-139 tab+rails+search). The companion walks four levels —
+// FEAT-020/TASK-139 tab+rails layout). The companion walks four levels —
 // Sections -> Rails -> Grid -> Item — one at a time, driving the TV: each tap
 // emits the existing FEAT-017 `navigate`/`select` intent (no new protocol) and
 // optimistically renders locally. Chips are the breadcrumb (sideways jump = tap a
@@ -126,15 +126,6 @@ test('reuses the FEAT-021 breadcrumb — trail builds Home › Section › Rail 
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home', 'Films']);
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Animation');
-});
-
-test('filter narrows the current level (rail chips here), then restores', async ({ page }) => {
-  await page.locator('.chip[data-section="films"]').click();
-  await expect(page.locator('#rails-row .chip')).toHaveText(['Animation', 'Comedy']);
-  await page.locator('#search').fill('com');
-  await expect(page.locator('#rails-row .chip')).toHaveText(['Comedy']);
-  await page.locator('#search').fill('');
-  await expect(page.locator('#rails-row .chip')).toHaveText(['Animation', 'Comedy']);
 });
 
 test('Switch profile drives the picker — navigate intent echoes a profile context, companion follows (BUG-007)', async ({ page }) => {
