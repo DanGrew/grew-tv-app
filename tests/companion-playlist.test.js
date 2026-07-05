@@ -78,6 +78,17 @@ test.describe('Road Trip playlist (2 tracks)', () => {
     await expect(page.locator('.ph-txt[data-id="ootb-01"] .nm')).toHaveText('Turn to Stone');
   });
 
+  // TASK-287 — each track row carries a cover thumbnail (item.video.poster) at the
+  // left of the title. Red on the old code, whose rows had no <img>. (The src
+  // points at /media/<poster>; the file 404s in the fixture, but the <img> with
+  // its mediaUrl src is the assertion — matches companion-detail's poster rows.)
+  test('TASK-287: each track row shows a cover thumbnail from its poster', async ({ page }) => {
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await expect(page.locator('.ph-txt[data-id="ootb-03"] img')).toHaveCount(1);
+    await expect(page.locator('.ph-txt[data-id="ootb-03"] img')).toHaveAttribute('src', /\/media\/ootb\.jpg$/);
+    await expect(page.locator('.ph-txt[data-id="ootb-01"] img')).toHaveAttribute('src', /\/media\/ootb\.jpg$/);
+  });
+
   test('tapping a track plays it — sends the play intent and follows the TV to the player', async ({ page }) => {
     await page.locator('.ph-txt[data-id="ootb-01"]').click();
     await expect.poll(() => sentIntents).toContain('play');
@@ -194,6 +205,34 @@ test.describe('Empty playlist (still lists + opens)', () => {
     await expect(page.locator('.ph-txt')).toHaveCount(0);
     await expect(page.locator('.no-actions')).toHaveText('No tracks');
   });
+});
+
+// TASK-287 — a track with no poster hides its thumbnail (no broken icon, no gap)
+// and still renders the title. mediaUrl('' ) yields an empty src, so posterImg
+// takes the hide branch.
+test('TASK-287: a track with no poster hides its thumbnail but still shows the title', async ({ page }) => {
+  sentIntents = [];
+  await installApi(page);
+  await page.route('**/api/playlist/*', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({
+      id: 'pl-mixed', title: 'Mixed', profile: 'kids', collectionType: 'playlist', poster: null, seasons: [],
+      items: [
+        { season: null, episode: null, video: { id: 'has-poster', title: 'Has Poster', duration: 200, poster: 'ootb.jpg', mediaType: 'audio' } },
+        { season: null, episode: null, video: { id: 'no-poster', title: 'No Poster', duration: 200, poster: null, mediaType: 'audio' } }
+      ]
+    })
+  }));
+  await mockApp(page, 'pl-mixed');
+  await page.goto('/companion/playlist.html');
+  await expect(page.locator('.ph-txt')).toHaveCount(2);
+  // A poster'd track gets a real mediaUrl src; a poster-less track's img takes the
+  // hide branch (no src set, display:none) — no broken icon, no gap.
+  await expect(page.locator('.ph-txt[data-id="has-poster"] img')).toHaveAttribute('src', /\/media\/ootb\.jpg$/);
+  const noPosterSrc = await page.locator('.ph-txt[data-id="no-poster"] img').evaluate(el => el.getAttribute('src'));
+  expect(noPosterSrc).toBeNull();
+  await expect(page.locator('.ph-txt[data-id="no-poster"] img')).toBeHidden();
+  await expect(page.locator('.ph-txt[data-id="no-poster"] .nm')).toHaveText('No Poster');
 });
 
 // FEAT-038 (DSYNC-2c): opening a playlist while Browsing. The TV is elsewhere

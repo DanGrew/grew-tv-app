@@ -1,5 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
@@ -151,14 +151,36 @@ export function initPage() {
   // detail receives (it clicks the matching row -> teleports to the player).
   function playTrack(card) { api.sendIntent('play', { id: card.id }); }
 
-  // Bare text-label tile: track title + an optional resume-percent badge, no
-  // poster (posters live on the TV — matches the companion browse / artist grids).
+  // Cover thumbnail with a load-failure fallback (TASK-287): a missing/abortive
+  // poster hides the image (no broken icon, no gap) — the companion-detail.js
+  // posterImg pattern. loading="lazy" keeps one small image per visible row, so
+  // the single-column list stays within the deliberate low-image-concurrency
+  // budget that keeps the other companion lists text-only.
+  function posterImg(posterName) {
+    var img = document.createElement('img');
+    img.alt = '';
+    img.loading = 'lazy';
+    var src = mediaUrl(server, posterName);
+    ({
+      true: function() {
+        img.src = src;
+        img.addEventListener('error', function() { img.style.display = 'none'; });
+      },
+      false: function() { img.style.display = 'none'; }
+    })[String(!!src)]();
+    return img;
+  }
+
+  // Track tile: a cover thumbnail (TASK-287), the track title, and an optional
+  // resume-percent badge. The thumbnail sits left of the title inside the same
+  // single-column row (posters otherwise live on the TV).
   function trackTile(card) {
     var hint = tileHint(state.progress, card, true);
     var el = document.createElement('button');
     el.className = 'ph-txt';
     el.setAttribute('data-id', card.id);
     el.classList.toggle('prog', Boolean(hint));
+    el.appendChild(posterImg(card.poster));
     var nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = card.title;
@@ -205,7 +227,7 @@ export function initPage() {
   // a playlist carries no season/episode, so the bare track title is the label.
   function trackCards() {
     return state.tracks.map(function(item) {
-      return { id: item.video.id, title: item.video.title, durationSec: item.video.duration };
+      return { id: item.video.id, title: item.video.title, durationSec: item.video.duration, poster: item.video.poster };
     });
   }
 
