@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS, VIDEOS } = require('./fixtures/api.js');
 
 // FEAT-018/FEAT-027 — music browse + album detail + <audio> player + shuffle.
 // The Music tab (titled "Music"), Continue Listening rollup and routing are
@@ -313,6 +313,72 @@ test('after the idle window pointer activity wakes the bar so controls are click
   // And a control now fires (the Queue pill opens the Queue View overlay).
   await page.locator('#btn-queue').click();
   await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
+});
+
+// TASK-283 — per-track trim: startAt seeds the load seek, endAt fires the normal
+// next-track path early. The trim lives on the /api/video record; overriding that
+// route (matched most-recent-first over installApi's generic one) drives it. A
+// media element shim forces readyState>=1 + a settable currentTime so the load-seek
+// applies synchronously headless (no real audio to fire loadedmetadata).
+async function shimMediaElement(page) {
+  await page.addInitScript(() => {
+    const proto = HTMLMediaElement.prototype;
+    const store = new WeakMap();
+    Object.defineProperty(proto, 'currentTime', {
+      configurable: true, get() { return store.get(this) || 0; }, set(v) { store.set(this, v); }
+    });
+    Object.defineProperty(proto, 'readyState', { configurable: true, get() { return 1; } });
+  });
+}
+async function trimVideo(page, id, trim) {
+  await page.route('**/api/video/' + id, route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign({}, VIDEOS[id], trim))
+  }));
+}
+
+// A track whose record carries startAt begins at ~startAt, not 0. Red on the old
+// code (swapTrack always seeded the load seek with 0).
+test('a track with startAt seeks the <audio> to startAt on load (TASK-283)', async ({ page }) => {
+  await shimMediaElement(page);
+  await trimVideo(page, 'ootb-01', { startAt: 60 });
+  await openPlayer(page);
+  await expect.poll(() => page.locator('#audio').evaluate(a => a.currentTime)).toBe(60);
+});
+
+// Reaching endAt fires the SAME next-track path a natural end would — the next
+// POST lands and now-playing advances to the following album track. Red on the old
+// code (no endAt handling; the timeupdate at 150s did nothing).
+test('a track with endAt advances via the normal next path on reaching endAt (TASK-283)', async ({ page }) => {
+  await trimVideo(page, 'ootb-01', { endAt: 100 });
+  await openPlayer(page);
+  const nextPost = page.waitForRequest(r => r.url().includes('/api/playback/next') && r.method() === 'POST');
+  await page.evaluate(() => {
+    const a = document.getElementById('audio');
+    Object.defineProperty(a, 'currentTime', { configurable: true, get: () => 150 });
+    Object.defineProperty(a, 'duration', { configurable: true, get: () => 227 });
+    a.dispatchEvent(new Event('timeupdate'));
+  });
+  await nextPost;
+  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
+});
+
+// A track with neither field is unchanged: starts at 0 and plays past a high
+// timeupdate WITHOUT an early advance (now-playing stays put).
+test('a track with neither startAt nor endAt is unchanged — start 0, no early advance (TASK-283)', async ({ page }) => {
+  await shimMediaElement(page);
+  await openPlayer(page);
+  expect(await page.locator('#audio').evaluate(a => a.currentTime)).toBe(0);
+  let nextFired = false;
+  page.on('request', r => { nextFired = nextFired || r.url().includes('/api/playback/next'); });
+  await page.evaluate(() => {
+    const a = document.getElementById('audio');
+    Object.defineProperty(a, 'currentTime', { configurable: true, get: () => 200 });
+    Object.defineProperty(a, 'duration', { configurable: true, get: () => 227 });
+    a.dispatchEvent(new Event('timeupdate'));
+  });
+  await page.waitForTimeout(200);
+  expect(nextFired).toBe(false);
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
 });
 
 // BUG-018: an artist-sourced player carries from='artist'; pressing Back returns
