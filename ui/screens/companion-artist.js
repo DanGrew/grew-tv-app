@@ -177,8 +177,11 @@ export function initPage() {
   mountSyncBar(mode, onModeChange);
   applyMode();
   // Browse-mode entry: browse linked here with ?id=<artist>, so seed the artist
-  // ourselves (captureArtist loads its albums once the profile arrives).
+  // ourselves (captureArtist loads its albums once the profile arrives). The
+  // breadcrumb/TV path instead links ?artist=<name> (BUG-035) — seed that too;
+  // the value is already a name and captureArtist dedupes, so both keys are safe.
   [new URLSearchParams(window.location.search).get('id')].filter(Boolean).forEach(function(id) { captureArtist({ artist: artistFromId(id) }); });
+  [new URLSearchParams(window.location.search).get('artist')].filter(Boolean).forEach(function(name) { captureArtist({ artist: name }); });
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }
