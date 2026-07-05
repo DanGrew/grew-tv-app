@@ -274,7 +274,7 @@ if (rule === 'no-md-outside-docs') {
 if (rule === 'no-pure-fn-outside-core') {
   // Named function declarations outside core/ with params + logic + no DOM access belong in core/.
   // "Logic" = top-level return OR Math.* / numeric computation in body.
-  // Once in core/, check:untested enforces unit tests exist.
+  // Once in core/, the per-file coverage floor (vitest.config.js) enforces tests exist.
   const DOM_PATTERN = /\b(document|window|navigator|location|requestAnimationFrame|cancelAnimationFrame|fetch|decodeAudioBuffer|decodeAudioData)\b|\.(?:style\b|classList\b|textContent\b|innerHTML\b|innerText\b|appendChild\b|removeChild\b|remove\b|insertBefore\b|addEventListener\b|removeEventListener\b|setAttribute\b|getAttribute\b|querySelector\b|querySelectorAll\b|getElementById\b|offsetTop\b|offsetLeft\b|offsetWidth\b|offsetHeight\b|clientHeight\b|clientWidth\b|scrollTo\b|scrollLeft\b|scrollTop\b|cssText\b|createElementNS\b|createBufferSource\b|createGain\b|resume\b|decodeAudioData\b|clearRect\b|fillRect\b|strokeRect\b|drawImage\b|beginPath\b|moveTo\b|lineTo\b|arc\b|fill\b|stroke\b|fillText\b|strokeText\b|getImageData\b|putImageData\b|createLinearGradient\b|createRadialGradient\b)/;
   const THIN_DISPATCHER = /^\s*return\s+\w+\[.*\]\s*\(.*\)\s*;?\s*$/s;
   const COMPUTATION_PATTERN = /\bMath\.\w+\s*\(|\bparseInt\b|\bparseFloat\b|\bNumber\b|\bisNaN\b|\bisFinite\b/;

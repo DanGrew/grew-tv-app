@@ -25,8 +25,11 @@ node scripts/tv-check.js tv-focus-rings   "$TMPDIR_HOOK/tv-focus.txt"   || fail 
 node scripts/tv-check.js tv-min-font-size "$TMPDIR_HOOK/tv-font.txt"    || fail "tv-min-font-size"
 node scripts/tv-check.js tv-no-blank-screen "$TMPDIR_HOOK/tv-blank.txt" || fail "tv-no-blank-screen"
 
-echo "[pre-push] untested check..."
-node scripts/check-untested.js || fail "check-untested"
+# The old check-untested string-match retired in TASK-307 — a real per-file
+# coverage floor (vitest.config.js coverage.thresholds over core/**) now enforces
+# that every core/ file is genuinely exercised. It runs as the CI `coverage` job
+# (npm run test:coverage); pre-push keeps to `npm run test:unit` so an advisory
+# red floor never blocks a local push.
 
 echo "[pre-push] ui-cyclomatic..."
 node scripts/check-ui-cyclomatic.js "$TMPDIR_HOOK/ui-cyclomatic.txt" || fail "ui-cyclomatic"

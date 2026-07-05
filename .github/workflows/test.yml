@@ -61,25 +61,6 @@ jobs:
           name: report-coverage
           path: coverage-report.md
 
-  check-untested:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-      - run: npm ci
-      - name: Check untested files
-        run: |
-          node scripts/check-untested.js 2>&1 | tee untested-report.txt
-          exit ${PIPESTATUS[0]}
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: report-untested
-          path: untested-report.txt
-
   e2e-test:
     runs-on: ubuntu-latest
     steps:
@@ -405,7 +386,6 @@ jobs:
       pull-requests: write
     needs:
       - coverage
-      - check-untested
       - no-dom-in-core
       - no-ui-imports
       - no-stray-files
@@ -451,7 +431,6 @@ jobs:
             echo "|-------|--------|"
             COV=$(grep '| Lines' reports/coverage-report.md 2>/dev/null | grep -oP '\d+\.?\d*%' | head -1 || echo "❌ missing")
             row "Coverage (lines)" "$COV"
-            row "check-untested" "$(smry reports/untested-report.txt)"
             row "no-dom-in-core" "$(smry reports/no-dom.txt)"
             row "no-ui-imports" "$(smry reports/no-ui-imports.txt)"
             row "no-stray-files" "$(smry reports/no-stray-files.txt)"
