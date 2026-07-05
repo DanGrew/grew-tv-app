@@ -339,6 +339,18 @@ async function goToVideoScreen(page) {
   await page.locator('.film-tile[data-id="toy-story-main"]').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
+  // BUG-031: #screen-video + focus only prove the page INITED (onEnter focuses
+  // btn-play-pause synchronously). The <video> and its subtitle <track> are built
+  // by a LATER async chain (play-video action -> WS snapshot -> swapVideo ->
+  // loadProgress -> playVideo -> setSubtitleTrack). Under parallel CI load the
+  // helper returned before that chain primed, so a caller reading
+  // `video.textTracks[0].mode` hit undefined -> expect.poll fails fast on the throw
+  // (it does NOT retry through an exception) — the ~1/438 subtitles-default flake at
+  // l.575. Wait for the real post-nav settle signal: the media src set AND the CC
+  // button un-hidden (toy-story-main has subtitles, so its track built => textTracks
+  // is populated). Hardens every video test that shares this helper.
+  await expect(page.locator('#video')).toHaveAttribute('src', /toy-story-main/);
+  await expect(page.locator('#btn-cc')).toBeVisible();
 }
 
 async function goToSeriesEpisode(page) {
