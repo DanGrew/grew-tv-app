@@ -34,16 +34,71 @@ Apple Silicon Mac Mini (server, wired) runs media-manager on :8765
 
 ## Key Files
 
-- `core/screen-registry.js` — screen registration and d-pad key dispatch
-- `core/log.js` — app-side logging emitter (POST /log) + seek coalescer (TASK-213)
-- `core/error-reporter.js` — global browser-error capture → /log (TASK-213)
-- `core/ws-protocol.js` — WebSocket protocol (companion ↔ app)
-- `core/time.js` — time utilities
-- `ui/screens/screen-browse.js` — content grid browse screen
-- `ui/screens/screen-detail.js` — content detail / info screen
-- `ui/screens/screen-video.js` — video playback screen
-- `ui/screens/screen-profile.js` — profile selection screen
-- `ui/screens/screen-error.js` — error screen
+Grouped index of the two code layers. Each app page has a TV screen
+(`ui/screens/screen-*-page.js` + `app/homeview/*.html`) and usually a companion
+mirror (`ui/screens/companion-*.js` + `companion/*.html`) sharing the same `core/`
+logic (FEAT-017/028 mirror invariant). **Add a row here when you add a `core/`
+module or a screen** — this index rots otherwise (it did).
+
+### `core/` — pure logic (no DOM), unit-tested
+
+**Transport / plumbing**
+- `screen-registry.js` — screen registration + d-pad key dispatch
+- `app-api.js` — v3 normalized-model API client (FEAT-016)
+- `app-ws.js` — TV-side app WebSocket connect (`connectApp`, FEAT-026 Ph2)
+- `companion-ws.js` — companion WS: targets ONE screen by `device_id` (TASK-158)
+- `ws-protocol.js` — message types + device/person registries, addressed relay
+- `server-config.js` — single source for the media-manager WS URL (`fetchWsUrl`)
+- `companion-manifest.js` — companion manifest fetch
+- `remote.js` — WS watchdog (ping/reconnect)
+- `log.js` — app-side logging emitter (POST /log) + seek coalescer (TASK-213)
+- `error-reporter.js` — global browser-error capture → /log (TASK-213)
+- `state.js` — durable device identity (which screen this is; FEAT-026)
+- `time.js` — time format helpers (`pad`, `fmt`)
+
+**Model / view helpers (pure markup + view-models)**
+- `tile-model.js` — shared card view-model (TASK-116)
+- `home-rails.js` — group `/api/browse` cards into titled rails (TASK-117)
+- `detail-view.js` / `series-detail.js` / `seasons.js` — series-detail logic (TASK-118/123)
+- `progress.js` — watch-progress model (FEAT-017)
+- `breadcrumb.js` / `nav-trail.js` — ancestor-chain + sticky nav trail (FEAT-021/032)
+- `queue-view.js` / `queue-tabs.js` / `queue-crumb.js` — music Queue View (FEAT-031/039)
+- `video-queue-view.js` — video Queue View model + markup (FEAT-040)
+- `video-player-router.js` — persistent video-player view-router (FEAT-037)
+- `lrc.js` — LRC parse + rolling-frame lyric selection (FEAT-018)
+- `cover-mosaic.js` — playlist cover-mosaic markup (FEAT-039)
+- `playlist-name.js` / `playlist-pick.js` — create-playlist + "add to playlist" (FEAT-036)
+
+**Profile / device plane**
+- `profile-config.js` / `profile-rows.js` — persons + PIN gate, picker layout (FEAT-026)
+- `switch-profile.js` — "back to profile picker" nav target (BUG-007)
+- `device-colour.js` / `device-badge.js` — per-screen device colour identity (FEAT-026)
+- `screen-chooser.js` — companion screen-chooser view-model (TASK-179)
+- `companion-mode.js` / `companion-button-modes.js` / `companion-utils.js` — desync mode (FEAT-038)
+
+### `ui/screens/` — DOM screens
+
+**TV pages** (`screen-*-page.js`, each backs `app/homeview/*.html`)
+- `screen-profile-page.js` — person picker · `screen-browse-page.js` — browse
+- `screen-detail-page.js` — series detail · `screen-album-detail-page.js` — album detail
+- `screen-artist-page.js` — artist drill-down (FEAT-029) · `screen-rail-grid-page.js` — L3 poster grid (FEAT-028)
+- `screen-video-page.js` — persistent video player (FEAT-037) · `screen-audio-page.js` — music player (FEAT-031)
+- `screen-playlist-detail-page.js` / `screen-playlist-create-page.js` — playlists (FEAT-036)
+
+**Shared screen modules** (imported by pages, some by two)
+- `screen-detail.js` — detail render; **shared by series AND album pages** (must be element-optional-safe — see pre-flight)
+- `screen-browse.js` / `screen-rail-grid.js` — browse + rail-grid render
+- `screen-video-player.js` — video transport (graduated skips, auto-hide controls)
+- `screen-audio-player.js` — audio transport (FEAT-018)
+- `screen-queue.js` / `screen-video-queue.js` — Queue View overlays (FEAT-031/040)
+- `screen-error.js` — error screen · `breadcrumb.js` / `device-badge.js` — trail + badge mounts
+
+**Companion mirrors** (`companion-*.js`, back `companion/*.html`)
+- `companion-profile.js` · `companion-browse.js` · `companion-detail.js`
+- `companion-artist.js` · `companion-audio.js` · `companion-video.js`
+- `companion-queue.js` · `companion-video-queue.js`
+- `companion-playlist.js` · `companion-playlist-create.js`
+- `companion-breadcrumb.js` · `companion-screen-bar.js` · `companion-sync-bar.js` · `companion-error.js`
 
 ## Guidelines
 
