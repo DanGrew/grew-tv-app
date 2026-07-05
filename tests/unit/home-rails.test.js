@@ -370,6 +370,71 @@ describe('Continue Listening (collection-level, FEAT-027)', () => {
   });
 });
 
+// FEAT-044 (TASK-285) — in-progress PLAYLISTS also appear on the Continue
+// Listening rail, as tiles beside the album tiles. The backend adds a `playlists`
+// field to /api/continue-watching ([{id, title, last_watched}]) whose members
+// have an in-progress track (TASK-284); each id looks up its playlist browse card
+// (already in the music `content`) for the tile. Playlists are NOT deduped against
+// albums (a shared track yields both); album rows + playlist entries merge
+// newest-first by last_watched. The field is the 5th buildTabRails arg.
+const CL_CARDS = MUSIC.concat([
+  { kind: 'series', id: 'pl-faves',    title: 'Faves',     section: 'music', collectionType: 'playlist' },
+  { kind: 'series', id: 'pl-roadtrip', title: 'Road Trip', section: 'music', collectionType: 'playlist' }
+]);
+// One in-progress album (ootb), last played at ts 1000.
+const CL_CW = [
+  { item_id: 'ootb-02', title: 'Mr. Blue Sky', position_secs: 110, duration_secs: 245, collection_id: 'ootb', collection_title: 'Out of the Blue', last_watched: 1000 }
+];
+
+describe('Continue Listening playlist tiles (FEAT-044 / TASK-285)', () => {
+  it('appends an in-progress playlist tile beside the album tiles', () => {
+    const rails = buildTabRails('music', CL_CARDS, CL_CW, {}, [{ id: 'pl-faves', title: 'Faves', last_watched: 2000 }]);
+    expect(rails[0].id).toBe('continue');
+    const ids = rails[0].items.map(c => c.id);
+    expect(ids).toContain('ootb');       // album still there
+    expect(ids).toContain('pl-faves');   // playlist tile added
+  });
+
+  it('the playlist tile is its browse card (routes to playlist detail, continues via TASK-276)', () => {
+    const rails = buildTabRails('music', CL_CARDS, [], {}, [{ id: 'pl-faves', last_watched: 2000 }]);
+    const tile = rails[0].items.find(c => c.id === 'pl-faves');
+    expect(tile.collectionType).toBe('playlist');
+    expect(cardRoute(tile)).toBe('playlist');
+  });
+
+  it('orders album + playlist tiles newest-first by last_watched', () => {
+    // playlist newer (2000) than album row (1000) -> playlist first
+    const newer = buildTabRails('music', CL_CARDS, CL_CW, {}, [{ id: 'pl-faves', last_watched: 2000 }]);
+    expect(newer[0].items.map(c => c.id)).toEqual(['pl-faves', 'ootb']);
+    // playlist older (500) -> album first
+    const older = buildTabRails('music', CL_CARDS, CL_CW, {}, [{ id: 'pl-faves', last_watched: 500 }]);
+    expect(older[0].items.map(c => c.id)).toEqual(['ootb', 'pl-faves']);
+  });
+
+  it('does NOT dedupe a playlist against an album (both tiles for a shared track)', () => {
+    const rails = buildTabRails('music', CL_CARDS, CL_CW, {}, [
+      { id: 'pl-faves', last_watched: 2000 }, { id: 'pl-roadtrip', last_watched: 1500 }
+    ]);
+    expect(rails[0].items.map(c => c.id).slice().sort()).toEqual(['ootb', 'pl-faves', 'pl-roadtrip']);
+  });
+
+  it('shows a playlist tile even with no in-progress albums', () => {
+    const rails = buildTabRails('music', CL_CARDS, [], {}, [{ id: 'pl-faves', last_watched: 2000 }]);
+    expect(rails[0].id).toBe('continue');
+    expect(rails[0].items.map(c => c.id)).toEqual(['pl-faves']);
+  });
+
+  it('skips a playlist id absent from the browse set (no crash)', () => {
+    const rails = buildTabRails('music', CL_CARDS, CL_CW, {}, [{ id: 'ghost', last_watched: 9999 }]);
+    expect(rails[0].items.map(c => c.id)).toEqual(['ootb']);
+  });
+
+  it('stays albums-only when the playlists field is absent (backward compatible)', () => {
+    const rails = buildTabRails('music', CL_CARDS, CL_CW, {});
+    expect(rails[0].items.map(c => c.id)).toEqual(['ootb']);
+  });
+});
+
 // FEAT-027 — a film box-set is a collection (kind:'series', collectionType
 // 'boxset') with section:'films' (descriptor: boxset -> films). It is NOT its own
 // section/tab: the box-set lives in the Films tab. It gets its OWN "Box Sets"

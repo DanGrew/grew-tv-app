@@ -199,21 +199,45 @@ function continueRail(sectionId, cwRows, byId) {
     .filter(function(rail) { return rail.items.length > 0; });
 }
 
+// last_watched -> a comparable number for newest-first ordering. Mirrors
+// progress.js ts(): an epoch-ms number as-is, an ISO string parsed, null/absent
+// as 0 (sorts last). Used to interleave album rows and playlist entries below.
+function tsOf(v) {
+  if (typeof v === 'number') return v;
+  return v ? Date.parse(v) || 0 : 0;
+}
+
 // The Music section's lead rail: "Continue Listening", collection-level. An
 // in-progress track rolls up to its album tile (the album browse card), one per
-// album, in the backend's newest-first order — because a future cross-album
-// playlist puts a track in many collections, so resume is anchored at the album,
-// not the track. Omitted when nothing music is in progress.
-function continueListeningRail(cwRows, byId) {
+// album — because a future cross-album playlist puts a track in many
+// collections, so resume is anchored at the album, not the track.
+//
+// FEAT-044 (TASK-285): in-progress PLAYLISTS also appear here, as tiles beside
+// the album tiles. The backend adds a `playlists` field to /api/continue-watching
+// ([{id, title, last_watched}]) whose members have an in-progress track (TASK-284);
+// each id looks up its playlist browse card (already in the music `content`, so it
+// carries cover/title/route). A shared in-progress track yields BOTH an album tile
+// and a playlist tile — playlists are NOT deduped against albums (owner FEAT-044);
+// the `seen` dedupe stays album-only. Album rows and playlist entries are merged
+// newest-first by last_watched. A playlist id missing from `byId` is skipped, not
+// crashed. Omitted when nothing music is in progress.
+function continueListeningRail(cwRows, byId, cwPlaylists) {
   var seen = {};
-  var items = [];
+  var entries = [];
   (cwRows || []).forEach(function(row) {
     var card = rowCard(row, byId);
     if (card && sectionOf(card) === 'music' && !seen[card.id]) {
       seen[card.id] = true;
-      items.push(card);
+      entries.push({ card: card, ts: tsOf(row.last_watched) });
     }
   });
+  (cwPlaylists || []).forEach(function(p) {
+    var card = byId[p.id];
+    if (card) entries.push({ card: card, ts: tsOf(p.last_watched) });
+  });
+  var items = entries
+    .sort(function(a, b) { return b.ts - a.ts; })
+    .map(function(e) { return e.card; });
   return [{ id: 'continue', title: 'Continue Listening', items: items }]
     .filter(function(rail) { return rail.items.length > 0; });
 }
@@ -290,11 +314,11 @@ export function albumsByArtist(cards, artist) {
 // Albums rail. (No Singles rail — a standalone song is a 1-track album; FEAT-027.)
 // Square-art tiles are CSS; the rail shape is identical to the video tabs so the
 // browse screen renders it as-is.
-function musicRails(cards, cwRows, byId) {
+function musicRails(cards, cwRows, byId, cwPlaylists) {
   var music = cards.filter(function(c) { return sectionOf(c) === 'music'; });
   var albums = music.filter(function(c) { return c.collectionType !== 'playlist'; });
   var playlists = music.filter(function(c) { return c.collectionType === 'playlist'; });
-  return continueListeningRail(cwRows, byId)
+  return continueListeningRail(cwRows, byId, cwPlaylists)
     .concat(simpleRail('playlists', 'Playlists', playlists))
     .concat(simpleRail('artists', 'Artists', artistTiles(cards)))
     .concat(simpleRail('albums', 'Albums', albums));
@@ -338,10 +362,10 @@ export function buildTabs(cards) {
 // (standalone kind:'video'). Each structural rail is A-Z and omitted when empty.
 // (No person rails — home content carries no people tags, so they collapsed to a
 // single "Other" dump; dropped per owner feedback 2026-06-12.)
-export function buildTabRails(sectionId, cards, cwRows, genreLabels) {
+export function buildTabRails(sectionId, cards, cwRows, genreLabels, cwPlaylists) {
   var all = (cards || []).map(withDurationSec);
   var byId = cardIndex(all);
-  if (sectionId === 'music') return musicRails(all, cwRows, byId);
+  if (sectionId === 'music') return musicRails(all, cwRows, byId, cwPlaylists);
   var inTab = all.filter(function(c) { return sectionOf(c) === sectionId; });
   if (sectionId === 'home-movies') {
     var collections = inTab.filter(function(c) { return c.kind === 'series'; });

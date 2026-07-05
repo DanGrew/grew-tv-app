@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
 
 // FEAT-018/FEAT-027 — music browse + album detail + <audio> player + shuffle.
 // The Music tab (titled "Music"), Continue Listening rollup and routing are
@@ -261,6 +261,38 @@ test('Continue Listening rolls in-progress tracks up to ONE album tile, leading 
   await expect(cl.locator('.film-tile[data-id="ootb"]')).toHaveCount(1);
   await cl.locator('.film-tile[data-id="ootb"]').click();
   await expect(page).toHaveURL(/album-detail\.html/);
+});
+
+// FEAT-044 (TASK-285) — an in-progress PLAYLIST rides the Continue Listening rail
+// as a tile beside the album tiles, driven by the CW response's `playlists` field
+// (TASK-284). Newest-first by last_watched; tapping it opens playlist-detail
+// (which continues from the last-played track, TASK-276). Needs the playlist
+// browse card present so the tile resolves cover/route — inject PLAYLIST_CARDS.
+test('Continue Listening shows in-progress playlist tiles beside album tiles, newest-first (FEAT-044/TASK-285)', async ({ page }) => {
+  await page.route('**/api/browse**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS).concat(PLAYLIST_CARDS) })
+  }));
+  await page.route('**/api/continue-watching**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', content: [
+      { item_id: 'ootb-02', title: 'Mr. Blue Sky', poster: 'ootb.jpg', position_secs: 110, duration_secs: 245, last_watched: '2026-06-08T00:00:00Z', format: null, collection_id: 'ootb', collection_title: 'Out of the Blue' }
+    ], playlists: [
+      { id: 'pl-roadtrip', title: 'Road Trip', last_watched: '2026-06-09T00:00:00Z' }
+    ] })
+  }));
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await expect(page.locator('.rail-title').first()).toHaveText('Continue Listening');
+  const cl = page.locator('.rail-row[data-rail="continue"]');
+  // Album tile AND playlist tile both present (playlist not deduped against albums).
+  await expect(cl.locator('.film-tile[data-id="ootb"]')).toHaveCount(1);
+  await expect(cl.locator('.film-tile[data-id="pl-roadtrip"]')).toHaveCount(1);
+  // Playlist played more recently (Jun 9 > Jun 8) -> it leads (newest-first).
+  await expect(cl.locator('.film-tile').first()).toHaveAttribute('data-id', 'pl-roadtrip');
+  // Tapping the playlist tile opens playlist-detail (continues via TASK-276).
+  await cl.locator('.film-tile[data-id="pl-roadtrip"]').click();
+  await expect(page).toHaveURL(/playlist-detail\.html/);
 });
 
 test('an in-progress track does not leak into the Films Continue Watching rail', async ({ page }) => {

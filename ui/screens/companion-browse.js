@@ -60,7 +60,7 @@ export function initPage() {
   };
   var state = {
     profile: null, person: null,
-    cards: [], cw: [], labels: {}, progress: {},
+    cards: [], cw: [], cwPlaylists: [], labels: {}, progress: {},
     query: '', level: 'sections', section: null, rail: null
   };
   var api = {};
@@ -110,7 +110,7 @@ export function initPage() {
     return c;
   }
 
-  function railList() { return buildTabRails(state.section, state.cards, state.cw, state.labels); }
+  function railList() { return buildTabRails(state.section, state.cards, state.cw, state.labels, state.cwPlaylists); }
 
   // The picked rail (its tiles), or an empty stand-in so callers stay branch-free.
   function activeRail() {
@@ -417,6 +417,10 @@ export function initPage() {
     state.cards = [b.content].filter(Boolean).concat([[]])[0];
     state.labels = [b.genreLabels].filter(Boolean).concat([{}])[0];
     state.cw = [c.content].filter(Boolean).concat([[]])[0];
+    // FEAT-044/TASK-285: in-progress playlists on the CW response feed the
+    // Continue Listening rail as playlist tiles (mirror of the app). Absent on an
+    // un-redeployed backend → empty, albums-only unaffected.
+    state.cwPlaylists = [c.playlists].filter(Boolean).concat([[]])[0];
     state.progress = progressMapFromCW(state.cw);
     render();
   }

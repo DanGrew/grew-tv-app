@@ -138,6 +138,11 @@ export function initBrowsePage() {
     .then(function(res) {
       var browse = res[0];
       var cw = [res[1].content].filter(Boolean).concat([[]])[0];
+      // FEAT-044/TASK-285: in-progress playlists ride alongside `content` on the
+      // CW response — [{id, title, last_watched}]; the Continue Listening rail
+      // turns each into a playlist tile (via its browse card). Absent on an
+      // un-redeployed backend → empty, so albums-only keeps working.
+      var cwPlaylists = [res[1].playlists].filter(Boolean).concat([[]])[0];
       // FEAT-033: badge the bar with the active person's authored name + glyph
       // (e.g. "🦖 Daddy"); falls back to the profile class if config/id is absent.
       var person = badgePerson(parseConfig(res[2]), getPerson(), profile);
@@ -150,7 +155,7 @@ export function initBrowsePage() {
       // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) wins
       // over the last-visited tab; renderBrowse falls back when neither matches.
       var initialTab = [getParam('tab')].filter(Boolean).concat([sessionStorage.getItem(LAST_TAB_KEY)]).filter(Boolean)[0];
-      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist);
+      renderBrowse(SERVER, browse.content, cw, cwPlaylists, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
       refreshQueue();
     })

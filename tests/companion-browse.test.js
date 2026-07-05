@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { installApi, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
 
 // FEAT-028 / TASK-168 — the companion drill-down browse (replaces the flat
 // FEAT-020/TASK-139 tab+rails+search). The companion walks four levels —
@@ -189,6 +189,53 @@ test.describe('create-playlist affordance', () => {
     await page.locator('.chip[data-section="music"]').click();
     await page.locator('#rails-row [data-create-playlist]').click();
     await expect(page).toHaveURL(/companion\/playlist-create\.html/);
+  });
+});
+
+// FEAT-044 (TASK-285) — the companion MIRRORS the app: an in-progress playlist
+// appears on the Continue Listening rail as a text tile beside the album tiles,
+// driven by the CW response's `playlists` field (TASK-284). Newest-first by
+// last_watched; tapping it emits a `select` intent so the TV opens playlist-detail
+// (continues from the last-played track, TASK-276). Playlist browse card injected
+// so the tile resolves its title/route.
+test.describe('Continue Listening playlist tiles (FEAT-044 / TASK-285)', () => {
+  test.beforeEach(async ({ page }) => {
+    intents = [];
+    await installApi(page);
+    await mockApp(page, intents);
+    await page.route('**/api/browse**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat(MUSIC_CARDS).concat(PLAYLIST_CARDS) })
+    }));
+    await page.route('**/api/continue-watching**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', content: [
+        { item_id: 'ootb-02', title: 'Mr. Blue Sky', poster: 'ootb.jpg', position_secs: 110, duration_secs: 245, last_watched: '2026-06-08T00:00:00Z', collection_id: 'ootb', collection_title: 'Out of the Blue' }
+      ], playlists: [
+        { id: 'pl-roadtrip', title: 'Road Trip', last_watched: '2026-06-09T00:00:00Z' }
+      ] })
+    }));
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#sections-row .chip')).toContainText(['Music']);
+  });
+
+  test('the Continue Listening rail shows the playlist tile beside the album tile, newest-first', async ({ page }) => {
+    await page.locator('.chip[data-section="music"]').click();
+    await expect(page.locator('#rails-row .chip[data-rail="continue"]')).toHaveText('Continue Listening');
+    await page.locator('#rails-row .chip[data-rail="continue"]').click();
+    await expect(page.locator('#txtgrid .ph-txt[data-id="ootb"]')).toBeVisible();
+    await expect(page.locator('#txtgrid .ph-txt[data-id="pl-roadtrip"] .nm')).toHaveText('Road Trip');
+    // Playlist played more recently (Jun 9 > Jun 8) -> it leads (newest-first).
+    await expect(page.locator('#txtgrid .ph-txt').first()).toHaveAttribute('data-id', 'pl-roadtrip');
+  });
+
+  test('tapping the playlist tile emits a select intent (TV opens playlist-detail)', async ({ page }) => {
+    await page.locator('.chip[data-section="music"]').click();
+    await page.locator('#rails-row .chip[data-rail="continue"]').click();
+    await page.locator('#txtgrid .ph-txt[data-id="pl-roadtrip"]').click();
+    await expect.poll(function() { return intents.map(function(i) { return i.intent; }); }).toContain('select');
+    const sel = intents.find(function(i) { return i.intent === 'select'; });
+    expect(sel.params).toEqual({ id: 'pl-roadtrip' });
   });
 });
 
