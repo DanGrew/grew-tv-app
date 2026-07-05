@@ -42,9 +42,10 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 .ph-txt .pct { font-size: 11px; color: var(--focus); }
 .ph-txt.prog { border-color: var(--focus); }
 .ph-txt:active, .ph-txt:focus { outline: none; border-color: var(--focus); }
-.ph-txt-cell { display: flex; gap: 7px; align-items: stretch; }
-.ph-txt-cell .ph-txt { flex: 1; min-width: 0; }
-.ph-cell-queue { flex: 0 0 auto; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 0 12px; font-size: 13px; color: var(--text); font-family: inherit; cursor: pointer; white-space: nowrap; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.ph-txt-cell { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); transition: border-color var(--dur) var(--ease); }
+.ph-txt-cell:has(.ph-txt:active), .ph-txt-cell:has(.ph-txt:focus) { border-color: var(--focus); }
+.ph-txt-cell .ph-txt { flex: 1; min-width: 0; min-height: 0; border: none; background: none; border-radius: 0; padding: 6px 4px; }
+.ph-cell-queue { flex: 0 0 auto; align-self: center; padding: 6px 14px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); font-size: 20px; color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .ph-cell-queue:active, .ph-cell-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #queue-status { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 #btn-back { align-self: flex-start; flex-shrink: 0; font-size: 14px; padding: 9px 16px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }

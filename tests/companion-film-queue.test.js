@@ -43,7 +43,7 @@ async function openFilmsGrid(page) {
 
 test('a film grid tile carries a ＋ Queue control', async ({ page }) => {
   await openFilmsGrid(page);
-  await expect(page.locator('.ph-txt-cell .ph-cell-queue[data-queue="toy-story-main"]')).toHaveText('＋ Queue');
+  await expect(page.locator('.ph-txt-cell .ph-cell-queue[data-queue="toy-story-main"]')).toHaveText('＋');
 });
 
 test('＋ Queue POSTs queue-video for the active person and confirms with a toast', async ({ page }) => {
