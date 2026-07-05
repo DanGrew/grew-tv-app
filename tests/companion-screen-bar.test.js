@@ -56,7 +56,7 @@ test('>1 screen, none chosen → renders the chooser, not an empty grid (BUG-013
   await expect(page.locator('#screen-bar .screen-btn[data-id="tv-a"]')).toHaveText('Living Room');
   // ...and the (would-be empty) browse content is suppressed — no blank grid.
   await expect(page.locator('#sections-row .chip')).toHaveCount(0);
-  await expect(page.locator('#search')).toBeHidden();
+  await expect(page.locator('#drill')).toBeHidden();
   // Never auto-registered against either screen.
   expect(types(received)).not.toContain('register_companion');
 });
@@ -102,7 +102,7 @@ test('picking a screen re-targets (register_companion + snapshot_request) and re
 
   // The screen's pushed state renders the browse content.
   await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
-  await expect(page.locator('#search')).toBeVisible();
+  await expect(page.locator('#drill')).toBeVisible();
   // The bar collapses to a current-screen pill naming the bound screen.
   await expect(page.locator('#screen-bar .screen-current')).toContainText('Living Room');
 });

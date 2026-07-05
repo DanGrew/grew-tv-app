@@ -66,7 +66,7 @@ test('tapping the Home crumb on detail drives the companion to browse', async ({
   await page.goto('/companion/detail.html');
   await page.locator('#breadcrumb .crumb-link').click();
   await page.waitForURL('**/companion/browse.html');
-  await expect(page.locator('#search')).toBeVisible();
+  await expect(page.locator('#drill')).toBeVisible();
 });
 
 test('series episode shows Home > Series > Episode trail', async ({ page }) => {
