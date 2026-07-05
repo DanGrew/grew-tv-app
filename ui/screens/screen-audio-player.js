@@ -57,6 +57,11 @@ export function setup(config) {
   var lyricsOn        = true;          // ambient lyrics shown by default
   var pendingResume   = false;
   var _currentDisplay = {};
+  // TASK-283: the per-track early-advance boundary (endAt). A number arms the cut;
+  // null means play to the natural end. Latched by nulling it on fire so a burst of
+  // timeupdate ticks past the boundary advances exactly once; re-armed per track in
+  // playTrack.
+  var currentEndAt    = null;
 
   var AUDIO_TOGGLE = {
     'true':  function() { audio.play().catch(function() {}); },
@@ -290,12 +295,15 @@ export function setup(config) {
   }
 
   // record: a full playable record (from the album items[] or /api/video).
-  // startSec resolved by the page from the backend (resume by default, 0 on
-  // restart / fresh track).
-  function playTrack(record, from, startSec) {
+  // startSec is the load-seek the page resolved (TASK-283: track.startAt, else 0 —
+  // TASK-276 removed mid-song resume). endAt (TASK-283) is the early-advance
+  // boundary (a number to cut short, null to play to the natural end); it re-arms
+  // the latch for this track.
+  function playTrack(record, from, startSec, endAt) {
     var playFrom = [from].filter(Boolean).concat(['browse'])[0];
     currentTrack    = record;
     returnPage      = playFrom;
+    currentEndAt    = endAt;
     _currentDisplay = { id: record.id, title: record.title };
     audio.src       = mediaUrl(server, record.id + '.' + extFor(record));
     document.getElementById('audio-title').textContent = record.title;
@@ -366,13 +374,25 @@ export function setup(config) {
   });
 
   // Track end -> the page fires the server `next` action (autoadvance is server
-  // queue math now); no client-side progress write.
-  audio.addEventListener('ended', function() {
+  // queue math now); no client-side progress write. TASK-283: an endAt-trimmed
+  // track routes through the SAME fireEnd on reaching the boundary, so queue/album
+  // continuation is identical to a natural end (no bespoke stop).
+  function fireEnd() {
     heartbeat.stop();
     emit('complete');
     emitState();
     onEnded();
-  });
+  }
+  audio.addEventListener('ended', fireEnd);
+  // TASK-283: watch for the early-advance boundary. Nulling currentEndAt on fire
+  // latches it (a burst of ticks past endAt advances once); a manual seek past the
+  // boundary (>= endAt) advances too.
+  function checkTrim() {
+    [currentEndAt].filter(Boolean)
+      .filter(function(end) { return audio.currentTime >= end; })
+      .forEach(function() { currentEndAt = null; fireEnd(); });
+  }
+  audio.addEventListener('timeupdate', checkTrim);
   audio.addEventListener('play', function() {
     document.getElementById('btn-play-pause').textContent = '⏸';
     heartbeat.start();

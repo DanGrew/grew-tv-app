@@ -127,14 +127,28 @@ export function initAudioPage() {
   audioEl.addEventListener('timeupdate', renderLyrics);
 
   // ── server `playback` snapshot -> UI (the single source of truth) ───────────
-  // A new now-playing track loads into <audio> at 0 (TASK-276: no mid-song
-  // resume — a paused/left track restarts on return) + pulls its lyrics; the
-  // same track just keeps playing (position lives client-side).
+  // A new now-playing track loads into <audio>, pulls its lyrics, and honours the
+  // per-track trim fields off the /api/video record (TASK-283): startAt seeds the
+  // load seek (default 0 — TASK-276 removed mid-song resume, so an untrimmed track
+  // still restarts from 0 on return, never np.position); endAt is handed to the
+  // player as the early-advance boundary (null = play to the natural end). The
+  // record fetch feeds BOTH lyrics and the trim, so playback now starts from inside
+  // the `.then`; a fetch failure falls back to an untrimmed play (start 0, natural
+  // end) so a missing record never strands the player.
+  function beginPlayback(np, track) {
+    player.playTrack(
+      { id: np.track_id, title: np.title, artist: np.artist, ext: np.ext, poster: np.poster },
+      from,
+      [track.startAt].filter(Boolean).concat([0])[0],
+      [track.endAt].filter(Boolean).concat([null])[0]
+    );
+  }
   function swapTrack(np) {
     loadedTrackId = np.track_id;
     setArt(np.poster);
-    loadVideo(SERVER, np.track_id).then(loadTrackLyrics).catch(clearLyrics);
-    player.playTrack({ id: np.track_id, title: np.title, artist: np.artist, ext: np.ext, poster: np.poster }, from, 0);
+    loadVideo(SERVER, np.track_id)
+      .then(function(track) { loadTrackLyrics(track); beginPlayback(np, track); })
+      .catch(function() { clearLyrics(); beginPlayback(np, {}); });
   }
 
   var TRACK_CHANGED = {
