@@ -159,6 +159,16 @@ test.describe('desync mode (Browse)', () => {
     await expect(page.locator('.ph-txt')).toHaveCount(2);
   });
 
+  // BUG-035: the breadcrumb/TV path links here with ?artist=<name> (not ?id=), but
+  // the self-load read only ?id → no artist seeded → "No albums". The crumb hop off
+  // a playing album (artist-drilled) must resolve that artist's album grid.
+  test('BUG-035: a ?artist=<name> entry (crumb path) seeds the artist and renders its albums', async ({ page }) => {
+    await page.goto('/companion/artist.html?artist=ELO');
+    await expect(page.locator('#ctx-title')).toHaveText('ELO');
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await expect(page.locator('.no-actions')).toHaveCount(0);
+  });
+
   test('TASK-243: no Back button — the breadcrumb Home is the local hop to browse', async ({ page }) => {
     await expect(page.locator('.ph-txt').first()).toBeVisible();
     await expect(page.locator('#btn-back')).toHaveCount(0);
