@@ -210,7 +210,7 @@ export function initPage() {
     b.className = 'ph-cell-queue';
     b.setAttribute('data-queue', card.id);
     b.setAttribute('aria-label', 'Queue');
-    b.textContent = '＋ Queue';
+    b.textContent = '＋';
     b.addEventListener('click', function() { queueVideo(card.id); });
     return b;
   }
