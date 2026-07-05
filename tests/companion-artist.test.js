@@ -45,9 +45,14 @@ function mockApp(page) {
   });
 }
 
+// A 1×1 transparent PNG so the cover <img> resolves (200) in-test — otherwise a
+// 404 fires the tile's onerror, swapping the <img> out for the ♪ placeholder.
+const PNG_1x1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMCAoiTHmgAAAAASUVORK5CYII=', 'base64');
+
 test.beforeEach(async ({ page }) => {
   sentIntents = [];
   await installApi(page);
+  await page.route('**/media/**', route => route.fulfill({ status: 200, contentType: 'image/png', body: PNG_1x1 }));
   await page.route('**/api/browse**', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -67,6 +72,37 @@ test('lists only this artist’s albums (ELO x2), not the other artist', async (
   await expect(page.locator('.ph-txt[data-id="ootb"] .nm')).toHaveText('Out of the Blue');
   await expect(page.locator('.ph-txt[data-id="elo-time"] .nm')).toHaveText('Time');
   await expect(page.locator('.ph-txt[data-id="abba-arrival"]')).toHaveCount(0);
+});
+
+// TASK-274: the album tiles are full-width (single column, matching the companion
+// browse grid) and each shows its album cover — a scoped reversal of the otherwise
+// image-free companion rule (few albums per artist).
+test('TASK-274: album tiles are full-width (grid is a single column)', async ({ page }) => {
+  await expect(page.locator('.ph-txt').first()).toBeVisible();
+  const cols = await page.locator('#txtgrid').evaluate((el) => getComputedStyle(el).gridTemplateColumns);
+  expect(cols.split(' ').filter(Boolean)).toHaveLength(1);
+});
+
+test('TASK-274: each album tile shows its cover art from /media/', async ({ page }) => {
+  const cover = page.locator('.ph-txt[data-id="ootb"] .ph-cover');
+  await expect(cover).toHaveCount(1);
+  await expect(cover).toHaveAttribute('src', /\/media\/ootb\.jpg$/);
+});
+
+test('TASK-274: an album with no poster shows the ♪ placeholder (no broken image)', async ({ page }) => {
+  await page.route('**/api/browse**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat([
+      { kind: 'series', id: 'ootb', title: 'Out of the Blue', poster: 'ootb.jpg', type: null, section: 'music', artist: 'ELO', clipCount: 3, tags: { year: '1977' } },
+      { kind: 'series', id: 'elo-nocover', title: 'No Cover', poster: null, type: null, section: 'music', artist: 'ELO', clipCount: 1, tags: { year: '1980' } }
+    ]) })
+  }));
+  await page.goto('/companion/artist.html');
+  await expect(page.locator('.ph-txt')).toHaveCount(2);
+  await expect(page.locator('.ph-txt[data-id="ootb"] .ph-cover')).toHaveCount(1);
+  await expect(page.locator('.ph-txt[data-id="elo-nocover"] .ph-cover-ph')).toHaveText('♪');
+  await expect(page.locator('.ph-txt[data-id="elo-nocover"] .ph-cover')).toHaveCount(0);
 });
 
 test('tapping an album teleports the TV — the companion follows to the album detail', async ({ page }) => {

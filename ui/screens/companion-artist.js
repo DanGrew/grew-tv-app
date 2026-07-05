@@ -1,5 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, mediaUrl } from '../../core/app-api.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { albumsByArtist, artistFromId } from '../../core/home-rails.js';
@@ -78,14 +78,37 @@ export function initPage() {
     ({ true: function() { openItemLocal(card); }, false: function() { api.sendIntent('select', { id: card.id }); } })[mode.isDesynced()]();
   }
 
-  // Bare text-label tile: album title + an optional resume-percent badge, no
-  // poster (matches the companion browse grid — posters live on the TV).
+  // A ♪ placeholder box (consistent with TASK-273 + the audio-player .cover
+  // placeholder) shown when an album has no poster — and swapped in on a 404 via
+  // the img onerror below (mirrors the TV applyPoster fallback intent).
+  function placeholderCover() {
+    var d = document.createElement('span');
+    d.className = 'ph-cover-ph';
+    d.textContent = '♪';
+    return d;
+  }
+  function imgCover(url) {
+    var img = document.createElement('img');
+    img.className = 'ph-cover';
+    img.src = url;
+    img.addEventListener('error', function() { img.replaceWith(placeholderCover()); });
+    return img;
+  }
+  // Album tile: cover (or ♪ placeholder) + album title + an optional
+  // resume-percent badge — full-width, matching the companion browse grid.
+  // TASK-274 scoped exception: this ONE companion page reintroduces <img> covers
+  // (the wider companion rule is image-free — posters live on the TV,
+  // companion-browse.js:28 — but an artist page has few albums (2–10) so the image
+  // count is low, and the owner opted IN here). mediaUrl returns '' for a missing
+  // poster, so Boolean(url) falls through to the ♪ placeholder.
   function albumTile(card) {
     var hint = tileHint(state.progress, card);
     var el = document.createElement('button');
     el.className = 'ph-txt';
     el.setAttribute('data-id', card.id);
     el.classList.toggle('prog', Boolean(hint));
+    var url = mediaUrl(server, card.poster);
+    el.appendChild(({ true: function() { return imgCover(url); }, false: placeholderCover })[Boolean(url)]());
     var nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = [card.title].filter(Boolean).concat([card.id])[0];
