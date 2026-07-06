@@ -228,7 +228,10 @@ async function installApi(page) {
   await page.route('**/api/continue-watching**', function(route) {
     var person = new URL(route.request().url()).searchParams.get('person');
     if (!person) return json(route, 400, { error: 'person required' });
-    return json(route, 200, { person: person, content: midWatchRows(progress[person] || {}) });
+    // FEAT-045/TASK-317: `recents` (last 5 opened music sources, newest-first)
+    // rides this response. Empty by default — the Recently Played rail is then
+    // omitted; a test wanting it overrides this route with a populated `recents`.
+    return json(route, 200, { person: person, content: midWatchRows(progress[person] || {}), recents: [] });
   });
   await page.route('**/api/video/*', function(route) {
     var v = VIDEOS[lastSegment(route.request().url(), '/api/video/')];

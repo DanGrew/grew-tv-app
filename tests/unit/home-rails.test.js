@@ -20,9 +20,9 @@ describe('withPlaylistsRail', () => {
     const out = withPlaylistsRail([{ id: 'artists', title: 'Artists', items: [] }, { id: 'albums', title: 'Albums', items: [] }]);
     expect(out.map(r => r.id)).toEqual(['playlists', 'artists', 'albums']);
   });
-  it('the synthesised Playlists rail sits directly after Continue Listening (TASK-234)', () => {
-    const out = withPlaylistsRail([{ id: 'continue', title: 'Continue Listening', items: [] }, { id: 'artists', title: 'Artists', items: [] }]);
-    expect(out.map(r => r.id)).toEqual(['continue', 'playlists', 'artists']);
+  it('the synthesised Playlists rail sits directly after Recently Played (TASK-234/318)', () => {
+    const out = withPlaylistsRail([{ id: 'recent', title: 'Recently Played', items: [] }, { id: 'artists', title: 'Artists', items: [] }]);
+    expect(out.map(r => r.id)).toEqual(['recent', 'playlists', 'artists']);
   });
 });
 
@@ -252,7 +252,7 @@ const WITH_PLAYLISTS = MUSIC.concat([
 ]);
 
 describe('playlists rail + routing (FEAT-036)', () => {
-  it('splits playlists into their own Playlists rail, directly after Continue Listening (TASK-234)', () => {
+  it('splits playlists into their own Playlists rail, directly after Recently Played (TASK-234/318)', () => {
     const rails = buildTabRails('music', WITH_PLAYLISTS, [], {});
     expect(rails.map(r => r.id)).toEqual(['playlists', 'artists', 'albums']);
   });
@@ -348,25 +348,70 @@ const MUSIC_CW = [
   { item_id: 'toy-story', title: 'Toy Story', position_secs: 100, duration_secs: 600, collection_id: null, collection_title: null }
 ];
 
-describe('Continue Listening (collection-level, FEAT-027)', () => {
-  it('rolls in-progress album tracks up to ONE album tile, not per track', () => {
-    const rails = buildTabRails('music', MUSIC, MUSIC_CW, {});
-    expect(rails[0].id).toBe('continue');
-    expect(rails[0].title).toBe('Continue Listening');
-    // ootb has two in-progress tracks -> a single album tile (rollup); the film row excluded.
-    expect(rails[0].items.map(c => c.id)).toEqual(['ootb']);
-    expect(rails[0].items[0].kind).toBe('series'); // album tile opens album detail
+// FEAT-045 (TASK-318) — the Music tab's lead rail is now "Recently Played",
+// built from the backend `recents` [{source_type, source_id, last_played}]
+// (TASK-317), newest-first. Each source_id maps to its existing browse tile:
+// album/playlist by card id, artist by NAME (the tile's own id is prefixed
+// 'artist:'). The old inferred Continue Listening (album roll-up + watch_progress)
+// is GONE — the lead rail no longer reads cwRows/progress at all. These
+// assertions are red on the old code (no recentlyPlayedRail; a progress-derived
+// lead rail).
+const RP_MUSIC = [
+  { kind: 'series', id: 'ootb',     title: 'Out of the Blue', poster: 'ootb.jpg', section: 'music', artist: 'ELO' },
+  { kind: 'series', id: 'rumours',  title: 'Rumours',         poster: 'rum.jpg',  section: 'music', artist: 'Fleetwood Mac' },
+  { kind: 'series', id: 'pl-faves', title: 'Faves',           poster: null,       section: 'music', collectionType: 'playlist' }
+];
+
+describe('Recently Played rail (FEAT-045/TASK-318)', () => {
+  it('leads with a "Recently Played" rail of the recents tiles, newest-first order preserved', () => {
+    const recents = [
+      { source_type: 'playlist', source_id: 'pl-faves', last_played: 3 },
+      { source_type: 'album',    source_id: 'ootb',     last_played: 2 },
+      { source_type: 'artist',   source_id: 'ELO',      last_played: 1 }
+    ];
+    const rails = buildTabRails('music', RP_MUSIC, [], {}, recents);
+    expect(rails[0].id).toBe('recent');
+    expect(rails[0].title).toBe('Recently Played');
+    // Backend order kept (not re-sorted); an artist source maps by name to its tile.
+    expect(rails[0].items.map(c => c.id)).toEqual(['pl-faves', 'ootb', 'artist:ELO']);
+    expect(rails[0].items[2].kind).toBe('artist'); // artist source -> the synthesised artist tile
   });
 
-  it('excludes music rows from the video tabs Continue Watching (no track leaks into Films)', () => {
+  it('omits the rail entirely when recents is empty/absent (Story 9: leads with Playlists)', () => {
+    expect(buildTabRails('music', RP_MUSIC, [], {}, []).some(r => r.id === 'recent')).toBe(false);
+    expect(buildTabRails('music', RP_MUSIC, [], {}).some(r => r.id === 'recent')).toBe(false); // recents undefined
+    expect(buildTabRails('music', RP_MUSIC, [], {}, []).map(r => r.id)).toEqual(['playlists', 'artists', 'albums']);
+  });
+
+  it('skips a recents id absent from the browse cards (no throw)', () => {
+    const recents = [
+      { source_type: 'album', source_id: 'ootb',  last_played: 2 },
+      { source_type: 'album', source_id: 'ghost', last_played: 1 } // not in cards
+    ];
+    expect(buildTabRails('music', RP_MUSIC, [], {}, recents)[0].items.map(c => c.id)).toEqual(['ootb']);
+  });
+
+  it('does not read watch_progress — in-progress cwRows no longer create the lead rail', () => {
+    const rails = buildTabRails('music', RP_MUSIC, MUSIC_CW, {}, []);
+    expect(rails.every(r => r.id !== 'recent' && r.id !== 'continue')).toBe(true);
+    expect(rails[0].id).toBe('playlists');
+  });
+
+  it('a recents tile routes as its own kind (album->album detail, fast access not a resume button)', () => {
+    const recents = [{ source_type: 'album', source_id: 'ootb', last_played: 1 }];
+    const tile = buildTabRails('music', RP_MUSIC, [], {}, recents)[0].items[0];
+    expect(cardRoute(tile)).toBe('album');
+  });
+});
+
+// A music track still never leaks into a VIDEO tab's Continue Watching rail
+// (rowSection borrows the section from the row's browse card). Unchanged by
+// TASK-318 — the video CW path still reads cwRows.
+describe('video Continue Watching excludes music tracks (FEAT-027, unchanged)', () => {
+  it('a music track row does not appear in the Films Continue Watching rail', () => {
     const films = buildTabRails('films', MUSIC, MUSIC_CW, {});
     expect(films[0].id).toBe('continue');
     expect(films[0].items.map(c => c.id)).toEqual(['toy-story']); // only the film, no track
-  });
-
-  it('omits Continue Listening when nothing music is in progress', () => {
-    const rails = buildTabRails('music', MUSIC, [{ item_id: 'toy-story', position_secs: 100, duration_secs: 600, collection_id: null }], {});
-    expect(rails.every(r => r.id !== 'continue')).toBe(true);
   });
 });
 

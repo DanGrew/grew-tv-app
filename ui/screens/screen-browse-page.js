@@ -138,6 +138,9 @@ export function initBrowsePage() {
     .then(function(res) {
       var browse = res[0];
       var cw = [res[1].content].filter(Boolean).concat([[]])[0];
+      // FEAT-045/TASK-318: the Music tab's Recently Played rail rides the same
+      // /api/continue-watching response (TASK-317 serves `recents` there).
+      var recents = [res[1].recents].filter(Boolean).concat([[]])[0];
       // FEAT-033: badge the bar with the active person's authored name + glyph
       // (e.g. "🦖 Daddy"); falls back to the profile class if config/id is absent.
       var person = badgePerson(parseConfig(res[2]), getPerson(), profile);
@@ -150,7 +153,7 @@ export function initBrowsePage() {
       // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) wins
       // over the last-visited tab; renderBrowse falls back when neither matches.
       var initialTab = [getParam('tab')].filter(Boolean).concat([sessionStorage.getItem(LAST_TAB_KEY)]).filter(Boolean)[0];
-      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist);
+      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist, recents);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
       refreshQueue();
     })

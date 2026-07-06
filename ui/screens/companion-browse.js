@@ -59,7 +59,7 @@ export function initPage() {
   };
   var state = {
     profile: null, person: null,
-    cards: [], cw: [], labels: {}, progress: {},
+    cards: [], cw: [], recents: [], labels: {}, progress: {},
     level: 'sections', section: null, rail: null
   };
   var api = {};
@@ -109,7 +109,7 @@ export function initPage() {
     return c;
   }
 
-  function railList() { return buildTabRails(state.section, state.cards, state.cw, state.labels); }
+  function railList() { return buildTabRails(state.section, state.cards, state.cw, state.labels, state.recents); }
 
   // The picked rail (its tiles), or an empty stand-in so callers stay branch-free.
   function activeRail() {
@@ -416,6 +416,9 @@ export function initPage() {
     state.cards = [b.content].filter(Boolean).concat([[]])[0];
     state.labels = [b.genreLabels].filter(Boolean).concat([{}])[0];
     state.cw = [c.content].filter(Boolean).concat([[]])[0];
+    // FEAT-045/TASK-318: recents (Recently Played rail) rides the same
+    // continue-watching response (TASK-317 serves `recents` there).
+    state.recents = [c.recents].filter(Boolean).concat([[]])[0];
     state.progress = progressMapFromCW(state.cw);
     render();
   }
