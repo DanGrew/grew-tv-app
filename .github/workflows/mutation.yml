@@ -1,0 +1,29 @@
+name: Mutation
+
+# core/ pure-logic mutation gate (TASK-305 / SYS-016). Stryker mutates core/**
+# and reruns the unit suite against each mutant, so it is inherently slow. It is
+# advisory (Grew PR checks don't block a merge) and mirrors the backend gate
+# (media-manager mutation.yml): it runs on **merge to main only** — never delaying
+# a PR — and only when core/ (or the mutation config) actually changed. The
+# red/green signal lands on main; act on it there. See docs/mutation-testing.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "core/**"
+      - "stryker.conf.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/mutation.yml"
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:mutation
