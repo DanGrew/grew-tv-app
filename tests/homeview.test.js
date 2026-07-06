@@ -608,14 +608,18 @@ test('CC preference is sticky across videos via the backend', async ({ page }) =
 test('standalone film at end returns to its origin', async ({ page }) => {
   await goToVideoScreen(page);
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
-  await expect(page.locator('#screen-browse')).toBeVisible();
+  // BUG-026 settle-signal class: return-to-origin is an async screen swap; under
+  // parallel CPU load the default 5s toBeVisible can miss it. Give round-trip headroom.
+  await expect(page.locator('#screen-browse')).toBeVisible({ timeout: 10000 });
 });
 
 test('series at 100% shows an Up next countdown', async ({ page }) => {
   await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
   await expect(page.locator('#screen-video')).toBeVisible();
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
-  await expect(page.locator('#upnext-overlay')).toBeVisible();
+  // BUG-026 settle-signal class: the `ended`->countdown overlay is async; give the
+  // toBeVisible round-trip headroom so it doesn't flake under parallel CPU load.
+  await expect(page.locator('#upnext-overlay')).toBeVisible({ timeout: 10000 });
   await expect(page.locator('#upnext-text')).toContainText('The Weekend');
 });
 
@@ -623,7 +627,9 @@ test('Up next countdown is cancellable and returns to detail', async ({ page }) 
   await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
   await expect(page.locator('#screen-video')).toBeVisible();
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
-  await expect(page.locator('#upnext-overlay')).toBeVisible();
+  // BUG-026 settle-signal class: the `ended`->countdown overlay is async; give the
+  // toBeVisible round-trip headroom so it doesn't flake under parallel CPU load.
+  await expect(page.locator('#upnext-overlay')).toBeVisible({ timeout: 10000 });
   await page.locator('#btn-upnext-cancel').click();
   await expect(page).toHaveURL(/detail\.html/);
 });
