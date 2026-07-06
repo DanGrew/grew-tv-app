@@ -199,23 +199,37 @@ function continueRail(sectionId, cwRows, byId) {
     .filter(function(rail) { return rail.items.length > 0; });
 }
 
-// The Music section's lead rail: "Continue Listening", collection-level. An
-// in-progress track rolls up to its album tile (the album browse card), one per
-// album, in the backend's newest-first order — because a future cross-album
-// playlist puts a track in many collections, so resume is anchored at the album,
-// not the track. Omitted when nothing music is in progress.
-function continueListeningRail(cwRows, byId) {
-  var seen = {};
-  var items = [];
-  (cwRows || []).forEach(function(row) {
-    var card = rowCard(row, byId);
-    if (card && sectionOf(card) === 'music' && !seen[card.id]) {
-      seen[card.id] = true;
-      items.push(card);
-    }
-  });
-  return [{ id: 'continue', title: 'Continue Listening', items: items }]
+// FEAT-045 (TASK-318) — the Music section's lead rail: "Recently Played". The
+// backend (TASK-317) records the last 5 SOURCES a person opened (album /
+// playlist / artist — not shuffle-all), deduped by source, newest-first, and
+// serves them as `recents` [{source_type, source_id, last_played}]. This maps
+// each entry's source_id to its existing browse tile (recentsIndex), preserving
+// the backend order — so a tap is the same navigation as any album/playlist/
+// artist tile (fast access, not a resume button). An id missing from the cards
+// (unavailable / profile-filtered) is skipped safely. Omitted when recents is
+// empty — the tab then leads with Playlists (Stories 1-9). Replaces the old
+// inferred Continue Listening (album roll-up + TASK-285 playlist tiles), which
+// read watch_progress; the rail no longer reads progress at all.
+function recentlyPlayedRail(recents, byId) {
+  var items = (recents || [])
+    .map(function(r) { return byId[r.source_id]; })
+    .filter(Boolean);
+  return [{ id: 'recent', title: 'Recently Played', items: items }]
     .filter(function(rail) { return rail.items.length > 0; });
+}
+
+// Index a music source_id -> its browse tile for the Recently Played rail.
+// Albums & playlists are keyed by their card id (recents source_id === card id).
+// A synthesised artist tile is keyed by its ARTIST NAME, because the backend
+// records an artist source by name (source_id = the ?artist= param, e.g. 'ELO')
+// while the tile's own id is prefixed ('artist:ELO'). One index resolves all
+// three source types.
+function recentsIndex(cards) {
+  var byId = {};
+  cards.filter(function(c) { return sectionOf(c) === 'music'; })
+    .forEach(function(c) { byId[c.id] = c; });
+  artistTiles(cards).forEach(function(t) { byId[t.artist] = t; });
+  return byId;
 }
 
 // A simple titled rail of the given cards (A-Z by title), or [] when empty.
@@ -282,19 +296,19 @@ export function albumsByArtist(cards, artist) {
   });
 }
 
-// The Music section's rails: Continue Listening (lead), then the Playlists rail
-// (FEAT-039 TASK-234 — owner wants it directly under Continue Listening), then an
-// Artists rail (FEAT-029) of one tile per artist, then an Albums rail. Albums and
-// Playlists both sit in the music section but split on `collectionType` — a
-// playlist routes to its own detail (cardRoute), so it must not leak into the
-// Albums rail. (No Singles rail — a standalone song is a 1-track album; FEAT-027.)
-// Square-art tiles are CSS; the rail shape is identical to the video tabs so the
-// browse screen renders it as-is.
-function musicRails(cards, cwRows, byId) {
+// The Music section's rails: Recently Played (lead, FEAT-045 TASK-318), then the
+// Playlists rail (FEAT-039 TASK-234 — owner wants it directly under the lead
+// rail), then an Artists rail (FEAT-029) of one tile per artist, then an Albums
+// rail. Albums and Playlists both sit in the music section but split on
+// `collectionType` — a playlist routes to its own detail (cardRoute), so it must
+// not leak into the Albums rail. (No Singles rail — a standalone song is a
+// 1-track album; FEAT-027.) Square-art tiles are CSS; the rail shape is identical
+// to the video tabs so the browse screen renders it as-is.
+function musicRails(cards, recents) {
   var music = cards.filter(function(c) { return sectionOf(c) === 'music'; });
   var albums = music.filter(function(c) { return c.collectionType !== 'playlist'; });
   var playlists = music.filter(function(c) { return c.collectionType === 'playlist'; });
-  return continueListeningRail(cwRows, byId)
+  return recentlyPlayedRail(recents, recentsIndex(cards))
     .concat(simpleRail('playlists', 'Playlists', playlists))
     .concat(simpleRail('artists', 'Artists', artistTiles(cards)))
     .concat(simpleRail('albums', 'Albums', albums));
@@ -304,15 +318,15 @@ function musicRails(cards, cwRows, byId) {
 // playlists, so the browse screen always renders the "Playlists ＋" heading (the
 // create affordance lives on the heading now — TASK-235 — not as a rail tile). When
 // musicRails (simpleRail) omitted the empty rail, synthesise an empty one and place
-// it directly AFTER Continue Listening (TASK-234 order; leading when nothing is in
-// progress). The companion has its own create path (TASK-209/236) and does NOT call
-// this. Pure (no DOM) so it lives in core; the browse screen calls it for the music
-// tab after buildTabRails.
+// it directly AFTER Recently Played (TASK-234/318 order; leading when nothing has
+// been played). The companion has its own create path (TASK-209/236) and does NOT
+// call this. Pure (no DOM) so it lives in core; the browse screen calls it for the
+// music tab after buildTabRails.
 export function withPlaylistsRail(rails) {
   var hasRail = rails.some(function(r) { return r.id === 'playlists'; });
   if (hasRail) return rails;
   var newRail = { id: 'playlists', title: 'Playlists', items: [] };
-  var at = rails.findIndex(function(r) { return r.id === 'continue'; }) + 1;
+  var at = rails.findIndex(function(r) { return r.id === 'recent'; }) + 1;
   return rails.slice(0, at).concat([newRail]).concat(rails.slice(at));
 }
 
@@ -338,10 +352,10 @@ export function buildTabs(cards) {
 // (standalone kind:'video'). Each structural rail is A-Z and omitted when empty.
 // (No person rails — home content carries no people tags, so they collapsed to a
 // single "Other" dump; dropped per owner feedback 2026-06-12.)
-export function buildTabRails(sectionId, cards, cwRows, genreLabels) {
+export function buildTabRails(sectionId, cards, cwRows, genreLabels, recents) {
   var all = (cards || []).map(withDurationSec);
   var byId = cardIndex(all);
-  if (sectionId === 'music') return musicRails(all, cwRows, byId);
+  if (sectionId === 'music') return musicRails(all, recents);
   var inTab = all.filter(function(c) { return sectionOf(c) === sectionId; });
   if (sectionId === 'home-movies') {
     var collections = inTab.filter(function(c) { return c.kind === 'series'; });

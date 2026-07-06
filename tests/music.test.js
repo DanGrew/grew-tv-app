@@ -1,9 +1,10 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS, VIDEOS } = require('./fixtures/api.js');
 
-// FEAT-018/FEAT-027 — music browse + album detail + <audio> player + shuffle.
-// The Music tab (titled "Music"), Continue Listening rollup and routing are
-// exercised end-to-end against the fixture album ("Out of the Blue", 3 tracks).
+// FEAT-018/FEAT-027/FEAT-045 — music browse + album detail + <audio> player +
+// shuffle. The Music tab (titled "Music"), the Recently Played rail (TASK-318)
+// and routing are exercised end-to-end against the fixture album ("Out of the
+// Blue", 3 tracks).
 // FEAT-027: the app is type-agnostic — it groups by the server `section`, and a
 // track is never a standalone browse card (no Singles rail). Host-agnostic:
 // backend derives from the page origin (BUG-009). Music browse cards are injected
@@ -35,7 +36,7 @@ test('Music tab leads with a Playlists rail then Artists then Albums with square
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   // TASK-235: the Music tab always renders a Playlists rail (heading + create ＋),
   // even with zero playlists — here the rail BODY is empty (no create tile).
-  // TASK-234: that Playlists rail leads, directly under Continue Listening.
+  // TASK-234/318: with nothing recently played, that Playlists rail leads.
   await expect(page.locator('.rail-row')).toHaveCount(3);
   await expect(page.locator('.rail-row').nth(0)).toHaveAttribute('data-rail', 'playlists');
   await expect(page.locator('.rail-row').nth(1)).toHaveAttribute('data-rail', 'artists');
@@ -244,23 +245,41 @@ test('position is reported to the playback position action', async ({ page }) =>
   expect(JSON.parse(req.postData()).current_position).toBe(42);
 });
 
-test('Continue Listening rolls in-progress tracks up to ONE album tile, leading the Albums tab', async ({ page }) => {
+// FEAT-045 (TASK-318) — the Music tab now LEADS with a "Recently Played" rail
+// built from the backend `recents` (last opened sources, newest-first). Tapping a
+// tile OPENS that source's detail page — same nav as any tile, fast access not a
+// resume button (Story 3). The old inferred Continue Listening roll-up is gone.
+test('Music tab leads with a "Recently Played" rail of recents tiles, newest-first; a tile opens its source', async ({ page }) => {
   await page.route('**/api/continue-watching**', route => route.fulfill({
     status: 200, contentType: 'application/json',
-    body: JSON.stringify({ profile: 'kids', content: [
-      { item_id: 'ootb-02', title: 'Mr. Blue Sky', poster: 'ootb.jpg', position_secs: 110, duration_secs: 245, last_watched: '2026-06-08T00:00:00Z', format: null, collection_id: 'ootb', collection_title: 'Out of the Blue' },
-      { item_id: 'ootb-01', title: 'Turn to Stone', poster: 'ootb.jpg', position_secs: 30, duration_secs: 227, last_watched: '2026-06-07T00:00:00Z', format: null, collection_id: 'ootb', collection_title: 'Out of the Blue' }
+    body: JSON.stringify({ profile: 'kids', content: [], recents: [
+      { source_type: 'artist', source_id: 'ELO',  last_played: 2 },
+      { source_type: 'album',  source_id: 'ootb', last_played: 1 }
     ] })
   }));
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="music"]').click();
-  await expect(page.locator('.rail-title').first()).toHaveText('Continue Listening');
-  const cl = page.locator('.rail-row[data-rail="continue"]');
-  // Two in-progress tracks of one album -> a SINGLE album tile (rollup), opening detail.
-  await expect(cl.locator('.film-tile')).toHaveCount(1);
-  await expect(cl.locator('.film-tile[data-id="ootb"]')).toHaveCount(1);
-  await cl.locator('.film-tile[data-id="ootb"]').click();
+  // Leads before Playlists/Artists/Albums.
+  await expect(page.locator('.rail-title').first()).toHaveText('Recently Played');
+  const rp = page.locator('.rail-row[data-rail="recent"]');
+  // Newest-first: the ELO artist tile (by name), then the ootb album tile (by id).
+  await expect(rp.locator('.film-tile')).toHaveCount(2);
+  await expect(rp.locator('.film-tile').nth(0)).toHaveAttribute('data-id', 'artist:ELO');
+  await expect(rp.locator('.film-tile').nth(1)).toHaveAttribute('data-id', 'ootb');
+  // Tapping the album tile OPENS its detail (Story 3 — no auto-play; then you tap a track).
+  await rp.locator('.film-tile[data-id="ootb"]').click();
   await expect(page).toHaveURL(/album-detail\.html/);
+  await expect(page.locator('#detail-title')).toHaveText('Out of the Blue');
+});
+
+// Story 9 — nothing played yet: no Recently Played (nor a stray Continue Listening)
+// rail; the tab leads with Playlists as before.
+test('no "Recently Played" rail when nothing has been played; leads with Playlists (Story 9)', async ({ page }) => {
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await expect(page.locator('.rail-row[data-rail="recent"]')).toHaveCount(0);
+  await expect(page.locator('.rail-row[data-rail="continue"]')).toHaveCount(0);
+  await expect(page.locator('.rail-row').nth(0)).toHaveAttribute('data-rail', 'playlists');
 });
 
 test('an in-progress track does not leak into the Films Continue Watching rail', async ({ page }) => {

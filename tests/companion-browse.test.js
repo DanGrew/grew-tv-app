@@ -183,6 +183,41 @@ test.describe('create-playlist affordance', () => {
   });
 });
 
+// FEAT-045 (TASK-318, Story 8) — the companion Music browse shows the SAME
+// "Recently Played" rail as the TV (shared core/home-rails). It appears as a rail
+// chip under the Music section (leading), and its grid lists the recents tiles
+// newest-first — an artist source maps by name to its 'artist:' tile, an album by
+// id. `recents` rides the /api/continue-watching response (TASK-317).
+test.describe('Recently Played rail (companion mirror)', () => {
+  test.beforeEach(async ({ page }) => {
+    intents = [];
+    await installApi(page);
+    await mockApp(page, intents);
+    await page.route('**/api/browse**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat(MUSIC_CARDS) })
+    }));
+    await page.route('**/api/continue-watching**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', content: [], recents: [
+        { source_type: 'artist', source_id: 'ELO',  last_played: 2 },
+        { source_type: 'album',  source_id: 'ootb', last_played: 1 }
+      ] })
+    }));
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#sections-row .chip')).toContainText(['Music']);
+  });
+
+  test('the Music section leads with a Recently Played rail chip; its grid lists the recents newest-first', async ({ page }) => {
+    await page.locator('.chip[data-section="music"]').click();
+    await expect(page.locator('#rails-row .chip').first()).toHaveText('Recently Played');
+    await page.locator('#rails-row .chip[data-rail="recent"]').click();
+    await expect(page.locator('#txtgrid .ph-txt')).toHaveCount(2);
+    await expect(page.locator('#txtgrid .ph-txt').nth(0)).toHaveAttribute('data-id', 'artist:ELO');
+    await expect(page.locator('#txtgrid .ph-txt').nth(1)).toHaveAttribute('data-id', 'ootb');
+  });
+});
+
 // FEAT-032 (TASK-218): the companion records its drill position into nav-trail as
 // you descend, so returning to browse — Back, or a player's breadcrumb — lands on
 // the items you came from, not the sections root. The trail is sessionStorage, so

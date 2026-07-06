@@ -11,7 +11,7 @@ var PLAY_KEYS     = { Enter: true, ' ': true };
 // rails. Pure grouping/ordering lives in core/home-rails.js; this module owns
 // the DOM and the two-zone (sidebar / rails) d-pad focus model. Module state
 // holds the last-rendered data so a tab switch can rebuild the rails.
-var STATE = { server: null, cards: [], cw: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null };
+var STATE = { server: null, cards: [], cw: [], recents: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null };
 
 function tilesIn(railEl) {
   return Array.from(railEl.querySelectorAll('.film-tile'));
@@ -215,7 +215,7 @@ function markActive(tabId) {
 function selectTab(tabId) {
   STATE.activeTab = tabId;
   markActive(tabId);
-  var rails = buildTabRails(tabId, STATE.cards, STATE.cw, STATE.labels);
+  var rails = buildTabRails(tabId, STATE.cards, STATE.cw, STATE.labels, STATE.recents);
   renderRailRows(({ true: function() { return withPlaylistsRail(rails); }, false: function() { return rails; } })[tabId === 'music']());
 }
 
@@ -266,11 +266,13 @@ export function getActiveTab() {
 // `person` (FEAT-033 — its authored name + glyph badge the bar), the select
 // handler, and an optional initialTab to land on (else the first tab). The CW
 // rows feed both the per-tab Continue Watching rail and the tiles' progress bars
-// (via progressMapFromCW).
-export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue, onCreatePlaylist) {
+// (via progressMapFromCW). `recents` (FEAT-045/TASK-318, from the same
+// continue-watching response) feeds the Music tab's Recently Played rail.
+export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue, onCreatePlaylist, recents) {
   STATE.server = server;
   STATE.cards = cards;
   STATE.cw = cwRows;
+  STATE.recents = recents;
   STATE.progress = progressMapFromCW(cwRows);
   STATE.labels = labels;
   STATE.profile = profile;
