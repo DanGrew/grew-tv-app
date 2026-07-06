@@ -4,6 +4,7 @@ import { mediaUrl, saveProgress, resetProgress } from '../../core/app-api.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
 import { getCaptions, setCaptions, getPerson } from '../../core/state.js';
 import { readVolume, writeVolume } from '../../core/volume-store.js';
+import { progressPct, clampTime, wrapIndex, frameDrop } from '../../core/player-math.js';
 
 // Graduated relative skips (FEAT-017): ±10s / 30s / 2m / 10m / 30m. The Jump
 // popup is a 5-column grid: back row then forward row. No absolute seek / scrub.
@@ -82,7 +83,7 @@ export function setup(config) {
 
   function checkQuality() {
     var q = video.getVideoPlaybackQuality();
-    var dropped = q.droppedVideoFrames - lastDroppedFrames;
+    var dropped = frameDrop(q.droppedVideoFrames, lastDroppedFrames);
     lastDroppedFrames = q.droppedVideoFrames;
     [dropped].filter(Boolean).forEach(function() {
       emit('frame_dropped', { droppedFrames: dropped, perf: performance.now() });
@@ -119,7 +120,7 @@ export function setup(config) {
   }
 
   function updateProgress() {
-    var pct = (video.currentTime / video.duration) * 100;
+    var pct = progressPct(video.currentTime, video.duration);
     document.getElementById('progress-fill').style.width = pct + '%';
     document.getElementById('time-display').textContent = fmt(video.currentTime) + ' / ' + fmt(video.duration);
   }
@@ -147,7 +148,7 @@ export function setup(config) {
   }
 
   var executeSkip = function(delta) {
-    video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + delta));
+    video.currentTime = clampTime(video.currentTime, delta, video.duration);
     showControls();
   };
 
@@ -168,7 +169,7 @@ export function setup(config) {
     var list = focusList();
     var ids = list.map(function(el) { return el.id; });
     var cur = [ids.indexOf(document.activeElement.id)].filter(function(i) { return i >= 0; }).concat([0])[0];
-    list[(cur + delta + list.length) % list.length].focus();
+    list[wrapIndex(cur, delta, list.length)].focus();
   }
 
   function activate() { document.activeElement.click(); }

@@ -169,8 +169,8 @@ if (rule === 'no-filter-conditional') {
 }
 
 if (rule === 'no-json-in-repo') {
-  const EXCLUDED_DIRS = new Set(['node_modules', 'content', 'coverage', 'reports', 'test-results', '.claude']);
-  const ALLOWED_FILES = new Set(['package.json', 'package-lock.json', 'scripts/package.json', 'manifest.json']);
+  const EXCLUDED_DIRS = new Set(['node_modules', 'content', 'coverage', 'reports', 'test-results', '.claude', '.stryker-tmp']);
+  const ALLOWED_FILES = new Set(['package.json', 'package-lock.json', 'scripts/package.json', 'manifest.json', 'stryker.conf.json']);
 
   function walkJson(dir) {
     if (!fs.existsSync(dir)) return;
