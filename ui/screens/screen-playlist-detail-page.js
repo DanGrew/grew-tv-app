@@ -2,7 +2,7 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, mediaUrl } from '../../core/app-api.js';
 import { coverMosaicHtml } from '../../core/cover-mosaic.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { primaryAction } from '../../core/series-detail.js';
@@ -83,7 +83,7 @@ export function initPlaylistDetailPage() {
     return loadPlaylist(SERVER, playlistId).then(function(pl) {
       state.playlist = pl;
       renderCover();
-      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove, { suppressResume: true });
+      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, openAddSheet, null, onMove, onRemove, { suppressResume: true });
       ([document.querySelector(focusSel)].filter(Boolean)
         .concat([document.querySelector('.detail-row')]).filter(Boolean)
         .concat([document.getElementById('btn-play-next')]))[0].focus();
@@ -137,18 +137,23 @@ export function initPlaylistDetailPage() {
     [H[e.key]].filter(Boolean).forEach(function(fn) { e.preventDefault(); fn(); });
   }
 
-  // Bulk-add (TASK-212): the header "Add all to playlist" button snapshots THIS
-  // whole playlist into ANOTHER playlist (the add-source API, source_type
-  // 'playlist'). The sheet mirrors the album-detail Add sheet — list the active
-  // profile's playlists (this one EXCLUDED, since a playlist can't be added into
-  // itself) + New playlist + Cancel, owning its own keydown so the d-pad never
-  // fires beneath it. The target gets a snapshot, so this playlist is unchanged
-  // and no reload is needed — just a transient toast.
-  var addState = { cells: [], statusTimer: null };
+  // FEAT-036/039 — the "Add to playlist" sheet, ported from album detail
+  // (screen-album-detail-page, TASK-206/212/253). ONE sheet serves two entry points
+  // on this page: the per-track ＋ (openAddSheet — Play Next + add ONE track to a
+  // playlist, TASK-262) and the header "Add all to playlist" (openAddSourceSheet —
+  // bulk-snapshot THIS whole playlist into ANOTHER, TASK-212). addState.add(id) is the
+  // POST for the chosen mode (add-track vs add-source); queue / createParams /
+  // returnFocus / exclude differ per mode too, so the rest of the sheet is
+  // mode-agnostic. The sheet owns its keydown (stopPropagation) so the detail d-pad
+  // never fires beneath it, mirroring the delete-confirm overlay.
+  var addState = { add: null, queue: null, createParams: {}, returnFocus: function() {}, exclude: null, cells: [], statusTimer: null };
   function focusAdd(i) { addState.cells[i].focus(); }
+  function focusRow(id) {
+    [document.querySelector('.detail-row[data-id="' + id + '"]')].filter(Boolean).forEach(function(r) { r.focus(); });
+  }
   function closeAddSheet() {
     document.getElementById('add-sheet').style.display = 'none';
-    document.getElementById('btn-add-all').focus();
+    addState.returnFocus();
   }
   function hideStatus() { document.getElementById('add-status').style.display = 'none'; }
   function showStatus(text) {
@@ -159,11 +164,11 @@ export function initPlaylistDetailPage() {
     addState.statusTimer = setTimeout(hideStatus, 2500);
   }
   function addExisting(id, title) {
-    addSourceToPlaylist(SERVER, id, 'playlist', playlistId)
+    addState.add(id)
       .then(function() { closeAddSheet(); showStatus('Added to ' + title); })
       .catch(function() { closeAddSheet(); showStatus('Could not add to playlist.'); });
   }
-  function createNew() { navTo('playlist-create.html', { addSourceType: 'playlist', addSourceId: playlistId }); }
+  function createNew() { navTo('playlist-create.html', addState.createParams); }
   function moveAdd(e) {
     var i = addState.cells.indexOf(document.activeElement);
     var ni = gridIndex(i, 1, addState.cells.length, e.key);
@@ -174,6 +179,20 @@ export function initPlaylistDetailPage() {
     [ADD_CLOSE[e.key]].filter(Boolean).forEach(function() { e.preventDefault(); closeAddSheet(); });
   }
   function onAddKey(e) { e.stopPropagation(); moveAdd(e); closeKeys(e); }
+  // The per-track sheet's top option "☰ Play Next" (queue the track). Present only for
+  // the per-TRACK sheet (openAddSheet sets addState.queue); the header "Add all" sheet
+  // leaves queue null. NOT `.add-choice` so the playlist-list assertions stay clean.
+  function buildQueueChoice() {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'add-queue';
+    b.textContent = '☰ Play Next';
+    b.addEventListener('click', addState.queue);
+    b.addEventListener('keydown', onAddKey);
+    document.getElementById('add-sheet-list').appendChild(b);
+    return b;
+  }
+  function queueCells() { return [addState.queue].filter(Boolean).map(buildQueueChoice); }
   function buildPlaylistChoice(card) {
     var b = document.createElement('button');
     b.type = 'button';
@@ -187,15 +206,47 @@ export function initPlaylistDetailPage() {
   }
   function showAddSheet(cards) {
     document.getElementById('add-sheet-list').innerHTML = '';
-    addState.cells = cards.map(buildPlaylistChoice)
+    addState.cells = queueCells()
+      .concat(cards.map(buildPlaylistChoice))
       .concat([document.getElementById('btn-add-create'), document.getElementById('btn-add-cancel')]);
     document.getElementById('add-sheet').style.display = 'flex';
     focusAdd(0);
   }
-  function openAddSheet() {
+  function loadAndShowSheet() {
     loadBrowse(SERVER, profile)
-      .then(function(res) { showAddSheet(playlistCards(res.content, playlistId)); })
+      .then(function(res) { showAddSheet(playlistCards(res.content, addState.exclude)); })
       .catch(function() { showStatus('Could not load playlists.'); });
+  }
+  // FEAT-040/TASK-248 — queue a track to PLAY NEXT (queue-track, per person; durable
+  // override queue TASK-246). The sheet's top "☰ Play Next" action — closes the sheet
+  // first, then POSTs.
+  function queueTrack(item) {
+    playbackAction(SERVER, 'queue-track', getPerson(), { track_id: item.video.id })
+      .then(function() { showStatus('Queued to Play Next'); })
+      .catch(function() { showStatus('Could not queue track.'); });
+  }
+  function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
+  // Per-track (TASK-262): the single ＋ opens the sheet for ONE track — Play Next on
+  // top, playlist cards below. Return focus to the track row it opened from.
+  function openAddSheet(item) {
+    addState.add = function(id) { return addToPlaylist(SERVER, id, item.video.id); };
+    addState.queue = function() { queueThenClose(item); };
+    addState.createParams = { addTrack: item.video.id };
+    addState.returnFocus = function() { focusRow(item.video.id); };
+    addState.exclude = null;
+    loadAndShowSheet();
+  }
+  // Header "Add all to playlist" (TASK-212): bulk-add THIS whole playlist into ANOTHER
+  // as a snapshot (add-source, source_type 'playlist'), the current playlist EXCLUDED
+  // (no self-add). No Play Next (queue null — a per-track action). Return focus to the
+  // header button.
+  function openAddSourceSheet() {
+    addState.add = function(id) { return addSourceToPlaylist(SERVER, id, 'playlist', playlistId); };
+    addState.queue = null;
+    addState.createParams = { addSourceType: 'playlist', addSourceId: playlistId };
+    addState.returnFocus = function() { document.getElementById('btn-add-all').focus(); };
+    addState.exclude = playlistId;
+    loadAndShowSheet();
   }
 
   var wsApp = connectApp(window.location.origin, function(intent, params) {
@@ -222,7 +273,7 @@ export function initPlaylistDetailPage() {
   wsApp.sendAppState({ screen: 'playlist', itemId: playlistId, profile: profile });
   document.getElementById('btn-play-next').addEventListener('click', playFromResume);
   document.getElementById('btn-shuffle').addEventListener('click', shufflePlay);
-  document.getElementById('btn-add-all').addEventListener('click', openAddSheet);
+  document.getElementById('btn-add-all').addEventListener('click', openAddSourceSheet);
   document.getElementById('btn-rename-playlist').addEventListener('click', rename);
   document.getElementById('btn-delete-playlist').addEventListener('click', showConfirm);
   document.getElementById('btn-confirm-delete').addEventListener('click', doDelete);
@@ -255,7 +306,7 @@ export function initPlaylistDetailPage() {
       state.progress = progressMapFromCW(res[1].content);
       renderCover();
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: playlistId, seriesTitle: state.playlist.title }));
-      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, null, null, onMove, onRemove, { suppressResume: true });
+      buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, openAddSheet, null, onMove, onRemove, { suppressResume: true });
       focusFirstDetailRow();
     })
     .catch(function() { navTo('error.html'); });

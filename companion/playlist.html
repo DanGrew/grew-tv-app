@@ -58,6 +58,8 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 #add-sheet-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
 .add-choice { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .add-choice:active, .add-choice:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.add-queue { padding: 12px 14px; border: 2px solid var(--focus); border-radius: var(--radius-sm); background: var(--surface-hi); color: var(--text); font-size: 16px; font-family: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.add-queue:active, .add-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .add-sheet-act { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .add-sheet-act:active, .add-sheet-act:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #btn-add-create { border-color: #7ee787; color: #7ee787; }
@@ -127,7 +129,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 </div>
 <div id="add-sheet">
   <div class="add-sheet-panel">
-    <div class="add-sheet-title">Add all to playlist</div>
+    <div class="add-sheet-title">Add to playlist</div>
     <div id="add-sheet-list"></div>
     <button id="btn-add-create" class="add-sheet-act" type="button">&#65291; New playlist</button>
     <button id="btn-add-cancel" class="add-sheet-act" type="button">Cancel</button>

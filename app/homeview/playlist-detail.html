@@ -48,6 +48,7 @@ button:hover { background: var(--surface-hi); }
 .detail-progress { height: 4px; background: rgba(0,0,0,0.45); border-radius: 2px; margin-top: 8px; max-width: 320px; }
 .detail-progress-fill { height: 100%; background: var(--focus); border-radius: 2px; width: 0; }
 .detail-restart { font-size: var(--fs-xs); padding: 5px 12px; min-width: auto; flex-shrink: 0; border-width: 1.5px; }
+.detail-add { font-size: var(--fs-xs); padding: 5px 12px; min-width: auto; flex-shrink: 0; border-width: 1.5px; }
 .detail-move-up, .detail-move-down, .detail-remove { font-size: var(--fs-sm); padding: 5px 14px; min-width: auto; flex-shrink: 0; border-width: 1.5px; line-height: 1; }
 .detail-remove.danger { border-color: rgba(255,135,135,0.5); color: #ff8787; }
 .detail-remove.danger:focus { outline: none; border-color: #ff8787; box-shadow: var(--focus-glow); color: #ff8787; }
@@ -62,6 +63,7 @@ button:hover { background: var(--surface-hi); }
 .add-sheet-title { font-size: var(--fs-lg); }
 #add-sheet-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
 .add-choice { text-align: left; }
+.add-queue { text-align: left; background: var(--surface-hi); border-color: var(--focus); }
 #add-status { position: fixed; left: 50%; bottom: 48px; transform: translateX(-50%); z-index: 11; padding: 14px 28px; background: var(--surface-hi); border: 2.5px solid var(--border); border-radius: var(--radius); font-size: var(--fs-md); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); }
 .breadcrumb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .crumb { font-size: var(--fs-md); color: var(--text-muted); }
@@ -90,7 +92,7 @@ button:hover { background: var(--surface-hi); }
 <div id="detail-list"></div>
 <div id="add-sheet" style="display:none" role="dialog" aria-modal="true">
   <div class="add-sheet-panel">
-    <div class="add-sheet-title">Add all to playlist</div>
+    <div class="add-sheet-title">Add to playlist</div>
     <div id="add-sheet-list"></div>
     <button id="btn-add-create">&#65291; New playlist</button>
     <button id="btn-add-cancel">Cancel</button>
