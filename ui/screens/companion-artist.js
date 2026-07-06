@@ -23,7 +23,6 @@ export function initPage() {
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
-    ctxLabel: document.getElementById('ctx-label'),
     ctxTitle: document.getElementById('ctx-title'),
     gridEl: document.getElementById('txtgrid'),
     playBtn: document.getElementById('btn-play'),
@@ -158,7 +157,6 @@ export function initPage() {
   }
 
   function captureArtist(payload) {
-    els.ctxLabel.textContent = 'Artist';
     [payload.artist].filter(Boolean).filter(function(a) { return a !== state.artist; }).forEach(function(a) {
       state.artist = a;
       els.ctxTitle.textContent = a;

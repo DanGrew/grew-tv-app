@@ -66,7 +66,7 @@ test.describe('Road Trip playlist (2 tracks)', () => {
   });
 
   test('renders the playlist name and label from the live context', async ({ page }) => {
-    await expect(page.locator('#ctx-label')).toHaveText('Playlist');
+    await expect(page.locator('#ctx-label')).toHaveCount(0);
     await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
   });
 

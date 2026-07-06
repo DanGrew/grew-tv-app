@@ -26,7 +26,6 @@ export function initPage() {
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
-    ctxLabel: document.getElementById('ctx-label'),
     ctxTitle: document.getElementById('ctx-title'),
     gridEl: document.getElementById('txtgrid'),
     playBtn: document.getElementById('btn-play'),
@@ -320,7 +319,6 @@ export function initPage() {
   }
 
   function capturePlaylist(payload) {
-    els.ctxLabel.textContent = 'Playlist';
     [payload.playlist].filter(Boolean).filter(function(id) { return id !== state.playlistId; }).forEach(function(id) {
       state.playlistId = id;
       loadTracks();
@@ -357,7 +355,6 @@ export function initPage() {
   // ourselves (loadPlaylist / /api/playlist) instead of waiting for the TV echo.
   [new URLSearchParams(window.location.search).get('id')].filter(Boolean).forEach(function(id) {
     state.playlistId = id;
-    els.ctxLabel.textContent = 'Playlist';
     loadTracks();
   });
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
