@@ -79,6 +79,27 @@ test('toggling Shuffle inside the Queue View flips it (live, no exit)', async ({
   await expect(page.locator('.q-ends')).toContainText('Source ends');
 });
 
+// BUG-041: the shuffled (`.on`) pill must be visually distinct from a merely
+// focused-but-OFF pill. The old CSS painted `.on` with a near-transparent
+// surface-hi tint + the same white --focus border a focused-off pill gets, so a
+// focused-off Shuffle pill read as "shuffled". ON is now a solid --focus fill.
+test('BUG-041: the ON (shuffled) pill is a solid fill, distinct from a focused-OFF pill', async ({ page }) => {
+  await enterPlayer(page, 'ootb-02', 'Mr. Blue Sky');   // shuffle OFF
+  await openQueue(page);
+  const shuffle = page.locator('.np-pill', { hasText: 'Shuffle' });
+  // Focused but OFF must NOT look filled (the old collapse: focus ≈ on).
+  await shuffle.focus();
+  await expect(shuffle).not.toHaveClass(/on/);
+  const focusedOffBg = await shuffle.evaluate(el => getComputedStyle(el).backgroundColor);
+  expect(focusedOffBg).toBe('rgba(0, 0, 0, 0)');        // transparent — a focus ring only
+  // Toggle ON -> an opaque solid --focus fill (fails on the old surface-hi tint).
+  await shuffle.click();
+  await expect(shuffle).toHaveClass(/on/);
+  const onBg = await shuffle.evaluate(el => getComputedStyle(el).backgroundColor);
+  expect(onBg).toBe('rgb(255, 255, 255)');              // solid --focus fill
+  expect(onBg).not.toBe(focusedOffBg);                  // ON distinguishable from focused-OFF
+});
+
 test('deleting a FROM SOURCE row POSTs remove-queue-entry and the row disappears', async ({ page }) => {
   await enterPlayer(page, 'ootb-01', 'Turn to Stone');
   await openQueue(page);

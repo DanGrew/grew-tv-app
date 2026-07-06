@@ -52,6 +52,20 @@ test('toggling repeat POSTs the action and THEN gains the next permutation', asy
   await expect(page.locator('.ph-tbtn[data-action="toggle-repeat"]')).toHaveClass(/on/);
 });
 
+// BUG-041 (companion mirror): the ON (`.on`) transport pill must be a solid fill,
+// not the old near-transparent surface-hi tint that collapsed into the focus look.
+test('BUG-041: the ON (shuffled) pill is a solid fill, distinct from an OFF pill', async ({ page }) => {
+  await setup(page);
+  const shuffle = page.locator('.ph-tbtn[data-action="toggle-shuffle"]');
+  await expect(shuffle).not.toHaveClass(/on/);
+  const offBg = await shuffle.evaluate(el => getComputedStyle(el).backgroundColor);
+  await shuffle.click();
+  await expect(shuffle).toHaveClass(/on/);
+  const onBg = await shuffle.evaluate(el => getComputedStyle(el).backgroundColor);
+  expect(onBg).toBe('rgb(255, 255, 255)');   // solid --focus fill (fails on the old surface-hi tint)
+  expect(onBg).not.toBe(offBg);
+});
+
 test('tapping a queue row POSTs play-track — now-playing advances to it', async ({ page }) => {
   await setup(page);
   await expect(page.locator('.ph-np .nm')).toHaveText('Turn to Stone');

@@ -87,9 +87,10 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
 .np-status { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .np-transport { display: flex; align-items: center; gap: 14px; }
 .np-pill { font-size: 18px; border: 2px solid var(--border); border-radius: 999px; padding: 5px 14px; color: var(--text-muted); }
-.np-pill.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
 .np-pill.is-disabled { opacity: 0.35; pointer-events: none; }
 .np-pill:focus { outline: none; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
+.np-pill.on { border-color: var(--focus); background: var(--focus); color: #16213e; font-weight: 700; }
+.np-pill.on:focus { color: #16213e; box-shadow: var(--focus-glow); }
 .np-time { font-size: 18px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .q-row { display: flex; align-items: center; gap: 14px; padding: 11px 14px; margin-bottom: 8px; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); }
 .q-row.queued { border-left-width: 6px; border-left-color: var(--focus); }
