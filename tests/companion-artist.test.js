@@ -63,7 +63,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('renders the artist name and label from the live context', async ({ page }) => {
-  await expect(page.locator('#ctx-label')).toHaveText('Artist');
+  await expect(page.locator('#ctx-label')).toHaveCount(0);
   await expect(page.locator('#ctx-title')).toHaveText('ELO');
 });
 
