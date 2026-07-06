@@ -42,7 +42,8 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .ph-transport { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 4px 2px; }
 .ph-tbtn { flex: 1; padding: 12px 4px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-size: 20px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .ph-tbtn:active, .ph-tbtn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-.ph-tbtn.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
+.ph-tbtn.on { border-color: var(--focus); background: var(--focus); color: #16213e; font-weight: 700; }
+.ph-tbtn.on:active, .ph-tbtn.on:focus { color: #16213e; }
 .ph-tbtn.is-disabled { opacity: 0.35; pointer-events: none; }
 
 .ph-qrow { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); padding: 8px 12px; }
