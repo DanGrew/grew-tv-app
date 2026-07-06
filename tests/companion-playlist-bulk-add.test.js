@@ -132,7 +132,7 @@ test('the playlist sheet excludes the current playlist (no self-add)', async ({ 
   await openPlaylist(page, 'pl-roadtrip');
   await page.locator('#btn-add-all').click();
   await expect(page.locator('#add-sheet')).toBeVisible();
-  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['Empty Mix']);
+  await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['♪ Empty Mix']);
 });
 
 test('picking a target POSTs add-source for this whole playlist (snapshot)', async ({ page }) => {

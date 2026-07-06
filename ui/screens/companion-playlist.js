@@ -1,5 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, mediaUrl } from '../../core/app-api.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
@@ -81,52 +81,90 @@ export function initPage() {
   document.getElementById('btn-confirm-delete').addEventListener('click', doDelete);
   document.getElementById('btn-cancel-delete').addEventListener('click', hideConfirm);
 
-  // Bulk-add (TASK-212) — the companion mirror of the TV playlist detail's "Add
-  // all to playlist": snapshot THIS whole playlist into ANOTHER (the add-source
-  // API, source_type 'playlist'). The sheet lists the active profile's playlists
-  // with this one EXCLUDED (a playlist can't be added into itself) + New playlist
-  // + Cancel. The target gets a snapshot, so this playlist is unchanged — a toast
-  // confirms, no reload. New playlist hands off to the create page carrying the
-  // bulk source so the playlist is created then this one's tracks added into it.
-  var statusTimer = null;
+  // FEAT-036/039 — the "Add to playlist" sheet, the companion mirror of the app
+  // playlist detail's sheet (mirrors companion-detail.js too). ONE sheet, two entry
+  // points: the per-track ＋ (openAddSheet — Play Next + add ONE track, TASK-262) and
+  // the manage-row "Add all to playlist" (openAddAllSheet — bulk-snapshot THIS whole
+  // playlist into ANOTHER, source_type 'playlist', this one EXCLUDED, TASK-212).
+  // addState.add(id) is the POST for the chosen mode (add-track vs add-source); queue /
+  // createHref / exclude differ per mode, so the rest of the sheet is mode-agnostic.
+  // The target gets a snapshot / append, so a toast confirms — no reload.
+  var addState = { add: null, queue: null, createHref: '', statusTimer: null, exclude: null };
+  function activeProfile() { return [state.profile].filter(Boolean).concat(['adults'])[0]; }
   function hideStatus() { document.getElementById('add-status').style.display = 'none'; }
   function showStatus(text) {
     var el = document.getElementById('add-status');
     el.textContent = text;
     el.style.display = 'block';
-    clearTimeout(statusTimer);
-    statusTimer = setTimeout(hideStatus, 2500);
+    clearTimeout(addState.statusTimer);
+    addState.statusTimer = setTimeout(hideStatus, 2500);
   }
   function closeAddSheet() { document.getElementById('add-sheet').style.display = 'none'; }
   function addExisting(id, title) {
-    addSourceToPlaylist(server, id, 'playlist', state.playlistId)
+    addState.add(id)
       .then(function() { closeAddSheet(); showStatus('Added to ' + title); })
       .catch(function() { closeAddSheet(); showStatus('Could not add to playlist.'); });
   }
-  function createNew() {
-    window.location.href = 'playlist-create.html?addSourceType=playlist&addSourceId=' + encodeURIComponent(state.playlistId) +
-      '&profile=' + encodeURIComponent([state.profile].filter(Boolean).concat(['adults'])[0]);
-  }
+  function createNew() { window.location.href = addState.createHref; }
   function choiceBtn(card) {
     var b = document.createElement('button');
     b.className = 'add-choice';
     b.setAttribute('data-id', card.id);
-    b.textContent = card.title;
+    b.textContent = '♪ ' + card.title;
     b.addEventListener('click', function() { addExisting(card.id, card.title); });
+    return b;
+  }
+  // TASK-253 — the per-track sheet's top option "☰ Play Next" (queue the track), above
+  // the playlist cards. Present only for the per-TRACK sheet (openAddSheet sets
+  // addState.queue); the "Add all" sheet leaves it null. NOT `.add-choice`.
+  function queueChoiceBtn() {
+    var b = document.createElement('button');
+    b.className = 'add-queue';
+    b.textContent = '☰ Play Next';
+    b.addEventListener('click', addState.queue);
     return b;
   }
   function showAddSheet(cards) {
     var list = document.getElementById('add-sheet-list');
     list.innerHTML = '';
+    [addState.queue].filter(Boolean).forEach(function() { list.appendChild(queueChoiceBtn()); });
     cards.forEach(function(c) { list.appendChild(choiceBtn(c)); });
     document.getElementById('add-sheet').style.display = 'flex';
   }
-  function openAddSheet() {
-    loadBrowse(server, [state.profile].filter(Boolean).concat(['adults'])[0])
-      .then(function(res) { showAddSheet(playlistCards([res.content].filter(Boolean).concat([[]])[0], state.playlistId)); })
+  function loadAndShowSheet() {
+    loadBrowse(server, activeProfile())
+      .then(function(res) { showAddSheet(playlistCards([res.content].filter(Boolean).concat([[]])[0], addState.exclude)); })
       .catch(function() { showStatus('Could not load playlists.'); });
   }
-  document.getElementById('btn-add-all').addEventListener('click', openAddSheet);
+  // FEAT-040/TASK-248 — queue a track to PLAY NEXT (queue-track, per person; durable
+  // override queue TASK-246). Per-person POST ⇒ live in BOTH modes. The sheet's top
+  // "☰ Play Next" action — closes the sheet first, then POSTs.
+  function queueTrack(card) {
+    playbackAction(server, 'queue-track', state.person, { track_id: card.id })
+      .then(function() { showStatus('Queued to Play Next'); })
+      .catch(function() { showStatus('Could not queue track.'); });
+  }
+  function queueThenClose(card) { closeAddSheet(); queueTrack(card); }
+  // Per-track ＋ (TASK-262): add ONE track — Play Next on top, then the playlist cards.
+  function openAddSheet(card) {
+    addState.add = function(id) { return addToPlaylist(server, id, card.id); };
+    addState.queue = function() { queueThenClose(card); };
+    addState.createHref = 'playlist-create.html?addTrack=' + encodeURIComponent(card.id) +
+      '&profile=' + encodeURIComponent(activeProfile());
+    addState.exclude = null;
+    loadAndShowSheet();
+  }
+  // Manage-row "Add all to playlist" (TASK-212): snapshot THIS whole playlist into
+  // ANOTHER (add-source, source_type 'playlist'), this one EXCLUDED. No Play Next.
+  function openAddAllSheet() {
+    addState.add = function(id) { return addSourceToPlaylist(server, id, 'playlist', state.playlistId); };
+    addState.queue = null;
+    addState.createHref = 'playlist-create.html?addSourceType=playlist&addSourceId=' + encodeURIComponent(state.playlistId) +
+      '&profile=' + encodeURIComponent(activeProfile());
+    addState.exclude = state.playlistId;
+    loadAndShowSheet();
+  }
+  document.getElementById('btn-add-all').addEventListener('click', openAddAllSheet);
   document.getElementById('btn-add-create').addEventListener('click', createNew);
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
 
@@ -232,13 +270,16 @@ export function initPage() {
   }
 
   // A full-width row styled as ONE rounded box (TASK-263, the album-companion
-  // .detail-track-row model): a borderless play tile (tap = play on the TV) plus
-  // the ↑ ↓ ✕ edit controls as inner chips. A <button> can't nest, so the tile
-  // stays a button and the chips sit beside it inside the .ph-row box.
+  // .detail-track-row model): a borderless play tile (tap = play on the TV) plus the
+  // ＋ add (TASK-262 — Play Next / add this track to a playlist) and ↑ ↓ ✕ edit
+  // controls as inner chips. The ＋ is a per-person action, so it stays live in Browse
+  // mode (the play tile greys, the edit chips do not). A <button> can't nest, so the
+  // tile stays a button and the chips sit beside it inside the .ph-row box.
   function trackRow(card, i, total) {
     var row = document.createElement('div');
     row.className = 'ph-row';
     row.appendChild(trackTile(card));
+    row.appendChild(editBtn('&#65291;', 'add', 'Add to playlist', function() { openAddSheet(card); }));
     appendUp(row, i);
     appendDown(row, i, total);
     row.appendChild(editBtn('&#10005;', 'x', 'Remove', function() { removeTrack(i); }));
