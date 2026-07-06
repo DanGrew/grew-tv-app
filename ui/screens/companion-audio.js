@@ -283,12 +283,12 @@ export function initPage() {
   function disarmReset() {
     resetArmed = false;
     els.reset.classList.remove('confirm');
-    els.reset.textContent = 'Reset progress';
+    els.reset.textContent = '↻ Reset';
   }
   function armReset() {
     resetArmed = true;
     els.reset.classList.add('confirm');
-    els.reset.textContent = 'Reset progress?';
+    els.reset.textContent = '↻ Reset?';
     clearTimeout(resetTimer);
     resetTimer = setTimeout(disarmReset, 4000);
   }

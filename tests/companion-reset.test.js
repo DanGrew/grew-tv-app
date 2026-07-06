@@ -38,10 +38,10 @@ test('companion video Reset: two-tap arms then sends reset; TV exits and compani
   await mockApp(page, 'video', VIDEO_ST, 'Toy Story');
   await page.goto('/companion/video.html');
   const reset = page.locator('#c-reset');
-  await expect(reset).toHaveText('Reset progress');
+  await expect(reset).toHaveText('↻ Reset');
   // First tap arms — confirm prompt, no navigation.
   await reset.click();
-  await expect(reset).toHaveText('Reset progress?');
+  await expect(reset).toHaveText('↻ Reset?');
   await expect(reset).toHaveClass(/confirm/);
   await expect(page).toHaveURL(/video\.html/);
   // Second tap fires the reset intent — the TV exits and the companion follows.
@@ -54,9 +54,9 @@ test('companion audio Reset: two-tap arms then sends reset; TV exits and compani
   await mockApp(page, 'audio', AUDIO_ST, 'Mr. Blue Sky');
   await page.goto('/companion/audio.html');
   const reset = page.locator('#c-reset');
-  await expect(reset).toHaveText('Reset progress');
+  await expect(reset).toHaveText('↻ Reset');
   await reset.click();
-  await expect(reset).toHaveText('Reset progress?');
+  await expect(reset).toHaveText('↻ Reset?');
   await expect(reset).toHaveClass(/confirm/);
   await expect(page).toHaveURL(/audio\.html/);
   await reset.click();
