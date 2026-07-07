@@ -169,7 +169,11 @@ if (rule === 'no-filter-conditional') {
 }
 
 if (rule === 'no-json-in-repo') {
-  const EXCLUDED_DIRS = new Set(['node_modules', 'content', 'coverage', 'reports', 'test-results', '.claude', '.stryker-tmp']);
+  // `.contract` holds the gitignored backend contract fixtures pulled from the
+  // private grew-tv for the TASK-311 conformance test (npm run contract:pull) —
+  // never committed, so exclude it here too (a dev who populated it locally else
+  // trips this check on JSON that isn't in the repo).
+  const EXCLUDED_DIRS = new Set(['node_modules', 'content', 'coverage', 'reports', 'test-results', '.claude', '.stryker-tmp', '.contract']);
   const ALLOWED_FILES = new Set(['package.json', 'package-lock.json', 'scripts/package.json', 'manifest.json', 'stryker.conf.json']);
 
   function walkJson(dir) {

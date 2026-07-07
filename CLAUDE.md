@@ -199,6 +199,19 @@ npm run test:unit   # vitest — unit tests for core/ (run locally)
 npm test            # playwright e2e — CI only; pre-push skips it
 ```
 
+**Backend contract conformance (SYS-017 / TASK-311).** `tests/unit/contract-conformance.test.js`
+feeds the backend's OWN frozen response fixtures (TASK-310:
+`grew-tv media-manager/tests/contract/*.json`) through the app's `core/` readers
+(`home-rails`, `progress`, `tile-model`, `detail-view`, `series-detail`,
+`player-math`) and goes RED when a backend field the app reads is renamed/removed —
+the guard against silent stub↔backend drift. The fixtures live in the **private**
+`DanGrew/grew-tv`, so they are **not** committed here: CI's `contract-conformance`
+job sparse-checks-them-out into the gitignored `tests/.contract/` (needs a repo
+secret **`GREW_TV_CONTRACT_TOKEN`** — a read token for grew-tv; the default
+`GITHUB_TOKEN` can't clone a private repo). When `tests/.contract/` is **absent**
+(any local `npm run test:unit` without the checkout) the suite **skips** — CI is the
+gate. Populate it locally to run it: `npm run contract:pull`.
+
 **Verify touched suites, not the whole world — CI is the gate.** When checking
 a change locally, run the **touched + directly-relevant** e2e suites only
 (`npx playwright test tests/<file>.test.js`). Do NOT re-run the full e2e suite

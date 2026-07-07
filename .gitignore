@@ -4,6 +4,7 @@ coverage/
 reports/mutation/
 test-results/
 playwright-report/
+tests/.contract/
 demos/
 .idea/
 manifest.json
