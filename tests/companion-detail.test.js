@@ -35,10 +35,11 @@ async function openSeasons(page) {
   await expect(page.locator('.season-chip').first()).toBeVisible();
 }
 
-test('companion renders a chip per declared season', async ({ page }) => {
-  await openSeasons(page);
-  await expect(page.locator('.season-chip')).toHaveText(['Season 1', 'Season 2']);
-});
+// TASK-308: "one chip per declared season" + the 'Season N' label is unit-covered
+// (tests/unit/seasons.test.js seasonsOf + seasonLabel). Both chips reaching the DOM
+// is proven by the sibling tests below — the default-season test asserts the
+// Season-1 chip active, and the re-filter test taps the Season-2 chip — so this
+// static two-chip render assertion added no orthogonal signal.
 
 test('companion default season is active and filters the episode list', async ({ page }) => {
   await openSeasons(page);

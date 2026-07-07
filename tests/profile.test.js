@@ -106,13 +106,11 @@ test('Escape closes the keypad and returns focus to the Adults card', async ({ p
 
 // Two-row picker: kids row on top, adults row below. Left/Right walk a row;
 // Up/Down change rows. Default fixture has one kid + one adult, one per row.
-test('cards are grouped into a kids row and an adults row', async ({ page }) => {
-  await expect(page.locator('.profile-row')).toHaveCount(2);
-  await expect(page.locator('.profile-row').first().locator('.profile-card')).toHaveCount(1);
-  await expect(page.locator('.profile-row').first().locator('#btn-kids')).toBeVisible();
-  await expect(page.locator('.profile-row').last().locator('#btn-adults')).toBeVisible();
-});
-
+// TASK-308: the row-grouping itself (kids row first, adults second) is unit-covered
+// (tests/unit/profile-rows.test.js groupRows). That the two rows reach the DOM in
+// that order — kids above adults — is proven by the d-pad test below (btn-kids
+// focused, ArrowDown → btn-adults, ArrowUp → btn-kids), so the static structural
+// assertion added no orthogonal signal.
 test('d-pad Up/Down move focus between the kids and adults rows', async ({ page }) => {
   await expect(page.locator('#btn-kids')).toBeFocused();
   await page.keyboard.press('ArrowDown');

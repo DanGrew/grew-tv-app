@@ -50,17 +50,12 @@ test('Music tab leads with a Playlists rail then Artists then Albums with square
   await expect(album.locator('.tile-sub')).toHaveText('3 tracks');
 });
 
-test('Artists rail has one square tile per artist (A-Z), labelled with the album count (FEAT-029)', async ({ page }) => {
-  await enterKids(page);
-  await page.locator('.sidebar-tab[data-tab="music"]').click();
-  const tiles = page.locator('.rail-row[data-rail="artists"] .film-tile');
-  await expect(tiles).toHaveCount(2); // ABBA, ELO
-  await expect(tiles.locator('.tile-title')).toHaveText(['ABBA', 'ELO']); // A-Z
-  const elo = page.locator('.rail-row[data-rail="artists"] .film-tile[data-id="artist:ELO"]');
-  await expect(elo).toHaveAttribute('data-music', ''); // square art
-  await expect(elo.locator('.tile-sub')).toHaveText('2 albums');
-  await expect(page.locator('.film-tile[data-id="artist:ABBA"] .tile-sub')).toHaveText('1 album');
-});
+// TASK-308: the Artists-rail A-Z order + "N albums" pluralization + square art are
+// unit-covered (tests/unit/home-rails.test.js "Artists rail + drill-down": titles
+// A-Z, subLabel '2 albums'/'1 album', section:'music' square art). The tile-sub
+// text and data-music square reaching the DOM are proven by the sibling album tile
+// ('3 tracks' / data-music) above; that an artist tile renders and is clickable is
+// proven by the drill-down journey below. No orthogonal e2e signal remained here.
 
 test('selecting an artist drills into a grid of just that artist’s albums; an album opens its detail', async ({ page }) => {
   await enterKids(page);

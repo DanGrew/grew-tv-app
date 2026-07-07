@@ -175,11 +175,11 @@ test.describe('season selector (TASK-123)', () => {
     await expect(page.locator('.season-chip').first()).toBeVisible();
   }
 
-  test('renders a chip per declared season', async ({ page }) => {
-    await openSeasons(page);
-    await expect(page.locator('.season-chip')).toHaveCount(2);
-    await expect(page.locator('.season-chip')).toHaveText(['Season 1', 'Season 2']);
-  });
+  // TASK-308: "one chip per declared season" + the 'Season N' label is unit-covered
+  // (tests/unit/seasons.test.js seasonsOf + seasonLabel). Both chips reaching the
+  // DOM is proven by the sibling tests below — the default-season test asserts the
+  // Season-1 chip active, and the select/ArrowRight tests drive the Season-2 chip —
+  // so this static two-chip render assertion added no orthogonal signal.
 
   test('default chip is the Play-next season, filtered with no inline dividers', async ({ page }) => {
     await openSeasons(page);
