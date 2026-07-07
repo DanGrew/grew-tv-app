@@ -380,12 +380,60 @@ jobs:
           name: report-no-logic-in-inline-callbacks
           path: reports/no-logic-in-inline-callbacks.txt
 
+  # TASK-311 (SYS-017) — App ⇄ backend response-shape conformance. Sparse-checks
+  # out the live contract fixtures TASK-310 froze into the PRIVATE DanGrew/grew-tv
+  # (media-manager/tests/contract/*.json), stages them into the gitignored
+  # tests/.contract/, and runs the conformance vitest over them — red when a backend
+  # field the app reads is renamed/removed. PREREQ: grew-tv is private, so the
+  # default GITHUB_TOKEN cannot clone it; this job needs a repo secret
+  # GREW_TV_CONTRACT_TOKEN (a read-only token/PAT scoped to DanGrew/grew-tv contents).
+  # Until that secret is provisioned the fetch step fails and this job is RED — the
+  # honest "prereq unmet" signal. Other jobs are unaffected (isolated dependency).
+  contract-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Fetch backend contract fixtures (private grew-tv)
+        uses: actions/checkout@v4
+        with:
+          repository: DanGrew/grew-tv
+          ref: main
+          token: ${{ secrets.GREW_TV_CONTRACT_TOKEN }}
+          sparse-checkout: media-manager/tests/contract
+          sparse-checkout-cone-mode: false
+          path: .grew-tv-contract
+      - name: Stage contract fixtures
+        run: mkdir -p tests/.contract && cp .grew-tv-contract/media-manager/tests/contract/*.json tests/.contract/
+      - run: mkdir -p reports
+      - name: Run contract conformance
+        id: contract
+        run: npx vitest run tests/unit/contract-conformance.test.js
+      - name: Write contract report
+        if: always()
+        run: |
+          if [ "${{ steps.contract.outcome }}" = "success" ]; then
+            echo "SUMMARY: ✅ passed" > reports/contract-conformance.txt
+          else
+            echo "SUMMARY: ❌ failed" > reports/contract-conformance.txt
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-contract-conformance
+          path: reports/contract-conformance.txt
+
   pr-report:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
     needs:
       - coverage
+      - contract-conformance
       - no-dom-in-core
       - no-ui-imports
       - no-stray-files
@@ -454,6 +502,7 @@ jobs:
             row "tv-focus-rings" "$(smry reports/tv-focus-rings.txt)"
             row "tv-min-font-size" "$(smry reports/tv-min-font-size.txt)"
             row "tv-no-blank-screen" "$(smry reports/tv-no-blank-screen.txt)"
+            row "contract-conformance" "$(smry reports/contract-conformance.txt)"
             E2E=$(cat reports/e2e-report.txt 2>/dev/null || echo "❌ missing")
             row "e2e" "$E2E"
           } > combined.md
