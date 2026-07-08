@@ -191,6 +191,14 @@ Read this BEFORE writing screen code — these gate the PR in CI even when local
   Capture person FIRST / keep `onAppState` minimal, and an e2e that asserts
   `req.url()` contains `person=<id>` guards it (an empty-person POST still 204s in
   the fixture's global state, so assert the person, not just that the POST fired).
+- **A `core/` logic change ships tests that would FAIL if the logic broke —
+  `core/**` is mutation-gated by Stryker (TASK-305).** Coverage proves a line ran;
+  mutation proves a test *catches* a change to it. Assert the actual values and
+  branches you add, not just that the code executes — a surviving mutant means a
+  behaviour you left unasserted. **Always write the mutation-killing test; no
+  opt-out exclusions.** Run `npm run test:mutation` for the modules you touched and
+  drive their survivors to 0 before you push. (The existing backlog sweep is
+  TASK-327; see Tests below and `docs/mutation-testing.md`.)
 
 ## Tests
 
@@ -198,6 +206,16 @@ Read this BEFORE writing screen code — these gate the PR in CI even when local
 npm run test:unit   # vitest — unit tests for core/ (run locally)
 npm test            # playwright e2e — CI only; pre-push skips it
 ```
+
+**Stryker mutation gate (`core/**`, TASK-305).** `npm run test:mutation` (Stryker +
+vitest-runner, `stryker.conf.json`, `mutate: ["core/**/*.js"]`) mutates every `core/`
+module and reruns the unit suite against each mutant; a *survivor* is a mutation no
+test caught — a behaviour you didn't actually assert. **Kill every survivor with a
+test.** Never exclude one as "equivalent" to move the number, and never narrow the
+`mutate` glob to an include-list; if a mutant is genuinely unkillable, raise it with
+the owner rather than silencing it. The full pass runs in CI
+(`.github/workflows/mutation.yml`); the backlog survivor sweep is TASK-327. Details in
+`docs/mutation-testing.md`.
 
 **Backend contract conformance (SYS-017 / TASK-311).** `tests/unit/contract-conformance.test.js`
 feeds the backend's OWN frozen response fixtures (TASK-310:
