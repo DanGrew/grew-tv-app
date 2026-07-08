@@ -112,6 +112,14 @@ describe('videoQueueViewHtml (TV)', () => {
     expect(html).toContain('data-act="move" data-entry="q1"');
     expect(html).toContain('data-act="select" data-item="e2"');
   });
+  // BUG-042: the TV overlay remove button must use the app-wide cross (&#10005; ✕),
+  // not the non-standard boxed-plus (&#8862; ⊞) it used to render.
+  it('renders the standard cross (✕) on the remove button, not the boxed-plus', () => {
+    var html = videoQueueViewHtml(snap(0, true, [entry('q1', 'fz', 'Frozen')]));
+    expect(html).toContain('data-act="remove" data-entry="q1" title="Remove" aria-label="Remove">&#10005;</button>');
+    expect(html).not.toContain('&#8862;');
+  });
+
   it('a queued row name is a play-now control (plays it + drops it from the queue)', () => {
     var html = videoQueueViewHtml(snap(0, true, [entry('q1', 'fz', 'Frozen')]));
     expect(html).toContain('data-act="play-now" data-entry="q1" data-item="fz"');

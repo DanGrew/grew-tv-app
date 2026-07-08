@@ -115,6 +115,14 @@ describe('queueViewHtml', () => {
     expect(html).not.toContain('data-to=');   // no absolute index (was the bug)
   });
 
+  // BUG-042: the TV overlay remove button must use the app-wide cross (&#10005; ✕),
+  // not the non-standard boxed-plus (&#8862; ⊞) it used to render.
+  it('renders the standard cross (✕) on the remove button, not the boxed-plus', () => {
+    var html = queueViewHtml(shuffleSnap());
+    expect(html).toContain('data-act="remove" data-entry="s1" title="Remove" aria-label="Remove">&#10005;</button>');
+    expect(html).not.toContain('&#8862;');
+  });
+
   it('disables shift-up on the first row and shift-down on the last (no swap with now-playing / off-section)', () => {
     var src = queueModel(shuffleSnap()).sections.find(s => s.key === 'from-source').rows;
     expect(src[0].canUp).toBe(false);    // first FROM SOURCE row: can't swap up into now-playing
