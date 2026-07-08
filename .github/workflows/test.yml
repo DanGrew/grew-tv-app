@@ -412,7 +412,10 @@ jobs:
       - run: mkdir -p reports
       - name: Run contract conformance
         id: contract
-        run: npx vitest run tests/unit/contract-conformance.test.js
+        # TASK-311: contract → core readers. TASK-326: stub (installApi) → contract
+        # shape. Both feed the same sparse-checked-out tests/.contract/ fixtures and
+        # skip when it is absent, so they share this one private-checkout job.
+        run: npx vitest run tests/unit/contract-conformance.test.js tests/unit/stub-contract-shape.test.js
       - name: Write contract report
         if: always()
         run: |

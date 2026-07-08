@@ -212,6 +212,21 @@ secret **`GREW_TV_CONTRACT_TOKEN`** — a read token for grew-tv; the default
 (any local `npm run test:unit` without the checkout) the suite **skips** — CI is the
 gate. Populate it locally to run it: `npm run contract:pull`.
 
+**Stub↔contract shape conformance (SYS-017 / TASK-326).** `tests/unit/stub-contract-shape.test.js`
+closes the *other* half of the drift gap: TASK-311 checks `contract → readers`, but
+the e2e stub (`tests/fixtures/api.js installApi`) could still emit a wrong field name
+and nothing went red. This test compares the **key-set/nesting** (not values —
+content differs by design) of the objects `installApi` emits per route
+(browse/continue-watching/video/album/playlist), via the pure `*Response()` builders
+the route handlers delegate to, against the same-route `tests/.contract/` fixture;
+any renamed/added/dropped field on either side → RED. Legitimate shape gaps are
+excused **per-key with a one-line reason** (`expectShape`'s `stubOnly`/`contractOnly`
+maps) — never a blanket ignore; a stale exclusion also fails. Same gitignored
+`tests/.contract/` + skip-when-absent as TASK-311, run in the **same CI
+`contract-conformance` job** (no second private checkout). When you add a field the
+app reads to `installApi`, mirror it on the backend contract (or excuse it with a
+reason) or this goes red.
+
 **Verify touched suites, not the whole world — CI is the gate.** When checking
 a change locally, run the **touched + directly-relevant** e2e suites only
 (`npx playwright test tests/<file>.test.js`). Do NOT re-run the full e2e suite
