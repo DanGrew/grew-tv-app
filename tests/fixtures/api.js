@@ -201,6 +201,24 @@ function slugify(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
+// TASK-326: pure response builders — the objects installApi's routes emit, factored
+// out of the route handlers so the stub<->contract shape test
+// (tests/unit/stub-contract-shape.test.js) can call the SAME emission path without a
+// browser. Each contract-covered route handler below delegates to one of these; the
+// shape test binds their emitted key-sets to the backend's frozen contract fixtures.
+function browseResponse(profile) {
+  return BROWSE[profile] || { profile: profile, content: [] };
+}
+function videoResponse(id) { return VIDEOS[id]; }
+function albumResponse(id) { return ALBUMS[id]; }
+function playlistResponse(store, id) { return store[id]; }
+function continueWatchingResponse(person, store) {
+  // FEAT-045/TASK-317: `recents` (last 5 opened music sources, newest-first) rides
+  // this response. Empty by default — the Recently Played rail is then omitted; a
+  // test wanting it overrides the route with a populated `recents`.
+  return { person: person, content: midWatchRows(store), recents: [] };
+}
+
 async function installApi(page) {
   // Global settings (FEAT-023). Stateful per install so a POST sticks for later
   // GETs — stickiness now lives in the backend, not localStorage. Default ON.
@@ -223,18 +241,15 @@ async function installApi(page) {
   });
   await page.route('**/api/browse**', function(route) {
     var profile = new URL(route.request().url()).searchParams.get('profile');
-    return json(route, 200, BROWSE[profile] || { profile: profile, content: [] });
+    return json(route, 200, browseResponse(profile));
   });
   await page.route('**/api/continue-watching**', function(route) {
     var person = new URL(route.request().url()).searchParams.get('person');
     if (!person) return json(route, 400, { error: 'person required' });
-    // FEAT-045/TASK-317: `recents` (last 5 opened music sources, newest-first)
-    // rides this response. Empty by default — the Recently Played rail is then
-    // omitted; a test wanting it overrides this route with a populated `recents`.
-    return json(route, 200, { person: person, content: midWatchRows(progress[person] || {}), recents: [] });
+    return json(route, 200, continueWatchingResponse(person, progress[person] || {}));
   });
   await page.route('**/api/video/*', function(route) {
-    var v = VIDEOS[lastSegment(route.request().url(), '/api/video/')];
+    var v = videoResponse(lastSegment(route.request().url(), '/api/video/'));
     return v ? json(route, 200, v) : json(route, 404, { error: 'not found' });
   });
   await page.route('**/api/series/*', function(route) {
@@ -242,11 +257,11 @@ async function installApi(page) {
     return s ? json(route, 200, s) : json(route, 404, { error: 'not found' });
   });
   await page.route('**/api/album/*', function(route) {
-    var a = ALBUMS[lastSegment(route.request().url(), '/api/album/')];
+    var a = albumResponse(lastSegment(route.request().url(), '/api/album/'));
     return a ? json(route, 200, a) : json(route, 404, { error: 'not found' });
   });
   await page.route('**/api/playlist/*', function(route) {
-    var p = playlists[lastSegment(route.request().url(), '/api/playlist/')];
+    var p = playlistResponse(playlists, lastSegment(route.request().url(), '/api/playlist/'));
     return p ? json(route, 200, p) : json(route, 404, { error: 'not found' });
   });
   // FEAT-036/TASK-208 playlist actions. create -> 200 + the created record (the
@@ -716,4 +731,10 @@ async function installVideoPlaybackBackend(page) {
   return { seed: seed, snapshot: snapshot };
 }
 
-module.exports = { VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, BROWSE, CONFIG, nextOf, installApi, installPlaybackBackend, installVideoPlaybackBackend };
+module.exports = {
+  VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, BROWSE, CONFIG, nextOf,
+  installApi, installPlaybackBackend, installVideoPlaybackBackend,
+  // TASK-326: pure response builders + the CW row builder, so the stub<->contract
+  // shape test can exercise the exact objects the routes above emit.
+  browseResponse, videoResponse, albumResponse, playlistResponse, continueWatchingResponse, midWatchRows
+};
