@@ -14,10 +14,12 @@ import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 
 // Companion series context (TASK-118): the episode list with per-episode
-// progress + a Play-next button, fetched straight from the backend (catalog +
-// progress are backend state). Only the live context — which series the app is
-// on, and the profile — arrives over WS. Tapping a row plays it on the TV
-// (resume by default); Play next teleports to the next-in-order episode.
+// progress, fetched straight from the backend (catalog + progress are backend
+// state). Only the live context — which series the app is on, and the profile —
+// arrives over WS. Tapping a row plays it on the TV (resume by default). A video
+// series also gets a Play-next button (teleports to the next-in-order episode);
+// TASK-321: an ALBUM has no Play-next — you tap a track to start it (mirrors the
+// TV album page, which dropped its header Play/Shuffle).
 export function initPage() {
   var server = window.location.origin;
   var els = {
@@ -240,6 +242,10 @@ export function initPage() {
     btn.addEventListener('click', function() { api.sendIntent('play_next'); });
     return btn;
   }
+  // TASK-321: Play-next is video-series only. An album drives no `play_next` on the
+  // TV (that handler was removed with the header button) — you tap a track instead.
+  function appendPlayNext() { els.actionsEl.appendChild(playNextBtn()); }
+  function maybePlayNext() { ({ 'true': noop, 'false': appendPlayNext })[isAlbum() + ''](); }
 
   // Season chips (TASK-123): mirror the app's season selector. Tapping a chip
   // re-renders the list filtered to that season (companion is touch — a full
@@ -291,7 +297,7 @@ export function initPage() {
   function trackNode(item) { return TRACK_NODE[isAlbum() + ''](item); }
 
   function renderSeries() {
-    els.actionsEl.appendChild(playNextBtn());
+    maybePlayNext();
     maybeAddAll();
     renderSeasonChips();
     visibleItems(state.series.items, state.activeSeason).forEach(function(e) { els.actionsEl.appendChild(trackNode(e.item)); });

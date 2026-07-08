@@ -1,11 +1,10 @@
 import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
-import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
+import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, mediaUrl } from '../../core/app-api.js';
 import { coverMosaicHtml } from '../../core/cover-mosaic.js';
 import { progressMapFromCW } from '../../core/progress.js';
-import { primaryAction } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 import { playlistCards } from '../../core/playlist-pick.js';
@@ -16,7 +15,9 @@ import { gridIndex } from '../../core/playlist-name.js';
 // series-detail render + d-pad nav (buildDetailList + the detailArrow/Left/Right
 // helpers) wholesale — identical to album-detail, only the source differs: it
 // loads /api/playlist and plays the FEAT-031 `playlist` source. An EMPTY playlist
-// is valid: buildDetailList renders no rows and Play/Shuffle no-op.
+// is valid: buildDetailList renders no rows. TASK-321: there is no header
+// Play/Shuffle button — you start playback by tapping a track (the source follows
+// onward with its stored shuffle pref, which the backend owns, TASK-320).
 var SERVER = window.location.origin;
 
 export function initPlaylistDetailPage() {
@@ -33,22 +34,10 @@ export function initPlaylistDetailPage() {
   function play(item, mode) { navTo('audio.html', PLAY_PARAMS[mode](item.video.id)); }
   function onPlayItem(item, i, mode) { play(item, mode); }
 
-  // Header Play: continue the playlist at the right track (TASK-276). A track left
-  // part-played resumes THAT track (from 0 — no mid-song resume); a finished track
-  // advances to the next (wrapping last->first). primaryAction encodes that
-  // continue/next/again choice; playNextIndex would always skip forward, dropping
-  // a half-heard track.
-  function playFromResume() {
-    var idx = primaryAction(state.playlist.items, state.progress).index;
-    [state.playlist.items[idx]].filter(Boolean).forEach(function(item) { play(item, 'resume'); });
-  }
-
-  // Header Shuffle: start the playlist shuffled from its first track (the player
-  // builds + holds the shuffled order).
-  function shufflePlay() {
-    [state.playlist.items[0]].filter(Boolean).forEach(function(item) {
-      navTo('audio.html', { playlist: playlistId, track: item.video.id, shuffle: '1', from: 'detail-playlist' });
-    });
+  // TASK-321: no header Play/Shuffle — entry focus lands on the first track row,
+  // tapping it starts the playlist from there.
+  function focusFirstRow() {
+    ([document.querySelector('.detail-row')].filter(Boolean).concat([document.body]))[0].focus();
   }
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
@@ -86,7 +75,7 @@ export function initPlaylistDetailPage() {
       buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, openAddSheet, null, onMove, onRemove, { suppressResume: true });
       ([document.querySelector(focusSel)].filter(Boolean)
         .concat([document.querySelector('.detail-row')]).filter(Boolean)
-        .concat([document.getElementById('btn-play-next')]))[0].focus();
+        .concat([document.body]))[0].focus();
     });
   }
   // Keep focus on the moved track's same-direction control at its NEW index, so a
@@ -253,8 +242,6 @@ export function initPlaylistDetailPage() {
     var INTENTS = {
       navigate_up:   function() { detailArrow({ key: 'ArrowUp',   preventDefault: function() {} }); },
       navigate_down: function() { detailArrow({ key: 'ArrowDown', preventDefault: function() {} }); },
-      play_next:     function() { playFromResume(); },
-      shuffle:       function() { shufflePlay(); },
       play:          function() {
         var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
         var target = [id].filter(Boolean).map(function(i) { return document.querySelector('.detail-row[data-id="' + i + '"]'); }).filter(Boolean)[0];
@@ -271,8 +258,6 @@ export function initPlaylistDetailPage() {
   // companion and loadSeries(playlistId) 404s (TASK-205).
   wsApp.sendContext({ context_id: 'playlist', playlist: playlistId });
   wsApp.sendAppState({ screen: 'playlist', itemId: playlistId, profile: profile });
-  document.getElementById('btn-play-next').addEventListener('click', playFromResume);
-  document.getElementById('btn-shuffle').addEventListener('click', shufflePlay);
   document.getElementById('btn-add-all').addEventListener('click', openAddSourceSheet);
   document.getElementById('btn-rename-playlist').addEventListener('click', rename);
   document.getElementById('btn-delete-playlist').addEventListener('click', showConfirm);
@@ -285,7 +270,7 @@ export function initPlaylistDetailPage() {
   document.addEventListener('keydown', dispatchKey);
 
   initPage({
-    onEnter: focusFirstDetailRow,
+    onEnter: focusFirstRow,
     keys: {
       Escape:     function(e) { goBack(e); },
       Backspace:  function(e) { goBack(e); },
@@ -307,7 +292,7 @@ export function initPlaylistDetailPage() {
       renderCover();
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: playlistId, seriesTitle: state.playlist.title }));
       buildDetailList(SERVER, state.playlist, state.progress, onPlayItem, openAddSheet, null, onMove, onRemove, { suppressResume: true });
-      focusFirstDetailRow();
+      focusFirstRow();
     })
     .catch(function() { navTo('error.html'); });
 }

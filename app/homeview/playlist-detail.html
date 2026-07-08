@@ -54,9 +54,6 @@ button:hover { background: var(--surface-hi); }
 .detail-remove.danger:focus { outline: none; border-color: #ff8787; box-shadow: var(--focus-glow); color: #ff8787; }
 .detail-season { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 600; padding: 18px 16px 8px; }
 .detail-empty { font-size: var(--fs-md); color: var(--text-muted); padding: 32px 16px; }
-#btn-play-next { font-size: var(--fs-md); padding: 14px 26px; min-width: auto; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
-#btn-shuffle { font-size: var(--fs-md); padding: 14px 22px; min-width: auto; }
-#btn-shuffle.hidden { display: none; }
 #btn-add-all { font-size: var(--fs-sm); padding: 12px 18px; min-width: auto; }
 #add-sheet { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
 .add-sheet-panel { background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); padding: 32px; width: 560px; max-height: 80vh; display: flex; flex-direction: column; gap: 14px; backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4); }
@@ -83,8 +80,6 @@ button:hover { background: var(--surface-hi); }
   <div id="detail-header-mosaic" class="detail-header-poster" style="display:none;padding:0;overflow:hidden"></div>
   <div id="detail-header-placeholder" class="detail-header-placeholder" style="display:none">&#127925;</div>
   <div id="detail-title" style="padding:0;font-size:var(--fs-2xl);flex:1"></div>
-  <button id="btn-play-next">&#9654; Play</button>
-  <button id="btn-shuffle">&#128256; Shuffle</button>
   <button id="btn-add-all">&#65291; Add all to playlist</button>
   <button id="btn-rename-playlist" style="font-size:var(--fs-sm);padding:12px 18px;min-width:auto">&#9998; Rename</button>
   <button id="btn-delete-playlist" style="font-size:var(--fs-sm);padding:12px 18px;min-width:auto">&#128465; Delete</button>

@@ -28,7 +28,6 @@ export function initAudioPage() {
   var artistId   = getParam('artist');
   var playlistId = getParam('playlist');
   var trackId    = getParam('track');
-  var shuffleParam = !!getParam('shuffle');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
   var person   = getPerson();
@@ -262,9 +261,10 @@ export function initAudioPage() {
   document.addEventListener('keydown', dispatchKey);
 
   // ── entry: establish the source, THEN jump to the tapped track ──────────────
-  // album/artist -> play-source (shuffle flag from the param); `play_track` leaves
-  // the source intact (engine: resumes the source on next advance), so a tapped
-  // row starts there and the album/artist queue still follows. A bare track id (no
+  // album/artist -> play-source (shuffle is server-owned now, per the source's
+  // stored pref — TASK-320/321, no URL param); `play_track` leaves the source
+  // intact (engine: resumes the source on next advance), so a tapped row starts
+  // there and the album/artist queue still follows. A bare track id (no
   // source) is a single — play-track only. The player is queue-mode (⏮/⏭) for a
   // source, single for a lone track.
   //
@@ -282,9 +282,9 @@ export function initAudioPage() {
   // music queue without opening a track first (the audio twin of the video page's
   // startQueue). No jumpToTrack (no trackId), no source title.
   var SOURCE_BASE = {
-    album:    function() { return sendAction('play-source', { source_type: 'album', source_id: albumId, shuffle: shuffleParam }); },
-    artist:   function() { return sendAction('play-source', { source_type: 'artist', source_id: artistId, shuffle: shuffleParam }); },
-    playlist: function() { return sendAction('play-source', { source_type: 'playlist', source_id: playlistId, shuffle: shuffleParam }); },
+    album:    function() { return sendAction('play-source', { source_type: 'album', source_id: albumId }); },
+    artist:   function() { return sendAction('play-source', { source_type: 'artist', source_id: artistId }); },
+    playlist: function() { return sendAction('play-source', { source_type: 'playlist', source_id: playlistId }); },
     queue:    function() { return sendAction('play-queue', {}); },
     track:    function() {}
   };

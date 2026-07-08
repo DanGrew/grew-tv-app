@@ -103,8 +103,9 @@ test('albums route to the album detail (not series detail)', async ({ page }) =>
   // Track rows reuse the series-detail rows, numbered from items[].episode.
   await expect(page.locator('.detail-row')).toHaveCount(3);
   await expect(page.locator('.detail-row[data-id="ootb-01"] .detail-label')).toHaveText('1. Turn to Stone');
-  await expect(page.locator('#btn-play-next')).toBeVisible();
-  await expect(page.locator('#btn-shuffle')).toBeVisible();
+  // TASK-321: no header Play or Shuffle button — you start by tapping a track.
+  await expect(page.locator('#btn-play-next')).toHaveCount(0);
+  await expect(page.locator('#btn-shuffle')).toHaveCount(0);
 });
 
 // TASK-276: music has no mid-song resume, so a track row NEVER shows the
@@ -125,30 +126,18 @@ test('a music track left mid-song shows no progress bar or Restart control (TASK
   await expect(row.locator('.detail-restart')).toHaveCount(0);
 });
 
-// TASK-276: the album header Play continues at the part-played track (from 0),
-// it does NOT skip to the following track. ootb-02 is left mid-song, so Play
-// resumes "Mr. Blue Sky" — the old playNextIndex wiring advanced to the next
-// track ("Sweet Talkin Woman"), the red-on-old assertion.
-test('album header Play continues at a part-played track, not the next one (TASK-276)', async ({ page }) => {
-  await page.route('**/api/continue-watching**', route => route.fulfill({
-    status: 200, contentType: 'application/json',
-    body: JSON.stringify({ profile: 'kids', content: [{ item_id: 'ootb-02', position_secs: 90, duration_secs: 245, last_watched: 2000 }] })
-  }));
-  await enterKids(page);
-  await page.locator('.sidebar-tab[data-tab="music"]').click();
-  await page.locator('.film-tile[data-id="ootb"]').click();
-  await expect(page.locator('.detail-row')).toHaveCount(3);
-  await page.locator('#btn-play-next').click();
-  await expect(page).toHaveURL(/audio\.html/);
-  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
-});
-
 test('selecting a track plays it in the <audio> player from {id}.m4a', async ({ page }) => {
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();
   await page.locator('.detail-row[data-id="ootb-02"]').click();
   await expect(page).toHaveURL(/audio\.html/);
+  // TASK-321: tapping a track carries the album source + that track, NO shuffle
+  // param (the backend owns shuffle now, per the source's stored pref — TASK-320).
+  const url = page.url();
+  expect(url).toContain('album=ootb');
+  expect(url).toContain('track=ootb-02');
+  expect(url).not.toContain('shuffle');
   await expect(page.locator('#screen-audio')).toBeVisible();
   await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
   await expect(page.locator('#audio-artist')).toHaveText('ELO');
@@ -157,24 +146,6 @@ test('selecting a track plays it in the <audio> player from {id}.m4a', async ({ 
   // Album queue -> prev/next are present (not the single's hidden state).
   await expect(page.locator('#btn-prev')).toBeVisible();
   await expect(page.locator('#btn-next')).toBeVisible();
-});
-
-// TASK-237: the player dropped its shuffle/repeat pills — shuffle is engaged from
-// album detail (shuffle=1 in the audio.html URL, applied server-side by
-// play-source) and toggled thereafter on the Queue View, not on the player.
-test('Shuffle from album detail opens the player with shuffle engaged (shuffle param)', async ({ page }) => {
-  await enterKids(page);
-  await page.locator('.sidebar-tab[data-tab="music"]').click();
-  await page.locator('.film-tile[data-id="ootb"]').click();
-  // Wait for the album to load — shufflePlay no-ops until items[] is populated, so
-  // clicking before the rows render races the load and the player never opens.
-  await expect(page.locator('.detail-row')).toHaveCount(3);
-  await page.locator('#btn-shuffle').click();
-  await expect(page).toHaveURL(/audio\.html.*shuffle=1/);
-  await expect(page.locator('#screen-audio')).toBeVisible();
-  // The player carries no shuffle/repeat pills any more.
-  await expect(page.locator('#btn-shuffle')).toHaveCount(0);
-  await expect(page.locator('#btn-repeat')).toHaveCount(0);
 });
 
 // REGRESSION (TASK-187): playback is server-authoritative — Next must POST the
