@@ -145,17 +145,19 @@ const BROWSE = {
 // Both /api/progress and /api/continue-watching 400 when ?person= is absent,
 // mirroring the backend. Tests that want fixed CW/resume still override the route.
 
-// Persons + adult PIN gate (GET /media/config.json, FEAT-026 TASK-156). Two
+// Persons + passcode gate (GET /media/config.json, FEAT-026 TASK-156). Two
 // persons whose ids happen to match their content class (allowed) so the wider
-// suite can drive the gate via #btn-kids / #btn-adults: the kid selects freely,
-// the adult is gated behind the defaultPin 1234. Photos null -> emoji
-// placeholder. Tests that exercise N persons, photos, per-person pins or absent
-// config override this route.
+// suite can drive the gate via #btn-kids / #btn-adults: the kid is passcode-less
+// (selects freely), the adult carries an own pin 1234 (gated). Since TASK-325
+// the lock follows the passcode, not the class, so the locked adult MUST carry an
+// explicit `pin` — the old class auto-lock (relying on defaultPin) is gone.
+// Photos null -> emoji placeholder. Tests that exercise N persons, photos,
+// per-person pins or absent config override this route.
 const CONFIG = {
   defaultPin: '1234',
   persons: [
     { id: 'kids',   name: 'Kids',   profile: 'kids',   photo: null, emoji: '🦖' },
-    { id: 'adults', name: 'Adults', profile: 'adults', photo: null }
+    { id: 'adults', name: 'Adults', profile: 'adults', photo: null, pin: '1234' }
   ]
 };
 

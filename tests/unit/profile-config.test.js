@@ -5,12 +5,14 @@ import {
 } from '../../core/profile-config.js';
 
 describe('defaultConfig', () => {
-  it('has the default PIN and one open kid + one locked adult placeholder', () => {
+  it('has the default PIN and two passcode-less (open) placeholders', () => {
     var c = defaultConfig();
     expect(c.defaultPin).toBe(DEFAULT_PIN);
     expect(c.persons.map(p => p.profile)).toEqual(['kids', 'adults']);
+    // Placeholders carry no own pin, so both are open (TASK-325 — lock follows
+    // the passcode, not the class).
     expect(isLocked(c.persons[0])).toBe(false);
-    expect(isLocked(c.persons[1])).toBe(true);
+    expect(isLocked(c.persons[1])).toBe(false);
     expect(c.persons[0].photo).toBe(null);
     // generic placeholders only — no real names
     expect(c.persons.map(p => p.id)).toEqual(['child', 'grownup']);
@@ -79,10 +81,14 @@ describe('personGlyph (FEAT-033)', () => {
   });
 });
 
-describe('isLocked', () => {
-  it('is true only for an adult person', () => {
-    expect(isLocked({ profile: 'adults' })).toBe(true);
-    expect(isLocked({ profile: 'kids' })).toBe(false);
+describe('isLocked (TASK-325 — passcode-driven, not class-driven)', () => {
+  it('is true iff the person carries its own passcode, regardless of class', () => {
+    // The two flips vs the old class-only gate:
+    expect(isLocked({ profile: 'kids', pin: '1234' })).toBe(true);   // was false
+    expect(isLocked({ profile: 'adults', pin: null })).toBe(false);  // was true
+    // And the unchanged cases:
+    expect(isLocked({ profile: 'adults', pin: '4321' })).toBe(true);
+    expect(isLocked({ profile: 'kids', pin: null })).toBe(false);
     expect(isLocked(null)).toBe(false);
   });
 });

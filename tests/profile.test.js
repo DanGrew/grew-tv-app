@@ -284,3 +284,42 @@ test('cancelling the take-over prompt stays on the picker', async ({ page }) => 
   await expect(page.locator('#screen-profile')).toBeVisible();
   await expect(page.locator('#screen-browse')).toHaveCount(0);
 });
+
+// ── TASK-325: the lock follows the passcode, not the content class. A kid WITH a
+// passcode is gated; an adult WITHOUT one selects freely. Roster: a passcode kid
+// (own pin 4321) + a passcode-less adult.
+const PASSCODE_ROSTER = {
+  defaultPin: '1234',
+  persons: [
+    { id: 'evie', name: 'Evie', profile: 'kids',   photo: null, pin: '4321' },
+    { id: 'dad',  name: 'Dad',  profile: 'adults', photo: null }
+  ]
+};
+
+function typePin(page, pin) {
+  return pin.split('').reduce(function(p, d) {
+    return p.then(function() { return page.locator('.key[data-key="' + d + '"]').click(); });
+  }, Promise.resolve());
+}
+
+test('TASK-325: a passcode-bearing kid is locked, prompts for the PIN, then unlocks', async ({ page }) => {
+  await configRoute(page, PASSCODE_ROSTER);
+  await page.reload();
+  await expect(page.locator('#btn-evie .lock-badge')).toBeVisible();
+  await page.locator('#btn-evie').click();
+  await expect(page.locator('#pin-panel')).toHaveClass(/active/);
+  // its own pin 4321 gates it (the default 1234 is never consulted for the lock)
+  await typePin(page, '4321');
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv-person'))).toBe('evie');
+});
+
+test('TASK-325: a passcode-less adult carries no lock and selects straight through', async ({ page }) => {
+  await configRoute(page, PASSCODE_ROSTER);
+  await page.reload();
+  await expect(page.locator('#btn-dad .lock-badge')).toHaveCount(0);
+  // one click lands on browse — no keypad ever interrupted the pick
+  await page.locator('#btn-dad').click();
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv-person'))).toBe('dad');
+});
