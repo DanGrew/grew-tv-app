@@ -199,7 +199,7 @@ function actionsHtml(row) {
   return '<div class="q-actions">' +
     shiftBtn(entry, 'up', row.canUp, '&#8593;', 'Shift up') +
     shiftBtn(entry, 'down', row.canDown, '&#8595;', 'Shift down') +
-    '<button type="button" class="q-act danger" data-act="remove" data-entry="' + entry + '" title="Remove" aria-label="Remove">&#8862;</button>' +
+    '<button type="button" class="q-act danger" data-act="remove" data-entry="' + entry + '" title="Remove" aria-label="Remove">&#10005;</button>' +
   '</div>';
 }
 
