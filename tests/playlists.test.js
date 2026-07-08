@@ -61,26 +61,9 @@ test('selecting a playlist opens the playlist detail (not album detail) with its
   // Stored order preserved: ootb-03 then ootb-01 (a playlist is not album order).
   await expect(page.locator('.detail-row')).toHaveCount(2);
   await expect(page.locator('.detail-row').first()).toHaveAttribute('data-id', 'ootb-03');
-  await expect(page.locator('#btn-play-next')).toBeVisible();
-  await expect(page.locator('#btn-shuffle')).toBeVisible();
-});
-
-// TASK-276: the playlist header Play continues at the part-played track (from 0),
-// not the following one. Road Trip is [ootb-03, ootb-01]; ootb-03 is left
-// mid-song, so Play resumes "Sweet Talkin Woman" — the old playNextIndex wiring
-// advanced to ootb-01 ("Turn to Stone"), the red-on-old assertion.
-test('playlist header Play continues at a part-played track, not the next one (TASK-276)', async ({ page }) => {
-  await page.route('**/api/continue-watching**', route => route.fulfill({
-    status: 200, contentType: 'application/json',
-    body: JSON.stringify({ profile: 'kids', content: [{ item_id: 'ootb-03', position_secs: 100, duration_secs: 228, last_watched: 2000 }] })
-  }));
-  await enterMusic(page);
-  await page.locator('.film-tile[data-id="pl-roadtrip"]').click();
-  await expect(page).toHaveURL(/playlist-detail\.html/);
-  await expect(page.locator('.detail-row')).toHaveCount(2);
-  await page.locator('#btn-play-next').click();
-  await expect(page).toHaveURL(/audio\.html/);
-  await expect(page.locator('#audio-title')).toHaveText('Sweet Talkin Woman');
+  // TASK-321: no header Play or Shuffle button — you start by tapping a track.
+  await expect(page.locator('#btn-play-next')).toHaveCount(0);
+  await expect(page.locator('#btn-shuffle')).toHaveCount(0);
 });
 
 test('an empty playlist opens its detail with no track rows', async ({ page }) => {
@@ -133,6 +116,12 @@ test('selecting a playlist track plays it in the <audio> player as a queue sourc
   await page.locator('.film-tile[data-id="pl-roadtrip"]').click();
   await page.locator('.detail-row[data-id="ootb-01"]').click();
   await expect(page).toHaveURL(/audio\.html/);
+  // TASK-321: tapping a track carries the playlist source + that track, NO shuffle
+  // param (the backend owns shuffle now, per the source's stored pref — TASK-320).
+  const url = page.url();
+  expect(url).toContain('playlist=pl-roadtrip');
+  expect(url).toContain('track=ootb-01');
+  expect(url).not.toContain('shuffle');
   await expect(page.locator('#screen-audio')).toBeVisible();
   await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
   const src = await page.locator('#audio').getAttribute('src');
@@ -140,18 +129,6 @@ test('selecting a playlist track plays it in the <audio> player as a queue sourc
   // Playlist is a queue source -> prev/next present (not a single's hidden state).
   await expect(page.locator('#btn-prev')).toBeVisible();
   await expect(page.locator('#btn-next')).toBeVisible();
-});
-
-test('Shuffle from playlist detail starts the player with shuffle engaged', async ({ page }) => {
-  await enterMusic(page);
-  await page.locator('.film-tile[data-id="pl-roadtrip"]').click();
-  await expect(page.locator('.detail-row')).toHaveCount(2); // wait for load (shuffle no-ops on empty items)
-  await page.locator('#btn-shuffle').click();
-  // TASK-237: shuffle rides the audio.html shuffle=1 param (applied server-side);
-  // the player no longer carries a shuffle pill.
-  await expect(page).toHaveURL(/audio\.html.*shuffle=1/);
-  await expect(page.locator('#screen-audio')).toBeVisible();
-  await expect(page.locator('#btn-shuffle')).toHaveCount(0);
 });
 
 test('Back from the playlist detail returns to browse', async ({ page }) => {

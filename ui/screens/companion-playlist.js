@@ -18,18 +18,16 @@ import { mountSyncBar } from './companion-sync-bar.js';
 // (loadPlaylist + Continue-Watching, keyed by core/progress so the two surfaces
 // never drift); only the live playlist id + profile arrive over WS. Tapping a
 // track plays it on the TV (the id-addressed `play` intent the TV's playlist
-// detail receives); the Play / Shuffle header drives the whole playlist
-// (`play_next` / `shuffle`, the TV header's own actions). An EMPTY playlist still
-// lists + opens. The TV teleports and echoes context — same per-person relay the
-// browse / detail / artist companions ride.
+// detail receives). TASK-321: there is no Play / Shuffle header — you tap a track
+// to start the playlist (mirrors the TV playlist page, which dropped its header
+// Play/Shuffle). An EMPTY playlist still lists + opens. The TV teleports and
+// echoes context — same per-person relay the browse / detail / artist companions ride.
 export function initPage() {
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
     ctxTitle: document.getElementById('ctx-title'),
-    gridEl: document.getElementById('txtgrid'),
-    playBtn: document.getElementById('btn-play'),
-    shuffleBtn: document.getElementById('btn-shuffle')
+    gridEl: document.getElementById('txtgrid')
   };
   var state = { playlistId: null, profile: null, person: null, tracks: [], progress: {}, title: '' };
   var api = {};
@@ -48,11 +46,8 @@ export function initPage() {
 
   // Back: Control drives the TV back; Browse is a local hop to the library.
 
-  // Header Play / Shuffle: drive the TV's playlist detail. Play resumes the
-  // playlist from its last-played track (`play_next`, the header's own action);
-  // Shuffle starts it shuffled. Neither carries params — the TV owns the live id.
-  els.playBtn.addEventListener('click', function() { api.sendIntent('play_next'); });
-  els.shuffleBtn.addEventListener('click', function() { api.sendIntent('shuffle'); });
+  // TASK-321: no header Play / Shuffle — you tap a track to start the playlist
+  // (playTrack sends the id-addressed `play` intent below).
 
   // Delete (TASK-209) — the companion mirror of the TV's delete-with-confirm
   // (screen-playlist-detail-page). A confirm overlay gates the destructive write;

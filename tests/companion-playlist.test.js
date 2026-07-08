@@ -8,8 +8,8 @@ const { installApi } = require('./fixtures/api.js');
 // (/api/playlist, installApi fixtures: pl-roadtrip = a 2-track cross-album mix in
 // stored order, pl-empty = a valid empty playlist). The app side is mocked over
 // the WS; the mock echoes intents back as fresh context — exactly the
-// app<->companion teleport contract. Header Play/Shuffle drive the TV, not the
-// companion, so the mock records the intents to assert them.
+// app<->companion teleport contract. TASK-321: there is no header Play/Shuffle —
+// tapping a track drives the TV (the `play` intent), so the mock records intents.
 
 function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
@@ -118,14 +118,12 @@ test.describe('Road Trip playlist (2 tracks)', () => {
     await expect(page).toHaveURL(/companion\/browse\.html$/);
   });
 
-  test('Play header sends the play_next intent — drives the TV into the playlist player', async ({ page }) => {
-    await page.locator('#btn-play').click();
-    await expect.poll(() => sentIntents).toContain('play_next');
-  });
-
-  test('Shuffle header sends the shuffle intent', async ({ page }) => {
-    await page.locator('#btn-shuffle').click();
-    await expect.poll(() => sentIntents).toContain('shuffle');
+  // TASK-321: the companion playlist has no header Play/Shuffle button — you tap a
+  // track to start it (asserted by the track-tap test above).
+  test('has no Play or Shuffle header button', async ({ page }) => {
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await expect(page.locator('#btn-play')).toHaveCount(0);
+    await expect(page.locator('#btn-shuffle')).toHaveCount(0);
   });
 
   // FEAT-036 (TASK-209) — delete-with-confirm, the companion mirror of the TV's

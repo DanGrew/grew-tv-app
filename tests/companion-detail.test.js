@@ -190,6 +190,21 @@ test('TASK-276: a part-played music album track shows no progress bar', async ({
   await expect(page.locator('.tile-btn[data-id="ootb-02"] .ep-progress')).toHaveCount(0);
 });
 
+// TASK-321: an album companion has NO Play-next button — you tap a track to start
+// it (mirrors the TV album page, which dropped its header Play/Shuffle). A video
+// series keeps Play-next (series-detail primaryAction still drives it), asserted
+// by the desync test below using `bluey`.
+test('TASK-321: an album companion has no Play-next button (video series keeps it)', async ({ page }) => {
+  await installApi(page);
+  await mockApp(page, {
+    context: { context_id: 'detail', series_id: 'ootb-album' },
+    appState: { screen: 'detail', itemId: 'ootb-album', profile: 'kids' }
+  });
+  await page.goto('/companion/detail.html');
+  await expect(page.locator('.tile-btn[data-id="ootb-01"]')).toBeVisible();
+  await expect(page.locator('.play-next-btn')).toHaveCount(0);
+});
+
 // FEAT-038 (TASK-230) — desynced detail. The companion arrives via browse's local
 // link (detail.html?id=…) while the TV is elsewhere, so it self-loads the series
 // from the id instead of waiting for the TV's context echo; it does not follow the

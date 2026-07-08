@@ -1,10 +1,9 @@
 import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
-import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
+import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadAlbum, loadContinueWatching, addToPlaylist, addSourceToPlaylist, loadBrowse, playbackAction } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
-import { primaryAction } from '../../core/series-detail.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 import { playlistCards } from '../../core/playlist-pick.js';
@@ -13,9 +12,10 @@ import { gridIndex } from '../../core/playlist-name.js';
 // FEAT-018 (TASK-130) album detail. An album is a series, so this reuses the
 // FEAT-017 series-detail render + d-pad nav (buildDetailList + the detailArrow/
 // Left/Right helpers) wholesale; only the wiring differs — tracks play in the
-// <audio> player (audio.html) not the video player, and the header gains a
-// Shuffle action that starts the album shuffled. Track rows reuse items[].episode
-// as the track number via episodeLabel.
+// <audio> player (audio.html) not the video player. TASK-321: there is no header
+// Play or Shuffle button — you start playback by tapping a track (the source
+// follows onward, using its stored shuffle pref which the backend owns, TASK-320).
+// Track rows reuse items[].episode as the track number via episodeLabel.
 var SERVER = window.location.origin;
 
 export function initAlbumDetailPage() {
@@ -32,22 +32,10 @@ export function initAlbumDetailPage() {
   function play(item, mode) { navTo('audio.html', PLAY_PARAMS[mode](item.video.id)); }
   function onPlayItem(item, i, mode) { play(item, mode); }
 
-  // Header Play: continue the album at the right track (TASK-276). A track left
-  // part-played resumes THAT track (from 0 — no mid-song resume); a finished
-  // track advances to the next (wrapping last->first). primaryAction encodes
-  // that continue/next/again choice; playNextIndex would always skip forward,
-  // dropping a half-heard track.
-  function playFromResume() {
-    var idx = primaryAction(state.album.items, state.progress).index;
-    [state.album.items[idx]].filter(Boolean).forEach(function(item) { play(item, 'resume'); });
-  }
-
-  // Header Shuffle: start the album shuffled from its first track (the player
-  // builds + holds the shuffled order).
-  function shufflePlay() {
-    [state.album.items[0]].filter(Boolean).forEach(function(item) {
-      navTo('audio.html', { album: albumId, track: item.video.id, shuffle: '1', from: 'detail-album' });
-    });
+  // TASK-321: no header Play/Shuffle — entry focus lands on the first track row,
+  // tapping it starts the album from there.
+  function focusFirstRow() {
+    [document.querySelector('.detail-row')].filter(Boolean).forEach(function(r) { r.focus(); });
   }
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
@@ -178,8 +166,6 @@ export function initAlbumDetailPage() {
     var INTENTS = {
       navigate_up:   function() { detailArrow({ key: 'ArrowUp',   preventDefault: function() {} }); },
       navigate_down: function() { detailArrow({ key: 'ArrowDown', preventDefault: function() {} }); },
-      play_next:     function() { playFromResume(); },
-      shuffle:       function() { shufflePlay(); },
       play:          function() {
         var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
         var target = [id].filter(Boolean).map(function(i) { return document.querySelector('.detail-row[data-id="' + i + '"]'); }).filter(Boolean)[0];
@@ -192,8 +178,6 @@ export function initAlbumDetailPage() {
   });
   wsApp.sendContext({ context_id: 'detail', series_id: albumId });
   wsApp.sendAppState({ screen: 'detail', itemId: albumId, profile: profile });
-  document.getElementById('btn-play-next').addEventListener('click', playFromResume);
-  document.getElementById('btn-shuffle').addEventListener('click', shufflePlay);
   document.getElementById('btn-add-all').addEventListener('click', openAddSourceSheet);
   document.getElementById('btn-add-create').addEventListener('click', createNew);
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
@@ -202,7 +186,7 @@ export function initAlbumDetailPage() {
   document.addEventListener('keydown', dispatchKey);
 
   initPage({
-    onEnter: focusFirstDetailRow,
+    onEnter: focusFirstRow,
     keys: {
       Escape:     function(e) { goBack(e); },
       Backspace:  function(e) { goBack(e); },
@@ -223,7 +207,7 @@ export function initAlbumDetailPage() {
       state.progress = progressMapFromCW(res[1].content);
       mountBreadcrumb('breadcrumb', buildCrumbs('detail', { seriesId: albumId, seriesTitle: state.album.title }));
       buildDetailList(SERVER, state.album, state.progress, onPlayItem, openAddSheet, null, null, null, { suppressResume: true });
-      focusFirstDetailRow();
+      focusFirstRow();
     })
     .catch(function() { navTo('error.html'); });
 }
