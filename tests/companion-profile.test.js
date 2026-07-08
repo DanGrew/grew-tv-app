@@ -115,3 +115,26 @@ test('cancelling the take-over hides the prompt and stays on the picker', async 
   await expect(page.locator('#takeover-overlay')).not.toHaveClass(/active/);
   await expect(page.locator('.cmp-card[data-id="oliver"]')).toBeVisible();
 });
+
+// TASK-325 mirror: the companion lock follows the passcode, not the class. A
+// passcode-bearing kid raises the keypad (no activation yet); a passcode-less
+// adult carries no lock badge.
+test('TASK-325: a passcode kid is locked and raises the keypad; a passcode-less adult is not', async ({ page }) => {
+  await page.route('**/media/config.json', function(route) {
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      defaultPin: '1234',
+      persons: [
+        { id: 'evie', name: 'Evie', profile: 'kids',   photo: null, pin: '4321' },
+        { id: 'dad',  name: 'Dad',  profile: 'adults', photo: null }
+      ]
+    }) });
+  });
+  await page.reload();
+  await expect(page.locator('.cmp-card[data-id="evie"]')).toBeVisible();
+  await expect(page.locator('.cmp-card[data-id="evie"] .cmp-lock')).toBeVisible();
+  await expect(page.locator('.cmp-card[data-id="dad"] .cmp-lock')).toHaveCount(0);
+  // clicking the locked kid raises the keypad and does NOT activate yet
+  await page.locator('.cmp-card[data-id="evie"]').click();
+  await expect(page.locator('.cmp-keypad-wrap')).toHaveClass(/active/);
+  expect(sent.filter(function(m) { return m.type === 'activate_person'; }).length).toBe(0);
+});

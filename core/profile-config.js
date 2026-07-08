@@ -3,8 +3,9 @@
 // /media/config.json) holding the family's persons and the gate PIN. A person
 // carries identity (a stable `id` — the watch-progress key, TASK-154/155 — never
 // the display name, so renames don't orphan progress) and a fixed content class
-// (`profile`: kids|adults). Adult persons are gated behind a PIN; kids select
-// freely. The gate is a deliberate SOFT block for young children — deterrence,
+// (`profile`: kids|adults, used for browse filtering + picker layout only). A
+// person is PIN-gated iff it carries its own passcode (TASK-325) — kid or adult;
+// passcode-less persons select freely. The gate is a deliberate SOFT block — deterrence,
 // not security — so the PIN is plaintext and trivially swappable; it lives on
 // the device, never in this public repo. When the file is absent or malformed
 // the app falls back to the generic placeholders below so the screen always
@@ -66,9 +67,12 @@ export function parseConfig(raw) {
   return { defaultPin: dpin, persons: persons };
 }
 
-// An adult person is gated; a kid person selects freely.
+// A profile is locked iff it carries its OWN passcode (TASK-325) — kid or adult,
+// class-agnostic. A passcode-less profile selects freely; the removed
+// `profile === 'adults'` auto-lock means every profile that should stay gated
+// (adults included) must now carry an explicit `pin` in the on-Mini config.json.
 export function isLocked(person) {
-  return !!person && person.profile === 'adults';
+  return !!person && person.pin != null;
 }
 
 // A person's effective PIN = its own pin or the config default.
