@@ -41,11 +41,11 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .ph-edit.x:active, .ph-edit.x:focus { outline: none; border-color: #ff8787; }
 .no-actions { color: var(--text-muted); font-size: 16px; text-align: center; margin-top: 40px; grid-column: 1 / -1; }
 #manage-actions { display: flex; gap: 10px; justify-content: center; margin-top: 4px; flex-shrink: 0; }
-#btn-rename-playlist { padding: 10px 18px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 15px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#btn-rename-playlist { min-width: 52px; padding: 10px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 20px; line-height: 1; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #btn-rename-playlist:active, #btn-rename-playlist:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-#btn-delete-playlist { padding: 10px 18px; border: 2px solid rgba(255,135,135,0.5); border-radius: var(--radius-sm); background: var(--surface); color: #ff8787; font-size: 15px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease); }
+#btn-delete-playlist { min-width: 52px; padding: 10px 16px; border: 2px solid rgba(255,135,135,0.5); border-radius: var(--radius-sm); background: var(--surface); color: #ff8787; font-size: 20px; line-height: 1; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease); }
 #btn-delete-playlist:active, #btn-delete-playlist:focus { outline: none; border-color: #ff8787; }
-#btn-add-all { padding: 10px 18px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 15px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#btn-add-all { min-width: 52px; padding: 10px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 20px; line-height: 1; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #btn-add-all:active, #btn-add-all:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #add-sheet { display: none; position: fixed; inset: 0; z-index: 10; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); }
 .add-sheet-panel { background: #16213e; border: 2px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 24px; width: 100%; max-width: 360px; max-height: 76vh; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); }
@@ -103,9 +103,9 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 <div id="ctx-title"></div>
 <div id="grid-wrap"><div id="txtgrid"></div></div>
 <div id="manage-actions">
-  <button id="btn-add-all" type="button">&#65291; Add all to playlist</button>
-  <button id="btn-rename-playlist" type="button">&#9998; Rename</button>
-  <button id="btn-delete-playlist" type="button">&#128465; Delete playlist</button>
+  <button id="btn-add-all" type="button" aria-label="Add all to playlist" title="Add all to playlist">&#8862;</button>
+  <button id="btn-rename-playlist" type="button" aria-label="Rename" title="Rename">&#9998;</button>
+  <button id="btn-delete-playlist" type="button" aria-label="Delete playlist" title="Delete playlist">&#128465;</button>
 </div>
 <div id="confirm-delete">
   <div id="confirm-box">

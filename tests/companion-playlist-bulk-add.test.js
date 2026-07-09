@@ -125,7 +125,12 @@ async function openPlaylist(page, id) {
 
 test('a playlist offers an Add all to playlist control', async ({ page }) => {
   await openPlaylist(page, 'pl-roadtrip');
-  await expect(page.locator('#btn-add-all')).toHaveText('＋ Add all to playlist');
+  // TASK-316: on the companion PLAYLIST page the manage-bar add-all is icon-only —
+  // ⊞ (squared-plus, distinct from the per-track single-add ＋); the words survive as
+  // aria-label. (The companion ALBUM header add-all above is a different surface and
+  // keeps its ＋ label — out of TASK-316 scope.)
+  await expect(page.locator('#btn-add-all')).toHaveText('⊞');
+  await expect(page.locator('#btn-add-all')).toHaveAttribute('aria-label', 'Add all to playlist');
 });
 
 test('the playlist sheet excludes the current playlist (no self-add)', async ({ page }) => {
