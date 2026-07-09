@@ -376,3 +376,79 @@ test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () =
     );
   });
 });
+
+// BUG-044: the player breadcrumb inserts the PLAYBACK SOURCE (the album/playlist/
+// artist you launched) between the recorded browse rail and the now-playing leaf, so
+// the source you're listening to is ALWAYS a crumb that returns to its own page —
+// Home › [browse rail] › [Source] › Now Playing. The source rides the real playback
+// snapshot (source_type/source_id), so these use installPlaybackBackend.
+test.describe('source crumb (BUG-044)', () => {
+  test('an album source shows Home › Out of the Blue › <track>, the source crumb linking album-detail', async ({ page }) => {
+    await installApi(page);
+    const backend = await installPlaybackBackend(page);
+    backend.seed('play-source', { source_type: 'album', source_id: 'ootb' });
+    backend.seed('play-track', { track_id: 'ootb-02' });
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
+    // Home + the album source (no recorded browse rail here); the track is the leaf.
+    await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home', 'Out of the Blue']);
+    await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Mr. Blue Sky');
+    const src = page.locator('#breadcrumb .crumb-link', { hasText: 'Out of the Blue' });
+    await expect(src).toHaveAttribute('data-page', 'album-detail.html');
+    await expect(src).toHaveAttribute('data-params', JSON.stringify({ album: 'ootb' }));
+  });
+
+  test('keeps the recorded browse rail AND inserts the source — Home › Albums › Out of the Blue › <track>', async ({ page }) => {
+    await installApi(page);
+    const backend = await installPlaybackBackend(page);
+    backend.seed('play-source', { source_type: 'album', source_id: 'ootb' });
+    backend.seed('play-track', { track_id: 'ootb-02' });
+    await page.addInitScript(() => {
+      sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([{ page: 'browse.html', params: { tab: 'music', rail: 'albums' }, label: 'Albums' }]));
+    });
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
+    // Four crumbs: the browse rail is KEPT and the source is inserted after it.
+    await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home', 'Albums', 'Out of the Blue']);
+    await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Mr. Blue Sky');
+  });
+
+  test('an artist source labels the crumb with the artist name, linking artist.html', async ({ page }) => {
+    await installApi(page);
+    const backend = await installPlaybackBackend(page);
+    backend.seed('play-source', { source_type: 'artist', source_id: 'ELO' });
+    backend.seed('play-track', { track_id: 'ootb-02' });
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
+    const src = page.locator('#breadcrumb .crumb-link', { hasText: 'ELO' });
+    await expect(src).toHaveAttribute('data-page', 'artist.html');
+    await expect(src).toHaveAttribute('data-params', JSON.stringify({ artist: 'ELO' }));
+  });
+
+  test('a playlist source links playlist-detail with the playlist title', async ({ page }) => {
+    await installApi(page);
+    const backend = await installPlaybackBackend(page);
+    backend.seed('play-source', { source_type: 'playlist', source_id: 'pl-roadtrip' });
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('.track-btn')).toHaveCount(2);
+    const src = page.locator('#breadcrumb .crumb-link', { hasText: 'Road Trip' });
+    await expect(src).toHaveAttribute('data-page', 'playlist-detail.html');
+    await expect(src).toHaveAttribute('data-params', JSON.stringify({ playlist: 'pl-roadtrip' }));
+  });
+
+  // Browse (desynced) mode: tapping the source crumb is a LOCAL hop. The crumb
+  // carries the TV detail-page name (album-detail.html); the companion translates it
+  // to its own detail.html?id= so the hop lands (the two aren't co-named).
+  test('in Browse mode the album source crumb hops to the companion detail page (id-addressed)', async ({ page }) => {
+    await installApi(page);
+    const backend = await installPlaybackBackend(page);
+    backend.seed('play-source', { source_type: 'album', source_id: 'ootb' });
+    backend.seed('play-track', { track_id: 'ootb-02' });
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#breadcrumb .crumb-link', { hasText: 'Out of the Blue' })).toBeVisible();
+    await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
+    await expect(page.locator('body')).toHaveClass(/browsing/);
+    await page.locator('#breadcrumb .crumb-link', { hasText: 'Out of the Blue' }).click();
+    await expect(page).toHaveURL(/companion\/detail\.html\?id=ootb$/);
+  });
+});

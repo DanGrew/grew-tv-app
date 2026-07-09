@@ -96,6 +96,22 @@ export function trailCrumbs(entry, leafLabel) {
   return [home(), link(entry.label, entry.page, entry.params), leaf(leafLabel)];
 }
 
+// BUG-044 — the audio player breadcrumb must name the PLAYBACK SOURCE (the album /
+// playlist / artist you launched), not just the browse position. INSERT-AFTER
+// (owner-decided): keep the recorded browse-rail crumb (`entry` = nav-trail.peek(),
+// or null on a deep-link) AND insert the `source` crumb between it and the
+// now-playing leaf, so the source you're listening to is always represented and its
+// crumb returns you to its own page. `source` is a { label, page, params } target,
+// built per surface — the TV audio page and the companion carry different detail-page
+// names — or null for a lone single track (no source page), which degrades to the
+// plain browse-trail crumbs (Home › [rail] › leaf).
+//   Home › [browse rail (entry)] › [source] › leaf(now playing)
+export function playerCrumbs(entry, source, leafLabel) {
+  if (!source) return trailCrumbs(entry, leafLabel);
+  var rail = entry ? [link(entry.label, entry.page, entry.params)] : [];
+  return [home()].concat(rail).concat([link(source.label, source.page, source.params), leaf(leafLabel)]);
+}
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')

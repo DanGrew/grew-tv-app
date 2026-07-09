@@ -3,7 +3,7 @@ import { loadAlbum, loadPlaylist, playbackAction } from '../../core/app-api.js';
 import { screenPage, displayTitle, queryString } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
-import { trailCrumbs } from '../../core/breadcrumb.js';
+import { playerCrumbs } from '../../core/breadcrumb.js';
 import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
@@ -40,7 +40,7 @@ export function initPage() {
     reset: document.getElementById('c-reset'),
     lyrics: document.getElementById('c-lyrics')
   };
-  var state = { snap: null, psnap: null, sourceType: null, sourceId: null, person: null, statusTimer: null };
+  var state = { snap: null, psnap: null, sourceType: null, sourceId: null, sourceTitle: '', nowTitle: '', person: null, statusTimer: null };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -63,13 +63,36 @@ export function initPage() {
   // Home crumb — the one with EMPTY params — clears the trail and roots at
   // sections; an items crumb (browse tab/rail or artist) keeps it. The crumb fires
   // the same `navigate` intent the other companion screens use.
-  function mountAudioCrumbs(title) {
-    mountCompanionBreadcrumb('breadcrumb', trailCrumbs(peekTrail(), title), onCrumbNav);
+  // BUG-044: the player breadcrumb keeps the recorded browse rail AND inserts the
+  // playback source (album/playlist/artist) crumb after it — Home › [rail] › [Source]
+  // › Now Playing — so the source you're listening to always returns to its page.
+  // The source crumb links to the TV detail page (the crumb navigate intent drives
+  // the TV; Browse-mode local hops translate via LOCAL_PAGE below).
+  var SOURCE_CRUMB = {
+    album:    function() { return { label: state.sourceTitle, page: 'album-detail.html', params: { album: state.sourceId } }; },
+    artist:   function() { return { label: state.sourceTitle, page: 'artist.html', params: { artist: state.sourceId } }; },
+    playlist: function() { return { label: state.sourceTitle, page: 'playlist-detail.html', params: { playlist: state.sourceId } }; }
+  };
+  function sourceCrumb() {
+    return [SOURCE_CRUMB[state.sourceType]].filter(Boolean).map(function(fn) { return fn(); }).concat([null])[0];
+  }
+  function mountAudioCrumbs() {
+    mountCompanionBreadcrumb('breadcrumb', playerCrumbs(peekTrail(), sourceCrumb(), state.nowTitle), onCrumbNav);
   }
   // Browse mode: the crumb is a LOCAL hop (the intent would be suppressed anyway)
   // so you can reach the library without driving the TV. Control mode: the usual
-  // navigate intent the other screens use.
-  function localGo(page, params) { window.location.href = page + queryString(params); }
+  // navigate intent the other screens use. BUG-044: the source crumb carries TV
+  // detail-page names (for the navigate intent); translate the two that aren't
+  // co-named on the companion (album-detail/playlist-detail) so the local hop lands
+  // on the companion's own detail/playlist page (which read ?id=).
+  var LOCAL_PAGE = {
+    'album-detail.html':    function(p) { return { page: 'detail.html',   params: { id: p.album } }; },
+    'playlist-detail.html': function(p) { return { page: 'playlist.html', params: { id: p.playlist } }; }
+  };
+  function localGo(page, params) {
+    var t = [LOCAL_PAGE[page]].filter(Boolean).map(function(fn) { return fn(params); }).concat([{ page: page, params: params }])[0];
+    window.location.href = t.page + queryString(t.params);
+  }
   function onCrumbNav(page, params) {
     // Trim the trail to the clicked ancestor (Home clears) so a later Back can't
     // retrace past this jump (FEAT-032 stale-Back fix). Replaces the old
@@ -191,9 +214,14 @@ export function initPage() {
   }
 
   function renderTracks(album) {
+    // BUG-044: the loaded collection carries the source title (album/playlist) —
+    // capture it for the source crumb's label and re-mount so it shows the name
+    // rather than the id fallback loadSource seeded.
+    state.sourceTitle = album.title;
     els.tracks.innerHTML = '';
     album.items.forEach(function(item) { els.tracks.appendChild(trackBtn(item)); });
     markCurrent();
+    mountAudioCrumbs();
   }
 
   // Track list for a collection source (album or playlist) — both project to the
@@ -221,7 +249,12 @@ export function initPage() {
   };
   function loadSource(s) {
     state.sourceId = s.source_id;
+    // BUG-044: seed the source-crumb label from the id (the artist source_id IS the
+    // artist name — its final label; an album/playlist overwrites it with the real
+    // title once its track list loads in renderTracks) and re-mount the crumb.
+    state.sourceTitle = s.source_id;
     [SOURCE_TRACKS[s.source_type]].filter(Boolean).forEach(function(fn) { fn(s.source_id); });
+    mountAudioCrumbs();
   }
   // Always reflect the source type so Back routes correctly even before any list
   // resolves; reload the track list only when the source id changes.
@@ -252,7 +285,8 @@ export function initPage() {
     [snap.now_playing].filter(Boolean).forEach(function(np) {
       els.ctxLabel.textContent = 'Now playing';
       els.title.textContent = np.title;
-      mountAudioCrumbs(np.title);
+      state.nowTitle = np.title;
+      mountAudioCrumbs();
     });
   }
   function onPlayback(snap) {
@@ -265,7 +299,8 @@ export function initPage() {
   function followContext(payload) {
     els.ctxLabel.textContent = 'Now playing';
     els.title.textContent = displayTitle(payload);
-    mountAudioCrumbs(displayTitle(payload));
+    state.nowTitle = displayTitle(payload);
+    mountAudioCrumbs();
     var page = screenPage(payload.context_id);
     [page].filter(function(p) { return p !== 'audio'; }).forEach(function(p) { window.location.href = p + '.html'; });
   }
