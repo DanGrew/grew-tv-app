@@ -79,6 +79,74 @@ test('play/pause stays on the legacy intent rail — it is NOT a video-playback 
   expect(posts).toHaveLength(0);
 });
 
+// BUG-045 — the Queue and Reset buttons are live, full-opacity, clickable controls, but
+// their `.reset-btn` resting style painted the label in `var(--text-muted)` — the same
+// muted look the page uses for genuinely-disabled controls (`opacity:0.35`). An enabled
+// control read as dead. The fix repaints the resting label in `var(--text)`, so an
+// enabled button is visibly distinct from the disabled treatment. These guards fail on
+// the old muted style and prove the disabled path still LOOKS disabled.
+test.describe('BUG-045: the enabled Queue/Reset buttons look enabled, not disabled', () => {
+  // Resolve the theme tokens through a probe so the assertion tracks the CSS variables,
+  // not a hardcoded rgb string the browser might normalise differently.
+  function resolveTokens(page) {
+    return page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      const probe = document.createElement('span');
+      document.body.appendChild(probe);
+      probe.style.color = root.getPropertyValue('--text').trim();
+      const text = getComputedStyle(probe).color;
+      probe.style.color = root.getPropertyValue('--text-muted').trim();
+      const muted = getComputedStyle(probe).color;
+      probe.remove();
+      return { text, muted };
+    });
+  }
+
+  test('resting Queue and Reset labels use --text (not the muted/disabled colour) at full opacity', async ({ page }) => {
+    const tokens = await resolveTokens(page);
+    // sanity: the two tokens really are different, so the assertion below has teeth.
+    expect(tokens.text).not.toBe(tokens.muted);
+    const queue = page.locator('#c-queue');
+    const reset = page.locator('#c-reset');
+    const queueColor = await queue.evaluate((el) => getComputedStyle(el).color);
+    const resetColor = await reset.evaluate((el) => getComputedStyle(el).color);
+    expect(queueColor).toBe(tokens.text);
+    expect(resetColor).toBe(tokens.text);
+    expect(queueColor).not.toBe(tokens.muted);
+    expect(resetColor).not.toBe(tokens.muted);
+    // enabled = full opacity + clickable, unlike the opacity:0.35;pointer-events:none disabled look.
+    await expect(queue).toHaveCSS('opacity', '1');
+    await expect(reset).toHaveCSS('opacity', '1');
+    await expect(queue).toHaveCSS('pointer-events', 'auto');
+    await expect(reset).toHaveCSS('pointer-events', 'auto');
+  });
+
+  test('a genuinely-disabled Reset (browsing mode) still LOOKS disabled', async ({ page }) => {
+    await page.evaluate(() => document.body.classList.add('browsing'));
+    const reset = page.locator('#c-reset');
+    // the disabled treatment is unchanged: greyed out + non-interactive.
+    await expect(reset).toHaveCSS('opacity', '0.35');
+    await expect(reset).toHaveCSS('pointer-events', 'none');
+  });
+
+  test('the Reset confirm style stays amber (distinct from both enabled and disabled)', async ({ page }) => {
+    const tokens = await resolveTokens(page);
+    // Read the .reset-btn.confirm rule off a synthetic probe — the live #c-reset has its
+    // confirm class toggled by the page's reset state machine, so probe the rule directly.
+    const confirmColor = await page.evaluate(() => {
+      const probe = document.createElement('button');
+      probe.className = 'reset-btn confirm';
+      document.body.appendChild(probe);
+      const c = getComputedStyle(probe).color;
+      probe.remove();
+      return c;
+    });
+    // confirm is its own amber affordance — neither the enabled --text nor muted.
+    expect(confirmColor).not.toBe(tokens.text);
+    expect(confirmColor).not.toBe(tokens.muted);
+  });
+});
+
 // BUG-037 — the Plane-A breadcrumb (a standalone film has no video_playback engine
 // source, so its title + context arrive over the legacy WS intent rail, not a
 // snapshot). Before the fix the film player collapsed to `Home › Title` (the only
