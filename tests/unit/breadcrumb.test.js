@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCrumbs, breadcrumbHtml, trailCrumbs } from '../../core/breadcrumb.js';
+import { buildCrumbs, breadcrumbHtml, trailCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
 
 describe('buildCrumbs', () => {
   it('browse is a single non-clickable Home leaf', () => {
@@ -97,5 +97,42 @@ describe('trailCrumbs (FEAT-032 companion player breadcrumb)', () => {
     var crumbs = trailCrumbs(entry, 'X');
     expect(crumbs[0].params).toEqual({});
     expect(crumbs[1].params.tab).toBe('music');
+  });
+});
+
+describe('playerCrumbs (BUG-044 audio player source crumb)', () => {
+  var SOURCE = { label: 'Out of the Blue', page: 'album-detail.html', params: { album: 'ootb' } };
+
+  it('inserts the source AFTER the recorded browse rail, before the now-playing leaf', () => {
+    var entry = { label: 'Albums', page: 'browse.html', params: { tab: 'music' } };
+    var crumbs = playerCrumbs(entry, SOURCE, 'Mr. Blue Sky');
+    expect(crumbs).toHaveLength(4);
+    expect(crumbs[0]).toMatchObject({ label: 'Home', page: 'browse.html', current: false });
+    expect(crumbs[1]).toMatchObject({ label: 'Albums', page: 'browse.html', params: { tab: 'music' }, current: false });
+    // The source sits between the rail and the leaf — clickable, links to its page.
+    expect(crumbs[2]).toMatchObject({ label: 'Out of the Blue', page: 'album-detail.html', params: { album: 'ootb' }, current: false });
+    expect(crumbs[3]).toMatchObject({ label: 'Mr. Blue Sky', page: null, current: true });
+  });
+
+  it('with no recorded browse rail falls back to Home > Source > leaf (deep-link)', () => {
+    var crumbs = playerCrumbs(null, SOURCE, 'Mr. Blue Sky');
+    expect(crumbs).toHaveLength(3);
+    expect(crumbs[0]).toMatchObject({ label: 'Home', page: 'browse.html', current: false });
+    expect(crumbs[1]).toMatchObject({ label: 'Out of the Blue', page: 'album-detail.html', params: { album: 'ootb' }, current: false });
+    expect(crumbs[2]).toMatchObject({ label: 'Mr. Blue Sky', current: true });
+  });
+
+  it('a null source (a lone single track — no source page) degrades to the plain browse-trail crumbs', () => {
+    var entry = { label: 'Albums', page: 'browse.html', params: { tab: 'music' } };
+    expect(playerCrumbs(entry, null, 'Some Single')).toEqual(trailCrumbs(entry, 'Some Single'));
+    expect(playerCrumbs(null, null, 'Some Single')).toEqual(trailCrumbs(null, 'Some Single'));
+  });
+
+  it('carries the source page/params through verbatim (so the crumb returns to the source itself)', () => {
+    var src = { label: 'Road Trip', page: 'playlist-detail.html', params: { playlist: 'pl-roadtrip' } };
+    var crumbs = playerCrumbs(null, src, 'Turn to Stone');
+    expect(crumbs[1].page).toBe('playlist-detail.html');
+    expect(crumbs[1].params).toEqual({ playlist: 'pl-roadtrip' });
+    expect(crumbs[1].current).toBe(false);
   });
 });

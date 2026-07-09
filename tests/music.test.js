@@ -371,6 +371,29 @@ test('a track with neither startAt nor endAt is unchanged — start 0, no early 
   await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
 });
 
+// BUG-044: the TV album player breadcrumb names the PLAYBACK SOURCE (a clickable
+// crumb back to the album's own page) and the now-playing track as the leaf —
+// Home › Out of the Blue › Turn to Stone. Old code showed only Home › <album title>
+// (an inert leaf, no track, and the source was never clickable).
+test('the TV album player breadcrumb names the source (clickable) and the now-playing track', async ({ page }) => {
+  await openPlayer(page);
+  await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home', 'Out of the Blue']);
+  await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Turn to Stone');
+  const src = page.locator('#breadcrumb .crumb-link', { hasText: 'Out of the Blue' });
+  await expect(src).toHaveAttribute('data-page', 'album-detail.html');
+  await expect(src).toHaveAttribute('data-params', JSON.stringify({ album: 'ootb' }));
+});
+
+test('tapping the source crumb on the TV album player opens that album’s detail', async ({ page }) => {
+  await openPlayer(page);
+  // Re-kick the controls auto-hide (a d-pad key) so the crumb stays clickable under
+  // parallel load, then jump to the source.
+  await page.keyboard.press('ArrowDown');
+  await page.locator('#breadcrumb .crumb-link', { hasText: 'Out of the Blue' }).click();
+  await expect(page).toHaveURL(/album-detail\.html\?album=ootb/);
+  await expect(page.locator('#detail-title')).toHaveText('Out of the Blue');
+});
+
 // BUG-018: an artist-sourced player carries from='artist'; pressing Back returns
 // to the artist screen, not browse and not the error page.
 test('Back from an artist-sourced player returns to the artist screen, not error', async ({ page }) => {

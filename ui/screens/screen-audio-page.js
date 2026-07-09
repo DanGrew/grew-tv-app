@@ -5,7 +5,7 @@ import { setupQueue } from './screen-queue.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadAlbum, loadPlaylist, loadVideo, loadLyrics, mediaUrl, playbackAction } from '../../core/app-api.js';
 import { parseLrc, indexAt, windowAt } from '../../core/lrc.js';
-import { buildCrumbs } from '../../core/breadcrumb.js';
+import { buildCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
 // FEAT-031 (TASK-187) audio page — SERVER-AUTHORITATIVE playback. The album/artist
@@ -38,6 +38,12 @@ export function initAudioPage() {
   // track triggers a swap, the same track just updates the flag/position.
   var loadedTrackId = null;
   var title = '';
+  // BUG-044 breadcrumb state: the playback source crumb (album/playlist/artist,
+  // built once the source title resolves) and the now-playing track title (the
+  // leaf, updated as the snapshot advances). Together they build
+  // Home › [Source] › Now Playing (the TV player has no browse-rail nav-trail).
+  var sourceCrumb = null;
+  var nowTitle = '';
 
   // ── ambient lyrics (TASK-131) ──────────────────────────────────────────────
   // Lyrics are a page concern: the player stays playback-only. The current
@@ -154,7 +160,18 @@ export function initAudioPage() {
     'true':  function(np) { swapTrack(np); },
     'false': function() {}
   };
+  // BUG-044: once a track is playing, upgrade the player breadcrumb to
+  // Home › [Source] › Now Playing — the source becomes a CLICKABLE crumb back to
+  // its own page and the now-playing track is the leaf. Re-mount only when the leaf
+  // title actually changes so a snapshot doesn't blur a focused crumb needlessly.
+  function mountAudioBreadcrumb() {
+    mountBreadcrumb('breadcrumb', playerCrumbs(null, sourceCrumb, nowTitle));
+  }
+  function setNowTitle(t) {
+    [t].filter(function(x) { return x !== nowTitle; }).forEach(function(x) { nowTitle = x; mountAudioBreadcrumb(); });
+  }
   function renderNowPlaying(np) {
+    setNowTitle(np.title);
     TRACK_CHANGED[(np.track_id !== loadedTrackId) + ''](np);
   }
 
@@ -300,6 +317,17 @@ export function initAudioPage() {
   }
   var kind = sourceKind();
   var QUEUE_MODE = { album: true, artist: true, playlist: true, queue: true, track: false };
+  // BUG-044: the playback source's own crumb — { label, page, params } linking to
+  // its detail page (the SAME target Back uses, see goBackNav). A queue / lone
+  // single has no source page (absent from the map) → no source crumb.
+  var SOURCE_CRUMB = {
+    album:    function() { return { label: title, page: 'album-detail.html', params: { album: albumId } }; },
+    artist:   function() { return { label: title, page: 'artist.html', params: { artist: artistId } }; },
+    playlist: function() { return { label: title, page: 'playlist-detail.html', params: { playlist: playlistId } }; }
+  };
+  function buildSourceCrumb() {
+    return [SOURCE_CRUMB[kind]].filter(Boolean).map(function(fn) { return fn(); }).concat([null])[0];
+  }
   // Breadcrumb title is collection-level: the album title (fetched), the artist
   // name (already the param), or the single track's title.
   var TITLE_FOR = {
@@ -318,6 +346,10 @@ export function initAudioPage() {
       lyricsEnabled = getLyrics();
       player.setQueueMode(QUEUE_MODE[kind]);
       player.setLyrics(lyricsEnabled);
+      // Initial crumb is Home › <source title> (leaf) — the pre-playback view;
+      // once the first now-playing snapshot lands, setNowTitle upgrades it to
+      // Home › <source link> › <track> via the built sourceCrumb (BUG-044).
+      sourceCrumb = buildSourceCrumb();
       mountBreadcrumb('breadcrumb', buildCrumbs('video', { videoTitle: title }));
       fireEntry();
     })
