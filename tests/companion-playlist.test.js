@@ -126,6 +126,30 @@ test.describe('Road Trip playlist (2 tracks)', () => {
     await expect(page.locator('#btn-shuffle')).toHaveCount(0);
   });
 
+  // TASK-316: the three manage buttons are icon-only (labels stripped) — ⊞ add-all
+  // (a squared-plus, distinct from the per-track single-add ＋), ✎ rename, 🗑 delete.
+  // The words survive as aria-label/title for a11y, not as visible text.
+  test('TASK-316: the manage buttons are icon-only with no text labels', async ({ page }) => {
+    await expect(page.locator('#btn-add-all')).toHaveText('⊞');
+    await expect(page.locator('#btn-rename-playlist')).toHaveText('✎');
+    await expect(page.locator('#btn-delete-playlist')).toHaveText('\u{1F5D1}');
+    await expect(page.locator('#btn-add-all')).toHaveAttribute('aria-label', 'Add all to playlist');
+    await expect(page.locator('#btn-rename-playlist')).toHaveAttribute('aria-label', 'Rename');
+    await expect(page.locator('#btn-delete-playlist')).toHaveAttribute('aria-label', 'Delete playlist');
+  });
+
+  // TASK-316: add-all's ⊞ must not collide with the per-track single-add ＋ (U+FF0B).
+  test('TASK-316: add-all uses ⊞, distinct from the per-track add ＋', async ({ page }) => {
+    const addAll = await page.locator('#btn-add-all').evaluate(el => el.textContent.trim());
+    expect(addAll).toBe('⊞');
+    expect(addAll).not.toBe('＋');
+  });
+
+  // TASK-316: even icon-only, delete keeps its red destructive styling.
+  test('TASK-316: the delete button keeps its red destructive styling', async ({ page }) => {
+    await expect(page.locator('#btn-delete-playlist')).toHaveCSS('color', 'rgb(255, 135, 135)');
+  });
+
   // FEAT-036 (TASK-209) — delete-with-confirm, the companion mirror of the TV's
   // screen-playlist-detail-page delete. Confirm POSTs /api/playlists/delete (the
   // installApi fixture answers 204), drives the TV off the gone playlist (`back`),
