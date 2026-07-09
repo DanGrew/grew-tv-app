@@ -213,6 +213,43 @@ describe('companionQueueHtml — phone mirror', () => {
   });
 });
 
+// Fallback branches: null-valued fields (escapeHtml), missing durations
+// (durationText), and the ORDERED (non-shuffle) THEN hint (TASK-315 coverage).
+describe('queue-view fallbacks (TASK-315)', () => {
+  it('escapes null title/artist fields as empty strings (no "null" text)', () => {
+    var snap = shuffleSnap();
+    snap.now_playing.title = null;
+    snap.now_playing.artist = null;
+    var html = queueViewHtml(snap);
+    expect(html).toContain('class="np-title"></div>');
+    expect(html).toContain('class="np-artist"></div>');
+    expect(html).not.toContain('>null<');
+  });
+
+  it('renders an empty duration when a track carries none', () => {
+    var snap = shuffleSnap();
+    snap.from_source[0].duration = null;           // durationText -> ''
+    var m = queueModel(snap);
+    var src = m.sections.find(s => s.key === 'from-source');
+    expect(src.rows[0].durationText).toBe('');
+  });
+
+  it('now-playing time reads "/" when position and duration are absent', () => {
+    var snap = shuffleSnap();
+    snap.now_playing.position = null;
+    snap.now_playing.duration = null;
+    expect(queueModel(snap).nowPlaying.timeText).toBe(' / ');
+  });
+
+  it('uses the ordered (non-shuffle) THEN hint when the source continues in order', () => {
+    var snap = orderedSnap();
+    snap.then = [entry('maxwell', "Maxwell's Silver Hammer", 't1', 209)];   // THEN has rows, shuffle:false
+    var then = queueModel(snap).sections.find(s => s.key === 'then');
+    expect(then.hint).toBe('repeat from the top · also editable');
+    expect(queueViewHtml(snap)).toContain('repeat from the top');
+  });
+});
+
 // FEAT-040/TASK-255 — the music Play-Queue count helper (browse reads it from GET
 // /api/playback to decide whether to offer a music "Play Queue" button).
 describe('playNextCount — music override-queue length', () => {

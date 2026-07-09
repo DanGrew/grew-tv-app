@@ -84,9 +84,12 @@ export function cardRoute(card) {
 // `section`) can borrow its section from the browse card it belongs to: a bound
 // item (episode/track) from its owning collection, a standalone (film/home-movie)
 // from its own card. Keeps the app from re-deriving a type from the row.
+// Its sole caller (buildTabRails) always passes the already-normalized `all`
+// array, so no `cards || []` guard is needed here (it was an unreachable
+// branch — TASK-315).
 function cardIndex(cards) {
   var byId = {};
-  (cards || []).forEach(function(c) { byId[c.id] = c; });
+  cards.forEach(function(c) { byId[c.id] = c; });
   return byId;
 }
 

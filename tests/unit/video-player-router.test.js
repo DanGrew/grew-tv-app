@@ -83,6 +83,10 @@ describe('upNextItem', () => {
       override_queue: [item('f1', 'Cars')]
     }).item_id).toBe('f1');
   });
+  it('is null when the wrap target itself is absent (defensive hole in items)', () => {
+    // repeat wraps last -> items[0]; a null hole there degrades to null, not undefined
+    expect(upNextItem({ items: [null, item('e2', 'Two')], current_item_index: 1, repeat: true })).toBe(null);
+  });
 });
 
 describe('upNextLine', () => {

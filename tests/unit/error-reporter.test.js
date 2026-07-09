@@ -50,12 +50,31 @@ describe('error-reporter', () => {
     expect(body.context.page).toBe('/app/homeview/video.html');   // defaults to location.pathname
   });
 
+  it('stringifies a rejection reason that carries no message field', () => {
+    var win = fakeWindow();
+    installErrorReporter(win);
+    win._rejection({ reason: 'plain string reason' });   // no .message -> String(reason)
+    expect(lastBody(fetchMock).message).toBe('plain string reason');
+  });
+
+  it('falls back to a generic message when the rejection has no reason', () => {
+    var win = fakeWindow();
+    installErrorReporter(win);
+    win._rejection({});                                  // reason == null
+    expect(lastBody(fetchMock).message).toBe('unhandledrejection');
+  });
+
   it('reportWarn posts {level:"warn"}', () => {
     reportWarn('poster_fetch_failed', 'cover 404', { id: 'film-x' });
     var body = lastBody(fetchMock);
     expect(body.level).toBe('warn');
     expect(body.code).toBe('poster_fetch_failed');
     expect(body.context).toEqual({ id: 'film-x' });
+  });
+
+  it('coerces a null message to an empty string', () => {
+    reportError('js_error', null);
+    expect(lastBody(fetchMock).message).toBe('');
   });
 
   it('does not recurse: an error raised while reporting drops the nested report', () => {

@@ -66,8 +66,10 @@ export function primaryAction(items, progress) {
   var last = lastPlayedIndex(its, p);
   if (last < 0) return { kind: 'next', index: 0 };
   var lastItem = its[last];
-  var entry = p[lastItem.video.id];
-  var resume = entry ? entry.resumePositionSec : 0;
+  // last >= 0 only when lastPlayedIndex found a progress entry for this item (it
+  // requires a positive lastPlayed on it), so p[lastItem.video.id] is always
+  // present here — the old `entry ? … : 0` guard was an unreachable branch (TASK-315).
+  var resume = p[lastItem.video.id].resumePositionSec;
   if (isMidWatch(resume, lastItem.video.duration)) return { kind: 'continue', index: last };
   if (last === its.length - 1) return { kind: 'again', index: 0 };
   return { kind: 'next', index: (last + 1) % its.length };

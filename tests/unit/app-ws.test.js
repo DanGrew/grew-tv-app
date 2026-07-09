@@ -169,6 +169,24 @@ describe('connectApp', () => {
     expect(msg.payload.person).toBe('dad');
   });
 
+  it('keeps an explicit person on the snapshot (does not overwrite with localStorage)', async () => {
+    store['grew-tv-person'] = 'dad';
+    var { api, ws } = await boot('http://host:8766', () => {});
+    api.sendAppState({ screen: 'home', person: 'mom' });   // explicit person wins over the stored one
+    expect(ws.sent.find(m => m.type === 'app_state').payload.person).toBe('mom');
+  });
+
+  it('sendAppState tolerates a null/omitted snapshot', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {});
+    expect(() => api.sendAppState()).not.toThrow();
+    expect(ws.sent.find(m => m.type === 'app_state')).toBeTruthy();
+  });
+
+  it('ws.onerror is a no-op (never throws)', async () => {
+    var { ws } = await boot('http://host:8766', () => {});
+    expect(() => ws.onerror()).not.toThrow();
+  });
+
   it('reconnect re-registers the same device id', async () => {
     var { ws } = await boot('http://host:8766', () => {});
     ws.onopen();
@@ -198,6 +216,28 @@ describe('connectApp', () => {
     ws.onmessage({ data: JSON.stringify({ type: 'person_busy', payload: { person_id: 'mom', device_id: 'devB', label: 'Bedroom' } }) });
     expect(active.person_id).toBe('mom');
     expect(busy.label).toBe('Bedroom');
+  });
+
+  it('routes a music playback snapshot to opts.onPlayback', async () => {
+    var got = null;
+    var { ws } = await boot('http://host:8766', () => {}, { onPlayback: (p) => { got = p; } });
+    ws.onmessage({ data: JSON.stringify({ type: 'playback', payload: { now_playing: { item_id: 'ootb-01' } } }) });
+    expect(got.now_playing.item_id).toBe('ootb-01');
+  });
+
+  it('routes a video playback snapshot to opts.onVideoPlayback', async () => {
+    var got = null;
+    var { ws } = await boot('http://host:8766', () => {}, { onVideoPlayback: (p) => { got = p; } });
+    ws.onmessage({ data: JSON.stringify({ type: 'video_playback', payload: { now_playing: { item_id: 'bluey-s1e1' } } }) });
+    expect(got.now_playing.item_id).toBe('bluey-s1e1');
+  });
+
+  it('deactivated with no onDeactivated override falls back to the profile picker (default)', async () => {
+    global.location = { hostname: 'host', href: '' };
+    var { ws } = await boot('http://host:8766', () => {});   // no opts.onDeactivated
+    expect(() => ws.onmessage({ data: JSON.stringify({ type: 'deactivated', payload: {} }) })).not.toThrow();
+    // defaultDeactivated navigates to the switch-profile target
+    expect(global.location.href).toContain('profile.html');
   });
 
   it('activatePerson sends activate_person with the device id + takeover flag', async () => {

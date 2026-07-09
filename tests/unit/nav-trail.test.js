@@ -204,6 +204,14 @@ describe('nav-trail', () => {
       pop();
       expect(peek().page).toBe('browse.html');
     });
+
+    it('dedups entries that carry no params (stableParams tolerates undefined)', () => {
+      pushUnique({ page: 'home.html' });   // no params -> stableParams(undefined) -> ''
+      pushUnique({ page: 'home.html' });   // same target, no params -> not stacked
+      expect(peek().page).toBe('home.html');
+      pop();
+      expect(peek()).toBe(null);
+    });
   });
 
   it('entries returns the full stack innermost-last, so a caller can pick an ancestor', () => {

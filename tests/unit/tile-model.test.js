@@ -36,6 +36,11 @@ describe('tileModel — CC badge', () => {
     expect(tileModel({ id: 'x', subtitles: [{ lang: 'en' }] }, {}).showCC).toBe(true);
     expect(tileModel({ id: 'x', subtitles: [] }, {}).showCC).toBe(false);
   });
+  it('treats a truthy non-string, non-array subtitles value as CC (present)', () => {
+    // e.g. a bare truthy flag / object from an older backend -> assume subtitles exist
+    expect(tileModel({ id: 'x', subtitles: true }, {}).showCC).toBe(true);
+    expect(tileModel({ id: 'x', subtitles: { en: 'x.vtt' } }, {}).showCC).toBe(true);
+  });
 });
 
 describe('tileModel — Lyrics badge (music)', () => {
@@ -121,5 +126,21 @@ describe('tileModel — defaults', () => {
     expect(m.kind).toBe('video');
     expect(m.title).toBe('');
     expect(m.poster).toBeNull();
+  });
+  it('tolerates an omitted ctx (no progress context)', () => {
+    const m = tileModel({ id: 'x' });
+    expect(m.showBar).toBe(false);
+    expect(m.percent).toBe(0);
+  });
+});
+
+describe('tileModel — cover mosaic (FEAT-039)', () => {
+  it('passes through a coverArt array for a playlist tile', () => {
+    const m = tileModel({ kind: 'series', id: 'pl', section: 'music', coverArt: ['a.jpg', 'b.jpg'] }, {});
+    expect(m.coverArt).toEqual(['a.jpg', 'b.jpg']);
+  });
+  it('defaults to [] when coverArt is absent or not an array', () => {
+    expect(tileModel({ id: 'x' }, {}).coverArt).toEqual([]);
+    expect(tileModel({ id: 'x', coverArt: 'nope' }, {}).coverArt).toEqual([]);
   });
 });

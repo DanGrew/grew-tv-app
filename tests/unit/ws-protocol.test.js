@@ -1,8 +1,10 @@
+import { vi } from 'vitest';
 import {
   MESSAGE_TYPES,
   INTENTS,
   SKIP_DELTAS,
   SESSION_ID,
+  uuid,
   createMessage,
   createIntent,
   createSnapshotRequest,
@@ -33,6 +35,25 @@ describe('MESSAGE_TYPES', () => {
 
 describe('SESSION_ID', () => {
   it('is grew-tv', () => expect(SESSION_ID).toBe('grew-tv'));
+});
+
+describe('uuid', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('uses crypto.randomUUID when available', () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'fixed-uuid-from-crypto' });
+    expect(uuid()).toBe('fixed-uuid-from-crypto');
+  });
+
+  it('falls back to a v4-shaped uuid when crypto is entirely absent', () => {
+    vi.stubGlobal('crypto', undefined);
+    expect(uuid()).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+
+  it('falls back when crypto exists but lacks randomUUID', () => {
+    vi.stubGlobal('crypto', {});
+    expect(uuid()).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
 });
 
 describe('createMessage', () => {
@@ -262,6 +283,12 @@ describe('interpolatePosition', () => {
   it('never returns negative', () => {
     expect(interpolatePosition({ positionSec: 0, playing: true }, -5)).toBe(0);
   });
+  it('defaults a missing positionSec to 0', () => {
+    expect(interpolatePosition({ playing: false }, 5)).toBe(0);
+  });
+  it('treats a missing elapsed as 0 while playing', () => {
+    expect(interpolatePosition({ positionSec: 10, playing: true })).toBe(10);
+  });
 });
 
 describe('createHeartbeat', () => {
@@ -292,5 +319,29 @@ describe('createHeartbeat', () => {
     });
     hb.start();
     expect(ticks).toBe(1);
+  });
+
+  it('falls back to the ambient setInterval/clearInterval when none injected (no opts)', () => {
+    vi.useFakeTimers();
+    let ticks = 0;
+    const hb = createHeartbeat(() => { ticks++; });   // no opts -> ambient timers, default interval
+    expect(hb.running()).toBe(false);
+    hb.start();
+    expect(hb.running()).toBe(true);
+    vi.advanceTimersByTime(1000);
+    expect(ticks).toBe(1);
+    hb.stop();
+    expect(hb.running()).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('degrades to a no-op scheduler when no ambient timers exist', () => {
+    vi.stubGlobal('setInterval', undefined);
+    vi.stubGlobal('clearInterval', undefined);
+    const hb = createHeartbeat(() => {}, {});   // opts present but no timers injected -> null scheduler
+    hb.start();
+    expect(hb.running()).toBe(false);           // schedule null -> start is a no-op
+    expect(() => hb.stop()).not.toThrow();
+    vi.unstubAllGlobals();
   });
 });

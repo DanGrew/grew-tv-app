@@ -38,6 +38,14 @@ describe('postLog / logEvent', () => {
     expect(lastBody(fetchMock).item).toBe(null);
   });
 
+  it('defaults an omitted context to an empty object (item null)', () => {
+    logEvent('ended');
+    var body = lastBody(fetchMock);
+    expect(body.event).toBe('ended');
+    expect(body.item).toBe(null);
+    expect(body.context).toEqual({});
+  });
+
   it('swallows a rejected fetch — never throws, resolves', async () => {
     fetchMock.mockReturnValue(Promise.reject(new Error('network down')));
     await expect(postLog({ event: 'play' })).resolves.toBeUndefined();

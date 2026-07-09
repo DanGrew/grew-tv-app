@@ -129,6 +129,10 @@ describe('personById / personByProfile', () => {
     expect(personByProfile(config, 'kids').id).toBe('oliver');
     expect(personByProfile({ defaultPin: '0', persons: [{ id: 'oliver', profile: 'kids' }] }, 'adults').id).toBe('oliver');
   });
+
+  it('personByProfile is null when the config has no persons at all', () => {
+    expect(personByProfile({ defaultPin: '0', persons: [] }, 'kids')).toBe(null);
+  });
 });
 
 describe('badgePerson (FEAT-033)', () => {

@@ -170,8 +170,10 @@ function rowHtml(row) {
 
 // TASK-238: a section now drops its own rail-label — the TAB is the label. A panel
 // body is the section's hint line + its rows; an empty section shows a placeholder.
+// Only ever called on a rows-bearing section, which always carries a non-empty
+// hint, so the former `hint ? … : ''` empty-guard was an unreachable branch (TASK-315).
 function hintHtml(hint) {
-  return hint ? '<div class="q-hint">' + escapeHtml(hint) + '</div>' : '';
+  return '<div class="q-hint">' + escapeHtml(hint) + '</div>';
 }
 function emptyHtml(text) {
   return '<div class="q-empty">' + escapeHtml(text) + '</div>';
@@ -180,12 +182,12 @@ function panelBody(sec, emptyText) {
   if (!sec || sec.rows.length === 0) return emptyHtml(emptyText);
   return hintHtml(sec.hint) + sec.rows.map(rowHtml).join('');
 }
-// Coming Up (Then): rows when the source continues, the "Source ends" marker when
-// it doesn't (ordered + repeat off), else a plain note.
+// Coming Up (Then): rows when the source continues, else the "Source ends" marker.
+// A rows-empty 'then' section always carries endsText (thenSection), so the former
+// "Nothing coming up" fallback was an unreachable branch (TASK-315).
 function comingUpBody(sec) {
   if (sec.rows.length > 0) return hintHtml(sec.hint) + sec.rows.map(rowHtml).join('');
-  if (sec.endsText) return '<div class="q-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>';
-  return emptyHtml('Nothing coming up');
+  return '<div class="q-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>';
 }
 function sectionByKey(model) {
   var byKey = {};
@@ -289,8 +291,10 @@ function phRow(row) {
 }
 
 // Phone tab-panel bodies (mirror the TV helpers, `.ph-*` markup).
+// See hintHtml: only called on a rows-bearing (non-empty-hint) section, so the
+// empty-guard was unreachable (TASK-315).
 function phHintHtml(hint) {
-  return hint ? '<div class="ph-qhint">' + escapeHtml(hint) + '</div>' : '';
+  return '<div class="ph-qhint">' + escapeHtml(hint) + '</div>';
 }
 function phEmptyHtml(text) {
   return '<div class="ph-qempty">' + escapeHtml(text) + '</div>';
@@ -299,10 +303,11 @@ function phPanelBody(sec, emptyText) {
   if (!sec || sec.rows.length === 0) return phEmptyHtml(emptyText);
   return phHintHtml(sec.hint) + sec.rows.map(phRow).join('');
 }
+// See comingUpBody: a rows-empty 'then' always carries endsText, so the former
+// "Nothing coming up" fallback was unreachable (TASK-315).
 function phComingUpBody(sec) {
   if (sec.rows.length > 0) return phHintHtml(sec.hint) + sec.rows.map(phRow).join('');
-  if (sec.endsText) return '<div class="ph-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>';
-  return phEmptyHtml('Nothing coming up');
+  return '<div class="ph-ends">&#9209; ' + escapeHtml(sec.endsText) + '</div>';
 }
 
 // Full phone Queue View — Now Playing header + Queue / Next / Coming Up tabs (same
