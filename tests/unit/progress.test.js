@@ -21,6 +21,10 @@ describe('percent', () => {
     expect(percent(-5, 120)).toBe(0);
     expect(percent(200, 120)).toBe(100);
   });
+  it('treats a missing resumePosition as 0 (not NaN)', () => {
+    expect(percent(undefined, 120)).toBe(0);
+    expect(percent(0, 120)).toBe(0);
+  });
 });
 
 describe('isFinished', () => {
@@ -30,6 +34,10 @@ describe('isFinished', () => {
   });
   it('false mid-watch', () => expect(isFinished(300, 600)).toBe(false));
   it('false with no duration', () => expect(isFinished(10, 0)).toBe(false));
+  it('treats a missing resumePosition as 0 (unstarted is not finished)', () => {
+    expect(isFinished(0, 600)).toBe(false);
+    expect(isFinished(undefined, 600)).toBe(false);
+  });
 });
 
 describe('isMidWatch', () => {
@@ -56,6 +64,7 @@ describe('resumeAfter', () => {
   it('keeps a mid-watch position', () => expect(resumeAfter(120, 600)).toBe(120));
   it('clears to 0 when finished', () => expect(resumeAfter(599, 600)).toBe(0));
   it('never negative', () => expect(resumeAfter(-3, 600)).toBe(0));
+  it('treats a missing resumePosition as 0', () => expect(resumeAfter(undefined, 600)).toBe(0));
 });
 
 describe('continueWatching', () => {
@@ -83,6 +92,14 @@ describe('continueWatching', () => {
   });
   it('empty when no progress', () => expect(continueWatching(videos, {})).toEqual([]));
   it('tolerates null inputs', () => expect(continueWatching(null, null)).toEqual([]));
+  it('treats a missing or unparseable lastPlayed as epoch 0 in the sort', () => {
+    const p = {
+      a: { resumePositionSec: 100 },                       // no lastPlayed -> ts 0
+      b: { resumePositionSec: 100, lastPlayed: 'garbage' }  // unparseable -> ts 0
+    };
+    // both collapse to timestamp 0; both mid-watch, so both are returned
+    expect(continueWatching(videos, p).map(v => v.id).sort()).toEqual(['a', 'b']);
+  });
 });
 
 describe('progressMapFromCW', () => {
@@ -127,5 +144,8 @@ describe('series progress', () => {
   it('seriesIsMidWatch true only when an episode is mid-watch', () => {
     expect(seriesIsMidWatch(episodes, { e2: { resumePositionSec: 60 } })).toBe(true);
     expect(seriesIsMidWatch(episodes, {})).toBe(false);
+  });
+  it('tolerates a missing progress map (no episode mid-watch -> 0)', () => {
+    expect(seriesProgressPercent(episodes)).toBe(0);
   });
 });

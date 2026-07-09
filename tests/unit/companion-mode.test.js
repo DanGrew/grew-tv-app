@@ -108,4 +108,15 @@ describe('local navigation stack', () => {
     expect(m.depth()).toBe(0);
     expect(m.current()).toBe(null);
   });
+
+  it('reset empties the local stack without touching the mode', () => {
+    var m = createCompanionMode();
+    m.setDesynced();
+    m.push({ page: 'browse' });
+    m.push({ page: 'detail' });
+    m.reset();
+    expect(m.depth()).toBe(0);
+    expect(m.current()).toBe(null);
+    expect(m.isDesynced()).toBe(true);   // mode untouched by reset
+  });
 });

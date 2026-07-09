@@ -83,9 +83,10 @@ function sourceRow(item) {
   };
 }
 
+// videoQueueModel always passes an array (override_queue || []), so the former
+// `arr || []` guard was an unreachable branch (TASK-315).
 function queueRows(arr) {
-  var rows = arr || [];
-  return rows.map(function (e, i) { return queueRow(e, i > 0, i < rows.length - 1); });
+  return arr.map(function (e, i) { return queueRow(e, i > 0, i < arr.length - 1); });
 }
 
 function nowPlayingModel(snap) {
@@ -226,8 +227,10 @@ function rowHtml(row) {
 // Queue = Play Next (your queued episodes), Next = From Series (rest of the source,
 // or the "Series ends" marker the model attaches here), Coming Up = Then (the
 // repeat wrap, present only under repeat).
+// Only ever called (via rowsHtml) on a rows-bearing section, which always carries
+// a non-empty hint, so the former empty-guard was an unreachable branch (TASK-315).
 function hintHtml(hint) {
-  return hint ? '<div class="q-hint">' + escapeHtml(hint) + '</div>' : '';
+  return '<div class="q-hint">' + escapeHtml(hint) + '</div>';
 }
 function emptyHtml(text) {
   return '<div class="q-empty">' + escapeHtml(text) + '</div>';
@@ -346,8 +349,10 @@ function phRow(row) {
 }
 
 // Phone tab-panel bodies (mirror the TV helpers, `.ph-*` markup).
+// See hintHtml: only called on a rows-bearing (non-empty-hint) section, so the
+// empty-guard was unreachable (TASK-315).
 function phHintHtml(hint) {
-  return hint ? '<div class="ph-qhint">' + escapeHtml(hint) + '</div>' : '';
+  return '<div class="ph-qhint">' + escapeHtml(hint) + '</div>';
 }
 function phEmptyHtml(text) {
   return '<div class="ph-qempty">' + escapeHtml(text) + '</div>';

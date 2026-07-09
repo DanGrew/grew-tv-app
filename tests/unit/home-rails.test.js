@@ -510,3 +510,97 @@ describe('Home Movies structural rails (TASK-183)', () => {
     expect(buildTabRails('home-movies', noVideos, [], {}).some(r => r.id === 'videos')).toBe(false);
   });
 });
+
+// Defensive/fallback branches — falsy fields, missing sections, inherited props,
+// and null inputs that the readers must tolerate (TASK-315 coverage floor).
+describe('home-rails edge-case fallbacks (TASK-315)', () => {
+  it('withDurationSec copies only OWN properties (ignores inherited)', () => {
+    var proto = { inherited: 'should-not-copy' };
+    var card = Object.create(proto);
+    card.kind = 'video'; card.id = 'v'; card.title = 'V'; card.duration = 42;
+    var item = buildRails([card], {}).find(r => r.id === 'films').items[0];
+    expect(item.hasOwnProperty('inherited')).toBe(false);
+    expect(item.durationSec).toBe(42);
+  });
+
+  it('an unstamped card (no section) falls back to the Films section', () => {
+    var card = { kind: 'video', id: 'legacy', title: 'Legacy' };   // no `section`
+    expect(buildTabs([card]).map(t => t.id)).toEqual(['films']);
+    expect(buildTabRails('films', [card], [], {})[0].items.map(c => c.id)).toEqual(['legacy']);
+  });
+
+  it('labelFor title-cases the slug when genreLabels is omitted (undefined)', () => {
+    var card = { kind: 'video', id: 'x', title: 'X', section: 'films', genres: ['rom-com'] };
+    // genreLabels arg omitted -> labelFor sees undefined labels -> `labels || {}`
+    expect(buildTabRails('films', [card], []).find(r => r.id.startsWith('genre:')).title).toBe('Rom Com');
+  });
+
+  it('sorts rail items with missing titles as empty strings (both operands, no throw)', () => {
+    var cards = [
+      { kind: 'series', id: 'a', section: 'music', artist: 'Z' },   // no title
+      { kind: 'series', id: 'b', section: 'music', artist: 'Z' }    // no title -> cmp('','') both fall back
+    ];
+    var albums = buildTabRails('music', cards, [], {}).find(r => r.id === 'albums');
+    expect(albums.items.map(c => c.id).sort()).toEqual(['a', 'b']); // both present, no throw
+  });
+
+  it('a CW row absent from the browse cards resolves to no section and is dropped', () => {
+    var cards = [{ kind: 'video', id: 'toy-story', title: 'Toy Story', section: 'films' }];
+    var cw = [
+      { item_id: 'toy-story', title: 'Toy Story', position_secs: 100, duration_secs: 600, collection_id: null, collection_title: null },
+      { item_id: 'ghost-item', title: 'Ghost', position_secs: 5, duration_secs: 60, collection_id: null, collection_title: null } // not in cards -> rowCard null
+    ];
+    var cwRail = buildTabRails('films', cards, cw, {})[0];
+    expect(cwRail.id).toBe('continue');
+    expect(cwRail.items.map(c => c.id)).toEqual(['toy-story']); // orphan row dropped, no throw
+  });
+
+  it('cwCard uses an empty label when a row has no title (with and without a collection)', () => {
+    var cards = [
+      { kind: 'series', id: 'ootb', title: 'Out of the Blue', section: 'home-movies' },
+      { kind: 'video', id: 'lone', title: 'Lone', section: 'home-movies' }
+    ];
+    var cw = [
+      { item_id: 'ootb-02', collection_id: 'ootb', collection_title: 'Out of the Blue', position_secs: 10, duration_secs: 200 }, // no title, has collection
+      { item_id: 'lone', collection_id: null, collection_title: null, position_secs: 10, duration_secs: 200 }                    // no title, standalone
+    ];
+    var cwRail = buildTabRails('home-movies', cards, cw, {})[0];
+    var byId = Object.fromEntries(cwRail.items.map(i => [i.id, i]));
+    expect(byId['ootb-02'].title).toBe('Out of the Blue · ');  // collection prefix, empty episode title
+    expect(byId['lone'].title).toBe('');                        // standalone, empty title
+  });
+
+  it('buildTabRails tolerates null cards', () => {
+    expect(buildTabRails('films', null, [], {})).toEqual([]);
+    expect(buildTabRails('home-movies', null, [], {})).toEqual([]);
+    expect(buildTabRails('music', null, [], {})).toEqual([]);
+  });
+
+  it('Home Movies treats a standalone card with no kind as a video', () => {
+    var cards = [{ id: 'no-kind', title: 'No Kind', section: 'home-movies' }]; // kind absent -> video
+    var videos = buildTabRails('home-movies', cards, [], {}).find(r => r.id === 'videos');
+    expect(videos.items.map(c => c.id)).toEqual(['no-kind']);
+  });
+
+  it('albumsByArtist ignores non-music and other-artist cards (filter short-circuits)', () => {
+    var cards = [
+      { kind: 'series', id: 'ootb', title: 'Out of the Blue', section: 'music', artist: 'ELO', tags: { year: '1977' } },
+      { kind: 'series', id: 'rumours', title: 'Rumours', section: 'music', artist: 'Fleetwood Mac' }, // music, different artist
+      { kind: 'video', id: 'film', title: 'Film', section: 'films', artist: 'ELO' }                   // non-music (artist ignored)
+    ];
+    expect(albumsByArtist(cards, 'ELO').map(c => c.id)).toEqual(['ootb']);
+  });
+
+  it('albumsByArtist tie-breaks equal-year albums, tolerating missing titles on both sides', () => {
+    var cards = [
+      { kind: 'series', id: 'y1', section: 'music', artist: 'X', tags: { year: '1990' } },   // same year, no title
+      { kind: 'series', id: 'y2', section: 'music', artist: 'X', tags: { year: '1990' } }    // same year, no title -> cmp('','')
+    ];
+    // equal years -> the tie-break compares both (missing) titles as '' -> no throw.
+    expect(albumsByArtist(cards, 'X').map(c => c.id).sort()).toEqual(['y1', 'y2']);
+  });
+
+  it('albumsByArtist tolerates null cards', () => {
+    expect(albumsByArtist(null, 'X')).toEqual([]);
+  });
+});

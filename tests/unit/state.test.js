@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { getProfile, setProfile, getPerson, setPerson, getCaptions, setCaptions, initCaptions, getLyrics, setLyrics, initLyrics, getParam, navTo } from '../../core/state.js';
+import { getProfile, setProfile, getPerson, setPerson, getCaptions, setCaptions, initCaptions, getLyrics, setLyrics, initLyrics, getParam, navTo, getDevice, ensureDevice, getDeviceLabel, setDeviceLabel } from '../../core/state.js';
 
 describe('getProfile / setProfile', () => {
   var store;
@@ -55,6 +55,13 @@ describe('lyrics (server-backed)', () => {
     expect(JSON.parse(calls[0].opts.body)).toEqual({ lyricsOn: false });
     setLyrics(true);
     expect(getLyrics()).toBe(true);
+  });
+
+  it('setLyrics swallows a rejected write-through (fire-and-forget catch)', async () => {
+    global.fetch = async () => { throw new Error('offline'); };
+    setLyrics(false);
+    expect(getLyrics()).toBe(false);
+    await Promise.resolve(); await Promise.resolve();   // flush the .catch handler
   });
 
   it('initLyrics seeds the cache from the backend GET', async () => {
@@ -132,6 +139,13 @@ describe('captions (server-backed)', () => {
     expect(getCaptions()).toBe(true);
   });
 
+  it('setCaptions swallows a rejected write-through (fire-and-forget catch)', async () => {
+    global.fetch = async () => { throw new Error('offline'); };
+    setCaptions(false);
+    expect(getCaptions()).toBe(false);          // cache still updates locally
+    await Promise.resolve(); await Promise.resolve();   // flush the .catch handler
+  });
+
   it('initCaptions seeds the cache from the backend GET', async () => {
     await initCaptions('http://s');
     expect(calls[0].url).toBe('http://s/api/settings');
@@ -161,6 +175,39 @@ describe('captions (server-backed)', () => {
     global.fetch = async () => { throw new Error('offline'); };
     await expect(initCaptions('http://s')).resolves.toBe(true);
     expect(getCaptions()).toBe(true);                        // cache preserved
+  });
+});
+
+// FEAT-026 TASK-158: durable device identity — WHICH screen this is, minted once.
+describe('device identity', () => {
+  var store;
+  beforeEach(() => {
+    store = {};
+    vi.stubGlobal('localStorage', {
+      getItem:    (k) => store[k] ?? null,
+      setItem:    (k, v) => { store[k] = v; },
+      removeItem: (k) => { delete store[k]; }
+    });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('getDevice is null until a device is minted', () => {
+    expect(getDevice()).toBe(null);
+  });
+  it('ensureDevice mints a uuid once and returns the same id thereafter', () => {
+    var id = ensureDevice();
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(ensureDevice()).toBe(id);   // set-and-forget: stable across calls
+    expect(getDevice()).toBe(id);
+  });
+  it('getDeviceLabel returns an explicit label once set', () => {
+    setDeviceLabel('Living Room');
+    expect(getDeviceLabel()).toBe('Living Room');
+  });
+  it('getDeviceLabel falls back to "Screen · <short-id>" when unset', () => {
+    var label = getDeviceLabel();
+    expect(label).toMatch(/^Screen · [0-9a-f]{4}$/);   // short id = first 4 of the minted uuid
+    expect(label.endsWith(getDevice().slice(0, 4))).toBe(true);
   });
 });
 
@@ -221,5 +268,11 @@ describe('navTo', () => {
     vi.stubGlobal('location', loc);
     navTo('browse.html', { tab: '' });
     expect(loc.href).toBe('browse.html?tab=');
+  });
+  it('tolerates an omitted params object', () => {
+    var loc = { href: '' };
+    vi.stubGlobal('location', loc);
+    navTo('browse.html');
+    expect(loc.href).toBe('browse.html');
   });
 });

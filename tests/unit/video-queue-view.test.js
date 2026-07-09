@@ -237,6 +237,40 @@ describe('videoQueueModel — poster', () => {
   });
 });
 
+// Fallback / edge branches: null-valued fields (escapeHtml), the ENABLED shift
+// controls on a multi-row queue, and the empty (no-ends) Next panel on the phone
+// (TASK-315 coverage).
+describe('video-queue-view edge branches (TASK-315)', () => {
+  it('escapes a null now-playing title as an empty string', () => {
+    var s = snap(1, false);
+    s.now_playing = { item_id: 'e2', title: null, duration: 480, poster: 'e2.jpg' };
+    var html = videoQueueViewHtml(s);
+    expect(html).toContain('class="np-title"></div>');
+    expect(html).not.toContain('>null<');
+  });
+
+  it('renders ENABLED shift controls (not disabled) on a multi-row TV queue', () => {
+    var html = videoQueueViewHtml(snap(0, true, [entry('q1', 'a', 'A'), entry('q2', 'b', 'B')]));
+    // q1 can shift down (not last), q2 can shift up (not first) -> enabled controls.
+    expect(html).toContain('class="q-act" data-act="move" data-entry="q1" data-dir="down"');
+    expect(html).toContain('class="q-act" data-act="move" data-entry="q2" data-dir="up"');
+  });
+
+  it('renders ENABLED shift controls on a multi-row companion queue', () => {
+    var html = companionVideoQueueHtml(snap(0, true, [entry('q1', 'a', 'A'), entry('q2', 'b', 'B')]));
+    expect(html).toContain('class="ph-ract" data-act="move" data-entry="q1" data-dir="down"');
+    expect(html).toContain('class="ph-ract" data-act="move" data-entry="q2" data-dir="up"');
+  });
+
+  it('companion Next panel shows the empty placeholder (no "Series ends") when the source is exhausted but repeat is on', () => {
+    // idx 2 (last) + repeat on + no queue -> From Series is empty WITHOUT the ends
+    // marker (the wrap tail lives under Coming Up), so Next shows the plain empty note.
+    var html = companionVideoQueueHtml(snap(2, true));
+    expect(html).toContain('Nothing up next');
+    expect(html).not.toContain('Series ends');
+  });
+});
+
 describe('video queue artwork markup', () => {
   it('renders the now-playing poster as a same-origin /media/ img on both surfaces', () => {
     expect(videoQueueViewHtml(snap(1, false))).toContain('src="/media/e2.jpg"');

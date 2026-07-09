@@ -196,6 +196,28 @@ describe('connect', () => {
     expect(seen[0].label).toBe('Living Room');
   });
 
+  it('devices() returns the most recent screen list (for the UI chooser)', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
+    ws.onopen();
+    expect(api.devices()).toEqual([]);   // empty before any devices message
+    ws.onmessage(deviceMsg([{ device_id: 'devA', label: 'Living Room' }]));
+    expect(api.devices()[0].device_id).toBe('devA');
+  });
+
+  it('routes a music playback snapshot to opts.onPlayback', async () => {
+    var got = null;
+    var { ws } = await boot('http://host:8766', () => {}, () => {}, () => {}, () => {}, { onPlayback: (p) => { got = p; } });
+    ws.onmessage({ data: JSON.stringify({ type: 'playback', payload: { now_playing: { item_id: 'ootb-01' } } }) });
+    expect(got.now_playing.item_id).toBe('ootb-01');
+  });
+
+  it('routes a video playback snapshot to opts.onVideoPlayback', async () => {
+    var got = null;
+    var { ws } = await boot('http://host:8766', () => {}, () => {}, () => {}, () => {}, { onVideoPlayback: (p) => { got = p; } });
+    ws.onmessage({ data: JSON.stringify({ type: 'video_playback', payload: { now_playing: { item_id: 'bluey-s1e1' } } }) });
+    expect(got.now_playing.item_id).toBe('bluey-s1e1');
+  });
+
   it('calls onStatus connected on open', async () => {
     var statuses = [];
     var { ws } = await boot('http://host:8766', () => {}, function(s) { statuses.push(s); });
@@ -247,6 +269,14 @@ describe('connect', () => {
     var { ws } = await boot('http://host:8766', () => {}, function(s) { statuses.push(s); });
     ws.onerror();
     expect(statuses).toContain('error');
+  });
+
+  it('watchdog closes a stale connection after 20s without a ping', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
+    var closed = false;
+    ws.close = function() { closed = true; };
+    vi.advanceTimersByTime(25000);
+    expect(closed).toBe(true);
   });
 
   it('sendIntent sends intent message when open', async () => {

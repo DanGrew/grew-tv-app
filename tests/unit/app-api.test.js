@@ -1,4 +1,11 @@
-import { loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, saveProgress, loadContinueWatching, loadConfig, loadSettings, saveSettings, scanDevices, mediaUrl, loadLyrics } from '../../core/app-api.js';
+import {
+  loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, saveProgress,
+  loadContinueWatching, loadConfig, loadSettings, saveSettings, scanDevices,
+  mediaUrl, loadLyrics, resetProgress, playbackAction, videoPlaybackAction,
+  loadVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, createPlaylist,
+  addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
+  deletePlaylist, renamePlaylist
+} from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
   var calls = [];
@@ -157,5 +164,159 @@ describe('mediaUrl', () => {
   it('returns empty string for falsy name', () => {
     expect(mediaUrl('http://s', null)).toBe('');
     expect(mediaUrl('http://s', '')).toBe('');
+  });
+});
+
+// The `person || ''` guard: an absent person serializes to an empty query value
+// (the backend 400s, but the client must still form a valid URL, never "undefined").
+describe('person-keyed reads default an absent person to empty', () => {
+  it('loadContinueWatching omits the person value when none passed', async () => {
+    var calls = fakeFetch({ content: [] });
+    await loadContinueWatching('http://s', 'kids');
+    expect(calls[0].url).toBe('http://s/api/continue-watching?profile=kids&person=');
+  });
+  it('saveProgress omits the person value when none passed', async () => {
+    var calls = fakeFetch({ ok: true });
+    await saveProgress('http://s', 'a', 90, 600);
+    expect(calls[0].url).toBe('http://s/api/progress/a?person=');
+  });
+  it('loadProgress omits the person value when none passed', async () => {
+    var calls = fakeFetch({ item_id: 'a' });
+    await loadProgress('http://s', 'a');
+    expect(calls[0].url).toBe('http://s/api/progress/a?person=');
+  });
+});
+
+describe('resetProgress', () => {
+  it('DELETEs /api/progress/{id} keyed by the active person', async () => {
+    var calls = fakeFetch({});
+    await resetProgress('http://s', 'a', 'oliver');
+    expect(calls[0].url).toBe('http://s/api/progress/a?person=oliver');
+    expect(calls[0].opts.method).toBe('DELETE');
+  });
+  it('defaults an absent person to empty', async () => {
+    var calls = fakeFetch({});
+    await resetProgress('http://s', 'a');
+    expect(calls[0].url).toBe('http://s/api/progress/a?person=');
+  });
+});
+
+describe('playbackAction', () => {
+  it('POSTs /api/playback/{action} with the person and body', async () => {
+    var calls = fakeFetch({});
+    await playbackAction('http://s', 'next', 'mom', { track_id: 't1' });
+    expect(calls[0].url).toBe('http://s/api/playback/next?person=mom');
+    expect(calls[0].opts.method).toBe('POST');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ track_id: 't1' });
+  });
+  it('defaults an absent person and body', async () => {
+    var calls = fakeFetch({});
+    await playbackAction('http://s', 'toggle-shuffle');
+    expect(calls[0].url).toBe('http://s/api/playback/toggle-shuffle?person=');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({});
+  });
+});
+
+describe('videoPlaybackAction', () => {
+  it('POSTs /api/video-playback/{action} with the person and body', async () => {
+    var calls = fakeFetch({});
+    await videoPlaybackAction('http://s', 'play-source', 'dad', { source_id: 'bluey' });
+    expect(calls[0].url).toBe('http://s/api/video-playback/play-source?person=dad');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ source_id: 'bluey' });
+  });
+  it('defaults an absent person and body', async () => {
+    var calls = fakeFetch({});
+    await videoPlaybackAction('http://s', 'next');
+    expect(calls[0].url).toBe('http://s/api/video-playback/next?person=');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({});
+  });
+});
+
+describe('loadVideoPlayback / loadPlayback', () => {
+  it('loadVideoPlayback GETs /api/video-playback keyed by person', async () => {
+    var calls = fakeFetch({ override_queue: [] });
+    await loadVideoPlayback('http://s', 'mom');
+    expect(calls[0].url).toBe('http://s/api/video-playback?person=mom');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('loadVideoPlayback defaults an absent person', async () => {
+    var calls = fakeFetch({});
+    await loadVideoPlayback('http://s');
+    expect(calls[0].url).toBe('http://s/api/video-playback?person=');
+  });
+  it('loadPlayback GETs /api/playback keyed by person', async () => {
+    var calls = fakeFetch({ play_next: [] });
+    await loadPlayback('http://s', 'dad');
+    expect(calls[0].url).toBe('http://s/api/playback?person=dad');
+  });
+  it('loadPlayback defaults an absent person', async () => {
+    var calls = fakeFetch({});
+    await loadPlayback('http://s');
+    expect(calls[0].url).toBe('http://s/api/playback?person=');
+  });
+});
+
+describe('loadAlbum / loadPlaylist', () => {
+  it('loadAlbum GETs /api/album/{id}', async () => {
+    var calls = fakeFetch({ id: 'ootb', items: [] });
+    await loadAlbum('http://s', 'ootb');
+    expect(calls[0].url).toBe('http://s/api/album/ootb');
+  });
+  it('loadPlaylist GETs /api/playlist/{id}', async () => {
+    var calls = fakeFetch({ id: 'pl-1', items: [] });
+    await loadPlaylist('http://s', 'pl-1');
+    expect(calls[0].url).toBe('http://s/api/playlist/pl-1');
+  });
+});
+
+describe('createPlaylist', () => {
+  it('POSTs name + profile and resolves the created record on 200', async () => {
+    var calls = fakeFetch({ id: 'my-mix' });
+    var rec = await createPlaylist('http://s', 'My Mix', 'kids');
+    expect(calls[0].url).toBe('http://s/api/playlists/create');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ name: 'My Mix', profile: 'kids' });
+    expect(rec).toEqual({ id: 'my-mix' });
+  });
+  it('rejects with the status on a non-2xx (e.g. blank name)', async () => {
+    fakeFetch({}, false);
+    await expect(createPlaylist('http://s', '', 'kids')).rejects.toBe(500);
+  });
+});
+
+// The 204-contract playlist mutations: resolve the response on 2xx, reject the
+// status otherwise (mirrors createPlaylist but keeps the raw response, not JSON).
+describe('204-contract playlist mutations resolve on ok / reject on error', () => {
+  var cases = [
+    { name: 'addToPlaylist', call: (ok) => { fakeFetch({}, ok); return addToPlaylist('http://s', 'pl', 't1'); }, url: 'http://s/api/playlists/add-track', body: { playlist_id: 'pl', track_id: 't1' } },
+    { name: 'addSourceToPlaylist', call: (ok) => { fakeFetch({}, ok); return addSourceToPlaylist('http://s', 'pl', 'album', 'ootb'); }, url: 'http://s/api/playlists/add-source', body: { playlist_id: 'pl', source_type: 'album', source_id: 'ootb' } },
+    { name: 'movePlaylistTrack', call: (ok) => { fakeFetch({}, ok); return movePlaylistTrack('http://s', 'pl', 2, 'up'); }, url: 'http://s/api/playlists/move-track', body: { playlist_id: 'pl', index: 2, direction: 'up' } },
+    { name: 'removeFromPlaylist', call: (ok) => { fakeFetch({}, ok); return removeFromPlaylist('http://s', 'pl', 3); }, url: 'http://s/api/playlists/remove-track', body: { playlist_id: 'pl', index: 3 } },
+    { name: 'renamePlaylist', call: (ok) => { fakeFetch({}, ok); return renamePlaylist('http://s', 'pl', 'New Name'); }, url: 'http://s/api/playlists/rename', body: { playlist_id: 'pl', name: 'New Name' } }
+  ];
+  cases.forEach(function(c) {
+    it(c.name + ' resolves the response on a 2xx', async () => {
+      var res = await c.call(true);
+      expect(res.ok).toBe(true);
+    });
+    it(c.name + ' rejects the status on a non-2xx', async () => {
+      await expect(c.call(false)).rejects.toBe(500);
+    });
+  });
+
+  it('addToPlaylist POSTs the expected url + body', async () => {
+    var calls = fakeFetch({});
+    await addToPlaylist('http://s', 'pl', 't1');
+    expect(calls[0].url).toBe('http://s/api/playlists/add-track');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ playlist_id: 'pl', track_id: 't1' });
+  });
+});
+
+describe('deletePlaylist', () => {
+  it('POSTs /api/playlists/delete with the playlist_id', async () => {
+    var calls = fakeFetch({});
+    await deletePlaylist('http://s', 'pl-1');
+    expect(calls[0].url).toBe('http://s/api/playlists/delete');
+    expect(calls[0].opts.method).toBe('POST');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ playlist_id: 'pl-1' });
   });
 });

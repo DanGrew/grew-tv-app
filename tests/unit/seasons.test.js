@@ -79,6 +79,9 @@ describe('defaultSeason', () => {
   it('falls back to the first declared season when the item has no season', () => {
     expect(defaultSeason([{ video: { id: 'x' } }], {}, SEASONS)).toBe(1);
   });
+  it('tolerates missing items — falls back to the first declared season', () => {
+    expect(defaultSeason(null, {}, SEASONS)).toBe(1);
+  });
 });
 
 describe('seasonPosterOf', () => {
@@ -89,6 +92,7 @@ describe('seasonPosterOf', () => {
     expect(seasonPosterOf(SEASONS, 9)).toBe(null);
     expect(seasonPosterOf(SEASONS, null)).toBe(null);
     expect(seasonPosterOf([], 1)).toBe(null);
+    expect(seasonPosterOf(null, 1)).toBe(null);
   });
 });
 

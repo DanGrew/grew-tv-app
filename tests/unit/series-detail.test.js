@@ -26,6 +26,15 @@ describe('lastPlayedIndex', () => {
     var progress = { a: { lastPlayed: 0 }, b: { resumePositionSec: 5 } };
     expect(lastPlayedIndex(items(['a', 'b']), progress)).toBe(-1);
   });
+  it('treats an unparseable lastPlayed string as epoch 0', () => {
+    expect(lastPlayedIndex(items(['a', 'b']), { a: { lastPlayed: 'nonsense' }, b: { lastPlayed: 2000 } })).toBe(1);
+  });
+  it('keeps the earlier index when a later entry has a smaller timestamp', () => {
+    expect(lastPlayedIndex(items(['a', 'b']), { a: { lastPlayed: 5000 }, b: { lastPlayed: 3000 } })).toBe(0);
+  });
+  it('tolerates missing items and progress (returns -1)', () => {
+    expect(lastPlayedIndex()).toBe(-1);
+  });
 });
 
 describe('playNextIndex', () => {
@@ -42,6 +51,9 @@ describe('playNextIndex', () => {
   });
   it('returns -1 for an empty list', () => {
     expect(playNextIndex([], {})).toBe(-1);
+  });
+  it('tolerates missing inputs (no items -> -1)', () => {
+    expect(playNextIndex(null, null)).toBe(-1);
   });
 });
 
@@ -78,6 +90,9 @@ describe('primaryAction', () => {
   it('is none for an empty collection', () => {
     expect(primaryAction([], {})).toEqual({ kind: 'none', index: -1 });
   });
+  it('tolerates missing inputs (no items/progress -> none)', () => {
+    expect(primaryAction()).toEqual({ kind: 'none', index: -1 });
+  });
 });
 
 describe('playNextLabel', () => {
@@ -99,6 +114,9 @@ describe('playNextLabel', () => {
   });
   it('is bare "Play next" for an empty collection', () => {
     expect(playNextLabel([], {})).toBe('Play next');
+  });
+  it('tolerates missing inputs (bare "Play next")', () => {
+    expect(playNextLabel(null)).toBe('Play next');
   });
 });
 
