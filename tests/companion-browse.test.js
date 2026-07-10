@@ -326,7 +326,8 @@ test.describe('desync mode', () => {
   });
 });
 
-// FEAT-040/TASK-255 — the MUSIC "♪ Music Queue (N)" button beside the video one:
+// FEAT-040/TASK-255 — the MUSIC "🎵 (N)" queue button beside the video one (TASK-258
+// compact label, de-purpled to match the video button):
 // shown only when the music override ("Play Next") queue is non-empty (count from
 // GET /api/playback), drives the TV audio page to start the queue head
 // (audio.html?playQueue), and greys while desynced (Browse) like the video/profile
