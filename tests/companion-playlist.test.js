@@ -184,23 +184,71 @@ test.describe('Road Trip playlist (2 tracks)', () => {
   // FEAT-036 (TASK-211) — per-track reorder (↑ ↓) + remove (✕), the companion
   // mirror of the TV playlist detail's row controls. Each POSTs BY POSITION (the
   // installApi fixture mutates the playlist clone) then reloads the list.
+  // TASK-328 — those chips no longer sit inline in the row; each row shows only the
+  // track tile + a ⋮ kebab, and the chips live in the kebab's popover (#row-pop).
   function rowOf(page, id) {
     return page.locator('.ph-row', { has: page.locator('.ph-txt[data-id="' + id + '"]') });
   }
+  async function openMenu(page, id) {
+    await rowOf(page, id).locator('.ph-kebab').click();
+    await expect(page.locator('#row-pop')).toBeVisible();
+  }
 
-  test('reorder/remove controls are edge-gated: first track has no ↑, last no ↓, both have ✕', async ({ page }) => {
+  // TASK-328 — the row itself is now just the song + one ⋮ button; the edit chips
+  // that used to dominate it (＋ ↑ ↓ ✕) are gone from the row until you open ⋮.
+  test('TASK-328: each row shows a ⋮ kebab and no inline edit chips', async ({ page }) => {
     await expect(page.locator('.ph-txt')).toHaveCount(2);
-    await expect(rowOf(page, 'ootb-03').locator('.ph-edit.up')).toHaveCount(0);   // first
-    await expect(rowOf(page, 'ootb-03').locator('.ph-edit.down')).toHaveCount(1);
-    await expect(rowOf(page, 'ootb-01').locator('.ph-edit.down')).toHaveCount(0); // last
-    await expect(rowOf(page, 'ootb-01').locator('.ph-edit.up')).toHaveCount(1);
-    await expect(rowOf(page, 'ootb-03').locator('.ph-edit.x')).toHaveCount(1);
-    await expect(rowOf(page, 'ootb-01').locator('.ph-edit.x')).toHaveCount(1);
+    await expect(page.locator('.ph-row .ph-kebab')).toHaveCount(2);
+    await expect(page.locator('.ph-row .ph-kebab').first()).toHaveText('⋮');
+    // No edit chips live in the row itself, and the popover starts hidden.
+    await expect(page.locator('.ph-row .ph-edit')).toHaveCount(0);
+    await expect(page.locator('#row-pop')).toBeHidden();
+  });
+
+  // TASK-328 — tapping ⋮ opens a popover of the four action icons (＋ ↑ ↓ ✕) as a
+  // vertical column. Icons only — the words live in the aria-labels for a11y.
+  test('TASK-328: ⋮ opens an icon-only action popover (＋ ↑ ↓ ✕ with word aria-labels)', async ({ page }) => {
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await openMenu(page, 'ootb-03'); // first track: add, down, x
+    await expect(page.locator('#row-pop .ph-edit')).toHaveCount(3);
+    await expect(page.locator('#row-pop .ph-edit.add')).toHaveText('＋');
+    await expect(page.locator('#row-pop .ph-edit.down')).toHaveText('↓');
+    await expect(page.locator('#row-pop .ph-edit.x')).toHaveText('✕');
+    await expect(page.locator('#row-pop .ph-edit.add')).toHaveAttribute('aria-label', 'Add to playlist');
+    await expect(page.locator('#row-pop .ph-edit.down')).toHaveAttribute('aria-label', 'Move down');
+    await expect(page.locator('#row-pop .ph-edit.x')).toHaveAttribute('aria-label', 'Remove');
+  });
+
+  // TASK-328 — picking an action closes the popover; tapping outside also closes it.
+  test('TASK-328: choosing an action closes the popover, and tap-outside closes it', async ({ page }) => {
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await openMenu(page, 'ootb-03');
+    await page.locator('#row-pop .ph-edit.add').click(); // opens the add-sheet, closes the popover
+    await expect(page.locator('#row-pop')).toBeHidden();
+    await page.locator('#btn-add-cancel').click();
+    // reopen, then dismiss by tapping the outside overlay
+    await openMenu(page, 'ootb-03');
+    await page.locator('#row-pop-overlay').click();
+    await expect(page.locator('#row-pop')).toBeHidden();
+  });
+
+  test('TASK-328: reorder/remove controls are edge-gated inside the popover: first has no ↑, last no ↓', async ({ page }) => {
+    await expect(page.locator('.ph-txt')).toHaveCount(2);
+    await openMenu(page, 'ootb-03'); // first
+    await expect(page.locator('#row-pop .ph-edit.up')).toHaveCount(0);
+    await expect(page.locator('#row-pop .ph-edit.down')).toHaveCount(1);
+    await expect(page.locator('#row-pop .ph-edit.x')).toHaveCount(1);
+    await page.locator('#row-pop-overlay').click();
+    await openMenu(page, 'ootb-01'); // last
+    await expect(page.locator('#row-pop .ph-edit.down')).toHaveCount(0);
+    await expect(page.locator('#row-pop .ph-edit.up')).toHaveCount(1);
+    await expect(page.locator('#row-pop .ph-edit.x')).toHaveCount(1);
   });
 
   test('moving the first track down reorders the list', async ({ page }) => {
     await expect(page.locator('.ph-txt')).toHaveCount(2);
-    await rowOf(page, 'ootb-03').locator('.ph-edit.down').click();
+    await openMenu(page, 'ootb-03');
+    await page.locator('#row-pop .ph-edit.down').click();
     await expect.poll(async () =>
       page.locator('.ph-txt').evaluateAll(els => els.map(e => e.getAttribute('data-id')))
     ).toEqual(['ootb-01', 'ootb-03']);
@@ -208,7 +256,8 @@ test.describe('Road Trip playlist (2 tracks)', () => {
 
   test('removing a track drops it from the list', async ({ page }) => {
     await expect(page.locator('.ph-txt')).toHaveCount(2);
-    await rowOf(page, 'ootb-01').locator('.ph-edit.x').click();
+    await openMenu(page, 'ootb-01');
+    await page.locator('#row-pop .ph-edit.x').click();
     await expect(page.locator('.ph-txt')).toHaveCount(1);
     await expect(page.locator('.ph-txt').first()).toHaveAttribute('data-id', 'ootb-03');
   });
@@ -292,10 +341,12 @@ test.describe('desync mode (Browse) — playlist self-load + edit', () => {
     await expect(page.locator('body')).toHaveClass(/browsing/);
   });
 
-  test('editing stays live while browsing — remove POSTs and repaints', async ({ page }) => {
+  test('editing stays live while browsing — the kebab popover remove POSTs and repaints', async ({ page }) => {
     await page.goto('/companion/playlist.html?id=pl-roadtrip');
     await expect(page.locator('.ph-txt')).toHaveCount(2);
-    await page.locator('.ph-row', { has: page.locator('.ph-txt[data-id="ootb-01"]') }).locator('.ph-edit.x').click();
+    await page.locator('.ph-row', { has: page.locator('.ph-txt[data-id="ootb-01"]') }).locator('.ph-kebab').click();
+    await expect(page.locator('#row-pop')).toBeVisible();
+    await page.locator('#row-pop .ph-edit.x').click();
     await expect(page.locator('.ph-txt')).toHaveCount(1);
   });
 

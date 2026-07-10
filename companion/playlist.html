@@ -39,6 +39,11 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .ph-edit:active, .ph-edit:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .ph-edit.x { border-color: rgba(255,135,135,0.5); color: #ff8787; }
 .ph-edit.x:active, .ph-edit.x:focus { outline: none; border-color: #ff8787; }
+.ph-kebab { flex-shrink: 0; align-self: center; min-width: 46px; padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-hi); color: var(--text); font-size: 20px; font-family: inherit; line-height: 1; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.ph-kebab:active, .ph-kebab:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#row-pop-overlay { display: none; position: fixed; inset: 0; z-index: 20; }
+#row-pop { display: none; position: fixed; z-index: 21; flex-direction: column; gap: 6px; padding: 6px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 12px 36px rgba(0,0,0,0.55); }
+#row-pop .ph-edit { width: 56px; min-width: 56px; text-align: center; }
 .no-actions { color: var(--text-muted); font-size: 16px; text-align: center; margin-top: 40px; grid-column: 1 / -1; }
 #manage-actions { display: flex; gap: 10px; justify-content: center; margin-top: 4px; flex-shrink: 0; }
 #btn-rename-playlist { min-width: 52px; padding: 10px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 20px; line-height: 1; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
@@ -126,6 +131,8 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
   </div>
 </div>
 <div id="add-status"></div>
+<div id="row-pop-overlay"></div>
+<div id="row-pop"></div>
 <script type="module">
 import { initPage } from '../ui/screens/companion-playlist.js';
 initPage();

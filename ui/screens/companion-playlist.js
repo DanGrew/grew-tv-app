@@ -5,6 +5,7 @@ import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { playlistCards } from '../../core/playlist-pick.js';
+import { rowActions, popoverTop } from '../../core/playlist-row-menu.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
@@ -30,6 +31,7 @@ export function initPage() {
     gridEl: document.getElementById('txtgrid')
   };
   var state = { playlistId: null, profile: null, person: null, tracks: [], progress: {}, title: '' };
+  var pop = { overlay: document.getElementById('row-pop-overlay'), menu: document.getElementById('row-pop'), openTrigger: null };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -242,18 +244,62 @@ export function initPage() {
     b.addEventListener('click', onTap);
     return b;
   }
-  // ↑ is omitted on the first track and ↓ on the last (an edge has nothing to swap
-  // with) — matches the TV detail's edge gating; ✕ is always present.
-  function appendUp(row, i) {
-    [i].filter(function(x) { return x > 0; }).forEach(function() {
-      row.appendChild(editBtn('&#8593;', 'up', 'Move up', function() { moveTrack(i, 'up'); }));
-    });
+  // TASK-328 — the per-track edit controls (＋ ↑ ↓ ✕) no longer sit inline in the
+  // row (a "wall of buttons"); they live in a single ⋮-triggered popover. The spec
+  // maps each action key to its icon-only chip (same editBtn as before, just
+  // relocated into the popover column); rowActions (core) decides WHICH keys a row
+  // offers, gating ↑ at the first track and ↓ at the last. Icons only — the words
+  // survive as aria-labels for a11y.
+  function fillPop(card, i, total) {
+    var spec = {
+      add:  function() { return editBtn('&#65291;', 'add', 'Add to playlist', function() { openAddSheet(card); }); },
+      up:   function() { return editBtn('&#8593;', 'up', 'Move up', function() { moveTrack(i, 'up'); }); },
+      down: function() { return editBtn('&#8595;', 'down', 'Move down', function() { moveTrack(i, 'down'); }); },
+      x:    function() { return editBtn('&#10005;', 'x', 'Remove', function() { removeTrack(i); }); }
+    };
+    rowActions(i, total).forEach(function(k) { pop.menu.appendChild(spec[k]()); });
   }
-  function appendDown(row, i, total) {
-    [i].filter(function(x) { return x < total - 1; }).forEach(function() {
-      row.appendChild(editBtn('&#8595;', 'down', 'Move down', function() { moveTrack(i, 'down'); }));
-    });
+  // Popover open/close. A full-screen transparent overlay under the menu catches a
+  // tap-outside (and intercepts a second kebab tap) — closing it; z-index layers the
+  // menu above. A click on any menu chip fires its action then bubbles to the menu's
+  // own close listener, so the action fires AND the popover closes. Positioning is
+  // fixed (never clipped by #grid-wrap's scroll): right-aligned to the kebab, top
+  // computed by popoverTop (below by default, flips above near the viewport bottom).
+  function closePop() {
+    pop.overlay.style.display = 'none';
+    pop.menu.style.display = 'none';
+    pop.menu.innerHTML = '';
+    pop.openTrigger = null;
   }
+  function placePop(trigger) {
+    var r = trigger.getBoundingClientRect();
+    pop.menu.style.right = (window.innerWidth - r.right) + 'px';
+    pop.menu.style.top = popoverTop(r, window.innerHeight, pop.menu.offsetHeight) + 'px';
+  }
+  function showPop(trigger, card, i, total) {
+    fillPop(card, i, total);
+    pop.overlay.style.display = 'block';
+    pop.menu.style.display = 'flex';
+    placePop(trigger);
+    pop.openTrigger = trigger;
+  }
+  // Re-tapping the same kebab closes (toggle); tapping a new one opens after closing.
+  function togglePop(trigger, card, i, total) {
+    var wasOpen = trigger === pop.openTrigger;
+    closePop();
+    ({ true: noop, false: function() { showPop(trigger, card, i, total); } })[wasOpen]();
+  }
+  function kebabBtn(card, i, total) {
+    var b = document.createElement('button');
+    b.className = 'ph-kebab';
+    b.setAttribute('aria-label', 'Track actions');
+    b.setAttribute('title', 'Track actions');
+    b.innerHTML = '&#8942;';
+    b.addEventListener('click', function() { togglePop(b, card, i, total); });
+    return b;
+  }
+  pop.overlay.addEventListener('click', closePop);
+  pop.menu.addEventListener('click', closePop);
 
   // Playlist items -> tile cards (id/title/duration for the progress hint). Flat:
   // a playlist carries no season/episode, so the bare track title is the label.
@@ -264,19 +310,16 @@ export function initPage() {
   }
 
   // A full-width row styled as ONE rounded box (TASK-263, the album-companion
-  // .detail-track-row model): a borderless play tile (tap = play on the TV) plus the
-  // ＋ add (TASK-262 — Play Next / add this track to a playlist) and ↑ ↓ ✕ edit
-  // controls as inner chips. The ＋ is a per-person action, so it stays live in Browse
-  // mode (the play tile greys, the edit chips do not). A <button> can't nest, so the
-  // tile stays a button and the chips sit beside it inside the .ph-row box.
+  // .detail-track-row model): a borderless play tile (tap = play on the TV) and, on
+  // the right, a single ⋮ kebab (TASK-328). The four edit chips (＋ ↑ ↓ ✕) that used
+  // to sit inline now live in the kebab's popover, so the row reads as a song, not a
+  // wall of buttons. The kebab stays live in Browse mode (only the play tile greys)
+  // — the popover's ＋ is a per-person add (TASK-262) and ↑ ↓ ✕ are edit actions.
   function trackRow(card, i, total) {
     var row = document.createElement('div');
     row.className = 'ph-row';
     row.appendChild(trackTile(card));
-    row.appendChild(editBtn('&#65291;', 'add', 'Add to playlist', function() { openAddSheet(card); }));
-    appendUp(row, i);
-    appendDown(row, i, total);
-    row.appendChild(editBtn('&#10005;', 'x', 'Remove', function() { removeTrack(i); }));
+    row.appendChild(kebabBtn(card, i, total));
     return row;
   }
 
