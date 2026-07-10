@@ -2,12 +2,13 @@ import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, videoPlaybackAction } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, videoPlaybackAction, loadPlayback } from '../../core/app-api.js';
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute } from '../../core/home-rails.js';
 import { queueCount } from '../../core/video-player-router.js';
+import { playNextCount } from '../../core/queue-view.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
 // Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
@@ -17,19 +18,34 @@ var LAST_TAB_KEY = 'grew-tv:last-tab';
 var ACTIVATE_KEYS = { Enter: true, ' ': true };
 
 export function initBrowsePage() {
-  // FEAT-040 Play Queue: the bottom-right pill (was the unused settings button)
-  // appears only when the video queue is non-empty; it drives the persistent
-  // player to start the queue head (?playQueue). Count read from the read-only
-  // video-playback snapshot, refreshed on load + after queueing a film here.
+  // FEAT-040 Play Queue / TASK-259: the bottom-right shows TWO adjacent icon+count
+  // buttons — 🎬 video, 🎵 music — each appearing only when ITS OWN override queue
+  // is non-empty; each drives its persistent player to start the queue head
+  // (?playQueue). The icon+`(N)` style matches the companion (TASK-258). Counts read
+  // from the read-only playback snapshots, refreshed on load (+ the video one after
+  // queueing a film here). Before this the music queue was unreachable from browse.
   function showPlayQueue(count) {
     var btn = document.getElementById('btn-play-queue');
-    btn.textContent = '▶ Play Queue (' + count + ')';
+    btn.textContent = '🎬 (' + count + ')';
     btn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[(count > 0) + ''];
   }
   function refreshQueue() {
     loadVideoPlayback(SERVER, getPerson()).then(function(snap) { showPlayQueue(queueCount(snap)); }).catch(function() {});
   }
   function onPlayQueue() { navTo('video.html', { playQueue: 1, from: 'browse' }); }
+
+  // The MUSIC twin, sitting beside the video button. Count read from the read-only
+  // GET /api/playback snapshot (music override queue = play_next, via playNextCount);
+  // tapping starts the music queue head (audio.html?playQueue, the TASK-255 entry).
+  function showPlayQueueMusic(count) {
+    var btn = document.getElementById('btn-play-queue-music');
+    btn.textContent = '🎵 (' + count + ')';
+    btn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[(count > 0) + ''];
+  }
+  function refreshQueueMusic() {
+    loadPlayback(SERVER, getPerson()).then(function(snap) { showPlayQueueMusic(playNextCount(snap)); }).catch(function() {});
+  }
+  function onPlayQueueMusic() { navTo('audio.html', { playQueue: 1, from: 'browse' }); }
 
   // Transient ＋Queue confirmation toast (films queued from a tile badge).
   var statusTimer = null;
@@ -64,6 +80,7 @@ export function initBrowsePage() {
   });
 
   document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
+  document.getElementById('btn-play-queue-music').addEventListener('click', onPlayQueueMusic);
   document.addEventListener('keydown', dispatchKey);
   mountBreadcrumb('breadcrumb', buildCrumbs('browse'));
 
@@ -156,6 +173,7 @@ export function initBrowsePage() {
       renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist, recents);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
       refreshQueue();
+      refreshQueueMusic();
     })
     .catch(function() { navTo('error.html'); });
 }
