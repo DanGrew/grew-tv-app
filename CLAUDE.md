@@ -70,6 +70,7 @@ module or a screen** — this index rots otherwise (it did).
 - `lrc.js` — LRC parse + rolling-frame lyric selection (FEAT-018)
 - `cover-mosaic.js` — playlist cover-mosaic markup (FEAT-039)
 - `playlist-name.js` / `playlist-pick.js` — create-playlist + "add to playlist" (FEAT-036)
+- `playlist-row-menu.js` — companion playlist row ⋮-popover logic: `rowActions` (which chips, edge-gated) + `popoverTop` (below/flip-above placement) (TASK-328)
 
 **Profile / device plane**
 - `profile-config.js` / `profile-rows.js` — persons + PIN gate, picker layout (FEAT-026)
