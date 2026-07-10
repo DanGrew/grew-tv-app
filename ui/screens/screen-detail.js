@@ -15,7 +15,7 @@ var AVAILABLE_ROW = {
 // Per-render context for the detail screen: the series + progress + the active
 // season chip (TASK-123). null activeSeason = no season chips (legacy single
 // list). Reset on each buildDetailList.
-var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, onAddToPlaylist: null, onQueue: null, onMoveItem: null, onRemoveItem: null, seasons: [], activeSeason: null, suppressResume: false };
+var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, onAddToPlaylist: null, onQueue: null, onMoveItem: null, onRemoveItem: null, seasons: [], activeSeason: null, suppressResume: false, albumHeaders: false };
 
 // Up/Down move between vertical stops: clickable breadcrumb crumbs (top), then
 // the header Play-next action, the shuffle button, the active season chip, then
@@ -118,6 +118,34 @@ function maybeSeasonHeaderFor(list, item, ctx) {
     true:  function() { maybeSeasonHeader(list, item, ctx); },
     false: function() {}
   })[String(state.activeSeason === null)]();
+}
+
+// TASK-322 (FEAT-046) — album-group headers for the artist song list. The artist
+// page passes opts.albumHeaders + items tagged with albumId/albumTitle
+// (core/artist-tracks); a header renders whenever the album changes, so an
+// artist's tracks read grouped by album (newest album first) instead of the
+// season/legacy dividers. Reuses the .detail-season header style.
+function albumHeader(list, title) {
+  var h = document.createElement('div');
+  h.className = 'detail-season';
+  h.textContent = title;
+  list.appendChild(h);
+}
+
+function maybeAlbumHeader(list, item, ctx) {
+  [item.albumId]
+    .filter(function(k) { return k != null; })
+    .filter(function(k) { return k !== ctx.lastAlbum; })
+    .forEach(function(k) { albumHeader(list, item.albumTitle); ctx.lastAlbum = k; });
+}
+
+// The per-item group header: album titles when the page opts into albumHeaders
+// (artist list), otherwise the season dividers (series legacy single list).
+function maybeGroupHeader(list, item, ctx) {
+  ({
+    true:  function() { maybeAlbumHeader(list, item, ctx); },
+    false: function() { maybeSeasonHeaderFor(list, item, ctx); }
+  })[String(state.albumHeaders)]();
 }
 
 function thumbMarkup(src) {
@@ -364,7 +392,7 @@ function renderList() {
   // index, so a filtered season still tags the right row.
   var nextIdx = primaryAction(state.series.items, state.progress).index;
   visibleItems(state.series.items, state.activeSeason).forEach(function(e) {
-    maybeSeasonHeaderFor(list, e.item, ctx);
+    maybeGroupHeader(list, e.item, ctx);
     list.appendChild(buildRow(state.server, state.series, state.progress, state.onPlayItem, e.item, e.idx, e.idx === nextIdx));
   });
 }
@@ -389,6 +417,9 @@ function renderList() {
 // opts.suppressResume (TASK-276): music surfaces (album / playlist detail) pass true
 // so track rows never show the mid-watch treatment (progress bar / RESUME tag /
 // Restart) — audio has no mid-song resume. Video series/film detail omits it.
+// opts.albumHeaders (TASK-322): the artist song list passes true + items tagged with
+// albumId/albumTitle (core/artist-tracks) so the rows group under album headers
+// (newest album first) instead of the season/legacy dividers.
 export function buildDetailList(server, series, progress, onPlayItem, onAddToPlaylist, onQueue, onMoveItem, onRemoveItem, opts) {
   state = {
     server: server, series: series, progress: progress, onPlayItem: onPlayItem,
@@ -398,7 +429,8 @@ export function buildDetailList(server, series, progress, onPlayItem, onAddToPla
     onRemoveItem: [onRemoveItem].filter(Boolean).concat([null])[0],
     seasons: seasonsOf(series),
     activeSeason: defaultSeason(series.items, progress, seasonsOf(series)),
-    suppressResume: Boolean([opts].filter(Boolean).concat([{}])[0].suppressResume)
+    suppressResume: Boolean([opts].filter(Boolean).concat([{}])[0].suppressResume),
+    albumHeaders: Boolean([opts].filter(Boolean).concat([{}])[0].albumHeaders)
   };
   document.getElementById('detail-title').textContent = series.title;
   renderChips();

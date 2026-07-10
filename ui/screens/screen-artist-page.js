@@ -1,37 +1,45 @@
 import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
-import { gridArrow, renderGrid, focusFirstGridTile } from './screen-rail-grid.js';
+import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadAlbum } from '../../core/app-api.js';
+import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 import { albumsByArtist } from '../../core/home-rails.js';
-import { progressMapFromCW } from '../../core/progress.js';
+import { artistTracks } from '../../core/artist-tracks.js';
 
-// FEAT-029 — the artist drill-down (L3 off the Music tab's Artists rail): a full
-// poster grid of one artist's albums. Reuses the rail-grid grid + glass tokens
-// (screen-rail-grid.js) so it matches browse; an album tile opens album detail.
-// Pure album filtering lives in core/home-rails (albumsByArtist). Backend = page
-// origin, not a hardcoded host (BUG-009 — see screen-video-page).
+// TASK-322 (FEAT-046) — the artist page is a SONG LIST of all the artist's tracks,
+// grouped by album (newest album first, track order within), reusing the album/
+// playlist detail row markup (screen-detail buildDetailList + its d-pad helpers).
+// Tapping a song plays the ARTIST source from there: navTo('audio.html',
+// {artist, track}) → the audio page fires play-source {artist} then play-track, so
+// playback continues through the artist's songs (shuffle is server-owned, per the
+// artist's stored pref — TASK-320). No header Play/Shuffle — consistent with album/
+// playlist (TASK-321); you start by tapping a song.
+//
+// Data (impl choice: option (b), client-assembly — no backend endpoint, so no
+// co-deploy): the album grid already available via albumsByArtist (browse cards,
+// newest-first by year) + one /api/album fetch per album, flattened in that order
+// (core/artist-tracks) to reproduce the artist source order. N = the artist's album
+// count (2–10 for the family rips — see the PR perf note). Perf: the .detail-row is
+// FLAT (no per-row backdrop-filter — artist.html) so the longest list stays cheap.
+// Backend = page origin, not a hardcoded host (BUG-009).
 var SERVER = window.location.origin;
 
 export function initArtistPage() {
   var artist = getParam('artist');
   var profile = [getProfile()].filter(Boolean).concat(['kids'])[0];
 
-  // id -> album card, filled once /api/browse resolves. The companion's `select`
-  // intent carries only an id, so resolve against the catalog rather than a
-  // rendered tile (BUG-008, mirrors the rail-grid page).
-  var catalog = {};
+  // Tapping a song → the artist player, jumping to this track (the audio page fires
+  // play-source {artist} then play-track). from:'artist' so Back returns here.
+  function onPlayItem(item) { navTo('audio.html', { artist: artist, track: item.video.id, from: 'artist' }); }
 
-  function onSelect(card) { navTo('album-detail.html', { album: card.id }); }
-
-  // Header Play / Shuffle (TASK-214): the artist param IS the play-source id —
-  // the audio page reads `?artist=` and fires `play-source` { source_type:
-  // 'artist' } with the shuffle flag (TASK-187 plumbing). Play-all = ordered,
-  // Shuffle = shuffled; both carry from:'artist' for the breadcrumb.
-  function playArtist() { navTo('audio.html', { artist: artist, from: 'artist' }); }
-  function shuffleArtist() { navTo('audio.html', { artist: artist, shuffle: '1', from: 'artist' }); }
+  // Entry focus lands on the first track row; tapping it starts the artist from the
+  // top (mirrors the album/playlist detail focus — TASK-321).
+  function focusFirstRow() {
+    [document.querySelector('.detail-row')].filter(Boolean).forEach(function(r) { r.focus(); });
+  }
 
   // Back collapses one level — to the Music tab on the browse page (?tab=music).
   function goBack(e) {
@@ -41,38 +49,33 @@ export function initArtistPage() {
 
   var wsApp = connectApp(window.location.origin, function(intent, params) {
     var INTENTS = {
-      navigate_up:    function() { gridArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
-      navigate_down:  function() { gridArrow({ key: 'ArrowDown',  preventDefault: function() {} }); },
-      navigate_left:  function() { gridArrow({ key: 'ArrowLeft',  preventDefault: function() {} }); },
-      navigate_right: function() { gridArrow({ key: 'ArrowRight', preventDefault: function() {} }); },
-      select:         function() {
+      navigate_up:   function() { detailArrow({ key: 'ArrowUp',   preventDefault: function() {} }); },
+      navigate_down: function() { detailArrow({ key: 'ArrowDown', preventDefault: function() {} }); },
+      play:          function() {
         var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
-        [catalog[id]].filter(Boolean).forEach(onSelect);
+        var target = [id].filter(Boolean).map(function(i) { return document.querySelector('.detail-row[data-id="' + i + '"]'); }).filter(Boolean)[0];
+        ([target].filter(Boolean).concat([document.activeElement]))[0].click();
       },
-      playArtist:     function() { playArtist(); },
-      shuffle:        function() { shuffleArtist(); },
-      back:           function() { goBack(null); },
-      navigate:       function() { navTo(params.page, params.params); }
+      back:          function() { goBack(null); },
+      navigate:      function() { navTo(params.page, params.params); }
     };
     [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
   });
   wsApp.sendContext({ context_id: 'artist', artist: artist });
-  // Live snapshot so the companion mirrors this L3 state.
+  // Live snapshot so the companion mirrors this artist state.
   wsApp.sendAppState({ screen: 'artist', artist: artist, profile: profile });
 
-  document.getElementById('btn-play').addEventListener('click', playArtist);
-  document.getElementById('btn-shuffle').addEventListener('click', shuffleArtist);
   document.addEventListener('keydown', dispatchKey);
 
   initPage({
-    onEnter: focusFirstGridTile,
+    onEnter: focusFirstRow,
     keys: {
-      ArrowLeft:  gridArrow,
-      ArrowRight: gridArrow,
-      ArrowUp:    gridArrow,
-      ArrowDown:  gridArrow,
       Escape:     goBack,
-      Backspace:  goBack
+      Backspace:  goBack,
+      ArrowUp:    detailArrow,
+      ArrowDown:  detailArrow,
+      ArrowLeft:  detailLeft,
+      ArrowRight: detailRight
     },
     remote: {}
   });
@@ -82,15 +85,16 @@ export function initArtistPage() {
     loadContinueWatching(SERVER, profile, getPerson()).catch(function() { return { content: [] }; })
   ])
     .then(function(res) {
-      var browse = res[0];
       var cw = [res[1].content].filter(Boolean).concat([[]])[0];
-      var cards = [browse.content].filter(Boolean).concat([[]])[0];
+      var cards = [res[0].content].filter(Boolean).concat([[]])[0];
       var albums = albumsByArtist(cards, artist);
-      albums.forEach(function(c) { catalog[c.id] = c; });
-      document.getElementById('grid-title').textContent = artist;
+      var progress = progressMapFromCW(cw);
       mountBreadcrumb('breadcrumb', buildCrumbs('artist', { artistName: artist }));
-      renderGrid(SERVER, albums, progressMapFromCW(cw), onSelect);
-      focusFirstGridTile();
+      return Promise.all(albums.map(function(a) { return loadAlbum(SERVER, a.id).catch(function() { return null; }); }))
+        .then(function(details) {
+          buildDetailList(SERVER, artistTracks(artist, details), progress, onPlayItem, null, null, null, null, { suppressResume: true, albumHeaders: true });
+          focusFirstRow();
+        });
     })
     .catch(function() { navTo('error.html'); });
 }

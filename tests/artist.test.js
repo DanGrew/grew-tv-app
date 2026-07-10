@@ -1,14 +1,13 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 
-// FEAT-031 (TASK-214) — the artist screen's Play-all / Shuffle header. TASK-187
-// wired the `audio.html?artist=` plumbing (play-source { source_type: 'artist' });
-// the two header buttons open the player on the artist source. TASK-320/321:
-// shuffle is server-owned per source now, so play-source no longer carries a
-// client shuffle flag (the artist header buttons remain — their re-scope is
-// TASK-316). The faithful playback fixture resolves an artist source to every
-// audio track by that artist (ELO -> ootb-01..03), so now-playing paints the
-// first track.
+// TASK-322 (FEAT-046) — the artist page is a SONG LIST of all the artist's tracks,
+// grouped by album (newest album first, track order within), reusing the album/
+// playlist detail rows. Tapping a song plays the ARTIST source from there
+// (audio.html?artist=&track= → play-source {artist} + play-track), so playback
+// continues through the artist's songs. No Play/Shuffle header (TASK-321). The
+// data is assembled client-side (option (b)): albumsByArtist + one /api/album per
+// album — ELO has Time (1981) + Out of the Blue (1977) in the fixtures.
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
@@ -26,49 +25,68 @@ async function enterArtist(page) {
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="artist:ELO"]').click();
   await expect(page).toHaveURL(/artist\.html/);
-  await expect(page.locator('#grid-title')).toHaveText('ELO');
+  await expect(page.locator('#detail-title')).toHaveText('ELO');
+  // The render signal: the first song row is present (init has wired its handlers).
+  await expect(page.locator('.detail-row').first()).toBeVisible();
 }
 
-test('the artist page shows Play and Shuffle header buttons', async ({ page }) => {
+// Story 1 — all the artist's songs, grouped under album headers, newest album first.
+test('the artist page lists all the artist songs grouped by album, newest album first', async ({ page }) => {
   await enterArtist(page);
-  await expect(page.locator('#btn-play')).toBeVisible();
-  await expect(page.locator('#btn-shuffle')).toBeVisible();
+  // Two album headers, newest first (Time 1981 above Out of the Blue 1977).
+  await expect(page.locator('.detail-season')).toHaveText(['Time', 'Out of the Blue']);
+  // Every ELO track across both albums, in album-then-track order.
+  await expect(page.locator('.detail-row')).toHaveCount(5);
+  await expect(page.locator('.detail-row .detail-label')).toHaveText([
+    '1. Twilight', '2. Ticket to the Moon',
+    '1. Turn to Stone', '2. Mr. Blue Sky', '3. Sweet Talkin Woman'
+  ]);
+  // The first row belongs to the newest album (Time).
+  await expect(page.locator('.detail-row').first()).toHaveAttribute('data-id', 'elo-time-01');
 });
 
-test('Play opens the player on the artist source (ordered), now-playing = first track', async ({ page }) => {
+// Story 3 — no Play/Shuffle button; you tap a song to start (same as album/playlist).
+test('there is no Play or Shuffle button on the artist page', async ({ page }) => {
   await enterArtist(page);
-  const post = page.waitForRequest(r => r.url().includes('/api/playback/play-source') && r.method() === 'POST');
-  await page.locator('#btn-play').click();
-  await expect(page).toHaveURL(/audio\.html/);
-  const body = JSON.parse((await post).postData());
-  expect(body.source_type).toBe('artist');
-  expect(body.source_id).toBe('ELO');
-  // TASK-320/321: play-source carries no client shuffle flag — the backend owns
-  // shuffle per source now (the source's stored pref governs order).
-  expect(body.shuffle).toBeUndefined();
-  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
-  await expect(page.locator('#audio-artist')).toHaveText('ELO');
-});
-
-// TASK-320/321: the artist Shuffle button still opens the artist player, but the
-// client no longer sends a shuffle flag on play-source — shuffle is server-owned
-// per source (the artist header-button re-scope is TASK-316). The player carries
-// no shuffle pill to reflect it either.
-test('Shuffle on the artist source sends no client shuffle flag (backend owns it)', async ({ page }) => {
-  await enterArtist(page);
-  const post = page.waitForRequest(r => r.url().includes('/api/playback/play-source') && r.method() === 'POST');
-  await page.locator('#btn-shuffle').click();
-  await expect(page).toHaveURL(/audio\.html/);
-  const body = JSON.parse((await post).postData());
-  expect(body.source_type).toBe('artist');
-  expect(body.shuffle).toBeUndefined();
-  await expect(page.locator('#screen-audio')).toBeVisible();
+  await expect(page.locator('#btn-play')).toHaveCount(0);
   await expect(page.locator('#btn-shuffle')).toHaveCount(0);
 });
 
-test('the grid is reachable below the header — Up from the first tile lands on the actions', async ({ page }) => {
+// Story 2 — tapping a song plays it and continues through the artist's songs.
+test('tapping a song plays the artist source from there (play-source artist + play-track)', async ({ page }) => {
   await enterArtist(page);
-  await page.locator('#rail-grid .film-tile').first().focus();
-  await page.keyboard.press('ArrowUp');
-  await expect(page.locator('#btn-play')).toBeFocused();
+  const srcPost = page.waitForRequest(r => r.url().includes('/api/playback/play-source') && r.method() === 'POST');
+  const trkPost = page.waitForRequest(r => r.url().includes('/api/playback/play-track') && r.method() === 'POST');
+  await page.locator('.detail-row[data-id="ootb-01"]').click();
+  await expect(page).toHaveURL(/audio\.html/);
+  const url = page.url();
+  expect(url).toContain('artist=ELO');
+  expect(url).toContain('track=ootb-01');
+  expect(url).not.toContain('shuffle');
+  const src = JSON.parse((await srcPost).postData());
+  expect(src.source_type).toBe('artist');
+  expect(src.source_id).toBe('ELO');
+  // Shuffle is server-owned per source now (TASK-320) — no client flag.
+  expect(src.shuffle).toBeUndefined();
+  expect(JSON.parse((await trkPost).postData()).track_id).toBe('ootb-01');
+  // now-playing = the tapped song; the artist source follows on (queue mode: ⏭ shown).
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
+  await expect(page.locator('#audio-artist')).toHaveText('ELO');
+  await expect(page.locator('#btn-next')).toBeVisible();
+});
+
+// Tapping a song in the SECOND (older) album plays THAT song (not the album top).
+test('tapping a song in a later album starts on that song', async ({ page }) => {
+  await enterArtist(page);
+  await page.locator('.detail-row[data-id="elo-time-02"]').click();
+  await expect(page).toHaveURL(/track=elo-time-02/);
+  await expect(page.locator('#audio-title')).toHaveText('Ticket to the Moon');
+});
+
+// The Artists-rail drill-down still lands here, and Back returns to the Music tab.
+test('Back from the artist song list returns to the Music tab', async ({ page }) => {
+  await enterArtist(page);
+  await page.keyboard.press('Backspace');
+  await expect(page).toHaveURL(/tab=music/);
+  await expect(page.locator('.rail-row[data-rail="artists"]')).toBeVisible();
 });
