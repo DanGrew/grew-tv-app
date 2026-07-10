@@ -158,6 +158,15 @@ Read this BEFORE writing screen code — these gate the PR in CI even when local
   obsoleted `tests/screen-resume.test.js`). Mock new endpoints in
   `tests/fixtures/api.js`. e2e is CI-only; run locally with
   `npx playwright test tests/<file>.test.js` before pushing.
+- **One page can be backed by SEVERAL e2e suites — grep, don't guess.** A screen's
+  behaviour is often split across multiple `tests/*.test.js` by feature, not one
+  file per page. The companion playlist page (`companion/playlist.html`) alone is
+  covered by `companion-playlist.test.js` (rows/reorder/delete), `-track-add`,
+  `-bulk-add`, `-add`, and `-create` — change the row markup and you must update
+  every suite that asserts it, not just the obvious one (TASK-328 shipped a fix
+  green in `companion-playlist.test.js` but red in `-track-add`). Before finishing
+  a screen change, `grep -rl "<the class/id you touched>" tests/*.test.js` and run
+  each hit.
 - **Some screen modules are shared by more than one HTML page — any element they
   touch must be optional-safe (`[el].filter(Boolean).forEach(...)`), and you must
   run BOTH pages' e2e.** Known sharers: `screen-detail.js` (`buildDetailList` +
