@@ -356,7 +356,7 @@ test.describe('music Play Queue button', () => {
     const intents2 = [];
     await musicMock(page, intents2, [{ track_id: 'a' }, { track_id: 'b' }]);
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 Music Queue (2)');
+    await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 (2)');
     await page.locator('#btn-play-queue-music').click();
     await expect.poll(() => {
       const nav = intents2.find((i) => i.intent === 'navigate' && i.params.page === 'audio.html');
@@ -372,4 +372,53 @@ test.describe('music Play Queue button', () => {
     await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
     await expect(page.locator('#btn-play-queue-music')).toHaveClass(/desync-off/);
   });
+
+  // TASK-258 (3): the music queue button carries no purple `--accent` tint — its
+  // border matches the video button + every other button (the white --focus).
+  test('is de-purpled — its border matches the other buttons, not the accent', async ({ page }) => {
+    await musicMock(page, [], [{ track_id: 'a' }]);
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#btn-play-queue-music')).toBeVisible();
+    const border = await page.locator('#btn-play-queue-music').evaluate(el => getComputedStyle(el).borderTopColor);
+    expect(border).toBe('rgb(255, 255, 255)');       // --focus white, NOT rgb(185, 140, 255) accent
+  });
+});
+
+// TASK-258 (2): the VIDEO queue button reads a compact "🎬 (N)" — media icon +
+// bracketed count, no "Video" word or list icon (mirrors the music button). A
+// dedicated mock carries a `person` in app_state (the top-level mock omits it, so
+// the queue is never fetched) + routes the GET video-playback snapshot's queue.
+test.describe('video Play Queue button label (TASK-258)', () => {
+  function videoMock(page, queue) {
+    return page.routeWebSocket(/:8766/, (ws) => {
+      ws.onMessage(function(raw) {
+        const m = JSON.parse(raw);
+        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+        if (m.type === 'snapshot_request') { ws.send(msg('context', { version: 2, context_id: 'browse' })); ws.send(msg('app_state', { screen: 'home', profile: 'kids', person: 'kids' })); }
+      });
+    }).then(() => page.route(/\/api\/video-playback\?/, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', override_queue: queue }) })));
+  }
+
+  test('shows just the icon and bracketed count — no "Video" word', async ({ page }) => {
+    await videoMock(page, [{ entry_id: 'e1' }, { entry_id: 'e2' }, { entry_id: 'e3' }]);
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (3)');
+  });
+});
+
+// TASK-258 (1): the screen pill (screen-bar) and the Control/Browse toggle
+// (sync-bar) share ONE row inside #bar-row — side by side, not stacked as two
+// full-width bars. The default mock auto-targets the sole screen, so screen-bar
+// renders its compact current-screen pill beside the sync seg.
+test('the screen pill and the Control/Browse toggle share one row (not stacked)', async ({ page }) => {
+  await expect(page.locator('#bar-row #screen-bar')).toBeVisible();
+  await expect(page.locator('#bar-row #sync-bar')).toBeVisible();
+  const screenBox = await page.locator('#screen-bar').boundingBox();
+  const syncBox = await page.locator('#sync-bar').boundingBox();
+  // Same row: their vertical spans overlap (stacked bars would not).
+  expect(screenBox.y).toBeLessThan(syncBox.y + syncBox.height);
+  expect(syncBox.y).toBeLessThan(screenBox.y + screenBox.height);
+  // Side by side: the screen pill sits left of the toggle.
+  expect(screenBox.x).toBeLessThan(syncBox.x);
 });

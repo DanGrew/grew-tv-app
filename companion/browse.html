@@ -55,7 +55,6 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 #queue-actions { display: flex; gap: 10px; flex-shrink: 0; }
 #btn-play-queue, #btn-play-queue-music { flex: 1 1 0; min-width: 0; font-size: 15px; padding: 12px 16px; border-radius: var(--radius-sm); border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #btn-play-queue:active, #btn-play-queue:focus, #btn-play-queue-music:active, #btn-play-queue-music:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-#btn-play-queue-music { border-color: var(--accent, #b98cff); color: var(--accent, #b98cff); }
 #breadcrumb { flex-shrink: 0; }
 .breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .crumb { font-size: 13px; }
@@ -64,7 +63,8 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 .crumb-link { background: none; border: none; padding: 2px 4px; margin: 0; color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); touch-action: manipulation; transition: color var(--dur) var(--ease); }
 .crumb-link:active { color: var(--focus); }
 .crumb-link:focus { outline: 1px solid var(--focus); }
-#screen-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; flex-shrink: 0; }
+#bar-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+#screen-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; align-items: center; flex-shrink: 0; }
 #screen-bar:empty { display: none; }
 .screen-bar-label { width: 100%; font-size: 12px; color: var(--text-muted); text-align: center; text-transform: uppercase; letter-spacing: 1px; }
 .screen-list { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 100%; }
@@ -86,11 +86,13 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 </head>
 <body>
 <div id="conn-status">connecting…</div>
+<div id="bar-row">
 <div id="screen-bar"></div>
 <div id="sync-bar"></div>
+</div>
 <div id="queue-actions">
-<button id="btn-play-queue" type="button" style="display:none">&#127909; Video Queue</button>
-<button id="btn-play-queue-music" type="button" style="display:none">&#127925; Music Queue</button>
+<button id="btn-play-queue" type="button" style="display:none">&#127909; (0)</button>
+<button id="btn-play-queue-music" type="button" style="display:none">&#127925; (0)</button>
 </div>
 <div id="topbar">
   <div id="breadcrumb"></div>
