@@ -103,9 +103,9 @@ mirrors, shared `core/`). Same arcs, different mechanics.
     Home until BUG-037 lands. Series/collections keep the two-hop crumb.
   - **G-COLD (TASK-299)**: the browse Continue rail intermittently empties on a
     cold DB (root cause unconfirmed; flaked on TV). CONTINUE stories gated on it.
-  - **G-ARTIST**: confirm the artist page's whole-artist **Play** cleanly lands the
-    player (companion `#btn-play`→`playArtist`; confirm TV artist page has a
-    play-all) before relying on it; fallback = drill artist→album→track→play.
+  - **G-ARTIST (resolved TASK-322)**: the artist page is now a SONG LIST — you start
+    by tapping a song (there is no whole-artist Play/Shuffle to confirm). C7 + T7 tap
+    a song row (`#songlist .song` / `#detail-list .detail-row`) to land the player.
 
 ---
 
@@ -194,17 +194,17 @@ Collection = kind `series`; opens detail with a clip list; keeps the two-hop cru
 CHECK: Collections rail; clip list; two-hop retrace (contrast C5's Home-only).
 DATA: Ollie (8 clips).
 
-### C7 · PLAY ARTIST  🆕 new  ⚠️ G-ARTIST
+### C7 · PLAY ARTIST (song list)  🔁 reworked (TASK-322)
 ```
 01-music        Music → Artists rail appears
 02-artists      tap Artists → artist grid
-03-artist       tap "Queen" → artist.html, albums grid + Play/Shuffle header
-04-audio        tap Play (#btn-play → playArtist) → audio.html
+03-artist       tap "Queen" → artist.html: SONG LIST, tracks grouped by album header
+04-audio        tap a song (#songlist .song → play intent) → drives TV to audio.html
 05-paused ▶    06-playing ⏸
 07-crumb-artist crumb "Queen" → artist page (Control mode ok; Browse-mode = BUG-035)
 ```
-CHECK: artist albums grid; whole-artist play lands the player; crumb back.
-DATA: Queen.  Fallback if playArtist doesn't land: drill artist→album→track→play.
+CHECK: artist song list grouped by album; tapping a song lands the player; crumb back.
+DATA: Queen.  (TASK-322: no whole-artist Play/Shuffle — you tap a song to start.)
 
 ### C8 · PLAY PLAYLIST  🆕 new
 Cold DB seeds no playlist → build first (create + add a track), then play.
@@ -334,10 +334,9 @@ DATA: Jungle Gym (26-05-21).
 Home Movies tab → Collections rail → "Ollie" → detail (clip list) → play clip → paused/playing → crumb retrace (two-hop).
 DATA: Ollie.
 
-### T7 · PLAY ARTIST  🆕 new  ⚠️ G-ARTIST
-Music tab → Artists rail → artist page (`#grid-title`, `#rail-grid`) → **Play-all** → audio → paused/playing.
-⚠️ CONFIRM the TV artist page has a whole-artist play control; else drill artist→album→track→play.
-DATA: Queen.
+### T7 · PLAY ARTIST (song list)  🔁 reworked (TASK-322)
+Music tab → Artists rail → artist page (`#detail-title`, `#detail-list` — a SONG LIST grouped by album header) → **tap a song** → audio → paused/playing.
+DATA: Queen.  (TASK-322: no whole-artist Play/Shuffle control — tap a song to start, same as album/playlist.)
 
 ### T8 · PLAY PLAYLIST  🆕 new
 Build (or reuse tv-artist-playlist's build) → `playlist-detail.html` (`#detail-list .detail-row`) → play → paused/playing. Cold DB → build first.

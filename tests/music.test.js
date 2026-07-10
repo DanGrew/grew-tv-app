@@ -62,23 +62,26 @@ test('Artists rail has one square tile per artist (A-Z), labelled with the album
   await expect(page.locator('.film-tile[data-id="artist:ABBA"] .tile-sub')).toHaveText('1 album');
 });
 
-test('selecting an artist drills into a grid of just that artist’s albums; an album opens its detail', async ({ page }) => {
+// TASK-322: the artist drill-down is now a SONG LIST grouped by album (newest album
+// first), not an album grid; tapping a song opens the artist player on that track.
+test('selecting an artist drills into its song list grouped by album; tapping a song opens the player', async ({ page }) => {
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="artist:ELO"]').click();
   await expect(page).toHaveURL(/artist\.html/);
-  await expect(page.locator('#grid-title')).toHaveText('ELO');
-  // ELO's two albums, newest first by year (Time 1981 before Out of the Blue 1977);
+  await expect(page.locator('#detail-title')).toHaveText('ELO');
+  await expect(page.locator('.detail-row').first()).toBeVisible();
+  // ELO's two albums group newest first (Time 1981 above Out of the Blue 1977);
   // ABBA's Arrival is absent.
-  const tiles = page.locator('#rail-grid .film-tile');
-  await expect(tiles).toHaveCount(2);
-  await expect(tiles.locator('.tile-title')).toHaveText(['Time', 'Out of the Blue']);
-  await expect(page.locator('#rail-grid .film-tile[data-id="abba-arrival"]')).toHaveCount(0);
+  await expect(page.locator('.detail-season')).toHaveText(['Time', 'Out of the Blue']);
+  await expect(page.locator('.detail-row')).toHaveCount(5);
+  await expect(page.locator('.detail-row[data-id="dancing-queen"]')).toHaveCount(0);
   // Breadcrumb: Home › Music › ELO.
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('ELO');
-  await page.locator('#rail-grid .film-tile[data-id="ootb"]').click();
-  await expect(page).toHaveURL(/album-detail\.html/);
-  await expect(page.locator('#detail-title')).toHaveText('Out of the Blue');
+  await page.locator('.detail-row[data-id="ootb-01"]').click();
+  await expect(page).toHaveURL(/audio\.html/);
+  await expect(page).toHaveURL(/artist=ELO/);
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
 });
 
 test('Back from an artist page returns to the Music tab', async ({ page }) => {
@@ -86,9 +89,10 @@ test('Back from an artist page returns to the Music tab', async ({ page }) => {
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="artist:ELO"]').click();
   await expect(page).toHaveURL(/artist\.html/);
-  // Wait for the page module to register its key handlers (the grid render is the
+  // Wait for the page module to register its key handlers (the first song row is the
   // ready signal) before the Backspace, else it races the navigation.
-  await expect(page.locator('#grid-title')).toHaveText('ELO');
+  await expect(page.locator('#detail-title')).toHaveText('ELO');
+  await expect(page.locator('.detail-row').first()).toBeVisible();
   await page.keyboard.press('Backspace');
   await expect(page).toHaveURL(/tab=music/);
   await expect(page.locator('.rail-row[data-rail="artists"]')).toBeVisible();

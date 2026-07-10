@@ -14,6 +14,10 @@ const VIDEOS = {
   'ootb-01':          { id: 'ootb-01',          title: 'Turn to Stone',    profile: 'kids',   duration: 227,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
   'ootb-02':          { id: 'ootb-02',          title: 'Mr. Blue Sky',     profile: 'kids',   duration: 245,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  lyrics: 'ootb-02.lrc', available: true },
   'ootb-03':          { id: 'ootb-03',          title: 'Sweet Talkin Woman',profile: 'kids',  duration: 228,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
+  // TASK-322: ELO's SECOND album (Time, 1981) — a resolvable /api/album so the
+  // artist page's grouped song list has two albums to group under headers.
+  'elo-time-01':      { id: 'elo-time-01',      title: 'Twilight',         profile: 'kids',   duration: 226,  poster: 'time.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
+  'elo-time-02':      { id: 'elo-time-02',      title: 'Ticket to the Moon',profile: 'kids',  duration: 246,  poster: 'time.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
   'dancing-queen':    { id: 'dancing-queen',    title: 'Dancing Queen',    profile: 'kids',   duration: 230,  poster: 'dq.jpg',        subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ABBA', available: true },
   // TASK-123: a multi-season series for the season-selector tests. Not on any
   // browse rail (opened by direct nav) so it can't disturb the rail-count suites.
@@ -85,6 +89,15 @@ const ALBUMS = {
       { episode: 1, video: VIDEOS['ootb-01'] },
       { episode: 2, video: VIDEOS['ootb-02'] },
       { episode: 3, video: VIDEOS['ootb-03'] }
+    ]
+  },
+  // TASK-322: ELO's newer album — the artist page groups its 2 tracks under a
+  // "Time" header ABOVE Out of the Blue (albumsByArtist orders newest year first).
+  'elo-time': {
+    id: 'elo-time', title: 'Time', profile: 'kids', poster: 'time.jpg', format: 'album', artist: 'ELO',
+    items: [
+      { episode: 1, video: VIDEOS['elo-time-01'] },
+      { episode: 2, video: VIDEOS['elo-time-02'] }
     ]
   }
 };

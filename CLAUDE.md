@@ -61,6 +61,7 @@ module or a screen** — this index rots otherwise (it did).
 - `tile-model.js` — shared card view-model (TASK-116)
 - `home-rails.js` — group `/api/browse` cards into titled rails (TASK-117)
 - `detail-view.js` / `series-detail.js` / `seasons.js` — series-detail logic (TASK-118/123)
+- `artist-tracks.js` — artist page's album-grouped song model (TASK-322)
 - `progress.js` — watch-progress model (FEAT-017)
 - `breadcrumb.js` / `nav-trail.js` — ancestor-chain + sticky nav trail (FEAT-021/032)
 - `queue-view.js` / `queue-tabs.js` / `queue-crumb.js` — music Queue View (FEAT-031/039)
@@ -83,7 +84,7 @@ module or a screen** — this index rots otherwise (it did).
 **TV pages** (`screen-*-page.js`, each backs `app/homeview/*.html`)
 - `screen-profile-page.js` — person picker · `screen-browse-page.js` — browse
 - `screen-detail-page.js` — series detail · `screen-album-detail-page.js` — album detail
-- `screen-artist-page.js` — artist drill-down (FEAT-029) · `screen-rail-grid-page.js` — L3 poster grid (FEAT-028)
+- `screen-artist-page.js` — artist song list, album-grouped (FEAT-046/TASK-322; was FEAT-029 album grid) · `screen-rail-grid-page.js` — L3 poster grid (FEAT-028)
 - `screen-video-page.js` — persistent video player (FEAT-037) · `screen-audio-page.js` — music player (FEAT-031)
 - `screen-playlist-detail-page.js` / `screen-playlist-create-page.js` — playlists (FEAT-036)
 
