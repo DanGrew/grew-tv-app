@@ -103,11 +103,17 @@ export function initRailGridPage() {
     .then(function(res) {
       var browse = res[0];
       var cw = [res[1].content].filter(Boolean).concat([[]])[0];
+      // FEAT-045/TASK-318: recents (the Music "Recently Played" rail) rides the
+      // continue-watching response — thread it through so this rail builds here
+      // too (the browse page does the same). Without it the recents rail is empty
+      // → "Nothing here yet", and its synthesised artist tile never lands in
+      // `catalog` so a companion `select` on it no-ops (BUG-049).
+      var recents = [res[1].recents].filter(Boolean).concat([[]])[0];
       var cards = [browse.content].filter(Boolean).concat([[]])[0];
       cards.forEach(function(c) { catalog[c.id] = c; });
       cw.forEach(function(r) { catalog[r.item_id] = [catalog[r.item_id]].filter(Boolean).concat([{ kind: 'video', id: r.item_id, series: r.collection_id }])[0]; });
       var labels = [browse.genreLabels].filter(Boolean).concat([{}])[0];
-      var rails = buildTabRails(section, cards, cw, labels);
+      var rails = buildTabRails(section, cards, cw, labels, recents);
       var rail = [rails.filter(function(r) { return r.id === railId; })[0]].filter(Boolean).concat([{ title: '', items: [] }])[0];
       var sectionTitle = [buildTabs(cards).filter(function(t) { return t.id === section; })[0]].filter(Boolean).map(function(t) { return t.title; }).concat([section])[0];
       // The rail's tiles can be CW rows (episodes/tracks) the catalog lacks — add
