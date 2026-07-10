@@ -67,11 +67,30 @@ twice.
 
 The bar is **zero survivors**: `thresholds.break` is 100 in `stryker.conf.json`,
 so `stryker run` exits non-zero (CI red) while any mutant is uncaught. It runs on
-merge to main, so until the survivor backlog is cleared the run stays **red** and
-GitHub emails the merger on every `core/` change. That nag is deliberate — it's
-the standing reminder that the unit suite isn't yet airtight — and it stops the
-moment the count hits zero. Grew checks never block a merge, so it's a signal, not
-a stop.
+merge to main, so until the survivor backlog is cleared the run stays **red**. That
+nag is deliberate — it's the standing reminder that the unit suite isn't yet
+airtight — and it stops the moment the count hits zero. Grew checks never block a
+merge, so it's a signal, not a stop.
+
+### How you find out it failed — the survivor issue
+
+The score lands on a push-to-`main` run, which nobody watching PRs ever opens. So
+the workflow **notifies** instead of relying on you to go look (mirrors the backend
+gate):
+
+- **On failure** it opens a single GitHub issue labelled `mutation-gate`, titled
+  *"🔴 core/ mutation gate failed on main — raise a survivor task"*, with the gate
+  output tail and a link to the run. The distinctive title is filterable in the
+  GitHub-email flood (set a filter on it) and the issue stands as the "raise a
+  task" reminder until dealt with.
+- **No duplicates.** It dedups on the label: if an open `mutation-gate` issue
+  already exists it adds a one-line "failed again on `<sha>`" comment (a re-ping)
+  rather than opening a second — at most one open issue at a time.
+- **On success** it closes the standing issue. An open `mutation-gate` issue
+  therefore always means live survivor work; when the gate is green there is none.
+
+The workflow needs `issues: write` permission (declared in the workflow) and uses
+the built-in `GITHUB_TOKEN` — no external service or secret.
 
 To retire a survivor: **strengthen the unit test** so it asserts on the mutated
 behaviour (the common case), or — if the mutant is provably **equivalent** (no
