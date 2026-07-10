@@ -39,7 +39,12 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - id: gate
-        run: npm run test:mutation | tee "$RUNNER_TEMP/mutation.log"
+        # `set -o pipefail` is required: piping into `tee` otherwise returns
+        # tee's exit code (0), swallowing the gate's non-zero exit — the job then
+        # reports green even when mutants survive, and the notifier never fires.
+        run: |
+          set -o pipefail
+          npm run test:mutation | tee "$RUNNER_TEMP/mutation.log"
 
       # Gate PASSED (every prior step ok) → close any standing survivor issue.
       - name: Close resolved survivor issue
