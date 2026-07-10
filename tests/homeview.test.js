@@ -372,6 +372,22 @@ async function mockVideoTime(page, currentTime, duration) {
   }, { ct: currentTime, dur: duration });
 }
 
+// BUG-046 (BUG-019 auto-hide-disarm family): the video player hides #controls 3s
+// after the last input (screen-video-player.js hideControls); #btn-jump lives
+// INSIDE #controls, which gets pointer-events:none while hidden (video.html). So
+// under parallel load, a slow setup step (mockVideoTime) between screen-entry and
+// the click can let the 3s window elapse first — clicking #btn-jump is then a dead
+// no-op, the jump popup never opens, and the downstream toBeFocused/toBeVisible
+// times out. Summon the controls with a d-pad key first: handleVideoKey
+// unconditionally calls showControls() (re-arms the timer + un-hides #controls).
+// ArrowDown only cycles transport focus — it never changes video.currentTime — so
+// every time assertion downstream still holds. Route ALL jump-popup opens through
+// this so no sibling regresses into the same race.
+async function openJumpPopup(page) {
+  await page.keyboard.press('ArrowDown');
+  await page.locator('#btn-jump').click();
+}
+
 test('series transport shows prev / play-pause / next / jump', async ({ page }) => {
   await goToSeriesEpisode(page);
   await expect(page.locator('#btn-prev')).toBeVisible();
@@ -436,26 +452,26 @@ test('standalone film hides prev / next (no episodes)', async ({ page }) => {
 
 test('clicking Jump opens the jump popup', async ({ page }) => {
   await goToVideoScreen(page);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await expect(page.locator('.jump-popup')).toBeVisible();
 });
 
 test('jump popup shows 10 graduated options', async ({ page }) => {
   await goToVideoScreen(page);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await expect(page.locator('.jump-popup .jump-grid button')).toHaveCount(10);
 });
 
 test('jump popup default focus is +10s', async ({ page }) => {
   await goToVideoScreen(page);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await expect(page.locator('.jump-popup button[data-delta="10"]')).toBeFocused();
 });
 
 test('forward jump adds exact delta to currentTime', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 600, 3600);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await page.locator('.jump-popup button[data-delta="120"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
   expect(time).toBe(720);
@@ -464,7 +480,7 @@ test('forward jump adds exact delta to currentTime', async ({ page }) => {
 test('back jump subtracts exact delta from currentTime', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 600, 3600);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await page.locator('.jump-popup button[data-delta="-30"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
   expect(time).toBe(570);
@@ -473,7 +489,7 @@ test('back jump subtracts exact delta from currentTime', async ({ page }) => {
 test('back jump clamps to 0', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 5, 3600);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await page.locator('.jump-popup button[data-delta="-1800"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
   expect(time).toBe(0);
@@ -482,7 +498,7 @@ test('back jump clamps to 0', async ({ page }) => {
 test('forward jump clamps to duration', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 3590, 3600);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await page.locator('.jump-popup button[data-delta="1800"]').click();
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
   expect(time).toBe(3600);
@@ -491,7 +507,7 @@ test('forward jump clamps to duration', async ({ page }) => {
 test('selecting a jump option closes the popup', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 600, 3600);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await page.locator('.jump-popup button[data-delta="10"]').click();
   await expect(page.locator('.jump-popup')).toHaveCount(0);
 });
@@ -499,7 +515,7 @@ test('selecting a jump option closes the popup', async ({ page }) => {
 test('Escape closes jump popup without seeking', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 600, 3600);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await page.keyboard.press('Escape');
   await expect(page.locator('.jump-popup')).toHaveCount(0);
   const time = await page.evaluate(() => document.getElementById('video').currentTime);
@@ -508,7 +524,7 @@ test('Escape closes jump popup without seeking', async ({ page }) => {
 
 test('ArrowRight in jump popup moves focus one cell', async ({ page }) => {
   await goToVideoScreen(page);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await expect(page.locator('.jump-popup button[data-delta="10"]')).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.jump-popup button[data-delta="30"]')).toBeFocused();
@@ -516,7 +532,7 @@ test('ArrowRight in jump popup moves focus one cell', async ({ page }) => {
 
 test('ArrowUp in jump popup moves focus one row', async ({ page }) => {
   await goToVideoScreen(page);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await expect(page.locator('.jump-popup button[data-delta="10"]')).toBeFocused();
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('.jump-popup button[data-delta="-10"]')).toBeFocused();
@@ -525,7 +541,7 @@ test('ArrowUp in jump popup moves focus one row', async ({ page }) => {
 test('Enter in jump popup selects focused option and closes', async ({ page }) => {
   await goToVideoScreen(page);
   await mockVideoTime(page, 600, 3600);
-  await page.locator('#btn-jump').click();
+  await openJumpPopup(page);
   await expect(page.locator('.jump-popup button[data-delta="10"]')).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.locator('.jump-popup')).toHaveCount(0);
