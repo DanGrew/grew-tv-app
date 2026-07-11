@@ -326,7 +326,8 @@ test.describe('desync mode', () => {
   });
 });
 
-// FEAT-040/TASK-255 — the MUSIC "♪ Music Queue (N)" button beside the video one:
+// FEAT-040/TASK-255 — the MUSIC "🎵 (N)" queue button beside the video one (TASK-258
+// compact label, de-purpled to match the video button):
 // shown only when the music override ("Play Next") queue is non-empty (count from
 // GET /api/playback), drives the TV audio page to start the queue head
 // (audio.html?playQueue), and greys while desynced (Browse) like the video/profile
@@ -356,7 +357,7 @@ test.describe('music Play Queue button', () => {
     const intents2 = [];
     await musicMock(page, intents2, [{ track_id: 'a' }, { track_id: 'b' }]);
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 Music Queue (2)');
+    await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 (2)');
     await page.locator('#btn-play-queue-music').click();
     await expect.poll(() => {
       const nav = intents2.find((i) => i.intent === 'navigate' && i.params.page === 'audio.html');
@@ -371,5 +372,38 @@ test.describe('music Play Queue button', () => {
     await expect(page.locator('#btn-play-queue-music')).not.toHaveClass(/desync-off/);
     await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
     await expect(page.locator('#btn-play-queue-music')).toHaveClass(/desync-off/);
+  });
+
+  // TASK-258 (3): the music queue button carries no purple `--accent` tint — its
+  // border matches the video button + every other button (the white --focus).
+  test('is de-purpled — its border matches the other buttons, not the accent', async ({ page }) => {
+    await musicMock(page, [], [{ track_id: 'a' }]);
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#btn-play-queue-music')).toBeVisible();
+    const border = await page.locator('#btn-play-queue-music').evaluate(el => getComputedStyle(el).borderTopColor);
+    expect(border).toBe('rgb(255, 255, 255)');       // --focus white, NOT rgb(185, 140, 255) accent
+  });
+});
+
+// TASK-258 (2): the VIDEO queue button reads a compact "🎬 (N)" — media icon +
+// bracketed count, no "Video" word or list icon (mirrors the music button). A
+// dedicated mock carries a `person` in app_state (the top-level mock omits it, so
+// the queue is never fetched) + routes the GET video-playback snapshot's queue.
+test.describe('video Play Queue button label (TASK-258)', () => {
+  function videoMock(page, queue) {
+    return page.routeWebSocket(/:8766/, (ws) => {
+      ws.onMessage(function(raw) {
+        const m = JSON.parse(raw);
+        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+        if (m.type === 'snapshot_request') { ws.send(msg('context', { version: 2, context_id: 'browse' })); ws.send(msg('app_state', { screen: 'home', profile: 'kids', person: 'kids' })); }
+      });
+    }).then(() => page.route(/\/api\/video-playback\?/, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', override_queue: queue }) })));
+  }
+
+  test('shows just the icon and bracketed count — no "Video" word', async ({ page }) => {
+    await videoMock(page, [{ entry_id: 'e1' }, { entry_id: 'e2' }, { entry_id: 'e3' }]);
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (3)');
   });
 });
