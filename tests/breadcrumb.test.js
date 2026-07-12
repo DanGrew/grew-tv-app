@@ -33,6 +33,8 @@ test('clicking the Home crumb on detail returns to browse', async ({ page }) => 
 
 test('ArrowUp from Play next reaches the Home crumb, Enter navigates home', async ({ page }) => {
   await page.locator(SERIES_TILE).click();
+  await expect(page.locator('#screen-detail')).toBeVisible();
+  await expect(page.locator('.detail-row').first()).toBeVisible();
   await expect(page.locator('#btn-play-next')).toBeFocused();
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('#breadcrumb .crumb-link')).toBeFocused();
