@@ -523,11 +523,17 @@ export function initPage() {
     renderSearch();
     searchInput.focus();
   }
-  // Tap a result -> route via the SAME openItem() path a tile tap uses: synced it
-  // drives the TV with `select` (a TRACK's card carries its album_id so the TV
-  // opens the album; an ARTIST tile carries id 'artist:Name'), desynced it opens
-  // the item's companion page locally. cardRoute does the routing (reuse).
-  function openSearchResult(card) { closeSearch(); openItem(card); }
+  // Tap a result -> route by kind. A TRACK plays: synced, drive the TV to the
+  // album player started on the song (navigate intent -> TV navTo audio.html ->
+  // echoes audio context, companion follows); desynced, the companion can't drive
+  // the TV, so open the album locally as a fallback. Everything else reuses the
+  // SAME openItem() path a tile tap uses (synced `select`, desynced local open).
+  function playTrack(card) {
+    ({ true: function() { window.location.href = 'detail.html?id=' + encodeURIComponent(card.album); },
+       false: function() { api.sendIntent('navigate', { page: 'audio.html', params: { album: card.album, track: card.id, from: 'browse' } }); } })[mode.isDesynced()]();
+  }
+  var SEARCH_ROUTE = { true: playTrack, false: openItem };
+  function openSearchResult(card) { closeSearch(); SEARCH_ROUTE[cardRoute(card) === 'track'](card); }
   function onResultClick(e) {
     [e.target.closest('.sr-row')].filter(Boolean).forEach(function(row) {
       openSearchResult(state.searchItems[Number(row.getAttribute('data-i'))].card);

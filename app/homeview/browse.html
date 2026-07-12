@@ -74,12 +74,11 @@ button:hover { background: var(--surface-hi); }
 .tile-queue:hover, .tile-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 .tile-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,0.45); }
 .tile-progress-fill { height: 100%; background: var(--focus); }
-#queue-actions { position: fixed; bottom: 32px; right: 32px; z-index: 6; display: flex; gap: 12px; }
+#queue-actions { position: fixed; bottom: 32px; right: 32px; z-index: 6; display: flex; align-items: center; gap: 12px; }
 #btn-play-queue, #btn-play-queue-music { font-size: var(--fs-sm); padding: 12px 22px; min-width: auto; border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); border-radius: 999px; }
 #btn-play-queue:focus, #btn-play-queue-music:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); }
 #queue-status { display: none; position: fixed; bottom: 96px; right: 32px; z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
-#top-left { position: fixed; top: 20px; left: 32px; z-index: 6; display: flex; align-items: center; gap: 16px; }
-#breadcrumb { display: flex; }
+#breadcrumb { position: fixed; top: 20px; left: 32px; z-index: 5; }
 body.sidebar-collapsed #breadcrumb { display: none; }
 .breadcrumb { display: flex; align-items: center; gap: 10px; }
 .crumb { font-size: var(--fs-md); color: var(--text-muted); }
@@ -120,13 +119,14 @@ body.sidebar-collapsed #breadcrumb { display: none; }
 </style>
 </head>
 <body id="screen-browse">
-<div id="top-left"><button id="btn-search" type="button" aria-label="Search">🔍</button><div id="breadcrumb"></div></div>
+<div id="breadcrumb"></div>
 <div id="top-bar"><div id="device-badge" title="This screen"></div><div id="profile-label" tabindex="0" role="button" aria-label="Switch profile"></div></div>
 <div id="browse-main">
   <nav id="sidebar"></nav>
   <div id="rails-container"><div id="rails"></div></div>
 </div>
 <div id="queue-actions">
+<button id="btn-search" type="button" aria-label="Search">🔍</button>
 <button id="btn-play-queue" tabindex="0" style="display:none">&#127916;</button>
 <button id="btn-play-queue-music" tabindex="0" style="display:none">&#127925;</button>
 </div>

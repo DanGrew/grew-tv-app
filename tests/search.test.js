@@ -95,7 +95,7 @@ test.describe('Music search', () => {
     await expect(page.locator('.sr-row').first().locator('.sr-tag')).toHaveText('ARTIST');
   });
 
-  test('Story 4 — tapping a TRACK opens its album; ARTIST opens the artist page', async ({ page }) => {
+  test('Story 4 — tapping a TRACK plays it in its album player', async ({ page }) => {
     await openBrowse(page);
     await page.locator('#btn-search').click();
     await page.locator('#search-seg .seg-opt[data-domain="music"]').click();
@@ -104,7 +104,8 @@ test.describe('Music search', () => {
     await expect(track.locator('.sr-tag')).toHaveText('TRACK');
     await expect(track.locator('.sr-sub')).toHaveText('ELO · Out of the Blue');
     await track.click();
-    await expect(page).toHaveURL(/album-detail\.html\?album=ootb/);
+    // A TRACK opens its album's player STARTED on that song.
+    await page.waitForURL(/audio\.html\?album=ootb&track=ootb-02/);
   });
 
   test('Story 4 — tapping an ARTIST opens the artist page', async ({ page }) => {

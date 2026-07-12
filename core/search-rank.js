@@ -54,15 +54,17 @@ export function videoItems(cards) {
     });
 }
 
-// A track (from /api/tracks) routes to ITS album — the card carries the
-// album_id, so cardRoute -> 'album' opens the album on either surface. Ranked
-// title -> album -> artist so an artist/album name still surfaces its tracks.
+// A track (from /api/tracks) routes to ITS album AND starts playing: the card is
+// kind:'track' (cardRoute -> 'track'), carrying the track id + its album_id, so
+// each surface opens audio.html?album=<album_id>&track=<track_id> — the album's
+// player started on this song. Ranked title -> album -> artist so an artist/album
+// name still surfaces its tracks.
 function trackItems(tracks) {
   return (tracks || []).map(function(t) {
     return {
       title: t.title || '', poster: t.cover || null,
       secondary: [t.artist, t.album].filter(Boolean).join(' · '), tag: 'TRACK',
-      card: { kind: 'series', id: t.album_id, section: 'music' },
+      card: { kind: 'track', id: t.id, album: t.album_id },
       fields: [t.title || '', t.album || '', t.artist || '']
     };
   });

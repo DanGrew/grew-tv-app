@@ -64,12 +64,12 @@ describe('musicItems', () => {
     expect(tags.filter(function(t) { return t === 'ALBUM'; }).length).toBe(2); // ootb + arrival, NOT the playlist
     expect(tags.filter(function(t) { return t === 'ARTIST'; }).length).toBe(2); // ELO + ABBA
   });
-  it('a TRACK routes to its album (card id = album_id, section music)', () => {
+  it('a TRACK routes to a playable track card (kind track, its id + album_id)', () => {
     var track = musicItems(TRACKS, CARDS)[0];
     expect(track.title).toBe('Mr. Blue Sky');
     expect(track.tag).toBe('TRACK');
     expect(track.secondary).toBe('ELO · Out of the Blue');
-    expect(track.card).toEqual({ kind: 'series', id: 'ootb', section: 'music' });
+    expect(track.card).toEqual({ kind: 'track', id: 'ootb-02', album: 'ootb' });
     expect(track.fields).toEqual(['Mr. Blue Sky', 'Out of the Blue', 'ELO']);
   });
   it('an ALBUM item carries the browse card + artist secondary, never the playlist', () => {
@@ -88,9 +88,9 @@ describe('musicItems', () => {
     expect(artist.fields).toEqual(['ELO']);
   });
   it('fills blank defaults for a sparse track and a sparse album card', () => {
-    var track = musicItems([{ album_id: 'a1' }], [])[0];
+    var track = musicItems([{ id: 't1', album_id: 'a1' }], [])[0];
     expect(track).toMatchObject({ title: '', poster: null, secondary: '', tag: 'TRACK', fields: ['', '', ''] });
-    expect(track.card).toEqual({ kind: 'series', id: 'a1', section: 'music' });
+    expect(track.card).toEqual({ kind: 'track', id: 't1', album: 'a1' });
     var album = musicItems([], [{ id: 'a1', section: 'music' }]).filter(function(i) { return i.tag === 'ALBUM'; })[0];
     expect(album).toMatchObject({ title: '', poster: null, secondary: '', fields: ['', ''] });
   });

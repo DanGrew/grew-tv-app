@@ -112,7 +112,7 @@ test.describe('Music search', () => {
     await expect(page.locator('.sr-row').first().locator('.sr-tag')).toHaveText('ARTIST');
   });
 
-  test('Story 4 — tapping a TRACK drives to its album; ARTIST drives to the artist page', async ({ page }) => {
+  test('Story 4 — tapping a TRACK drives the TV to play it in its album player', async ({ page }) => {
     await page.locator('#btn-search').click();
     await page.locator('#search-seg .seg-opt[data-domain="music"]').click();
     await page.locator('#search-input').fill('blue sky');
@@ -120,8 +120,9 @@ test.describe('Music search', () => {
     await expect(track.locator('.sr-tag')).toHaveText('TRACK');
     await expect(track.locator('.sr-sub')).toHaveText('ELO · Out of the Blue');
     await track.click();
-    // A TRACK opens its album — the select carries the album_id, not the track id.
-    await expect.poll(() => intents.filter(i => i.intent === 'select').map(i => i.params.id)).toContain('ootb');
+    // A TRACK plays: drive the TV to audio.html with the album source + track id.
+    await expect.poll(() => intents.filter(i => i.intent === 'navigate' && i.params.page === 'audio.html')
+      .map(i => i.params.params)).toContainEqual({ album: 'ootb', track: 'ootb-02', from: 'browse' });
   });
 
   test('Story 4 — tapping an ARTIST drives to the artist page (id artist:Name)', async ({ page }) => {

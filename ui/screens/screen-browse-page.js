@@ -151,7 +151,11 @@ export function initBrowsePage() {
     album:    function(card) { navTo('album-detail.html', { album: card.id }); },
     playlist: function(card) { navTo('playlist-detail.html', { playlist: card.id }); },
     video:    function(card) { navTo('video.html', { video: card.id, from: 'browse', series: card.series }); },
-    series:   function(card) { navTo('detail.html', { series: card.id }); }
+    series:   function(card) { navTo('detail.html', { series: card.id }); },
+    // TASK-324 search: a TRACK opens its album's player STARTED on that song
+    // (audio.html fires play-source album -> play-track). Only search emits a
+    // kind:'track' card; a browse tile never does.
+    track:    function(card) { navTo('audio.html', { album: card.album, track: card.id, from: 'browse' }); }
   };
 
   // cardRoute (core) gives 'album' for a music card else the card's kind;
