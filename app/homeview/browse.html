@@ -78,7 +78,8 @@ button:hover { background: var(--surface-hi); }
 #btn-play-queue, #btn-play-queue-music { font-size: var(--fs-sm); padding: 12px 22px; min-width: auto; border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); border-radius: 999px; }
 #btn-play-queue:focus, #btn-play-queue-music:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); }
 #queue-status { display: none; position: fixed; bottom: 96px; right: 32px; z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
-#breadcrumb { position: fixed; top: 20px; left: 32px; z-index: 5; }
+#top-left { position: fixed; top: 20px; left: 32px; z-index: 6; display: flex; align-items: center; gap: 16px; }
+#breadcrumb { display: flex; }
 body.sidebar-collapsed #breadcrumb { display: none; }
 .breadcrumb { display: flex; align-items: center; gap: 10px; }
 .crumb { font-size: var(--fs-md); color: var(--text-muted); }
@@ -89,7 +90,7 @@ body.sidebar-collapsed #breadcrumb { display: none; }
 #device-badge { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; font-size: var(--fs-xs); color: var(--text-muted); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); pointer-events: none; }
 #device-swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
 #error-msg { display: none; }
-#btn-search { display: flex; align-items: center; gap: 8px; min-width: auto; font-size: var(--fs-sm); padding: 8px 16px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; color: var(--text-muted); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); }
+#btn-search { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-width: auto; font-size: var(--fs-sm); padding: 8px 16px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; color: var(--text-muted); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); }
 #btn-search:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 #search-panel { display: none; position: fixed; inset: 0; z-index: 30; background: rgba(6, 10, 22, 0.97); flex-direction: column; padding: 44px 64px 56px; gap: 26px; }
 #search-panel.open { display: flex; }
@@ -119,8 +120,8 @@ body.sidebar-collapsed #breadcrumb { display: none; }
 </style>
 </head>
 <body id="screen-browse">
-<div id="breadcrumb"></div>
-<div id="top-bar"><div id="device-badge" title="This screen"></div><button id="btn-search" type="button" aria-label="Search">🔍</button><div id="profile-label" tabindex="0" role="button" aria-label="Switch profile"></div></div>
+<div id="top-left"><button id="btn-search" type="button" aria-label="Search">🔍</button><div id="breadcrumb"></div></div>
+<div id="top-bar"><div id="device-badge" title="This screen"></div><div id="profile-label" tabindex="0" role="button" aria-label="Switch profile"></div></div>
 <div id="browse-main">
   <nav id="sidebar"></nav>
   <div id="rails-container"><div id="rails"></div></div>

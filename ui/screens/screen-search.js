@@ -59,6 +59,10 @@ export function mountSearch(opts) {
     st.domain = d;
     document.querySelectorAll('#search-seg .seg-opt').forEach(function(b) { b.classList.toggle('on', b.getAttribute('data-domain') === d); });
     render();
+    // Return focus to the keyboard so the d-pad keeps working after a toggle —
+    // a seg click otherwise strands focus on the toggle (renderResults also
+    // rebuilds the result buttons, dropping any focus that sat on one).
+    focusKey(0);
   }
 
   // Keyboard-cell d-pad: gridIndex moves within the grid; at an edge where it

@@ -119,6 +119,22 @@ test.describe('Music search', () => {
   });
 });
 
+// Regression: switching Videos<->Music must keep the on-screen keyboard usable —
+// a seg toggle otherwise stranded focus on the toggle (and rebuilt the result
+// buttons), so the d-pad went dead until you clicked a letter.
+test('switching Videos<->Music keeps keyboard focus (d-pad stays live)', async ({ page }) => {
+  await openBrowse(page);
+  await page.locator('#btn-search').click();
+  await page.locator('#search-seg .seg-opt[data-domain="music"]').click();
+  await expect(page.locator('#search-keys .sk-key').first()).toBeFocused();
+  await page.locator('#search-seg .seg-opt[data-domain="videos"]').click();
+  await expect(page.locator('#search-keys .sk-key').first()).toBeFocused();
+  // ...and the keyboard immediately types via the d-pad (no click needed).
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#search-query')).toHaveText('B');
+});
+
 // d-pad reachability (TV gate): the keyboard grid is arrow-navigable and Enter
 // types; a typed query surfaces results reachable by ArrowDown into the list.
 test('the on-screen keyboard is d-pad navigable (arrow to a letter, Enter types it)', async ({ page }) => {

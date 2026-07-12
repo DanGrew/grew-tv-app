@@ -286,7 +286,8 @@ async function installApi(page) {
     return s ? json(route, 200, s) : json(route, 404, { error: 'not found' });
   });
   await page.route('**/api/tracks', function(route) {
-    return json(route, 200, TRACKS);
+    // Backend wraps the index as { tracks: [...] } (TASK-323 api/tracks.py).
+    return json(route, 200, { tracks: TRACKS });
   });
   await page.route('**/api/album/*', function(route) {
     var a = albumResponse(lastSegment(route.request().url(), '/api/album/'));

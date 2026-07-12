@@ -98,8 +98,10 @@ export function loadVideo(serverUrl, id) {
 // the search panel ranks + renders ({ id, title, album, artist, album_id,
 // cover }). A read-only projection (no schema change); the search overlay derives
 // its Music results (tracks, plus albums/artists from browse cards) from this.
+// The backend wraps the list as { tracks: [...] } — unwrap to the array the
+// search candidates expect (empty when absent).
 export function loadTracks(serverUrl) {
-  return getJson(serverUrl + '/api/tracks');
+  return getJson(serverUrl + '/api/tracks').then(function(r) { return [r.tracks].filter(Array.isArray).concat([[]])[0]; });
 }
 
 // Backend watch progress for one video (FEAT-017 source of truth). Returns the

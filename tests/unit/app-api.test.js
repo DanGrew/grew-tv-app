@@ -40,14 +40,18 @@ describe('loadVideo', () => {
 
 describe('loadTracks', () => {
   it('GETs /api/tracks, no-store', async () => {
-    var calls = fakeFetch([{ id: 'ootb-02', album_id: 'ootb' }]);
+    var calls = fakeFetch({ tracks: [{ id: 'ootb-02', album_id: 'ootb' }] });
     await loadTracks('http://s');
     expect(calls[0].url).toBe('http://s/api/tracks');
     expect(calls[0].opts).toEqual({ cache: 'no-store' });
   });
-  it('resolves the parsed track index', async () => {
-    fakeFetch([{ id: 'ootb-02', album_id: 'ootb' }]);
+  it('unwraps the { tracks: [...] } envelope to the track array', async () => {
+    fakeFetch({ tracks: [{ id: 'ootb-02', album_id: 'ootb' }] });
     expect(await loadTracks('http://s')).toEqual([{ id: 'ootb-02', album_id: 'ootb' }]);
+  });
+  it('yields an empty array when the envelope has no tracks', async () => {
+    fakeFetch({});
+    expect(await loadTracks('http://s')).toEqual([]);
   });
   it('rejects on a non-ok response', async () => {
     fakeFetch({}, false);
