@@ -604,3 +604,122 @@ describe('home-rails edge-case fallbacks (TASK-315)', () => {
     expect(albumsByArtist(null, 'X')).toEqual([]);
   });
 });
+
+// TASK-327 mutation-hardening: inputs whose natural order differs from the sorted
+// output, exact-value assertions, and the null-guard empties.
+describe('home-rails mutation hardening (TASK-327)', () => {
+  it('withDurationSec keeps an existing durationSec when the card carries no `duration`', () => {
+    var item = buildRails([{ kind: 'video', id: 'x', title: 'X', durationSec: 300 }], {}).find(r => r.id === 'films').items[0];
+    expect(item.durationSec).toBe(300);
+  });
+
+  it('buildRails titles the Series and Films rails', () => {
+    var rails = buildRails(cards, {});
+    expect(rails.find(r => r.id === 'series').title).toBe('Series');
+    expect(rails.find(r => r.id === 'films').title).toBe('Films');
+  });
+
+  it('the Series tab uses the "TV Series" title', () => {
+    expect(buildTabs([{ kind: 'series', id: 'bluey', title: 'Bluey', section: 'series' }])[0].title).toBe('TV Series');
+  });
+
+  it('a CW row whose collection_id is off-page still shows via the item own card', () => {
+    var only = [{ kind: 'video', id: 'toy-story', title: 'Toy Story', section: 'films' }];
+    var cw = [{ item_id: 'toy-story', collection_id: 'gone', collection_title: 'Gone', position_secs: 100, duration_secs: 600 }];
+    var rail = buildTabRails('films', only, cw, {})[0];
+    expect(rail.id).toBe('continue');
+    expect(rail.items.map(c => c.id)).toEqual(['toy-story']);
+  });
+
+  it('a films card with neither genres nor a type lands in an "Other" rail', () => {
+    var rail = buildTabRails('films', [{ kind: 'video', id: 'z', title: 'Z', section: 'films' }], [], {}).find(r => r.id.startsWith('genre:'));
+    expect(rail.title).toBe('Other');
+    expect(rail.items.map(c => c.id)).toEqual(['z']);
+  });
+
+  it('genre rails AND their items sort A-Z from reverse-ordered input', () => {
+    var revd = [
+      { kind: 'video', id: 'z1', title: 'Zzz', section: 'films', genres: ['zeta'] },
+      { kind: 'video', id: 'a1', title: 'Aaa', section: 'films', genres: ['alpha'] },
+      { kind: 'video', id: 'a2', title: 'Aab', section: 'films', genres: ['alpha'] }
+    ];
+    var rails = buildTabRails('films', revd, [], {});
+    expect(rails.map(r => r.title)).toEqual(['Alpha', 'Zeta']);           // rails A-Z
+    expect(rails[0].items.map(c => c.id)).toEqual(['a1', 'a2']);          // items A-Z within
+  });
+
+  it('sorting is case-insensitive (a mixed-case rail is A-Z, not ASCII case order)', () => {
+    var pl = [
+      { kind: 'series', id: 'z', title: 'zebra', section: 'music', collectionType: 'playlist' },
+      { kind: 'series', id: 'a', title: 'Apple', section: 'music', collectionType: 'playlist' }
+    ];
+    var rail = buildTabRails('music', pl, [], {}).find(r => r.id === 'playlists');
+    expect(rail.items.map(c => c.id)).toEqual(['a', 'z']);   // Apple before zebra
+  });
+
+  it('a rail sorts an untitled item as empty-string, before a titled one', () => {
+    var pl = [
+      { kind: 'series', id: 'titled', title: 'Middle', section: 'music', collectionType: 'playlist' },
+      { kind: 'series', id: 'untitled', section: 'music', collectionType: 'playlist' }
+    ];
+    var rail = buildTabRails('music', pl, [], {}).find(r => r.id === 'playlists');
+    expect(rail.items.map(c => c.id)).toEqual(['untitled', 'titled']);
+  });
+
+  it('the Artists rail is A-Z from reverse-ordered input, and indexes only music cards', () => {
+    var revd = [
+      { kind: 'series', id: 'z-alb', title: 'ZA', section: 'music', artist: 'Zeta', poster: 'z.jpg' },
+      { kind: 'series', id: 'a-alb', title: 'AA', section: 'music', artist: 'Alpha', poster: 'a.jpg' },
+      { kind: 'video',  id: 'film',  title: 'Film', section: 'films', artist: 'Alpha' }   // non-music: must not inflate Alpha
+    ];
+    var artists = buildTabRails('music', revd, [], {}).find(r => r.id === 'artists');
+    expect(artists.items.map(c => c.title)).toEqual(['Alpha', 'Zeta']);
+    expect(artists.items.find(c => c.artist === 'Alpha').subLabel).toBe('1 album');
+  });
+
+  it('Recently Played resolves only music sources (a films id is not indexed)', () => {
+    var only = [{ kind: 'video', id: 'toy-story', title: 'Toy Story', section: 'films' }];
+    var rails = buildTabRails('music', only, [], {}, [{ source_type: 'album', source_id: 'toy-story', last_played: 1 }]);
+    expect(rails.some(r => r.id === 'recent')).toBe(false);
+  });
+
+  it('the music rails carry their titles (Playlists / Artists / Albums)', () => {
+    var rails = buildTabRails('music', WITH_PLAYLISTS, [], {});
+    expect(rails.find(r => r.id === 'playlists').title).toBe('Playlists');
+    expect(rails.find(r => r.id === 'artists').title).toBe('Artists');
+    expect(rails.find(r => r.id === 'albums').title).toBe('Albums');
+  });
+
+  it('albumsByArtist orders newest-year first from reverse input, tie-breaking equal years by title', () => {
+    var recs = [
+      { kind: 'series', id: 'old',  title: 'Old',  section: 'music', artist: 'X', tags: { year: '1990' } },
+      { kind: 'series', id: 'new',  title: 'New',  section: 'music', artist: 'X', tags: { year: '2020' } },
+      { kind: 'series', id: 'same-z', title: 'Zed', section: 'music', artist: 'X', tags: { year: '2020' } }
+    ];
+    // 2020s A-Z (New < Zed), then 1990.
+    expect(albumsByArtist(recs, 'X').map(c => c.id)).toEqual(['new', 'same-z', 'old']);
+  });
+
+  it('albumsByArtist tie-breaks an equal-year pair where ONE album is untitled', () => {
+    var recs = [
+      { kind: 'series', id: 'titled',  title: 'Beta', section: 'music', artist: 'X', tags: { year: '2020' } },
+      { kind: 'series', id: 'untitled',               section: 'music', artist: 'X', tags: { year: '2020' } }
+    ];
+    // same year -> title tiebreak; the untitled one falls back to '' and sorts first.
+    expect(albumsByArtist(recs, 'X').map(c => c.id)).toEqual(['untitled', 'titled']);
+  });
+
+  it('empty content yields no rails (the continueRail / recentlyPlayedRail null-guards return [])', () => {
+    expect(buildTabRails('films', [], null, {})).toEqual([]);
+    expect(buildTabRails('music', [], [], {}, null)).toEqual([]);
+  });
+
+  it('the synthesised Playlists rail lands right after Recently Played, keeping the rails below it', () => {
+    var out = withPlaylistsRail([
+      { id: 'recent', title: 'Recently Played', items: [] },
+      { id: 'artists', title: 'Artists', items: [] },
+      { id: 'albums', title: 'Albums', items: [] }
+    ]);
+    expect(out.map(r => r.id)).toEqual(['recent', 'playlists', 'artists', 'albums']);
+  });
+});
