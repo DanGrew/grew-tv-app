@@ -62,6 +62,7 @@ module or a screen** — this index rots otherwise (it did).
 - `home-rails.js` — group `/api/browse` cards into titled rails (TASK-117)
 - `detail-view.js` / `series-detail.js` / `seasons.js` — series-detail logic (TASK-118/123)
 - `artist-tracks.js` — artist page's album-grouped song model (TASK-322)
+- `search-rank.js` — search overlay: build Video/Music candidates (cards + `/api/tracks`), rank a query (exact>prefix>substring, field-weighted), render result rows (TASK-324)
 - `progress.js` — watch-progress model (FEAT-017)
 - `breadcrumb.js` / `nav-trail.js` — ancestor-chain + sticky nav trail (FEAT-021/032)
 - `queue-view.js` / `queue-tabs.js` / `queue-crumb.js` — music Queue View (FEAT-031/039)
@@ -95,6 +96,7 @@ module or a screen** — this index rots otherwise (it did).
 - `screen-video-player.js` — video transport (graduated skips, auto-hide controls)
 - `screen-audio-player.js` — audio transport (FEAT-018)
 - `screen-queue.js` / `screen-video-queue.js` — Queue View overlays (FEAT-031/040)
+- `screen-search.js` — TV search overlay (🔍): reuses the create-playlist on-screen keyboard, ranked results via `core/search-rank` (TASK-324; companion mirror lives in `companion-browse.js`)
 - `screen-error.js` — error screen · `breadcrumb.js` / `device-badge.js` — trail + badge mounts
 
 **Companion mirrors** (`companion-*.js`, back `companion/*.html`)

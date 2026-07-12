@@ -82,6 +82,20 @@ const MUSIC_CARDS = [
   { kind: 'series', id: 'abba-arrival', title: 'Arrival',         poster: 'arrival.jpg', type: null, section: 'music', artist: 'ABBA', clipCount: 2, tags: { year: '1976' } }
 ];
 
+// TASK-323/324 track index: every audio track projected as { id, title, album,
+// artist, album_id, cover } — the shape GET /api/tracks returns and the search
+// overlay's Music results (tracks) rank + render from. album_id points at the
+// album browse card so a tapped TRACK opens its album. Covers both ELO albums +
+// the ABBA single so the search e2e can match tracks, albums and artists.
+const TRACKS = [
+  { id: 'ootb-01',      title: 'Turn to Stone',       album: 'Out of the Blue', artist: 'ELO',  album_id: 'ootb',         cover: 'ootb.jpg' },
+  { id: 'ootb-02',      title: 'Mr. Blue Sky',        album: 'Out of the Blue', artist: 'ELO',  album_id: 'ootb',         cover: 'ootb.jpg' },
+  { id: 'ootb-03',      title: 'Sweet Talkin Woman',  album: 'Out of the Blue', artist: 'ELO',  album_id: 'ootb',         cover: 'ootb.jpg' },
+  { id: 'elo-time-01',  title: 'Twilight',            album: 'Time',            artist: 'ELO',  album_id: 'elo-time',     cover: 'time.jpg' },
+  { id: 'elo-time-02',  title: 'Ticket to the Moon',  album: 'Time',            artist: 'ELO',  album_id: 'elo-time',     cover: 'time.jpg' },
+  { id: 'dancing-queen',title: 'Dancing Queen',       album: 'Arrival',         artist: 'ABBA', album_id: 'abba-arrival', cover: 'arrival.jpg' }
+];
+
 const ALBUMS = {
   ootb: {
     id: 'ootb', title: 'Out of the Blue', profile: 'kids', poster: 'ootb.jpg', format: 'album', artist: 'ELO',
@@ -270,6 +284,10 @@ async function installApi(page) {
   await page.route('**/api/series/*', function(route) {
     var s = SERIES[lastSegment(route.request().url(), '/api/series/')];
     return s ? json(route, 200, s) : json(route, 404, { error: 'not found' });
+  });
+  await page.route('**/api/tracks', function(route) {
+    // Backend wraps the index as { tracks: [...] } (TASK-323 api/tracks.py).
+    return json(route, 200, { tracks: TRACKS });
   });
   await page.route('**/api/album/*', function(route) {
     var a = albumResponse(lastSegment(route.request().url(), '/api/album/'));
@@ -747,7 +765,7 @@ async function installVideoPlaybackBackend(page) {
 }
 
 module.exports = {
-  VIDEOS, SERIES, ALBUMS, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, BROWSE, CONFIG, nextOf,
+  VIDEOS, SERIES, ALBUMS, TRACKS, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, BROWSE, CONFIG, nextOf,
   installApi, installPlaybackBackend, installVideoPlaybackBackend,
   // TASK-326: pure response builders + the CW row builder, so the stub<->contract
   // shape test can exercise the exact objects the routes above emit.

@@ -2,11 +2,12 @@ import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, videoPlaybackAction, loadPlayback } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, videoPlaybackAction, loadPlayback, loadTracks } from '../../core/app-api.js';
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
-import { cardRoute } from '../../core/home-rails.js';
+import { cardRoute, artistTiles } from '../../core/home-rails.js';
+import { mountSearch } from './screen-search.js';
 import { queueCount } from '../../core/video-player-router.js';
 import { playNextCount } from '../../core/queue-view.js';
 import { mountBreadcrumb } from './breadcrumb.js';
@@ -100,6 +101,20 @@ export function initBrowsePage() {
   // focused (last-watched) tile whenever the target tile wasn't on the active tab.
   var catalog = {};
 
+  // FEAT-048 (TASK-324) — the search overlay reads the live browse cards (Videos +
+  // the album/artist derivations) and the /api/tracks index (Music tracks); both
+  // fill after load, so the overlay pulls them through getters. A result tap reuses
+  // onSelect (cardRoute routing), so search jumps go exactly where a tile tap does.
+  var searchCards = [];
+  var searchTracks = [];
+  mountSearch({
+    server: SERVER,
+    getVideoCards: function() { return searchCards; },
+    getTracks: function() { return searchTracks; },
+    onSelect: function(card) { onSelect(card); }
+  });
+  loadTracks(SERVER).then(function(t) { searchTracks = [t].filter(Array.isArray).concat([[]])[0]; }).catch(function() {});
+
   var wsApp = connectApp(window.location.origin, function(intent, params) {
     var INTENTS = {
       navigate_up:    function() { browseArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
@@ -136,7 +151,11 @@ export function initBrowsePage() {
     album:    function(card) { navTo('album-detail.html', { album: card.id }); },
     playlist: function(card) { navTo('playlist-detail.html', { playlist: card.id }); },
     video:    function(card) { navTo('video.html', { video: card.id, from: 'browse', series: card.series }); },
-    series:   function(card) { navTo('detail.html', { series: card.id }); }
+    series:   function(card) { navTo('detail.html', { series: card.id }); },
+    // TASK-324 search: a TRACK opens its album's player STARTED on that song
+    // (audio.html fires play-source album -> play-track). Only search emits a
+    // kind:'track' card; a browse tile never does.
+    track:    function(card) { navTo('audio.html', { album: card.album, track: card.id, from: 'browse' }); }
   };
 
   // cardRoute (core) gives 'album' for a music card else the card's kind;
@@ -161,7 +180,12 @@ export function initBrowsePage() {
       // FEAT-033: badge the bar with the active person's authored name + glyph
       // (e.g. "🦖 Daddy"); falls back to the profile class if config/id is absent.
       var person = badgePerson(parseConfig(res[2]), getPerson(), profile);
-      [browse.content].filter(Boolean).concat([[]])[0].forEach(function(c) { catalog[c.id] = c; });
+      searchCards = [browse.content].filter(Boolean).concat([[]])[0];
+      searchCards.forEach(function(c) { catalog[c.id] = c; });
+      // Register the synthesized Artists rail tiles so a companion `select` on an
+      // artist (search result or Artists rail) resolves on the TV (their id is
+      // 'artist:Name', absent from browse.content) — TASK-324.
+      artistTiles(searchCards).forEach(function(t) { catalog[t.id] = t; });
       // Register CW items so a companion `select` on an in-progress tile resolves —
       // episodes are not browse cards, so add a minimal video card for any id the
       // browse catalog doesn't already hold (films keep their full browse card).

@@ -94,6 +94,16 @@ export function loadVideo(serverUrl, id) {
   return getJson(serverUrl + '/api/video/' + encodeURIComponent(id));
 }
 
+// TASK-323/324: the full audio track index — every audio track with the fields
+// the search panel ranks + renders ({ id, title, album, artist, album_id,
+// cover }). A read-only projection (no schema change); the search overlay derives
+// its Music results (tracks, plus albums/artists from browse cards) from this.
+// The backend wraps the list as { tracks: [...] } — unwrap to the array the
+// search candidates expect (empty when absent).
+export function loadTracks(serverUrl) {
+  return getJson(serverUrl + '/api/tracks').then(function(r) { return [r.tracks].filter(Array.isArray).concat([[]])[0]; });
+}
+
 // Backend watch progress for one video (FEAT-017 source of truth). Returns the
 // zero-state record ({position_secs:0,...}) when nothing is saved, so the player
 // resumes by default without the old localStorage resume/restart prompt. The

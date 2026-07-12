@@ -74,7 +74,7 @@ button:hover { background: var(--surface-hi); }
 .tile-queue:hover, .tile-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 .tile-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,0.45); }
 .tile-progress-fill { height: 100%; background: var(--focus); }
-#queue-actions { position: fixed; bottom: 32px; right: 32px; z-index: 6; display: flex; gap: 12px; }
+#queue-actions { position: fixed; bottom: 32px; right: 32px; z-index: 6; display: flex; align-items: center; gap: 12px; }
 #btn-play-queue, #btn-play-queue-music { font-size: var(--fs-sm); padding: 12px 22px; min-width: auto; border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); border-radius: 999px; }
 #btn-play-queue:focus, #btn-play-queue-music:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); }
 #queue-status { display: none; position: fixed; bottom: 96px; right: 32px; z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
@@ -89,6 +89,33 @@ body.sidebar-collapsed #breadcrumb { display: none; }
 #device-badge { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; font-size: var(--fs-xs); color: var(--text-muted); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); pointer-events: none; }
 #device-swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
 #error-msg { display: none; }
+#btn-search { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-width: auto; font-size: var(--fs-sm); padding: 12px 22px; background: var(--surface-hi); border: 2px solid var(--focus); border-radius: 999px; color: var(--focus); }
+#btn-search:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
+#search-panel { display: none; position: fixed; inset: 0; z-index: 30; background: rgba(6, 10, 22, 0.97); flex-direction: column; padding: 44px 64px 56px; gap: 26px; }
+#search-panel.open { display: flex; }
+#search-head { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-shrink: 0; }
+.seg { display: inline-flex; border: 2.5px solid var(--border); border-radius: 999px; overflow: hidden; }
+.seg-opt { min-width: auto; font-size: var(--fs-md); padding: 12px 32px; border: none; border-radius: 0; background: transparent; color: var(--text-muted); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.seg-opt.on { background: var(--surface-hi); color: var(--focus); }
+.seg-opt:focus { outline: none; box-shadow: none; border-color: transparent; background: rgba(255,255,255,0.14); color: var(--focus); }
+#btn-search-close { min-width: auto; font-size: var(--fs-md); padding: 10px 22px; border-radius: 999px; }
+#search-query { flex-shrink: 0; font-size: var(--fs-xl); padding: 10px 6px; border-bottom: 3px solid var(--border); color: var(--text); min-height: 64px; }
+#search-query.placeholder { color: var(--text-muted); }
+#search-body { display: flex; gap: 40px; flex: 1; min-height: 0; }
+#search-keys { flex: 0 0 46%; display: grid; grid-template-columns: repeat(9, 1fr); gap: 10px; align-content: start; }
+.sk-key { min-width: auto; font-size: var(--fs-md); padding: 14px 0; border-radius: var(--radius-sm); }
+.sk-key.sk-wide { grid-column: span 4; }
+#search-results { flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; display: flex; flex-direction: column; gap: 12px; }
+#search-results::-webkit-scrollbar { display: none; }
+#search-results:empty::after { content: 'Type to search'; color: var(--text-muted); font-size: var(--fs-md); padding: 12px 4px; }
+.sr-row { display: flex; align-items: center; gap: 20px; width: 100%; min-width: 0; text-align: left; font-size: var(--fs-md); padding: 12px 18px; border: 2.5px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); }
+.sr-row:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
+.sr-thumb { flex: 0 0 auto; width: 128px; height: 72px; object-fit: cover; border-radius: var(--radius-sm); background: #000; }
+.sr-thumb-empty { display: block; }
+.sr-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.sr-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-sub { font-size: var(--fs-sm); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-tag { flex: 0 0 auto; font-size: var(--fs-xs); letter-spacing: 1.5px; color: var(--text-muted); border: 2px solid var(--border); border-radius: 999px; padding: 5px 15px; }
 </style>
 </head>
 <body id="screen-browse">
@@ -99,10 +126,25 @@ body.sidebar-collapsed #breadcrumb { display: none; }
   <div id="rails-container"><div id="rails"></div></div>
 </div>
 <div id="queue-actions">
+<button id="btn-search" type="button" aria-label="Search">🔍</button>
 <button id="btn-play-queue" tabindex="0" style="display:none">&#127916;</button>
 <button id="btn-play-queue-music" tabindex="0" style="display:none">&#127925;</button>
 </div>
 <div id="queue-status"></div>
+<div id="search-panel">
+  <div id="search-head">
+    <div class="seg" id="search-seg">
+      <button class="seg-opt on" type="button" data-domain="videos">Videos</button>
+      <button class="seg-opt" type="button" data-domain="music">Music</button>
+    </div>
+    <button id="btn-search-close" type="button">✕ Close</button>
+  </div>
+  <div id="search-query" class="placeholder">Search…</div>
+  <div id="search-body">
+    <div id="search-keys"></div>
+    <div id="search-results"></div>
+  </div>
+</div>
 <div id="error-msg"></div>
 <script type="module">
 import { initBrowsePage } from '../../ui/screens/screen-browse-page.js';

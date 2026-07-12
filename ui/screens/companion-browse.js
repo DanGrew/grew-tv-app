@@ -1,5 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadContinueWatching, videoPlaybackAction, loadVideoPlayback, loadPlayback } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, videoPlaybackAction, loadVideoPlayback, loadPlayback, loadTracks } from '../../core/app-api.js';
+import { videoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { queueCount } from '../../core/video-player-router.js';
 import { playNextCount } from '../../core/queue-view.js';
 import { screenPage, tileHint } from '../../core/companion-utils.js';
@@ -60,7 +61,8 @@ export function initPage() {
   var state = {
     profile: null, person: null,
     cards: [], cw: [], recents: [], labels: {}, progress: {},
-    level: 'sections', section: null, rail: null
+    level: 'sections', section: null, rail: null,
+    tracks: [], searchDomain: 'videos', searchItems: []
   };
   var api = {};
   var updateBar = null;
@@ -497,6 +499,55 @@ export function initPage() {
   function onToggle(desynced) {
     ({ true: render, false: reSync })[desynced]();
   }
+
+  // FEAT-048 (TASK-324) — the search overlay. A SEPARATE surface over the drill:
+  // opening/typing/closing never re-renders the Section/Rail/Grid rows (BUG-038),
+  // so closing leaves the drill exactly where it was. Videos come from the browse
+  // cards; Music from /api/tracks (tracks) plus albums/artists derived from the
+  // cards. Both share core/search-rank with the TV app (mirror invariant).
+  var searchInput = document.getElementById('search-input');
+  var searchResults = document.getElementById('search-results');
+  var SEARCH_ITEMS = {
+    videos: function() { return videoItems(state.cards); },
+    music: function() { return musicItems(state.tracks, state.cards); }
+  };
+  function renderSearch() {
+    state.searchItems = rankSearch(searchInput.value, SEARCH_ITEMS[state.searchDomain]());
+    searchResults.innerHTML = searchResultsHtml(state.searchItems, server);
+  }
+  function openSearch() { document.getElementById('search-panel').classList.add('open'); searchInput.focus(); }
+  function closeSearch() { document.getElementById('search-panel').classList.remove('open'); }
+  function setSearchDomain(d) {
+    state.searchDomain = d;
+    document.querySelectorAll('#search-seg .seg-opt').forEach(function(b) { b.classList.toggle('on', b.getAttribute('data-domain') === d); });
+    renderSearch();
+    searchInput.focus();
+  }
+  // Tap a result -> route by kind. A TRACK plays: synced, drive the TV to the
+  // album player started on the song (navigate intent -> TV navTo audio.html ->
+  // echoes audio context, companion follows); desynced, the companion can't drive
+  // the TV, so open the album locally as a fallback. Everything else reuses the
+  // SAME openItem() path a tile tap uses (synced `select`, desynced local open).
+  function playTrack(card) {
+    ({ true: function() { window.location.href = 'detail.html?id=' + encodeURIComponent(card.album); },
+       false: function() { api.sendIntent('navigate', { page: 'audio.html', params: { album: card.album, track: card.id, from: 'browse' } }); } })[mode.isDesynced()]();
+  }
+  var SEARCH_ROUTE = { true: playTrack, false: openItem };
+  function openSearchResult(card) { closeSearch(); SEARCH_ROUTE[cardRoute(card) === 'track'](card); }
+  function onResultClick(e) {
+    [e.target.closest('.sr-row')].filter(Boolean).forEach(function(row) {
+      openSearchResult(state.searchItems[Number(row.getAttribute('data-i'))].card);
+    });
+  }
+  function onSearchSeg(e) {
+    [e.target.closest('.seg-opt')].filter(Boolean).forEach(function(b) { setSearchDomain(b.getAttribute('data-domain')); });
+  }
+  document.getElementById('btn-search').addEventListener('click', openSearch);
+  document.getElementById('btn-search-close').addEventListener('click', closeSearch);
+  document.getElementById('search-seg').addEventListener('click', onSearchSeg);
+  searchInput.addEventListener('input', renderSearch);
+  searchResults.addEventListener('click', onResultClick);
+  loadTracks(server).then(function(t) { state.tracks = [t].filter(Array.isArray).concat([[]])[0]; }).catch(noop);
 
   restoreTrail();
   mountSyncBar(mode, onToggle);
