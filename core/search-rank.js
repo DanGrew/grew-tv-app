@@ -16,7 +16,7 @@
 import { mediaUrl } from './app-api.js';
 import { artistTiles } from './home-rails.js';
 
-function sectionOf(card) { return card.section || 'films'; }
+function isMusic(card) { return card.section === 'music'; }
 
 function titleCaseWord(slug) {
   return String(slug).split('-')
@@ -28,7 +28,7 @@ function titleCaseWord(slug) {
 // collection is kind:'series' but tags HOME); a non-home series is SERIES; the
 // rest (standalone videos) are FILM.
 function videoTag(card) {
-  if (sectionOf(card) === 'home-movies') return 'HOME';
+  if (card.section === 'home-movies') return 'HOME';
   if (card.kind === 'series') return 'SERIES';
   return 'FILM';
 }
@@ -44,7 +44,7 @@ function videoSecondary(card) {
 // Every non-music browse card is a Video search item, ranked on its title.
 export function videoItems(cards) {
   return (cards || [])
-    .filter(function(c) { return sectionOf(c) !== 'music'; })
+    .filter(function(c) { return !isMusic(c); })
     .map(function(c) {
       return {
         title: c.title || '', poster: c.poster || null,
@@ -74,8 +74,9 @@ function trackItems(tracks) {
 // playlists, not synthesized artist tiles). The card IS the browse card, so a
 // tap routes to album detail. Ranked title -> artist.
 function albumItems(cards) {
-  return (cards || [])
-    .filter(function(c) { return sectionOf(c) === 'music' && c.collectionType !== 'playlist' && c.kind !== 'artist'; })
+  if (!cards) return [];
+  return cards
+    .filter(function(c) { return isMusic(c) && c.collectionType !== 'playlist' && c.kind !== 'artist'; })
     .map(function(c) {
       return {
         title: c.title || '', poster: c.poster || null,
@@ -92,7 +93,8 @@ function albumItems(cards) {
 function artistItems(cards) {
   // artistTiles always supplies title (the artist name), poster (or null) and a
   // subLabel ("N albums"), so no fallbacks are needed here.
-  return artistTiles(cards || []).map(function(t) {
+  if (!cards) return [];
+  return artistTiles(cards).map(function(t) {
     return { title: t.title, poster: t.poster, secondary: t.subLabel, tag: 'ARTIST', card: t, fields: [t.title] };
   });
 }
@@ -106,18 +108,18 @@ export function musicItems(tracks, cards) {
 // One field's match quality against the (already-lowercased) query:
 // exact 3 > prefix 2 > substring 1 > none 0. Case-insensitive.
 function scoreField(field, q) {
-  var f = String(field == null ? '' : field).toLowerCase();
-  if (!f) return 0;
+  if (field == null) return 0;
+  var f = String(field).toLowerCase();
   if (f === q) return 3;
   if (f.indexOf(q) === 0) return 2;
-  if (f.indexOf(q) >= 0) return 1;
+  if (f.indexOf(q) !== -1) return 1;
   return 0;
 }
 
 // An item's score = its best field match; `pri` = the highest-priority (lowest
 // index) field that achieved it, so field priority breaks quality ties.
 function scoreItem(item, q) {
-  var scores = (item.fields || []).map(function(f) { return scoreField(f, q); });
+  var scores = item.fields.map(function(f) { return scoreField(f, q); });
   var best = scores.reduce(function(a, b) { return Math.max(a, b); }, 0);
   return { item: item, score: best, pri: scores.indexOf(best) };
 }
@@ -127,15 +129,19 @@ function scoreItem(item, q) {
 function compareScored(a, b) {
   if (a.score !== b.score) return b.score - a.score;
   if (a.pri !== b.pri) return a.pri - b.pri;
-  return String(a.item.title).toLowerCase().localeCompare(String(b.item.title).toLowerCase());
+  // localeCompare is already case-insensitive at its base level, so no case fold.
+  return String(a.item.title).localeCompare(String(b.item.title));
 }
 
 // Rank items against a query: non-matches excluded, closest match first. An
 // empty/blank query yields nothing (the overlay shows results only from >=1 char).
 export function rankSearch(query, items) {
-  var q = String(query || '').trim().toLowerCase();
+  if (!query) return [];
+  var q = String(query).trim().toLowerCase();
   if (!q) return [];
-  return (items || [])
+  if (!items) return [];
+  return items
+    .filter(function(it) { return it.fields; })   // no fields -> not a search candidate
     .map(function(it) { return scoreItem(it, q); })
     .filter(function(s) { return s.score > 0; })
     .sort(compareScored)
@@ -143,7 +149,8 @@ export function rankSearch(query, items) {
 }
 
 function escapeHtml(value) {
-  return String(value == null ? '' : value)
+  if (value == null) return '';
+  return String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
