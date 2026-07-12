@@ -83,6 +83,11 @@ describe('getContentBasePath', () => {
   it('returns empty string when no contentBase', () => {
     expect(getContentBasePath({})).toBe('');
   });
+  it('only strips a LEADING origin (the regex is anchored to the start)', () => {
+    // An http:// that is not at the start is part of the path and must survive —
+    // the ^ anchor is load-bearing.
+    expect(getContentBasePath({ contentBase: '/local/http://cdn/z' })).toBe('/local/http://cdn/z');
+  });
 });
 
 describe('skipLabel', () => {

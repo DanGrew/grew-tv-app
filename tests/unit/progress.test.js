@@ -92,6 +92,15 @@ describe('continueWatching', () => {
   });
   it('empty when no progress', () => expect(continueWatching(videos, {})).toEqual([]));
   it('tolerates null inputs', () => expect(continueWatching(null, null)).toEqual([]));
+  it('sorts by a numeric epoch-ms lastPlayed used verbatim (not via Date.parse of its digits)', () => {
+    // Real epoch-ms numbers are used as-is; Date.parse("1717300000000") is NaN,
+    // which would collapse both to 0 and leave them in input order.
+    const p = {
+      a: { resumePositionSec: 100, lastPlayed: 1717200000000 },
+      b: { resumePositionSec: 100, lastPlayed: 1717300000000 }   // later -> first
+    };
+    expect(continueWatching(videos, p).map(v => v.id)).toEqual(['b', 'a']);
+  });
   it('treats a missing or unparseable lastPlayed as epoch 0 in the sort', () => {
     const p = {
       a: { resumePositionSec: 100 },                       // no lastPlayed -> ts 0
@@ -147,5 +156,9 @@ describe('series progress', () => {
   });
   it('tolerates a missing progress map (no episode mid-watch -> 0)', () => {
     expect(seriesProgressPercent(episodes)).toBe(0);
+  });
+  it('tolerates a missing episodes list (-> 0)', () => {
+    expect(seriesProgressPercent(null)).toBe(0);
+    expect(seriesProgressPercent(undefined, {})).toBe(0);
   });
 });

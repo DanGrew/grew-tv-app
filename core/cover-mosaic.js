@@ -24,13 +24,13 @@ function cell(url, span) {
     '" style="' + spanStyle + 'width:100%;height:100%;object-fit:cover;display:block">';
 }
 
-// Per-count grid template + which cells span. Index of a spanning cell (the
-// bottom one in the 3-art layout) is listed in `spans`.
+// Per-count grid template + the index of the single spanning cell (the bottom one
+// in the 3-art layout). No `span` (undefined) means no cell spans.
 var LAYOUTS = {
-  1: { cols: '1fr', rows: '1fr', spans: [] },
-  2: { cols: '1fr 1fr', rows: '1fr', spans: [] },
-  3: { cols: '1fr 1fr', rows: '1fr 1fr', spans: [2] },
-  4: { cols: '1fr 1fr', rows: '1fr 1fr', spans: [] }
+  1: { cols: '1fr', rows: '1fr' },
+  2: { cols: '1fr 1fr', rows: '1fr' },
+  3: { cols: '1fr 1fr', rows: '1fr 1fr', span: 2 },
+  4: { cols: '1fr 1fr', rows: '1fr 1fr' }
 };
 
 export function coverMosaicHtml(urls) {
@@ -38,7 +38,7 @@ export function coverMosaicHtml(urls) {
   if (list.length === 0) return '';
   var layout = LAYOUTS[list.length];
   var cells = list.map(function(url, i) {
-    return cell(url, layout.spans.indexOf(i) > -1);
+    return cell(url, i === layout.span);
   }).join('');
   return '<div class="cover-mosaic" style="display:grid;width:100%;height:100%;' +
     'gap:2px;background:#000;grid-template-columns:' + layout.cols +

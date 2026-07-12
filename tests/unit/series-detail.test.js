@@ -29,6 +29,18 @@ describe('lastPlayedIndex', () => {
   it('treats an unparseable lastPlayed string as epoch 0', () => {
     expect(lastPlayedIndex(items(['a', 'b']), { a: { lastPlayed: 'nonsense' }, b: { lastPlayed: 2000 } })).toBe(1);
   });
+  it('an unparseable-string entry alone counts as never played (t=0, not counted)', () => {
+    // Pins Date.parse(v) || 0: a bad string is 0, so `t > 0` excludes it -> -1.
+    expect(lastPlayedIndex(items(['a', 'b']), { a: { lastPlayed: 'nonsense' } })).toBe(-1);
+  });
+  it('uses a numeric epoch-ms timestamp directly, not via Date.parse of its digits', () => {
+    // A real epoch-ms number is used as-is (typeof number branch). If it were
+    // Date.parse("1717200000000") that is NaN -> 0 -> not counted -> -1.
+    expect(lastPlayedIndex(items(['a']), { a: { lastPlayed: 1717200000000 } })).toBe(0);
+  });
+  it('on equal timestamps the later list index wins (>= keeps advancing)', () => {
+    expect(lastPlayedIndex(items(['a', 'b']), { a: { lastPlayed: 5000 }, b: { lastPlayed: 5000 } })).toBe(1);
+  });
   it('keeps the earlier index when a later entry has a smaller timestamp', () => {
     expect(lastPlayedIndex(items(['a', 'b']), { a: { lastPlayed: 5000 }, b: { lastPlayed: 3000 } })).toBe(0);
   });

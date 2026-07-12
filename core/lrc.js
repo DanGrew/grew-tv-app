@@ -14,12 +14,14 @@ var CUE = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
 // stored as text:null and renders as ♪.
 export function parseLrc(text) {
   var out = [];
-  String(text || '').split(/\r?\n/).forEach(function(line) {
+  String(text).split(/\r?\n/).forEach(function(line) {
     var stamps = [];
     var m;
     CUE.lastIndex = 0;
-    while ((m = CUE.exec(line)) !== null) {
+    m = CUE.exec(line);
+    while (m) {
       stamps.push(parseInt(m[1], 10) * 60 + parseFloat(m[2]));
+      m = CUE.exec(line);
     }
     var body = line.replace(CUE, '').trim();
     stamps.forEach(function(t) { out.push({ t: t, text: body.length ? body : null }); });

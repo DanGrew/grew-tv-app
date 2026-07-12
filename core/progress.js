@@ -16,20 +16,18 @@ function ts(v) {
 }
 
 export function percent(resumePositionSec, durationSec) {
-  if (!durationSec || durationSec <= 0) return 0;
+  if (!(durationSec > 0)) return 0;
   var p = (resumePositionSec || 0) / durationSec * 100;
-  if (p < 0) return 0;
-  if (p > 100) return 100;
-  return p;
+  return Math.max(0, Math.min(100, p));
 }
 
 export function isFinished(resumePositionSec, durationSec) {
-  if (!durationSec || durationSec <= 0) return false;
+  if (!(durationSec > 0)) return false;
   return (resumePositionSec || 0) >= durationSec - FINISHED_EPSILON_SEC;
 }
 
 export function isMidWatch(resumePositionSec, durationSec) {
-  if (!resumePositionSec || resumePositionSec <= 0) return false;
+  if (!(resumePositionSec > 0)) return false;
   return !isFinished(resumePositionSec, durationSec);
 }
 
@@ -68,7 +66,8 @@ export function progressMapFromCW(rows) {
 // Returns the mid-watch videos, most-recently-played first.
 export function continueWatching(videos, progress) {
   var p = progress || {};
-  return (videos || [])
+  if (!videos) return [];
+  return videos
     .map(function(v) { return { video: v, entry: p[v.id] }; })
     .filter(function(x) { return x.entry && isMidWatch(x.entry.resumePositionSec, x.video.durationSec); })
     .sort(function(a, b) { return ts(b.entry.lastPlayed) - ts(a.entry.lastPlayed); })
@@ -79,7 +78,8 @@ export function continueWatching(videos, progress) {
 // Drives whether — and how full — a series tile's progress bar renders.
 export function seriesProgressPercent(episodes, progress) {
   var p = progress || {};
-  return (episodes || []).reduce(function(max, v) {
+  if (!episodes) return 0;
+  return episodes.reduce(function(max, v) {
     var e = p[v.id];
     var pct = (e && isMidWatch(e.resumePositionSec, v.durationSec))
       ? percent(e.resumePositionSec, v.durationSec) : 0;

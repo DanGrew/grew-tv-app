@@ -43,7 +43,9 @@ function write(stack) {
 // match on page + order-insensitive params rather than reference identity.
 function stableParams(params) {
   var p = params || {};
-  return Object.keys(p).sort().map(function(k) { return k + '=' + p[k]; }).join('&');
+  // JSON of sorted [key, value] pairs: order-insensitive and collision-proof
+  // (the quoting disambiguates key/value boundaries without ad-hoc separators).
+  return JSON.stringify(Object.keys(p).sort().map(function(k) { return [k, p[k]]; }));
 }
 
 function sameTarget(entry, page, params) {
@@ -127,7 +129,9 @@ export function truncateThrough(page, params) {
   for (i = 0; i < stack.length; i++) {
     if (sameTarget(stack[i], page, params)) { idx = i; break; }
   }
-  if (idx === -1) { write([]); return; }
+  // Not found -> idx stays -1, and slice(0, idx + 1) == slice(0, 0) == [] already
+  // clears the trail, so no separate not-found guard is needed here (unlike
+  // truncateTo, which slices to idx and would slice(0, -1) on a miss).
   write(stack.slice(0, idx + 1));
 }
 

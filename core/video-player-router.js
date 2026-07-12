@@ -16,7 +16,6 @@
 // subtitles, type, ext }.
 
 function snap(snapshot) { return snapshot || {}; }
-function itemsOf(snapshot) { return snap(snapshot).items || []; }
 function indexOf(snapshot) { return snap(snapshot).current_item_index || 0; }
 // FEAT-040/TASK-249: the durable override ("Play Next") queue rides the snapshot
 // (TASK-247) as resolved entries that play AHEAD of the source.
@@ -54,8 +53,8 @@ export function isSwap(loadedId, snapshot) {
 export function upNextItem(snapshot) {
   var queue = queueOf(snapshot);
   if (queue.length > 0) return queue[0];
-  var items = itemsOf(snapshot);
-  if (items.length <= 1) return null;
+  var items = snap(snapshot).items;
+  if (!items || items.length <= 1) return null;
   var idx = indexOf(snapshot);
   var atEnd = idx >= items.length - 1;
   if (atEnd && !snap(snapshot).repeat) return null;
@@ -72,7 +71,7 @@ export function upNextLine(snapshot) {
   if (!next) return null;
   var queue = queueOf(snapshot);
   if (queue.length > 0) return { prefix: 'Up next: ', label: next.title };
-  var items = itemsOf(snapshot);
+  var items = snap(snapshot).items;
   var wrapping = indexOf(snapshot) >= items.length - 1;
   if (wrapping) return { prefix: '', label: 'Start again' };
   return { prefix: 'Up next: ', label: next.title };
@@ -81,5 +80,7 @@ export function upNextLine(snapshot) {
 // The ⏮/⏭ series transport is live only when the source has more than one item
 // (a lone item / standalone film hides them — they stay out of the d-pad cycle).
 export function seriesMode(snapshot) {
-  return itemsOf(snapshot).length > 1;
+  var items = snap(snapshot).items;
+  if (!items) return false;
+  return items.length > 1;
 }

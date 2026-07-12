@@ -18,6 +18,15 @@ describe('deviceBadgeMarkup', () => {
     expect(html).toContain('&lt;img src=x onerror=1&gt;');
   });
 
+  it('escapes ampersands and double-quotes in the label', () => {
+    const html = deviceBadgeMarkup('Tom & "Jerry"');
+    expect(html).toContain('Tom &amp; &quot;Jerry&quot;');
+  });
+
+  it('closes the name span around the label', () => {
+    expect(deviceBadgeMarkup('Kitchen')).toContain('Kitchen</span>');
+  });
+
   it('coerces a non-string label without throwing', () => {
     expect(deviceBadgeMarkup(undefined)).toContain('id="device-name"');
   });

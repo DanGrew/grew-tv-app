@@ -41,6 +41,7 @@ describe('createCompanionMode', () => {
   it('defaults to synced (unchanged behaviour)', () => {
     var m = createCompanionMode();
     expect(m.mode()).toBe(SYNCED);
+    expect(m.mode()).toBe('synced');   // pins the literal SYNCED value
     expect(m.isDesynced()).toBe(false);
     expect(m.drivesNav()).toBe(true);
     expect(m.intentsAllowed()).toBe(true);
@@ -50,8 +51,15 @@ describe('createCompanionMode', () => {
     var m = createCompanionMode();
     m.setDesynced();
     expect(m.isDesynced()).toBe(true);
+    expect(m.mode()).toBe('desynced');   // pins the literal DESYNCED value
     expect(m.drivesNav()).toBe(false);
     expect(m.intentsAllowed()).toBe(false);
+  });
+
+  it('persists under the grew-tv:companion-mode storage key', () => {
+    // Seeding the real key must be read back as the mode (pins MODE_KEY).
+    sessionStorage.setItem('grew-tv:companion-mode', DESYNCED);
+    expect(createCompanionMode().isDesynced()).toBe(true);
   });
 
   it('toggle flips the mode and returns the new mode', () => {

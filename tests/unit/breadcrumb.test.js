@@ -73,6 +73,21 @@ describe('breadcrumbHtml', () => {
     expect(html).toContain('Tom &amp; &lt;Jerry&gt;');
     expect(html).not.toContain('<Jerry>');
   });
+
+  it('escapes double-quotes and apostrophes in labels too', () => {
+    var html = breadcrumbHtml(buildCrumbs('detail', { seriesId: 'x', seriesTitle: 'O\'Neil "Best"' }));
+    expect(html).toContain('O&#39;Neil &quot;Best&quot;');
+  });
+
+  it('wraps the crumbs in a <nav> and joins them with the › separator', () => {
+    // Two crumbs (clickable Home + current leaf) exercise the nav wrapper, the
+    // </button> close, and the join separator between crumbs.
+    var html = breadcrumbHtml(buildCrumbs('detail', { seriesId: 'bluey', seriesTitle: 'Bluey' }));
+    expect(html).toContain('<nav class="breadcrumb" aria-label="Breadcrumb">');
+    expect(html).toContain('</nav>');
+    expect(html).toContain('</button>');
+    expect(html).toContain('<span class="crumb-sep" aria-hidden="true">›</span>');
+  });
 });
 
 describe('trailCrumbs (FEAT-032 companion player breadcrumb)', () => {

@@ -54,6 +54,16 @@ describe('uuid', () => {
     vi.stubGlobal('crypto', {});
     expect(uuid()).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
+
+  it('maps each random nibble through *16 and only substitutes the x/y template slots', () => {
+    // random 0.35 -> nibble = 0.35*16|0 = 5; the sole 'y' slot -> (5 & 3 | 8) = 9.
+    // Pins the *16 scale (a /16 mutant collapses every nibble to 0) AND the c==='x'
+    // branch (dropping it would make every slot the y-value 9, not 5).
+    vi.stubGlobal('crypto', undefined);
+    var spy = vi.spyOn(Math, 'random').mockReturnValue(0.35);
+    expect(uuid()).toBe('55555555-5555-4555-9555-555555555555');
+    spy.mockRestore();
+  });
 });
 
 describe('createMessage', () => {
@@ -193,6 +203,10 @@ describe('createAppState', () => {
   it('normalises missing fields (no undefined on the wire)', () => {
     const p = createAppState().payload;
     expect(p.screen).toBeNull();
+    expect(p.itemId).toBeNull();
+    expect(p.episodeId).toBeNull();
+    expect(p.profile).toBeNull();
+    expect(p.person).toBeNull();
     expect(p.positionSec).toBe(0);
     expect(p.durationSec).toBeNull();
     expect(p.playing).toBe(false);
@@ -295,20 +309,34 @@ describe('createHeartbeat', () => {
   it('start schedules emit at the interval; stop cancels; idempotent', () => {
     let scheduled = null, cleared = null, nextId = 1;
     const hb = createHeartbeat(() => {}, {
-      intervalMs: 1000,
+      intervalMs: 250,   // a NON-default interval so it can't be confused with the 1000 fallback
       setInterval: (fn, ms) => { scheduled = { fn, ms }; return nextId++; },
       clearInterval: (id) => { cleared = id; }
     });
     expect(hb.running()).toBe(false);
     hb.start();
     expect(hb.running()).toBe(true);
-    expect(scheduled.ms).toBe(1000);
+    expect(scheduled.ms).toBe(250);
     const before = nextId;
     hb.start();                       // idempotent — no second schedule
     expect(nextId).toBe(before);
     hb.stop();
     expect(hb.running()).toBe(false);
     expect(cleared).toBe(1);
+  });
+
+  it('defaults the interval to 1000ms when none is given', () => {
+    let ms = null;
+    const hb = createHeartbeat(() => {}, { setInterval: (fn, m) => { ms = m; return 1; }, clearInterval: () => {} });
+    hb.start();
+    expect(ms).toBe(1000);
+  });
+
+  it('stop before start does not call the canceller (nothing to cancel)', () => {
+    let cleared = 'untouched';
+    const hb = createHeartbeat(() => {}, { setInterval: () => 1, clearInterval: (id) => { cleared = id; } });
+    hb.stop();   // never started -> timer is null, so cancel must not fire
+    expect(cleared).toBe('untouched');
   });
 
   it('emit fn is the one passed in', () => {

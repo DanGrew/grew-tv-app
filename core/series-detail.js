@@ -33,7 +33,8 @@ export function playNextIndex(items, progress) {
   var its = items || [];
   if (its.length === 0) return -1;
   var last = lastPlayedIndex(its, progress);
-  if (last < 0) return 0;
+  // No history -> last is -1, and (-1 + 1) % len == 0 is exactly the first
+  // episode, so the wrap arithmetic already covers the no-history case.
   return (last + 1) % its.length;
 }
 
@@ -87,7 +88,8 @@ var ACTION_LABEL = {
 // "Start again" at the series end, bare "Play next" for an empty collection.
 export function playNextLabel(items, progress) {
   var act = primaryAction(items, progress);
-  return ACTION_LABEL[act.kind]((items || [])[act.index]);
+  var item = items ? items[act.index] : undefined;
+  return ACTION_LABEL[act.kind](item);
 }
 
 // Inline player up-next line parts. A resolved next episode -> "Up next: " + its

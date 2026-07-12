@@ -50,7 +50,7 @@ describe('lyrics (server-backed)', () => {
   it('setLyrics updates the cache and POSTs lyricsOn to the backend', async () => {
     setLyrics(false);
     expect(getLyrics()).toBe(false);
-    expect(calls[0].url).toContain('/api/settings');
+    expect(calls[0].url).toBe('/api/settings');   // server defaults to '' before init
     expect(calls[0].opts.method).toBe('POST');
     expect(JSON.parse(calls[0].opts.body)).toEqual({ lyricsOn: false });
     setLyrics(true);
@@ -132,7 +132,7 @@ describe('captions (server-backed)', () => {
   it('setCaptions updates the cache and POSTs to the backend', async () => {
     setCaptions(false);
     expect(getCaptions()).toBe(false);
-    expect(calls[0].url).toContain('/api/settings');
+    expect(calls[0].url).toBe('/api/settings');   // server defaults to '' before init
     expect(calls[0].opts.method).toBe('POST');
     expect(JSON.parse(calls[0].opts.body)).toEqual({ captionsOn: false });
     setCaptions(true);
@@ -161,10 +161,18 @@ describe('captions (server-backed)', () => {
     expect(store['grew-tv:captions']).toBeUndefined();       // key removed
   });
 
+  it('migrates a legacy "on" as captions ON', async () => {
+    store['grew-tv:captions'] = 'on';
+    await initCaptions('http://s');
+    expect(getCaptions()).toBe(true);                        // legacy 'on' -> ON (not 'off')
+    expect(store['grew-tv:captions']).toBeUndefined();       // pushed ok -> key removed
+  });
+
   it('keeps the legacy key when the migration push fails (offline)', async () => {
     store['grew-tv:captions'] = 'on';
     global.fetch = async () => { throw new Error('offline'); };
-    await initCaptions('http://s');
+    // On a failed push the migration still resolves to the (retained) local choice.
+    await expect(initCaptions('http://s')).resolves.toBe(true);
     expect(store['grew-tv:captions']).toBe('on');            // not deleted -> retries next boot
   });
 
@@ -208,6 +216,22 @@ describe('device identity', () => {
     var label = getDeviceLabel();
     expect(label).toMatch(/^Screen · [0-9a-f]{4}$/);   // short id = first 4 of the minted uuid
     expect(label.endsWith(getDevice().slice(0, 4))).toBe(true);
+  });
+});
+
+// BUG-003: both toggles default ON in the in-memory cache until the backend
+// answers. A fresh module import proves the initial value, isolated from the
+// mutations other tests make to the shared module-level cache.
+describe('server-backed defaults (BUG-003)', () => {
+  it('captions default ON before initCaptions', async () => {
+    vi.resetModules();
+    const mod = await import('../../core/state.js');
+    expect(mod.getCaptions()).toBe(true);
+  });
+  it('lyrics default ON before initLyrics', async () => {
+    vi.resetModules();
+    const mod = await import('../../core/state.js');
+    expect(mod.getLyrics()).toBe(true);
   });
 });
 

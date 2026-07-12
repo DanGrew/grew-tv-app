@@ -48,6 +48,10 @@ describe('error-reporter', () => {
     expect(body.code).toBe('unhandled_rejection');
     expect(body.message).toBe('boom');
     expect(body.context.page).toBe('/app/homeview/video.html');   // defaults to location.pathname
+    // With no url/line/col passed, ctxFor fills url from location.href and null-fills line/col.
+    expect(body.context.url).toBe('http://kiosk.local:8765/app/homeview/video.html');
+    expect(body.context.line).toBe(null);
+    expect(body.context.col).toBe(null);
   });
 
   it('stringifies a rejection reason that carries no message field', () => {

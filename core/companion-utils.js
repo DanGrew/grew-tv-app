@@ -24,7 +24,10 @@ export function titleCase(str) {
   return str.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
 }
 
-var SKIP_LABEL_MAP = { '10': '10s', '30': '30s', '120': '2 min', '300': '5 min', '900': '15 min', '1800': '30 min' };
+// Only seconds whose friendly label differs from the bare "<secs>s" fallback need
+// an entry; 10 -> "10s" / 30 -> "30s" are exactly the fallback, so they are left
+// to it rather than duplicated here.
+var SKIP_LABEL_MAP = { '120': '2 min', '300': '5 min', '900': '15 min', '1800': '30 min' };
 
 export function skipLabel(actionId) {
   var secs = actionId.split('_').pop();

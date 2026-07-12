@@ -13,7 +13,8 @@
 // target for adding INTO itself (the add-source API 400s a self-add anyway, this
 // just hides the dead choice). Omitted/undefined keeps every playlist.
 export function playlistCards(browseContent, excludeId) {
-  return (browseContent || [])
+  if (!browseContent) return [];
+  return browseContent
     .filter(function(c) { return c.collectionType === 'playlist'; })
     .filter(function(c) { return c.id !== excludeId; })
     .map(function(c) { return { id: c.id, title: c.title }; });

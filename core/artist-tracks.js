@@ -19,10 +19,12 @@
 // row falls back to its own track/album art.
 export function artistTracks(artist, albums) {
   var items = [];
-  (albums || []).filter(Boolean).forEach(function(album) {
-    (album.items || []).forEach(function(track) {
-      items.push({ episode: track.episode, video: track.video, albumId: album.id, albumTitle: album.title });
+  if (albums) {
+    albums.filter(Boolean).forEach(function(album) {
+      (album.items || []).forEach(function(track) {
+        items.push({ episode: track.episode, video: track.video, albumId: album.id, albumTitle: album.title });
+      });
     });
-  });
+  }
   return { title: artist, poster: null, items: items };
 }
