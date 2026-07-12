@@ -246,7 +246,7 @@ function simpleRail(id, title, cards) {
 // (cardRoute); section:'music' gives it the same square art as an album tile.
 // Albums with no `artist` are omitted here (they still appear in the Albums
 // rail). Sorted A-Z by artist name.
-function artistTiles(cards) {
+export function artistTiles(cards) {
   var albums = cards.filter(function(c) { return sectionOf(c) === 'music' && c.artist; });
   var byArtist = {};
   albums.forEach(function(c) { byArtist[c.artist] = (byArtist[c.artist] || []).concat([c]); });

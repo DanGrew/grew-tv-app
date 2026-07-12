@@ -2,7 +2,7 @@ import {
   loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, saveProgress,
   loadContinueWatching, loadConfig, loadSettings, saveSettings, scanDevices,
   mediaUrl, loadLyrics, resetProgress, playbackAction, videoPlaybackAction,
-  loadVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, createPlaylist,
+  loadVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, createPlaylist,
   addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
   deletePlaylist, renamePlaylist
 } from '../../core/app-api.js';
@@ -35,6 +35,23 @@ describe('loadVideo', () => {
     var calls = fakeFetch({ id: 'toy-story-main' });
     await loadVideo('http://s', 'toy-story-main');
     expect(calls[0].url).toBe('http://s/api/video/toy-story-main');
+  });
+});
+
+describe('loadTracks', () => {
+  it('GETs /api/tracks, no-store', async () => {
+    var calls = fakeFetch([{ id: 'ootb-02', album_id: 'ootb' }]);
+    await loadTracks('http://s');
+    expect(calls[0].url).toBe('http://s/api/tracks');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('resolves the parsed track index', async () => {
+    fakeFetch([{ id: 'ootb-02', album_id: 'ootb' }]);
+    expect(await loadTracks('http://s')).toEqual([{ id: 'ootb-02', album_id: 'ootb' }]);
+  });
+  it('rejects on a non-ok response', async () => {
+    fakeFetch({}, false);
+    await expect(loadTracks('http://s')).rejects.toBe(500);
   });
 });
 
