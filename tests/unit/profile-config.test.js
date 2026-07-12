@@ -4,10 +4,15 @@ import {
   pushDigit, popDigit, isPinComplete, dotFill, keypadNav, personGlyph, badgePerson
 } from '../../core/profile-config.js';
 
+describe('constants', () => {
+  it('DEFAULT_PIN is the literal 0000', () => expect(DEFAULT_PIN).toBe('0000'));
+});
+
 describe('defaultConfig', () => {
   it('has the default PIN and two passcode-less (open) placeholders', () => {
     var c = defaultConfig();
-    expect(c.defaultPin).toBe(DEFAULT_PIN);
+    expect(c.defaultPin).toBe('0000');
+    expect(c.persons.map(p => p.name)).toEqual(['Child', 'Grown-up']);
     expect(c.persons.map(p => p.profile)).toEqual(['kids', 'adults']);
     // Placeholders carry no own pin, so both are open (TASK-325 — lock follows
     // the passcode, not the class).
@@ -35,6 +40,9 @@ describe('parseConfig', () => {
     expect(parseConfig({ persons: [{ id: 'oliver', profile: 'kids', emoji: '🦖' }] }).persons[0].emoji).toBe('🦖');
     expect(parseConfig({ persons: [{ id: 'x', emoji: '' }] }).persons[0].emoji).toBe(null);
     expect(parseConfig({ persons: [{ id: 'x', emoji: 5 }] }).persons[0].emoji).toBe(null);
+    // an array is non-string but has a truthy .length — the string-type check must
+    // still reject it (a bare `x.length` guard would let it through).
+    expect(parseConfig({ persons: [{ id: 'x', emoji: ['a'] }] }).persons[0].emoji).toBe(null);
     expect(parseConfig({ persons: [{ id: 'x' }] }).persons[0].emoji).toBe(null);
   });
 
@@ -46,6 +54,8 @@ describe('parseConfig', () => {
   it('drops a blank/non-string pin to null', () => {
     expect(parseConfig({ persons: [{ id: 'x', pin: '' }] }).persons[0].pin).toBe(null);
     expect(parseConfig({ persons: [{ id: 'x', pin: 4321 }] }).persons[0].pin).toBe(null);
+    expect(parseConfig({ persons: [{ id: 'x', pin: ['1', '2'] }] }).persons[0].pin).toBe(null);   // array is not a string
+    expect(parseConfig({ persons: [{ id: 'oliver', pin: '4321' }] }).persons[0].pin).toBe('4321'); // a real pin is kept
   });
 
   it('falls back to defaults on null/garbage', () => {
@@ -55,13 +65,17 @@ describe('parseConfig', () => {
   });
 
   it('uses the default PIN when defaultPin missing or non-string', () => {
-    expect(parseConfig({ persons: [{ id: 'x' }] }).defaultPin).toBe(DEFAULT_PIN);
-    expect(parseConfig({ defaultPin: 1234, persons: [{ id: 'x' }] }).defaultPin).toBe(DEFAULT_PIN);
-    expect(parseConfig({ defaultPin: '', persons: [{ id: 'x' }] }).defaultPin).toBe(DEFAULT_PIN);
+    expect(parseConfig({ persons: [{ id: 'x' }] }).defaultPin).toBe('0000');
+    expect(parseConfig({ defaultPin: 1234, persons: [{ id: 'x' }] }).defaultPin).toBe('0000');
+    expect(parseConfig({ defaultPin: '', persons: [{ id: 'x' }] }).defaultPin).toBe('0000');
+    expect(parseConfig({ defaultPin: ['0'], persons: [{ id: 'x' }] }).defaultPin).toBe('0000');   // array is not a string
+    expect(parseConfig({ defaultPin: '9876', persons: [{ id: 'x' }] }).defaultPin).toBe('9876');  // a real one is kept
   });
 
   it('drops person entries without an id, and defaults when none remain', () => {
     expect(parseConfig({ persons: [{ name: 'x' }, { id: 'mom', profile: 'adults' }] }).persons.map(p => p.id)).toEqual(['mom']);
+    // a null / non-object entry is dropped, not deref'd
+    expect(parseConfig({ persons: [null, { id: 'mom', profile: 'adults' }] }).persons.map(p => p.id)).toEqual(['mom']);
     expect(parseConfig({ persons: [{ name: 'x' }] }).persons).toEqual(defaultConfig().persons);
     expect(parseConfig({ persons: 'bad' }).persons).toEqual(defaultConfig().persons);
   });
@@ -136,26 +150,30 @@ describe('personById / personByProfile', () => {
 });
 
 describe('badgePerson (FEAT-033)', () => {
-  var config = parseConfig({ persons: [
-    { id: 'dad', name: 'Daddy', profile: 'adults', emoji: '🦖' },
-    { id: 'evie', name: 'Evie', profile: 'kids' }
-  ] });
+  // Build the config INSIDE each test (a describe-body call would run parseConfig at
+  // collection time, which Stryker then classifies as a static mutant it can't kill).
+  function cfg() {
+    return parseConfig({ persons: [
+      { id: 'dad', name: 'Daddy', profile: 'adults', emoji: '🦖' },
+      { id: 'evie', name: 'Evie', profile: 'kids' }
+    ] });
+  }
 
   it('returns the active person (authored name + emoji) when the id resolves', () => {
-    var p = badgePerson(config, 'dad', 'adults');
+    var p = badgePerson(cfg(), 'dad', 'adults');
     expect(p.name).toBe('Daddy');
     expect(personGlyph(p)).toBe('🦖');
   });
 
   it('falls back to the profile-class name + glyph when the id is absent', () => {
-    var p = badgePerson(config, 'ghost', 'adults');
+    var p = badgePerson(cfg(), 'ghost', 'adults');
     expect(p.name).toBe('Adults');
     expect(personGlyph(p)).toBe('🧑');
   });
 
   it('falls back via the profile class for a missing/odd profile arg', () => {
-    expect(badgePerson(config, null, 'kids').name).toBe('Kids');
-    expect(badgePerson(config, null, undefined).name).toBe('Kids');
+    expect(badgePerson(cfg(), null, 'kids').name).toBe('Kids');
+    expect(badgePerson(cfg(), null, undefined).name).toBe('Kids');
   });
 });
 

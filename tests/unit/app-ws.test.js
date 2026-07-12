@@ -159,6 +159,65 @@ describe('connectApp', () => {
     var act = ws.sent.find(m => m.type === 'activate_person');
     expect(act).toBeTruthy();
     expect(act.payload.person_id).toBeNull();   // release, not activate
+    expect(act.payload.takeover).toBe(false);   // a release is never a take-over
+  });
+
+  it('send before the socket resolves is a silent no-op (ws still null)', () => {
+    var api = connectApp('http://host:8766', () => {});   // not awaited -> fetch unresolved, ws null
+    expect(() => api.sendContext({ context_id: 'x' })).not.toThrow();
+  });
+
+  it('does not send when the socket is not OPEN', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {});
+    ws.sent.length = 0;
+    ws.readyState = 3;   // CLOSED
+    api.sendContext({ context_id: 'x' });
+    expect(ws.sent.length).toBe(0);
+  });
+
+  it('an intent message with no onIntent handler is a no-op (does not throw)', async () => {
+    var { ws } = await boot('http://host:8766', null);
+    expect(() => ws.onmessage({ data: JSON.stringify({ type: 'intent', payload: { intent: 'x', params: {} } }) })).not.toThrow();
+  });
+
+  it('optional verdict/playback handlers with no callback are no-ops', async () => {
+    var { ws } = await boot('http://host:8766', () => {});   // no opts callbacks
+    ['person_active', 'person_busy', 'playback', 'video_playback'].forEach(function(type) {
+      expect(() => ws.onmessage({ data: JSON.stringify({ type: type, payload: {} }) })).not.toThrow();
+    });
+  });
+
+  it('an unknown message type is ignored (does not throw)', async () => {
+    var { ws } = await boot('http://host:8766', () => {});
+    expect(() => ws.onmessage({ data: JSON.stringify({ type: 'nonsense', payload: {} }) })).not.toThrow();
+  });
+
+  it('does not replay a context_push on open when none is pending', async () => {
+    var { ws } = await boot('http://host:8766', () => {});
+    ws.sent.length = 0;
+    ws.onopen();
+    expect(ws.sent.find(m => m.type === 'context_push')).toBeFalsy();
+  });
+
+  it('watchdog before the socket resolves is a no-op (ws still null)', () => {
+    connectApp('http://host:8766', () => {});   // not awaited -> ws null while the watchdog ticks
+    expect(() => vi.advanceTimersByTime(25000)).not.toThrow();
+  });
+
+  it('watchdog does not close a fresh connection (< 20s since last ping)', async () => {
+    var { ws } = await boot('http://host:8766', () => {});
+    var closed = false;
+    ws.close = function() { closed = true; };
+    vi.advanceTimersByTime(15000);
+    expect(closed).toBe(false);
+  });
+
+  it('watchdog does not close at exactly 20s (boundary is strictly greater-than)', async () => {
+    var { ws } = await boot('http://host:8766', () => {});
+    var closed = false;
+    ws.close = function() { closed = true; };
+    vi.advanceTimersByTime(20000);   // diff is exactly 20000 at the 20000ms tick
+    expect(closed).toBe(false);
   });
 
   it('stamps the active person onto every app_state snapshot', async () => {

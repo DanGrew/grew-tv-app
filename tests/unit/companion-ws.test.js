@@ -279,6 +279,65 @@ describe('connect', () => {
     expect(closed).toBe(true);
   });
 
+  it('an intent before the socket resolves is a silent no-op (ws still null)', () => {
+    var api = connect('http://host:8766', () => {}, () => {});   // not awaited -> ws null
+    expect(() => api.sendIntent('pause')).not.toThrow();
+  });
+
+  it('does not send when the socket is not OPEN', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
+    ws.onopen();
+    ws.sent.length = 0;
+    ws.readyState = 3;   // CLOSED
+    api.sendIntent('pause');
+    expect(ws.sent.length).toBe(0);
+  });
+
+  it('a devices message with no devices array yields an empty device list', async () => {
+    var { api, ws } = await boot('http://host:8766', () => {}, () => {});
+    ws.onopen();
+    ws.onmessage({ data: JSON.stringify({ type: 'devices', payload: {} }) });
+    expect(api.devices()).toEqual([]);
+  });
+
+  it('optional playback/verdict handlers with no callback are no-ops', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});   // no opts callbacks
+    ['playback', 'video_playback', 'person_active', 'person_busy'].forEach(function(type) {
+      expect(() => ws.onmessage({ data: JSON.stringify({ type: type, payload: {} }) })).not.toThrow();
+    });
+  });
+
+  it('an unknown message type is ignored (does not throw)', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
+    expect(() => ws.onmessage({ data: JSON.stringify({ type: 'nonsense', payload: {} }) })).not.toThrow();
+  });
+
+  it('lifecycle events with no onStatus handler are no-ops (do not throw)', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, null);
+    expect(() => { ws.onopen(); ws.onclose(); ws.onerror(); }).not.toThrow();
+  });
+
+  it('watchdog before the socket resolves is a no-op (ws still null)', () => {
+    connect('http://host:8766', () => {}, () => {});   // not awaited -> ws null while the watchdog ticks
+    expect(() => vi.advanceTimersByTime(25000)).not.toThrow();
+  });
+
+  it('watchdog does not close a fresh connection (< 20s since last ping)', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
+    var closed = false;
+    ws.close = function() { closed = true; };
+    vi.advanceTimersByTime(15000);
+    expect(closed).toBe(false);
+  });
+
+  it('watchdog does not close at exactly 20s (boundary is strictly greater-than)', async () => {
+    var { ws } = await boot('http://host:8766', () => {}, () => {});
+    var closed = false;
+    ws.close = function() { closed = true; };
+    vi.advanceTimersByTime(20000);
+    expect(closed).toBe(false);
+  });
+
   it('sendIntent sends intent message when open', async () => {
     var { api, ws } = await boot('http://host:8766', () => {}, () => {});
     ws.onopen();
