@@ -28,6 +28,10 @@ async function openBrowse(page) {
   await page.goto('/app/homeview/profile.html');
   await page.locator('#btn-kids').click();
   await expect(page.locator('#screen-browse')).toBeVisible();
+  // Wait for the rails to render — proof the browse module script ran (and so
+  // mountSearch wired the 🔍 handler). #screen-browse is the <body>, visible on
+  // parse before init, so clicking 🔍 on it alone races a no-op under load.
+  await expect(page.locator('.sidebar-tab').first()).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
