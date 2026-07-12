@@ -75,6 +75,20 @@ describe('queueModel — empty override + THEN end', () => {
     expect(then.endsText).toBeUndefined();
     expect(then.rows.length).toBe(1);
   });
+
+  it('labels the sections (Play Next / From Source / Then), even though the tab is the visible label', () => {
+    var byKey = {};
+    queueModel(shuffleSnap()).sections.forEach(s => { byKey[s.key] = s; });
+    expect(byKey['play-next'].label).toBe('Play Next');
+    expect(byKey['from-source'].label).toBe('From Source');
+    expect(byKey['then'].label).toBe('Then');
+  });
+
+  it('the THEN section keeps its Then label and an empty hint when it ends the source', () => {
+    var then = queueModel(orderedSnap()).sections.find(s => s.key === 'then');
+    expect(then.label).toBe('Then');
+    expect(then.hint).toBe('');
+  });
 });
 
 describe('queueViewHtml', () => {
@@ -146,6 +160,12 @@ describe('queueViewHtml', () => {
     var snap = shuffleSnap();
     snap.play_next[0].title = 'Tom & <Jerry>';
     expect(queueViewHtml(snap)).toContain('Tom &amp; &lt;Jerry&gt;');
+  });
+
+  it('escapes double-quotes and apostrophes in titles too', () => {
+    var snap = shuffleSnap();
+    snap.play_next[0].title = 'O\'Neil "Live"';
+    expect(queueViewHtml(snap)).toContain('O&#39;Neil &quot;Live&quot;');
   });
 
   it('renders a stable shell for an empty snapshot', () => {
