@@ -1,7 +1,19 @@
 import { isMidWatch, percent } from './progress.js';
 
+// The companion has NO rail-grid.html — the rail-grid drill level lives inside
+// browse.html (companion-browse.js, sections→rails→grid on one page). So map the
+// drill context 'rail-grid' to the page that actually hosts it: a companion item
+// page (audio/video/detail/artist/playlist) receiving a drill context — e.g. the
+// TV returning to a Playlists rail-grid — then resolves to browse.html (exists;
+// restores the grid from the nav-trail) instead of navigating to a non-existent
+// rail-grid.html, which media-manager serves as 404 {"error":"not found"} (BUG-052).
+// 'browse' already resolves to browse.html via the identity fallback, so only the
+// rail-grid drill level needs an explicit entry; every real leaf context
+// (detail/audio/video/artist/playlist/profile/error) maps to itself.
+var DRILL_PAGE = { 'rail-grid': 'browse' };
+
 export function screenPage(contextId) {
-  return contextId;
+  return DRILL_PAGE[contextId] || contextId;
 }
 
 // FEAT-028 (TASK-168): the L3 text tile's optional resume hint. A mid-watch item

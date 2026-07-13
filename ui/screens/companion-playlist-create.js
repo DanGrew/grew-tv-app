@@ -42,7 +42,18 @@ export function initPage() {
 
   function showError(msg) { errEl.textContent = msg; errEl.style.display = 'block'; }
   function invalidName() { showError('Enter a name (1–100 characters).'); }
-  function cancel() { window.location.href = 'browse.html'; }
+  // BUG-052 — Cancel/Save return you where the editor was initiated, keyed on
+  // cfg.kind (the destination depends only on the mode, not Cancel-vs-Save — the
+  // companion twin of the TV's backToDetail in screen-playlist-create-page.js).
+  // rename is opened from the companion playlist page, so it returns to THAT
+  // playlist (Cancel unchanged, Save now showing the new name); create is opened
+  // from browse (the ＋ chip / add-sheet "New playlist"), so it returns there.
+  // The old unconditional 'browse.html' drove the TV to the Playlists rail-grid on
+  // return and 404'd the phone via the item pages' unguarded followContext.
+  function toBrowse() { window.location.href = 'browse.html'; }
+  function backToPlaylist() { window.location.href = 'playlist.html?id=' + encodeURIComponent(renameId); }
+  var DONE = { create: toBrowse, rename: backToPlaylist };
+  function cancel() { DONE[cfg.kind](); }
   // After create, apply any pending add — a single track (TASK-207) OR a whole
   // album/playlist snapshot (TASK-212) — then return to the list regardless of the
   // add outcome (the playlist already exists; a failed add just lands empty).
