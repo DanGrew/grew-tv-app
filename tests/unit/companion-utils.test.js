@@ -31,12 +31,23 @@ describe('seriesIdFromSnap', () => {
 });
 
 describe('screenPage', () => {
-  it('returns context_id unchanged for standard screens', () => {
+  it('returns context_id unchanged for a real leaf screen', () => {
     expect(screenPage('profile')).toBe('profile');
-    expect(screenPage('browse')).toBe('browse');
     expect(screenPage('detail')).toBe('detail');
+    expect(screenPage('audio')).toBe('audio');
     expect(screenPage('video')).toBe('video');
+    expect(screenPage('artist')).toBe('artist');
+    expect(screenPage('playlist')).toBe('playlist');
     expect(screenPage('error')).toBe('error');
+  });
+  // BUG-052 — the companion has no rail-grid.html (the drill level lives in
+  // browse.html), so the 'rail-grid' drill context must resolve to 'browse', not a
+  // non-existent 'rail-grid.html' page. 'browse' already resolves to itself.
+  it('maps the rail-grid drill context to browse (no rail-grid.html exists)', () => {
+    expect(screenPage('rail-grid')).toBe('browse');
+  });
+  it('leaves the browse drill context as browse', () => {
+    expect(screenPage('browse')).toBe('browse');
   });
 });
 

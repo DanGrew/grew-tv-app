@@ -57,11 +57,49 @@ test('rename mode prefills the name, hides the profile picker and labels the act
   await expect(page.locator('#btn-create')).toHaveText(/Save/);
 });
 
-test('rename: editing the name then Save returns to the playlists list', async ({ page }) => {
+// BUG-052 — rename Cancel/Save return you to the ORIGINATING playlist, not
+// browse.html. "Cancel leaves you where you initiated it": rename is opened from
+// the companion playlist page, so both Cancel and Save land back on
+// playlist.html?id=<renameId> (the companion twin of the TV's backToDetail), never
+// on browse.html — which drove the TV to the Playlists rail-grid on return and, via
+// the item pages' unguarded followContext, 404'd the phone ({"error":"not found"}).
+
+test('rename: editing the name then Save returns to the originating playlist (BUG-052)', async ({ page }) => {
   await page.goto('/companion/playlist-create.html?rename=pl-roadtrip&name=Road%20Trip');
   await page.locator('#pl-name').fill('Road Trip 2');
   await page.locator('#btn-create').click();
-  await expect(page).toHaveURL(/companion\/browse\.html$/);
+  await expect(page).toHaveURL(/companion\/playlist\.html\?id=pl-roadtrip$/);
+});
+
+test('rename: Cancel returns to the originating playlist, never browse (BUG-052)', async ({ page }) => {
+  await page.goto('/companion/playlist-create.html?rename=pl-roadtrip&name=Road%20Trip');
+  await page.locator('#pl-name').fill('Discarded rename');
+  await page.locator('#btn-cancel').click();
+  await expect(page).toHaveURL(/companion\/playlist\.html\?id=pl-roadtrip$/);
+});
+
+// The reproduced path end-to-end: open the playlist on the phone (the
+// Music→Playlists→playlist drill lands here with ?id=), tap the ✎ pencil, then
+// Cancel/Save — you return to THAT playlist, never a blank {"error":"not found"}.
+test('reproduced path: playlist → pencil → Cancel lands back on the playlist (BUG-052)', async ({ page }) => {
+  await page.goto('/companion/playlist.html?id=pl-roadtrip');
+  await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
+  await page.locator('#btn-rename-playlist').click();
+  await expect(page).toHaveURL(/companion\/playlist-create\.html\?rename=pl-roadtrip/);
+  await page.locator('#btn-cancel').click();
+  await expect(page).toHaveURL(/companion\/playlist\.html\?id=pl-roadtrip$/);
+  await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
+});
+
+test('reproduced path: playlist → pencil → Save lands back on the playlist with the new name (BUG-052)', async ({ page }) => {
+  await page.goto('/companion/playlist.html?id=pl-roadtrip');
+  await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
+  await page.locator('#btn-rename-playlist').click();
+  await expect(page).toHaveURL(/companion\/playlist-create\.html\?rename=pl-roadtrip/);
+  await page.locator('#pl-name').fill('Summer Trip');
+  await page.locator('#btn-create').click();
+  await expect(page).toHaveURL(/companion\/playlist\.html\?id=pl-roadtrip$/);
+  await expect(page.locator('#ctx-title')).toHaveText('Summer Trip');
 });
 
 test('rename with a blank name shows an error and stays on the page', async ({ page }) => {
