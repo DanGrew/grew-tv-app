@@ -17,7 +17,7 @@ export function episodeLabel(item) {
 }
 
 export function durationMarkup(d) {
-  return [d].filter(Boolean).map(function(x) { return '<div class="detail-duration">' + fmt(x) + '</div>'; }).join('');
+  return [d].filter(Boolean).map(function(x) { return '<div class="detail-duration">' + fmt(x) + '</div>'; }).concat([''])[0];
 }
 
 // Mini progress bar markup — empty unless mid-watch (a clean row otherwise).
@@ -25,7 +25,7 @@ export function durationMarkup(d) {
 export function progressBarMarkup(mid, pct, barClass) {
   return [mid].filter(Boolean).map(function() {
     return '<div class="' + barClass + '"><div class="' + barClass + '-fill" style="width:' + pct + '%"></div></div>';
-  }).join('');
+  }).concat([''])[0];
 }
 
 // Friendly label for a collection's content type (FEAT-017 detail meta line).

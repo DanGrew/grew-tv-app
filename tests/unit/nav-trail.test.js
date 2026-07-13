@@ -29,6 +29,12 @@ describe('nav-trail', () => {
     expect(pop()).toBe(null);
   });
 
+  it('reads/writes under the grew-tv:nav-trail sessionStorage key', () => {
+    // Seeding the literal key must be what peek() reads back (pins KEY).
+    sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([{ page: 'seeded.html', params: {} }]));
+    expect(peek().page).toBe('seeded.html');
+  });
+
   it('push then peek returns the top entry without removing it', () => {
     push(entry('browse.html', { tab: 'films' }, 120, 'tile-a'));
     expect(peek()).toEqual(entry('browse.html', { tab: 'films' }, 120, 'tile-a'));
@@ -88,6 +94,21 @@ describe('nav-trail', () => {
     it('clears the trail when the clicked target is not in it (fall back to default)', () => {
       deepTrail();
       truncateTo('audio.html', { artist: 'nobody' });
+      expect(peek()).toBe(null);
+    });
+
+    it('matches on BOTH page and params — a matching-params-but-wrong-page click clears', () => {
+      // sameTarget must require the page too: {rail:'r1'} matches an entry's params
+      // but 'nomatch.html' is not that entry's page, so nothing matches -> cleared.
+      deepTrail();
+      truncateTo('nomatch.html', { rail: 'r1' });
+      expect(peek()).toBe(null);
+    });
+
+    it('a matching-page-but-wrong-params click clears (params are part of the match)', () => {
+      push(entry('browse.html', { tab: 'films' }, 0, 'rail-1'));
+      push(entry('detail.html', { series: 'bx9' }, 0, 'series-2'));
+      truncateTo('detail.html', { series: 'WRONG' });   // same page, different params -> no match
       expect(peek()).toBe(null);
     });
 
@@ -167,6 +188,15 @@ describe('nav-trail', () => {
       expect(peek()).toBe(null);
     });
 
+    it('empty params ALWAYS clears — even when a same-page empty-params entry exists', () => {
+      // The empty-params branch is Home-clear, not a truncateThrough: a browse entry
+      // that itself has empty params must still be wiped, not kept.
+      push(entry('browse.html', {}, 0, 'rail-1'));
+      push(entry('detail.html', { series: 'bx9' }, 0, 'ep-3'));
+      trimOnCrumb('browse.html', {});
+      expect(peek()).toBe(null);
+    });
+
     it('tolerates an undefined params object (Home) — clears', () => {
       deepTrail();
       trimOnCrumb('browse.html', undefined);
@@ -203,6 +233,26 @@ describe('nav-trail', () => {
       expect(peek().page).toBe('artist.html');
       pop();
       expect(peek().page).toBe('browse.html');
+    });
+
+    it('same page but DIFFERENT params is a distinct target (both pushed)', () => {
+      // Pins stableParams actually comparing param contents: dedup must not collapse
+      // {tab:'music'} and {tab:'films'} on the same page.
+      pushUnique(e('browse.html', { tab: 'music' }));
+      pushUnique(e('browse.html', { tab: 'films' }));
+      expect(peek().params.tab).toBe('films');
+      pop();
+      expect(peek().params.tab).toBe('music');
+    });
+
+    it('same params but DIFFERENT page is a distinct target (both pushed)', () => {
+      // Pins the page half of the dedup key: identical params on different pages
+      // must not dedup.
+      pushUnique(e('artist.html', { id: 'x' }));
+      pushUnique(e('album.html', { id: 'x' }));
+      expect(peek().page).toBe('album.html');
+      pop();
+      expect(peek().page).toBe('artist.html');
     });
 
     it('dedups entries that carry no params (stableParams tolerates undefined)', () => {

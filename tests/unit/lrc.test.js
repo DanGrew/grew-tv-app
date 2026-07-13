@@ -25,6 +25,13 @@ describe('parseLrc', () => {
   it('treats an empty lyric line as an instrumental beat (text:null)', () => {
     expect(parseLrc('[00:05.00]   ')).toEqual([{ t: 5, text: null }]);
   });
+  it('parses a whole-second cue with no fractional part ([mm:ss])', () => {
+    // The fractional part of the stamp is optional; a bare [00:06] must still parse.
+    expect(parseLrc('[00:06]hi')).toEqual([{ t: 6, text: 'hi' }]);
+  });
+  it('parses a single cue line with no metadata (the exec loop actually runs)', () => {
+    expect(parseLrc('[00:03.00]hi')).toEqual([{ t: 3, text: 'hi' }]);
+  });
   it('emits one cue per timestamp on a multi-stamp line', () => {
     expect(parseLrc('[00:01.00][00:09.00]chorus')).toEqual([
       { t: 1, text: 'chorus' },

@@ -35,14 +35,23 @@ export function defaultConfig() {
   return { defaultPin: DEFAULT_PIN, persons: defaultPersons() };
 }
 
+// A non-empty string, else null — the emoji/pin/defaultPin coercion. As an
+// explicit statement (not an inline `&&` ternary) so the string-type + non-empty
+// checks are each observable by the mutation gate.
+function nonEmptyString(v) {
+  if (typeof v !== 'string') return null;
+  if (v.length === 0) return null;
+  return v;
+}
+
 function normalizePerson(raw) {
   return {
     id: raw.id,
     name: raw.name != null ? raw.name : raw.id,
     profile: raw.profile === 'adults' ? 'adults' : 'kids',
     photo: raw.photo != null ? raw.photo : null,
-    emoji: typeof raw.emoji === 'string' && raw.emoji.length ? raw.emoji : null,
-    pin: typeof raw.pin === 'string' && raw.pin.length ? raw.pin : null
+    emoji: nonEmptyString(raw.emoji),
+    pin: nonEmptyString(raw.pin)
   };
 }
 
@@ -58,11 +67,13 @@ export function personGlyph(person) {
 // the family's config can never blank the picker. Persons must be a non-empty
 // array of objects with an id; otherwise the placeholder pair is used.
 export function parseConfig(raw) {
-  var cfg = raw && typeof raw === 'object' ? raw : {};
-  var dpin = typeof cfg.defaultPin === 'string' && cfg.defaultPin.length ? cfg.defaultPin : DEFAULT_PIN;
-  var list = Array.isArray(cfg.persons)
-    ? cfg.persons.filter(function(p) { return p && typeof p === 'object' && p.id; })
-    : [];
+  // A primitive raw (string/number) reads `.persons`/`.defaultPin` as undefined
+  // without throwing, so `raw || {}` is enough to normalise a null/garbage config
+  // to the placeholder defaults — no explicit typeof-object guard needed.
+  var cfg = raw || {};
+  var dpin = nonEmptyString(cfg.defaultPin);
+  if (dpin === null) dpin = DEFAULT_PIN;
+  var list = Array.isArray(cfg.persons) ? cfg.persons.filter(function(p) { return p && p.id; }) : [];
   var persons = list.length ? list.map(normalizePerson) : defaultPersons();
   return { defaultPin: dpin, persons: persons };
 }

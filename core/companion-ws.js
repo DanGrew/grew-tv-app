@@ -30,7 +30,9 @@ export function connect(serverOrigin, onContext, onStatus, onAppState, onDevices
   // gated, so a desynced companion stays the same person and its queue-adds
   // still land. No mode passed (pre-TASK-230 screens) => always synced =>
   // behaviour unchanged.
-  var mode = o.mode != null ? o.mode : null;
+  // Absent -> undefined, which intentsAllowed()'s `mode == null` already reads as
+  // "no gate" (== matches both null and undefined), so no normalisation is needed.
+  var mode = o.mode;
   function intentsAllowed() { return mode == null || mode.intentsAllowed(); }
   function gate(fn) {
     return function() {

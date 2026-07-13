@@ -14,8 +14,12 @@ describe('coverMosaicHtml — degrade by count', () => {
     const h = coverMosaicHtml(['a.jpg']);
     expect(imgCount(h)).toBe(1);
     expect(h).toContain('grid-template-columns:1fr');
-    expect(h).toContain('grid-template-rows:1fr');
+    expect(h).toContain('grid-template-rows:1fr">');
     expect(h).not.toContain('grid-column:1/3');
+    // Full markup: the outer mosaic div, the img cell attrs + non-span style, and closings.
+    expect(h).toContain('<div class="cover-mosaic" style="display:grid;');
+    expect(h).toContain('cover-mosaic-cell" alt="" src="a.jpg" style="width:100%;height:100%;object-fit:cover;display:block">');
+    expect(h.endsWith('</div>')).toBe(true);
   });
 
   it('2 refs -> two halves, side by side', () => {
@@ -24,6 +28,7 @@ describe('coverMosaicHtml — degrade by count', () => {
     expect(h).toContain('grid-template-columns:1fr 1fr');
     expect(h).toContain('grid-template-rows:1fr');
     expect(h).not.toContain('grid-column:1/3');
+    expect(h).toContain('display:block"><img');   // cells concatenate with no separator
   });
 
   it('3 refs -> 2-over-1, third cell spans the bottom row', () => {
@@ -50,5 +55,6 @@ describe('coverMosaicHtml — degrade by count', () => {
     const h = coverMosaicHtml(['1.jpg', '2.jpg']);
     expect(h.indexOf('1.jpg')).toBeLessThan(h.indexOf('2.jpg'));
     expect(coverMosaicHtml(['a"><x'])).toContain('a&quot;&gt;&lt;x');
+    expect(coverMosaicHtml(['a&b'])).toContain('a&amp;b');   // & is escaped too
   });
 });

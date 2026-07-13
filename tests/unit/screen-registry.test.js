@@ -1,11 +1,13 @@
+import { vi } from 'vitest';
 import { registerScreen, activateScreen, getActiveConfig, dispatchKey, initPage } from '../../core/screen-registry.js';
 
 describe('registerScreen', () => {
   it('throws if onEnter missing', () => {
-    expect(() => registerScreen('reg-1', { keys: {} })).toThrow('missing onEnter');
+    // The full message pins the 'registerScreen: <id> missing ' prefix, not just the tail.
+    expect(() => registerScreen('reg-1', { keys: {} })).toThrow('registerScreen: reg-1 missing onEnter');
   });
   it('throws if keys missing', () => {
-    expect(() => registerScreen('reg-2', { onEnter: function() {} })).toThrow('missing keys');
+    expect(() => registerScreen('reg-2', { onEnter: function() {} })).toThrow('registerScreen: reg-2 missing keys');
   });
 });
 
@@ -73,6 +75,13 @@ describe('dispatchKey', () => {
     dispatchKey({ key: 'Enter' });
     expect(old).toBe(false);
   });
+  it('does not throw before any screen is active (the filter(Boolean) guard)', async () => {
+    // Fresh module state: activeScreen is null, so screenRegistry[null] is
+    // undefined. Without the .filter(Boolean) guard this would deref undefined.
+    vi.resetModules();
+    const fresh = await import('../../core/screen-registry.js');
+    expect(function() { fresh.dispatchKey({ key: 'Enter' }); }).not.toThrow();
+  });
 });
 
 describe('initPage', () => {
@@ -81,11 +90,11 @@ describe('initPage', () => {
     initPage({ onEnter: function() { called = true; }, keys: {} });
     expect(called).toBe(true);
   });
-  it('throws if onEnter missing', () => {
-    expect(function() { initPage({ keys: {} }); }).toThrow('missing onEnter');
+  it('throws its OWN initPage-prefixed error if onEnter missing (before delegating to registerScreen)', () => {
+    expect(function() { initPage({ keys: {} }); }).toThrow('initPage: missing onEnter');
   });
-  it('throws if keys missing', () => {
-    expect(function() { initPage({ onEnter: function() {} }); }).toThrow('missing keys');
+  it('throws its OWN initPage-prefixed error if keys missing', () => {
+    expect(function() { initPage({ onEnter: function() {} }); }).toThrow('initPage: missing keys');
   });
   it('dispatches keys after initPage', () => {
     var called = false;

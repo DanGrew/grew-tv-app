@@ -32,6 +32,14 @@ describe('tileModel — CC badge', () => {
     expect(tileModel({ id: 'x', subtitles: 'x.vtt' }, { hasCC: false }).showCC).toBe(false);
     expect(tileModel({ id: 'x' }, { hasCC: true }).showCC).toBe(true);
   });
+  it('a non-.vtt subtitles string is NOT CC (the string branch tests the extension)', () => {
+    // Guards the `typeof s === 'string'` branch: without it a bare string would
+    // fall through to the truthy default and wrongly show CC.
+    expect(tileModel({ id: 'x', subtitles: 'notes.srt' }, {}).showCC).toBe(false);
+  });
+  it('the .vtt match is anchored to the end (a .vtt mid-name is not CC)', () => {
+    expect(tileModel({ id: 'x', subtitles: 'x.vtt.bak' }, {}).showCC).toBe(false);
+  });
   it('treats a non-empty subtitles array as CC', () => {
     expect(tileModel({ id: 'x', subtitles: [{ lang: 'en' }] }, {}).showCC).toBe(true);
     expect(tileModel({ id: 'x', subtitles: [] }, {}).showCC).toBe(false);

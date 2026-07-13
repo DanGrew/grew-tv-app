@@ -46,6 +46,10 @@ describe('videoItems', () => {
     expect(toy.card).toBe(CARDS[0]);
     expect(toy.fields).toEqual(['Toy Story']);
   });
+  it('title-cases a hyphenated genre with a space separator', () => {
+    var item = videoItems([{ kind: 'video', id: 'sf', title: 'SF', section: 'films', genres: ['sci-fi'] }])[0];
+    expect(item.secondary).toBe('Sci Fi');
+  });
   it('tolerates missing input', () => {
     expect(videoItems(null)).toEqual([]);
   });
@@ -94,6 +98,11 @@ describe('musicItems', () => {
     var album = musicItems([], [{ id: 'a1', section: 'music' }]).filter(function(i) { return i.tag === 'ALBUM'; })[0];
     expect(album).toMatchObject({ title: '', poster: null, secondary: '', fields: ['', ''] });
   });
+  it('excludes a kind:artist music card from ALBUM items (it is not a real album)', () => {
+    var albums = musicItems([], [{ kind: 'artist', id: 'a', section: 'music', artist: 'X', title: 'X' }])
+      .filter(function(i) { return i.tag === 'ALBUM'; });
+    expect(albums).toHaveLength(0);
+  });
   it('tolerates missing inputs', () => {
     expect(musicItems(null, null)).toEqual([]);
   });
@@ -120,20 +129,36 @@ describe('rankSearch', () => {
     expect(out).toEqual(['Blue', 'Blueberry', 'zzz Blue']);
   });
   it('breaks a quality tie by field priority (title before album before artist)', () => {
-    var titleMatch  = { title: 'A-title', fields: ['queen', 'x', 'x'] };     // prefix on field 0
-    var albumMatch  = { title: 'B-album', fields: ['x', 'queen', 'x'] };     // prefix on field 1
-    var artistMatch = { title: 'C-artist', fields: ['x', 'x', 'queen'] };    // prefix on field 2
+    // Titles run Z > Y > X so field-priority order is the OPPOSITE of A-Z — proving
+    // the tie is broken by priority, not by an incidental alphabetical match.
+    var titleMatch  = { title: 'Zzz', fields: ['queen', 'x', 'x'] };     // prefix on field 0
+    var albumMatch  = { title: 'Yyy', fields: ['x', 'queen', 'x'] };     // prefix on field 1
+    var artistMatch = { title: 'Xxx', fields: ['x', 'x', 'queen'] };     // prefix on field 2
     var out = rankSearch('queen', [artistMatch, albumMatch, titleMatch]).map(function(i) { return i.title; });
-    expect(out).toEqual(['A-title', 'B-album', 'C-artist']);
+    expect(out).toEqual(['Zzz', 'Yyy', 'Xxx']);
+  });
+  it('a higher score wins even when it is alphabetically LATER (exact > prefix > substring)', () => {
+    var exact  = { title: 'Zebra', fields: ['q'] };    // exact match, A-Z last
+    var prefix = { title: 'Apple', fields: ['qx'] };   // prefix match, A-Z first
+    var subs   = { title: 'Mango', fields: ['xq'] };   // substring match
+    expect(rankSearch('q', [prefix, subs, exact]).map(function(i) { return i.title; }))
+      .toEqual(['Zebra', 'Apple', 'Mango']);
+  });
+  it('a prefix outranks a substring even when the prefix is alphabetically LATER', () => {
+    var prefix = { title: 'Zoo',   fields: ['qx'] };   // prefix, A-Z last
+    var subs   = { title: 'Apple', fields: ['xq'] };   // substring, A-Z first
+    expect(rankSearch('q', [subs, prefix]).map(function(i) { return i.title; })).toEqual(['Zoo', 'Apple']);
   });
   it('breaks a full tie alphabetically by title', () => {
+    // Three scrambled titles that ALL prefix-match 'a' at field 0 (same score + pri)
+    // so only the A-Z tiebreak orders them — input order is deliberately not sorted.
     var items = [
-      { title: 'Banana', fields: ['Banana'] },
-      { title: 'Apple', fields: ['Apple'] }
+      { title: 'Cherry', fields: ['ace'] },
+      { title: 'Apple',  fields: ['ant'] },
+      { title: 'Banana', fields: ['arc'] }
     ];
-    // both are exact-less prefix matches on 'a' at field 0 -> A-Z title
     var out = rankSearch('a', items).map(function(i) { return i.title; });
-    expect(out).toEqual(['Apple', 'Banana']);
+    expect(out).toEqual(['Apple', 'Banana', 'Cherry']);
   });
   it('a matching artist name surfaces the artist, its albums AND its tracks (Story 5)', () => {
     var out = rankSearch('elo', musicItems(TRACKS, CARDS));
@@ -145,6 +170,18 @@ describe('rankSearch', () => {
   it('scores a null/empty field as no-match (excluded)', () => {
     expect(rankSearch('x', [{ title: '', fields: [null] }])).toEqual([]);
     expect(rankSearch('x', [{ title: '', fields: [''] }])).toEqual([]);
+  });
+  it('a null field is truly empty — not the string "null" (so a query "ull" does not match it)', () => {
+    expect(rankSearch('ull', [{ title: 'x', fields: [null] }])).toEqual([]);
+  });
+  it('trims surrounding whitespace off the query before matching', () => {
+    var out = rankSearch('  blue ', [{ title: 'Blue', fields: ['Blue'] }]).map(function(i) { return i.title; });
+    expect(out).toEqual(['Blue']);
+  });
+  it('a null/undefined query yields nothing — NOT a search for the string "null"', () => {
+    // Guards `if (!query) return []`: without it, String(null) would search "null".
+    expect(rankSearch(null, [{ title: 'null', fields: ['null'] }])).toEqual([]);
+    expect(rankSearch(undefined, [{ title: 'undefined', fields: ['undefined'] }])).toEqual([]);
   });
   it('treats an item with no fields as a non-match', () => {
     expect(rankSearch('x', [{ title: 'x' }])).toEqual([]);
@@ -160,9 +197,20 @@ describe('searchResultsHtml', () => {
     var html = searchResultsHtml(items, 'http://s');
     expect(html).toContain('data-i="0"');
     expect(html).toContain('class="sr-thumb" loading="lazy" src="http://s/media/toy.jpg"');
-    expect(html).toContain('>Toy Story<');
-    expect(html).toContain('>Animation<');
-    expect(html).toContain('>FILM<');
+    // Pin the exact span wrappers + their closings, not just the inner text.
+    expect(html).toContain('<span class="sr-main">');
+    expect(html).toContain('<span class="sr-title">Toy Story</span>');
+    expect(html).toContain('<span class="sr-sub">Animation</span>');
+    expect(html).toContain('<span class="sr-tag">FILM</span>');
+    expect(html).toContain('</button>');
+    // the sub closes, then the sr-main wrapper closes, then the tag opens
+    expect(html).toContain('Animation</span></span><span class="sr-tag">');
+  });
+
+  it('renders an empty (not "null") sub-label when the secondary is null', () => {
+    var html = searchResultsHtml([{ title: 'X', poster: null, secondary: null, tag: 'FILM' }], 'http://s');
+    expect(html).toContain('<span class="sr-sub"></span>');
+    expect(html).not.toContain('null');
   });
   it('uses an empty placeholder cell when the item has no poster', () => {
     var html = searchResultsHtml([{ title: 'No Art', poster: null, secondary: '', tag: 'ALBUM' }], 'http://s');
@@ -174,10 +222,15 @@ describe('searchResultsHtml', () => {
     expect(html).toContain('&lt;b&gt;x&lt;/b&gt;');
     expect(html).toContain('a &amp; b');
   });
-  it('renders each item at its own index and joins them', () => {
+  it('escapes double-quotes and apostrophes too', () => {
+    var html = searchResultsHtml([{ title: 'O\'Neil "x"', poster: null, secondary: '', tag: 'FILM' }], 'http://s');
+    expect(html).toContain('O&#39;Neil &quot;x&quot;');
+  });
+  it('renders each item at its own index and joins them with no separator', () => {
     var html = searchResultsHtml([{ title: 'A', tag: 'FILM' }, { title: 'B', tag: 'ALBUM' }], 'http://s');
     expect(html).toContain('data-i="0"');
     expect(html).toContain('data-i="1"');
+    expect(html).toContain('</button><button');   // rows concatenate directly (join(''))
   });
   it('tolerates missing input', () => {
     expect(searchResultsHtml(null, 'http://s')).toBe('');

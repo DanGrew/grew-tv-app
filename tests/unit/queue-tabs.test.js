@@ -20,6 +20,14 @@ describe('tabShellHtml (TV)', () => {
     expect(html).toContain('>Coming Up</button>');
     expect(html).toContain('class="qtab-panel active" data-tab="queue"');
     expect(html).toContain('<i>n</i>');
+    // Each panel closes its own div, and the coming-up panel wraps its body.
+    expect(html).toContain('role="tabpanel">');
+    expect(html).toContain('<i>c</i></div>');
+    // Buttons and panels concatenate with no separator (join('')): the bar's tabs
+    // are adjacent, the bar closes </div>, and adjacent panels touch.
+    expect(html).toContain('</button><button');
+    expect(html).toContain('Coming Up</button></div>');
+    expect(html).toContain('</div><div class="qtab-panel" data-tab="next"');
   });
 
   it('opens on the first NON-empty tab', () => {

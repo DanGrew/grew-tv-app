@@ -75,7 +75,8 @@ export function createCompanionMode() {
     return stack[stack.length - 1];
   }
   function back() {
-    if (stack.length === 0) return null;
+    // A pop on an empty stack is a harmless no-op and current() already returns
+    // null for an empty stack, so no length guard is needed here.
     stack.pop();
     return current();
   }

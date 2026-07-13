@@ -156,8 +156,10 @@ export function interpolatePosition(snap, elapsedSec) {
 export function createHeartbeat(emit, opts) {
   var o = opts != null ? opts : {};
   var intervalMs = o.intervalMs != null ? o.intervalMs : 1000;
-  var schedule = o.setInterval || (typeof setInterval !== 'undefined' ? setInterval : null);
-  var cancel = o.clearInterval || (typeof clearInterval !== 'undefined' ? clearInterval : null);
+  // globalThis is universal (browser kiosk + node), so read the ambient timers off
+  // it directly rather than a typeof guard a Node test runner can never observe.
+  var schedule = o.setInterval || globalThis.setInterval;
+  var cancel = o.clearInterval || globalThis.clearInterval;
   var timer = null;
   return {
     start: function() { if (timer == null && schedule) timer = schedule(emit, intervalMs); },

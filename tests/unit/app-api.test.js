@@ -156,11 +156,40 @@ describe('saveSettings', () => {
 });
 
 describe('scanDevices', () => {
-  it('GETs /scan, no-store', async () => {
+  it('GETs /scan, no-store, resolving the parsed json', async () => {
     var calls = fakeFetch({ devices: ['TV'] });
-    await scanDevices('http://s');
+    var res = await scanDevices('http://s');
     expect(calls[0].url).toBe('http://s/scan');
     expect(calls[0].opts).toEqual({ cache: 'no-store' });
+    expect(res).toEqual({ devices: ['TV'] });   // resolves r.json(), not undefined
+  });
+});
+
+// Every POST helper sends method:POST + the JSON content-type header + a JSON body
+// to a fixed url. One table pins all four so no request-shape field goes unasserted.
+describe('POST request shapes (method + json header + body + url)', () => {
+  var posts = [
+    { name: 'saveProgress', run: () => saveProgress('http://s', 'a', 90, 600, 'oliver'), url: 'http://s/api/progress/a?person=oliver', body: { position_secs: 90, duration_secs: 600 } },
+    { name: 'playbackAction', run: () => playbackAction('http://s', 'next', 'mom', { track_id: 't1' }), url: 'http://s/api/playback/next?person=mom', body: { track_id: 't1' } },
+    { name: 'videoPlaybackAction', run: () => videoPlaybackAction('http://s', 'play-source', 'dad', { source_id: 'bluey' }), url: 'http://s/api/video-playback/play-source?person=dad', body: { source_id: 'bluey' } },
+    { name: 'saveSettings', run: () => saveSettings('http://s', { captionsOn: false }), url: 'http://s/api/settings', body: { captionsOn: false } },
+    { name: 'createPlaylist', run: () => createPlaylist('http://s', 'My Mix', 'kids'), url: 'http://s/api/playlists/create', body: { name: 'My Mix', profile: 'kids' } },
+    { name: 'addToPlaylist', run: () => addToPlaylist('http://s', 'pl', 't1'), url: 'http://s/api/playlists/add-track', body: { playlist_id: 'pl', track_id: 't1' } },
+    { name: 'addSourceToPlaylist', run: () => addSourceToPlaylist('http://s', 'pl', 'album', 'ootb'), url: 'http://s/api/playlists/add-source', body: { playlist_id: 'pl', source_type: 'album', source_id: 'ootb' } },
+    { name: 'movePlaylistTrack', run: () => movePlaylistTrack('http://s', 'pl', 2, 'up'), url: 'http://s/api/playlists/move-track', body: { playlist_id: 'pl', index: 2, direction: 'up' } },
+    { name: 'removeFromPlaylist', run: () => removeFromPlaylist('http://s', 'pl', 3), url: 'http://s/api/playlists/remove-track', body: { playlist_id: 'pl', index: 3 } },
+    { name: 'deletePlaylist', run: () => deletePlaylist('http://s', 'pl-1'), url: 'http://s/api/playlists/delete', body: { playlist_id: 'pl-1' } },
+    { name: 'renamePlaylist', run: () => renamePlaylist('http://s', 'pl', 'New Name'), url: 'http://s/api/playlists/rename', body: { playlist_id: 'pl', name: 'New Name' } }
+  ];
+  posts.forEach(function(p) {
+    it(p.name + ' POSTs a JSON body to the right url', async () => {
+      var calls = fakeFetch({ id: 'x' });
+      await p.run();
+      expect(calls[0].url).toBe(p.url);
+      expect(calls[0].opts.method).toBe('POST');
+      expect(calls[0].opts.headers).toEqual({ 'Content-Type': 'application/json' });
+      expect(JSON.parse(calls[0].opts.body)).toEqual(p.body);
+    });
   });
 });
 

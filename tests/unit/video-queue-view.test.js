@@ -289,3 +289,60 @@ describe('video queue artwork markup', () => {
     expect(html).toContain('&#127916;');
   });
 });
+
+// TASK-327: model-level pins (labels/hints/flags that never reach the HTML), the
+// durationText + escapeHtml fallbacks, and the items-fallback (surfaced via a
+// negative index so the slice reaches item 0).
+describe('video-queue-view mutation hardening (TASK-327)', () => {
+  function byKey(m, key) { return m.sections.filter(function (s) { return s.key === key; })[0]; }
+
+  it('labels the sections (Play Next / From Series / Then), the tab being the visible label', () => {
+    var m = videoQueueModel(snap(1, true, [entry('q1', 'x', 'Q', 100, null)]));
+    expect(byKey(m, 'play-next').label).toBe('Play Next');
+    expect(byKey(m, 'from-series').label).toBe('From Series');
+    expect(byKey(m, 'then').label).toBe('Then');
+  });
+
+  it('From Series carries an empty hint (no ends) when the source is exhausted but the queue continues', () => {
+    var m = videoQueueModel(snap(2, false, [entry('q1', 'x', 'Q', 100, null)])); // last item, queued follows
+    var fs = byKey(m, 'from-series');
+    expect(fs.label).toBe('From Series');
+    expect(fs.rows).toEqual([]);
+    expect(fs.hint).toBe('');
+    expect(fs.endsText).toBeUndefined();
+  });
+
+  it('From Series carries the Series-ends marker (empty hint) when nothing follows and repeat is off', () => {
+    var m = videoQueueModel(snap(2, false));   // last item, no queue, no repeat
+    var fs = byKey(m, 'from-series');
+    expect(fs.label).toBe('From Series');
+    expect(fs.hint).toBe('');
+    expect(fs.endsText).toMatch(/^Series ends/);
+  });
+
+  it('source rows are non-editable and never shiftable (canUp/canDown false)', () => {
+    var row = byKey(videoQueueModel(snap(0, false)), 'from-series').rows[0];
+    expect(row.editable).toBe(false);
+    expect(row.canUp).toBe(false);
+    expect(row.canDown).toBe(false);
+  });
+
+  it('durationText is empty for a null or NaN duration', () => {
+    var m = videoQueueModel(snap(1, true, [entry('q1', 'x', 'Q', null, null), entry('q2', 'y', 'Y', NaN, null)]));
+    expect(byKey(m, 'play-next').rows[0].durationText).toBe('');
+    expect(byKey(m, 'play-next').rows[1].durationText).toBe('');
+  });
+
+  it('escapes all five HTML entities in titles (& < > " \x27)', () => {
+    var s = snap(1, false, [entry('q1', 'x', 'A & B < C > D " E \x27 F', 100, null)]);
+    expect(videoQueueViewHtml(s)).toContain('A &amp; B &lt; C &gt; D &quot; E &#39; F');
+    expect(companionVideoQueueHtml(s)).toContain('A &amp; B &lt; C &gt; D &quot; E &#39; F');
+  });
+
+  it('an absent items list yields no From Series rows even at a negative index (items fallback is truly empty)', () => {
+    // current_item_index -1 makes slice(idx+1) == slice(0); if the items fallback
+    // held a bogus element it would surface here as a row.
+    var m = videoQueueModel({ current_item_index: -1, override_queue: [], repeat: false });
+    expect(byKey(m, 'from-series').rows).toEqual([]);
+  });
+});

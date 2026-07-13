@@ -49,14 +49,15 @@ export function episodeCount(items, season) {
 // season. null when there are no seasons.
 export function defaultSeason(items, progress, seasons) {
   if (!seasons || seasons.length === 0) return null;
-  var item = (items || [])[primaryAction(items, progress).index];
+  var item = items && items[primaryAction(items, progress).index];
   if (item && item.season != null) return item.season;
   return seasons[0].season;
 }
 
 // The poster filename for one season, or null.
 export function seasonPosterOf(seasons, season) {
-  return (seasons || [])
+  if (!seasons) return null;
+  return seasons
     .filter(function(s) { return s.season === season; })
     .map(function(s) { return s.poster; })
     .concat([null])[0];

@@ -51,6 +51,12 @@ describe('typeLabel', () => {
   it('falls back to the raw type when unmapped', () => {
     expect(typeLabel('documentary')).toBe('documentary');
   });
+  it('maps every declared type to its friendly label', () => {
+    expect(typeLabel('home-video')).toBe('Home videos');
+    expect(typeLabel('tv-series')).toBe('Episodes');
+    expect(typeLabel('film')).toBe('Film');
+    expect(typeLabel('action')).toBe('Action');
+  });
   it('is empty for an absent type', () => {
     expect(typeLabel(null)).toBe('');
     expect(typeLabel(undefined)).toBe('');

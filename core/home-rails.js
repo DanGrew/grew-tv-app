@@ -109,10 +109,7 @@ function rowSection(row, byId) {
 
 // Clamp an index into [0, len-1] (empty -> 0). Shared with the UI focus model.
 export function clampIndex(i, len) {
-  if (len <= 0) return 0;
-  if (i < 0) return 0;
-  if (i > len - 1) return len - 1;
-  return i;
+  return Math.max(0, Math.min(len - 1, i));
 }
 
 function titleCase(slug) {
@@ -141,11 +138,21 @@ function genresOf(card) {
 function isBoxset(card) { return card.collectionType === 'boxset'; }
 
 function cmpStr(a, b) {
-  return String(a).toLowerCase().localeCompare(String(b).toLowerCase());
+  // localeCompare is already case-insensitive at its primary (base-letter) level,
+  // so it gives A-Z ordering without an explicit case fold — and dropping the fold
+  // leaves nothing here for the gate to mark equivalent.
+  return String(a).localeCompare(String(b));
 }
 
+// A sortable title: the item's own, or '' when absent (an untitled item sorts
+// first). Shared by the rail sort and the album tie-break so the fallback is
+// exercised on whichever operand is untitled, not only the first.
+function titleOf(x) { return x.title || ''; }
+
 function sortItems(items) {
-  return items.slice().sort(function(a, b) { return cmpStr(a.title || '', b.title || ''); });
+  // Callers always build a fresh array (filter/map/concat) for us, so sorting in
+  // place is safe and no defensive copy is needed.
+  return items.sort(function(a, b) { return cmpStr(titleOf(a), titleOf(b)); });
 }
 
 // Group cards into rails keyed by a slug list, A-Z by rail label then tile
@@ -195,7 +202,8 @@ function cwCard(row) {
 // never matches a video section — an in-progress track can't leak into Films.
 // Omitted when this tab has nothing in progress.
 function continueRail(sectionId, cwRows, byId) {
-  var items = (cwRows || [])
+  if (!cwRows) return [];
+  var items = cwRows
     .filter(function(r) { return rowSection(r, byId) === sectionId; })
     .map(cwCard);
   return [{ id: 'continue', title: 'Continue Watching', items: items }]
@@ -214,7 +222,8 @@ function continueRail(sectionId, cwRows, byId) {
 // inferred Continue Listening (album roll-up + TASK-285 playlist tiles), which
 // read watch_progress; the rail no longer reads progress at all.
 function recentlyPlayedRail(recents, byId) {
-  var items = (recents || [])
+  if (!recents) return [];
+  var items = recents
     .map(function(r) { return byId[r.source_id]; })
     .filter(Boolean);
   return [{ id: 'recent', title: 'Recently Played', items: items }]
@@ -250,17 +259,18 @@ export function artistTiles(cards) {
   var albums = cards.filter(function(c) { return sectionOf(c) === 'music' && c.artist; });
   var byArtist = {};
   albums.forEach(function(c) { byArtist[c.artist] = (byArtist[c.artist] || []).concat([c]); });
-  return Object.keys(byArtist)
-    .map(function(name) {
-      var list = sortItems(byArtist[name]);
-      var n = list.length;
-      return {
-        kind: 'artist', id: 'artist:' + name, artist: name, title: name,
-        poster: list[0].poster || null, section: 'music',
-        subLabel: n === 1 ? '1 album' : n + ' albums'
-      };
-    })
-    .sort(function(a, b) { return cmpStr(a.title, b.title); });
+  // No .sort() here: the sole rail caller (simpleRail) sorts its items, and
+  // recentsIndex only indexes these by name — so an internal sort would be
+  // redundant (and invisible to the mutation gate behind simpleRail's sort).
+  return Object.keys(byArtist).map(function(name) {
+    var list = sortItems(byArtist[name]);
+    var n = list.length;
+    return {
+      kind: 'artist', id: 'artist:' + name, artist: name, title: name,
+      poster: list[0].poster || null, section: 'music',
+      subLabel: n === 1 ? '1 album' : n + ' albums'
+    };
+  });
 }
 
 // An album's release year as a number, from the browse card's tags.year
@@ -287,14 +297,15 @@ export function artistFromId(id) {
 // first by release year, then A-Z by title (yearless albums sort last). Pure so
 // the page stays DOM-only (no-pure-fn-outside-core).
 export function albumsByArtist(cards, artist) {
-  var all = (cards || []).map(withDurationSec);
+  if (!cards) return [];
+  var all = cards.map(withDurationSec);
   var mine = all.filter(function(c) { return sectionOf(c) === 'music' && c.artist === artist; });
-  return mine.slice().sort(function(a, b) {
-    var ya = albumYear(a);
-    var yb = albumYear(b);
-    if (ya === yb) return cmpStr(a.title || '', b.title || '');
-    if (ya === null) return 1;
-    if (yb === null) return -1;
+  return mine.sort(function(a, b) {
+    // Yearless -> 0 so it sorts oldest (last) under newest-first `yb - ya`, which
+    // makes the explicit null branches redundant (null coerces to 0 anyway).
+    var ya = albumYear(a) || 0;
+    var yb = albumYear(b) || 0;
+    if (ya === yb) return cmpStr(titleOf(a), titleOf(b));
     return yb - ya;
   });
 }

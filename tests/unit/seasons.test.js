@@ -52,6 +52,9 @@ describe('visibleItems', () => {
   it('tolerates missing items', () => {
     expect(visibleItems(null, 1)).toEqual([]);
   });
+  it('missing items with the no-chip (null season) path is still empty', () => {
+    expect(visibleItems(null, null)).toEqual([]);
+  });
 });
 
 describe('episodeCount', () => {

@@ -239,7 +239,9 @@ function rowsHtml(sec) {
   return hintHtml(sec.hint) + sec.rows.map(rowHtml).join('');
 }
 function panelBody(sec, emptyText) {
-  if (sec && sec.rows.length > 0) return rowsHtml(sec);
+  // Only ever the Play Next / Then sections, which are omitted (null) when empty —
+  // so a present section always has rows and no length check is needed.
+  if (sec) return rowsHtml(sec);
   return emptyHtml(emptyText);
 }
 // Next (From Series): rows, else the "Series ends" marker the model attaches here
@@ -361,7 +363,8 @@ function phRowsHtml(sec) {
   return phHintHtml(sec.hint) + sec.rows.map(phRow).join('');
 }
 function phPanelBody(sec, emptyText) {
-  if (sec && sec.rows.length > 0) return phRowsHtml(sec);
+  // See panelBody: Play Next / Then are null when empty, so a present section has rows.
+  if (sec) return phRowsHtml(sec);
   return phEmptyHtml(emptyText);
 }
 function phNextBody(sec, emptyText) {

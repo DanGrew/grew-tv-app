@@ -23,6 +23,8 @@ describe('postLog / logEvent', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe('http://kiosk.local:8765/log');
     expect(fetchMock.mock.calls[0][1].method).toBe('POST');
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(fetchMock.mock.calls[0][1].keepalive).toBe(true);   // survives a stop-on-unload post
   });
 
   it('logEvent uses the backend {event, item, context} shape', () => {
@@ -54,6 +56,11 @@ describe('postLog / logEvent', () => {
   it('swallows a fetch that throws synchronously', () => {
     fetchMock.mockImplementation(() => { throw new Error('no network stack'); });
     expect(() => postLog({ event: 'play' })).not.toThrow();
+  });
+
+  it('a synchronous fetch throw still resolves to a promise (the catch returns one)', async () => {
+    fetchMock.mockImplementation(() => { throw new Error('no network stack'); });
+    await expect(postLog({ event: 'play' })).resolves.toBeUndefined();
   });
 });
 

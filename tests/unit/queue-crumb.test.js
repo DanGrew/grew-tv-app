@@ -9,6 +9,11 @@ describe('queueCrumbHtml', () => {
     expect(html).toContain('crumb-link');
     expect(html).toContain('Now Playing');
     expect(html).toContain('Queue');
+    // Every element is closed and the separator sits between the two crumbs.
+    expect(html).toContain('Now Playing</button>');
+    expect(html).toContain('Queue</span>');
+    expect(html).toContain('</nav>');
+    expect(html).toContain('<span class="crumb-sep" aria-hidden="true">›</span>');
   });
 
   it('the back crumb is a button (closes the overlay), not a navigation link', () => {
