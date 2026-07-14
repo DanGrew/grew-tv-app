@@ -37,7 +37,8 @@ test('Music tab leads with a Playlists rail then Artists then Albums with square
   // TASK-235: the Music tab always renders a Playlists rail (heading + create ＋),
   // even with zero playlists — here the rail BODY is empty (no create tile).
   // TASK-234/318: with nothing recently played, that Playlists rail leads.
-  await expect(page.locator('.rail-row')).toHaveCount(3);
+  // (TASK-330 appends a trailing external-destination rail on every tab, excluded here.)
+  await expect(page.locator('.rail-row:not([data-rail="external"])')).toHaveCount(3);
   await expect(page.locator('.rail-row').nth(0)).toHaveAttribute('data-rail', 'playlists');
   await expect(page.locator('.rail-row').nth(1)).toHaveAttribute('data-rail', 'artists');
   await expect(page.locator('.rail-row').nth(2)).toHaveAttribute('data-rail', 'albums');

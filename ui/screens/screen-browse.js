@@ -4,8 +4,6 @@ import { buildTabs, buildTabRails, clampIndex, withPlaylistsRail } from '../../c
 import { progressMapFromCW } from '../../core/progress.js';
 import { personGlyph } from '../../core/profile-config.js';
 
-var PLAY_KEYS     = { Enter: true, ' ': true };
-
 // FEAT-020 (TASK-138): the browse screen is a content-type sidebar plus a
 // rail area. Selecting a sidebar tab swaps the rails to that content type's
 // rails. Pure grouping/ordering lives in core/home-rails.js; this module owns
@@ -286,8 +284,6 @@ export function renderBrowse(server, cards, cwRows, labels, profile, person, onS
   selectTab([initialTab].filter(function(t) { return ids.indexOf(t) >= 0; }).concat(ids).concat(['films'])[0]);
   focusFirstTile();
 }
-
-export { PLAY_KEYS };
 
 export function setup() {
   registerScreen('screen-browse', {

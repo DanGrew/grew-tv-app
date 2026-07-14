@@ -115,6 +115,13 @@ export function initBrowsePage() {
   });
   loadTracks(SERVER).then(function(t) { searchTracks = [t].filter(Array.isArray).concat([[]])[0]; }).catch(function() {});
 
+  // TASK-330 — cross the TV to an external destination on a companion tap. The atlas
+  // (or any config destination) is a separate LAN app; navigating there is a page
+  // teleport, so a down destination fails in the browser AFTER we've left — grew-tv
+  // itself never touches the destination at render, so it can't crash it. The TV has
+  // no Atlas button of its own; it only RECEIVES the launchExternal intent (below).
+  function crossExternal(url) { window.location.assign(url); }
+
   var wsApp = connectApp(window.location.origin, function(intent, params) {
     var INTENTS = {
       navigate_up:    function() { browseArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
@@ -124,6 +131,12 @@ export function initBrowsePage() {
       select:         function() {
         var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
         [catalog[id]].filter(Boolean).forEach(onSelect);
+      },
+      // A launchExternal intent from the companion crosses the TV to the carried
+      // tvUrl (Story 2, TV half). Guarded so a params-less intent is a no-op, not a
+      // throw (BUG-009 pattern).
+      launchExternal: function() {
+        [params].filter(Boolean).map(function(p) { return p.tvUrl; }).filter(Boolean).forEach(crossExternal);
       },
       back:           function() { navTo('profile.html'); },
       navigate:       function() { navTo(params.page, params.params); }
