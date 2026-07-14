@@ -3,6 +3,7 @@ import { createTile } from '../../components/tile.js';
 import { buildTabs, buildTabRails, clampIndex, withPlaylistsRail } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { personGlyph } from '../../core/profile-config.js';
+import { externalDestinations, externalTileHtml } from '../../core/external-destinations.js';
 
 var PLAY_KEYS     = { Enter: true, ' ': true };
 
@@ -11,7 +12,7 @@ var PLAY_KEYS     = { Enter: true, ' ': true };
 // rails. Pure grouping/ordering lives in core/home-rails.js; this module owns
 // the DOM and the two-zone (sidebar / rails) d-pad focus model. Module state
 // holds the last-rendered data so a tab switch can rebuild the rails.
-var STATE = { server: null, cards: [], cw: [], recents: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null };
+var STATE = { server: null, cards: [], cw: [], recents: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null, onExternal: null };
 
 function tilesIn(railEl) {
   return Array.from(railEl.querySelectorAll('.film-tile'));
@@ -194,6 +195,37 @@ function railSection(rail) {
   return section;
 }
 
+// TASK-330 — a config-driven external-destination tile ("Atlas"), rendered as the
+// trailing home rail on every tab so it sits alongside the usual content and is
+// d-pad selectable through the existing positional rails model (it is a real
+// `.film-tile` in a `.rail-row`). Selecting it crosses the TV to the destination
+// (STATE.onExternal, wired by the page). Config + markup are pure core
+// (core/external-destinations.js); this only wraps + wires. A down destination
+// can't affect this — the tile is built from static config, never a fetch.
+function externalTile(dest) {
+  var tile = document.createElement('div');
+  tile.className = 'film-tile';
+  tile.tabIndex = 0;
+  tile.setAttribute('data-external', dest.id);
+  tile.innerHTML = externalTileHtml(dest);
+  tile.addEventListener('click', function() { STATE.onExternal(dest); });
+  tile.addEventListener('keydown', function(e) {
+    [dest].filter(function() { return PLAY_KEYS[e.key]; }).forEach(function(d) { e.preventDefault(); STATE.onExternal(d); });
+  });
+  return tile;
+}
+
+function externalRail() {
+  var section = document.createElement('div');
+  section.className = 'rail';
+  var row = document.createElement('div');
+  row.className = 'rail-row';
+  row.setAttribute('data-rail', 'external');
+  externalDestinations().forEach(function(dest) { row.appendChild(externalTile(dest)); });
+  section.appendChild(row);
+  return section;
+}
+
 function renderRailRows(rails) {
   var root = document.getElementById('rails');
   root.innerHTML = '';
@@ -201,6 +233,7 @@ function renderRailRows(rails) {
     root.innerHTML = '<div class="home-empty">Nothing here yet</div>';
   });
   rails.forEach(function(rail) { root.appendChild(railSection(rail)); });
+  root.appendChild(externalRail());
 }
 
 function markActive(tabId) {
@@ -268,7 +301,7 @@ export function getActiveTab() {
 // rows feed both the per-tab Continue Watching rail and the tiles' progress bars
 // (via progressMapFromCW). `recents` (FEAT-045/TASK-318, from the same
 // continue-watching response) feeds the Music tab's Recently Played rail.
-export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue, onCreatePlaylist, recents) {
+export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue, onCreatePlaylist, recents, onExternal) {
   STATE.server = server;
   STATE.cards = cards;
   STATE.cw = cwRows;
@@ -279,6 +312,7 @@ export function renderBrowse(server, cards, cwRows, labels, profile, person, onS
   STATE.onSelect = onSelect;
   STATE.onQueue = onQueue;
   STATE.onCreatePlaylist = onCreatePlaylist;
+  STATE.onExternal = onExternal;
   document.getElementById('profile-label').textContent = personGlyph(person) + ' ' + person.name + ' ▸';
   var tabs = buildTabs(cards);
   var ids = tabs.map(function(t) { return t.id; });

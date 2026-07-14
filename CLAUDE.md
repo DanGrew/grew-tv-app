@@ -73,6 +73,7 @@ module or a screen** — this index rots otherwise (it did).
 - `cover-mosaic.js` — playlist cover-mosaic markup (FEAT-039)
 - `playlist-name.js` / `playlist-pick.js` — create-playlist + "add to playlist" (FEAT-036)
 - `playlist-row-menu.js` — companion playlist row ⋮-popover logic: `rowActions` (which chips, edge-gated) + `popoverTop` (below/flip-above placement) (TASK-328)
+- `external-destinations.js` — config-driven external-destination "door" (TASK-330): the `{ id, name, icon, tvUrl, remoteUrl }` list (Atlas) + `launchExternalParams` (companion→TV intent shape) + `externalTileHtml` (home-tile markup). Static config, no runtime fetch — grew-tv holds no atlas specifics. Rendered as the trailing home rail (`screen-browse.js`) + the companion `#door` (`companion-browse.js`)
 
 **Profile / device plane**
 - `profile-config.js` / `profile-rows.js` — persons + PIN gate, picker layout (FEAT-026)

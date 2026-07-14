@@ -10,6 +10,7 @@ import { buildCrumbs } from '../../core/breadcrumb.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute } from '../../core/home-rails.js';
+import { externalDestinations, launchExternalParams } from '../../core/external-destinations.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { desyncOpenPage, tileOffDesynced } from '../../core/companion-button-modes.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
@@ -49,6 +50,7 @@ export function initPage() {
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
+    door: document.getElementById('door'),
     drill: document.getElementById('drill'),
     sectionsRow: document.getElementById('sections-row'),
     railsWrap: document.getElementById('rails-wrap'),
@@ -335,6 +337,29 @@ export function initPage() {
   function openCreate() {
     window.location.href = 'playlist-create.html?profile=' + encodeURIComponent([state.profile].filter(Boolean).concat(['adults'])[0]);
   }
+
+  // TASK-330 — the external-destination "door" (Atlas). One tap crosses BOTH
+  // surfaces: the TV via a `launchExternal` intent (its handler navigates the TV to
+  // tvUrl), and this phone via its own navigation to remoteUrl (Story 2). The tiny
+  // delay lets the intent flush over the WS before this page tears down to navigate
+  // (matches the validated proto). Config + wire shape are pure core
+  // (core/external-destinations.js); a down destination can't affect this — the
+  // tiles are built from static config, never a fetch.
+  function crossExternal(dest) {
+    api.sendIntent('launchExternal', launchExternalParams(dest));
+    setTimeout(function() { window.location.href = dest.remoteUrl; }, 120);
+  }
+  function doorTile(dest) {
+    var b = document.createElement('button');
+    b.className = 'door-tile';
+    b.setAttribute('data-external', dest.id);
+    b.textContent = dest.icon + ' ' + dest.name;
+    b.addEventListener('click', function() { crossExternal(dest); });
+    return b;
+  }
+  function renderDoor() {
+    externalDestinations().forEach(function(dest) { els.door.appendChild(doorTile(dest)); });
+  }
   document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
   document.getElementById('btn-play-queue-music').addEventListener('click', onPlayQueueMusic);
 
@@ -550,6 +575,7 @@ export function initPage() {
   loadTracks(server).then(function(t) { state.tracks = [t].filter(Array.isArray).concat([[]])[0]; }).catch(noop);
 
   restoreTrail();
+  renderDoor();
   mountSyncBar(mode, onToggle);
   api = connect(server, onContext, function(s) { els.connStatus.textContent = s; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, setBound);

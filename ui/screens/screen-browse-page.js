@@ -115,6 +115,14 @@ export function initBrowsePage() {
   });
   loadTracks(SERVER).then(function(t) { searchTracks = [t].filter(Array.isArray).concat([[]])[0]; }).catch(function() {});
 
+  // TASK-330 — cross the TV to an external destination. The atlas (or any config
+  // destination) is a separate LAN app; navigating there is a page teleport, so a
+  // down destination fails in the browser AFTER we've left — grew-tv itself never
+  // touches the destination at render, so it can't crash it.
+  function crossExternal(url) { window.location.assign(url); }
+  // Selecting the tile ON the TV crosses the TV directly (Story 3).
+  function onExternal(dest) { crossExternal(dest.tvUrl); }
+
   var wsApp = connectApp(window.location.origin, function(intent, params) {
     var INTENTS = {
       navigate_up:    function() { browseArrow({ key: 'ArrowUp',    preventDefault: function() {} }); },
@@ -124,6 +132,12 @@ export function initBrowsePage() {
       select:         function() {
         var id = [params].filter(Boolean).map(function(p) { return p.id; }).filter(Boolean)[0];
         [catalog[id]].filter(Boolean).forEach(onSelect);
+      },
+      // A launchExternal intent from the companion crosses the TV to the carried
+      // tvUrl (Story 2, TV half). Guarded so a params-less intent is a no-op, not a
+      // throw (BUG-009 pattern).
+      launchExternal: function() {
+        [params].filter(Boolean).map(function(p) { return p.tvUrl; }).filter(Boolean).forEach(crossExternal);
       },
       back:           function() { navTo('profile.html'); },
       navigate:       function() { navTo(params.page, params.params); }
@@ -194,7 +208,7 @@ export function initBrowsePage() {
       // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) wins
       // over the last-visited tab; renderBrowse falls back when neither matches.
       var initialTab = [getParam('tab')].filter(Boolean).concat([sessionStorage.getItem(LAST_TAB_KEY)]).filter(Boolean)[0];
-      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist, recents);
+      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist, recents, onExternal);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
       refreshQueue();
       refreshQueueMusic();
