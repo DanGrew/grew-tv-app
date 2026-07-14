@@ -52,7 +52,7 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 #switch-profile { flex: 0 0 auto; font-size: 13px; padding: 8px 14px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #switch-profile:active, #switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .chip-create { font-weight: 700; padding-left: 17px; padding-right: 17px; }
-#door { display: flex; gap: 8px; flex-shrink: 0; }
+#door { display: flex; gap: 8px; flex-shrink: 0; margin-right: auto; }
 #door:empty { display: none; }
 .door-tile { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; padding: 8px 13px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .door-tile:active, .door-tile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
@@ -112,13 +112,12 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 <body>
 <div id="conn-status">connecting…</div>
 <div id="screen-bar"></div>
-<div id="sync-bar"></div>
+<div id="sync-bar"><div id="door"></div></div>
 <div id="queue-actions">
 <button id="btn-play-queue" type="button" style="display:none">&#127909; (0)</button>
 <button id="btn-play-queue-music" type="button" style="display:none">&#127925; (0)</button>
 </div>
 <div id="topbar">
-  <div id="door"></div>
   <div id="breadcrumb"></div>
   <div id="topbar-actions">
     <button id="btn-search" type="button" aria-label="Search">🔍</button>

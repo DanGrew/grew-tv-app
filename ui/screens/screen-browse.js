@@ -3,14 +3,13 @@ import { createTile } from '../../components/tile.js';
 import { buildTabs, buildTabRails, clampIndex, withPlaylistsRail } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { personGlyph } from '../../core/profile-config.js';
-import { externalDestinations, externalDoorHtml } from '../../core/external-destinations.js';
 
 // FEAT-020 (TASK-138): the browse screen is a content-type sidebar plus a
 // rail area. Selecting a sidebar tab swaps the rails to that content type's
 // rails. Pure grouping/ordering lives in core/home-rails.js; this module owns
 // the DOM and the two-zone (sidebar / rails) d-pad focus model. Module state
 // holds the last-rendered data so a tab switch can rebuild the rails.
-var STATE = { server: null, cards: [], cw: [], recents: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null, onExternal: null };
+var STATE = { server: null, cards: [], cw: [], recents: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null };
 
 function tilesIn(railEl) {
   return Array.from(railEl.querySelectorAll('.film-tile'));
@@ -24,10 +23,6 @@ function sidebarTabs() {
   return Array.from(document.querySelectorAll('.sidebar-tab'));
 }
 
-function sidebarDoors() {
-  return Array.from(document.querySelectorAll('.sidebar-door'));
-}
-
 function focusFirstTile() {
   [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
 }
@@ -38,16 +33,6 @@ function focusActiveTab() {
 
 function focusToggle() {
   document.querySelector('.sidebar-toggle').focus();
-}
-
-// The external-destination door sits at the foot of the sidebar, below the tabs.
-function focusFirstDoor() {
-  [document.querySelector('.sidebar-door')].filter(Boolean).forEach(function(d) { d.focus(); });
-}
-
-function focusLastTab() {
-  var tabs = sidebarTabs();
-  [tabs[tabs.length - 1]].filter(Boolean).forEach(function(t) { t.focus(); });
 }
 
 // BUG-007: the top-right profile control is the third focus target. It is the
@@ -86,43 +71,18 @@ function upFromTab(idx) {
   ({ true: focusToggle, false: function() { focusTab(idx - 1); } })[idx <= 0]();
 }
 
-// Down from the last tab drops onto the door row; from any other tab, the next tab
-// (focusFirstDoor no-ops when no door is configured, so focus simply stays put).
-function downFromTab(idx) {
-  var tabs = sidebarTabs();
-  ({ true: focusFirstDoor, false: function() { focusTab(idx + 1); } })[idx >= tabs.length - 1]();
-}
-
-// Sidebar zone, tab rows: Up/Down move between tabs (each focus swaps the rails,
-// below); Down off the last tab drops onto the door; Right enters the rails.
-function tabArrow(e) {
+// Sidebar zone: Up/Down move between tabs (each focus swaps the rails, below);
+// Right enters the rails; Left is the edge.
+export function sidebarArrow(e) {
+  e.preventDefault();
   var idx = sidebarTabs().indexOf(document.activeElement);
   var SMOVE = {
     ArrowUp:    function() { upFromTab(idx); },
-    ArrowDown:  function() { downFromTab(idx); },
+    ArrowDown:  function() { focusTab(idx + 1); },
     ArrowRight: function() { focusFirstTile(); },
     ArrowLeft:  function() {}
   };
   [SMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
-}
-
-// Sidebar zone, the door row below the tabs: Up returns to the last tab, Right
-// enters the rails; activation (Enter/Space) is the native button click.
-function doorArrow(e) {
-  var DMOVE = {
-    ArrowUp:    focusLastTab,
-    ArrowRight: focusFirstTile,
-    ArrowDown:  function() {},
-    ArrowLeft:  function() {}
-  };
-  [DMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
-}
-
-// The sidebar holds two kinds of focus stop — the content-type tabs and the
-// external-destination door beneath them — so route the arrow by which one is focused.
-export function sidebarArrow(e) {
-  e.preventDefault();
-  ({ true: doorArrow, false: tabArrow })[document.activeElement.classList.contains('sidebar-door')](e);
 }
 
 // Toggle zone: the collapse button above the tabs. Down drops to the first tab,
@@ -232,22 +192,6 @@ function railSection(rail) {
   return section;
 }
 
-// TASK-330 — a config-driven external-destination "door" ("Atlas"), rendered as a
-// small icon button at the FOOT of the sidebar (the nav/control column), below the
-// content-type tabs — a "leave to another place" affordance, not a content tile.
-// Selecting it (native button Enter/Space, or a tap) crosses the TV to the
-// destination (STATE.onExternal, wired by the page). Icon + name markup is pure core
-// (externalDoorHtml); this only wraps + wires. A down destination can't affect this
-// — the button is built from static config, never a fetch.
-function doorButton(dest) {
-  var b = document.createElement('button');
-  b.className = 'sidebar-door';
-  b.setAttribute('data-external', dest.id);
-  b.innerHTML = externalDoorHtml(dest);
-  b.addEventListener('click', function() { STATE.onExternal(dest); });
-  return b;
-}
-
 function renderRailRows(rails) {
   var root = document.getElementById('rails');
   root.innerHTML = '';
@@ -307,7 +251,6 @@ function renderSidebar(tabs) {
   bar.innerHTML = '';
   bar.appendChild(toggleButton());
   tabs.forEach(function(tab) { bar.appendChild(tabButton(tab)); });
-  externalDestinations().forEach(function(dest) { bar.appendChild(doorButton(dest)); });
 }
 
 // The tab currently shown — the page persists it so returning to browse lands
@@ -323,7 +266,7 @@ export function getActiveTab() {
 // rows feed both the per-tab Continue Watching rail and the tiles' progress bars
 // (via progressMapFromCW). `recents` (FEAT-045/TASK-318, from the same
 // continue-watching response) feeds the Music tab's Recently Played rail.
-export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue, onCreatePlaylist, recents, onExternal) {
+export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue, onCreatePlaylist, recents) {
   STATE.server = server;
   STATE.cards = cards;
   STATE.cw = cwRows;
@@ -334,7 +277,6 @@ export function renderBrowse(server, cards, cwRows, labels, profile, person, onS
   STATE.onSelect = onSelect;
   STATE.onQueue = onQueue;
   STATE.onCreatePlaylist = onCreatePlaylist;
-  STATE.onExternal = onExternal;
   document.getElementById('profile-label').textContent = personGlyph(person) + ' ' + person.name + ' ▸';
   var tabs = buildTabs(cards);
   var ids = tabs.map(function(t) { return t.id; });

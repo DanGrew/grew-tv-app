@@ -115,13 +115,12 @@ export function initBrowsePage() {
   });
   loadTracks(SERVER).then(function(t) { searchTracks = [t].filter(Array.isArray).concat([[]])[0]; }).catch(function() {});
 
-  // TASK-330 — cross the TV to an external destination. The atlas (or any config
-  // destination) is a separate LAN app; navigating there is a page teleport, so a
-  // down destination fails in the browser AFTER we've left — grew-tv itself never
-  // touches the destination at render, so it can't crash it.
+  // TASK-330 — cross the TV to an external destination on a companion tap. The atlas
+  // (or any config destination) is a separate LAN app; navigating there is a page
+  // teleport, so a down destination fails in the browser AFTER we've left — grew-tv
+  // itself never touches the destination at render, so it can't crash it. The TV has
+  // no Atlas button of its own; it only RECEIVES the launchExternal intent (below).
   function crossExternal(url) { window.location.assign(url); }
-  // Selecting the tile ON the TV crosses the TV directly (Story 3).
-  function onExternal(dest) { crossExternal(dest.tvUrl); }
 
   var wsApp = connectApp(window.location.origin, function(intent, params) {
     var INTENTS = {
@@ -208,7 +207,7 @@ export function initBrowsePage() {
       // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) wins
       // over the last-visited tab; renderBrowse falls back when neither matches.
       var initialTab = [getParam('tab')].filter(Boolean).concat([sessionStorage.getItem(LAST_TAB_KEY)]).filter(Boolean)[0];
-      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist, recents, onExternal);
+      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist, recents);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
       refreshQueue();
       refreshQueueMusic();

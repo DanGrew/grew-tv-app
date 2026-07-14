@@ -1,4 +1,4 @@
-import { externalDestinations, launchExternalParams, externalDoorHtml } from '../../core/external-destinations.js';
+import { externalDestinations, launchExternalParams } from '../../core/external-destinations.js';
 
 describe('externalDestinations', () => {
   it('carries the Atlas entry with its exact config (name, icon, tv + remote urls)', () => {
@@ -25,19 +25,5 @@ describe('launchExternalParams', () => {
   it('carries ONLY the TV url (the companion walks itself to remoteUrl)', () => {
     var dest = { id: 'atlas', name: 'Atlas', tvUrl: 'http://host/tv', remoteUrl: 'http://host/remote' };
     expect(launchExternalParams(dest)).toEqual({ tvUrl: 'http://host/tv' });
-  });
-});
-
-describe('externalDoorHtml', () => {
-  it('builds the destination icon + name spans, in order', () => {
-    expect(externalDoorHtml({ icon: '🗺️', name: 'Atlas' })).toBe(
-      '<span class="door-ico">🗺️</span><span class="door-name">Atlas</span>'
-    );
-  });
-
-  it('reflects a different destination (icon + name are data-driven, not hardcoded)', () => {
-    expect(externalDoorHtml({ icon: '📚', name: 'Library' })).toBe(
-      '<span class="door-ico">📚</span><span class="door-name">Library</span>'
-    );
   });
 });
