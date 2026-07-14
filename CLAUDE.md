@@ -226,9 +226,12 @@ module and reruns the unit suite against each mutant; a *survivor* is a mutation
 test caught — a behaviour you didn't actually assert. **Kill every survivor with a
 test.** Never exclude one as "equivalent" to move the number, and never narrow the
 `mutate` glob to an include-list; if a mutant is genuinely unkillable, raise it with
-the owner rather than silencing it. The full pass runs in CI
-(`.github/workflows/mutation.yml`); the backlog survivor sweep is TASK-327. Details in
-`docs/mutation-testing.md`.
+the owner rather than silencing it. **As of 2026-07-14 (TASK-336) the full pass runs
+*locally*, not in CI** — the `.github/workflows/mutation.yml` gate + its `mutation-gate`
+issue notifier were removed; run it via the cross-repo sweep
+`claude-workflow/tools/mutation-all` (or `npm run test:mutation` here directly). The 100%
+target, `stryker.conf.json`, and the runner are unchanged — only the trigger moved off
+Actions. The backlog survivor sweep is TASK-327. Details in `docs/mutation-testing.md`.
 
 **Backend contract conformance (SYS-017 / TASK-311).** `tests/unit/contract-conformance.test.js`
 feeds the backend's OWN frozen response fixtures (TASK-310:

@@ -47,11 +47,13 @@ npm run test:mutation
 
 The run mutates every `core/**` file, reruns the unit suite against each mutant,
 and prints the surviving mutants plus a per-file score table. Inspect a survivor
-by reading the `clear-text` report's diff for that file. CI runs the same command
-(`.github/workflows/mutation.yml`), on **merge to main only** and only when
-`core/` (or the mutation config) changed — a full pass is slow, so PRs are never
-taxed with it; the red/green signal lands on main. Speed is handled by *when* it
-runs, never by narrowing which tests run.
+by reading the `clear-text` report's diff for that file. **This runs locally, not
+in CI** — as of 2026-07-14 (TASK-336) the `.github/workflows/mutation.yml` gate was
+removed; a full pass is slow, and a per-merge Actions job burned minutes while its
+result landed on `main` where nobody watched. It's now driven on demand by the
+cross-repo sweep `claude-workflow/tools/mutation-all` (which runs this same
+`npm run test:mutation`). Speed is handled by *when* you run it, never by narrowing
+which tests run.
 
 ### Which tests run — the whole unit suite, opt-out
 
@@ -66,31 +68,21 @@ twice.
 ## The gate — 100%, red until then
 
 The bar is **zero survivors**: `thresholds.break` is 100 in `stryker.conf.json`,
-so `stryker run` exits non-zero (CI red) while any mutant is uncaught. It runs on
-merge to main, so until the survivor backlog is cleared the run stays **red**. That
-nag is deliberate — it's the standing reminder that the unit suite isn't yet
-airtight — and it stops the moment the count hits zero. Grew checks never block a
-merge, so it's a signal, not a stop.
+so `stryker run` exits non-zero while any mutant is uncaught. Until the survivor
+backlog is cleared the run stays **red** — that nag is deliberate, the standing
+reminder that the unit suite isn't yet airtight, and it stops the moment the count
+hits zero.
 
-### How you find out it failed — the survivor issue
+### How you find out it failed — the sweep output
 
-The score lands on a push-to-`main` run, which nobody watching PRs ever opens. So
-the workflow **notifies** instead of relying on you to go look (mirrors the backend
-gate):
-
-- **On failure** it opens a single GitHub issue labelled `mutation-gate`, titled
-  *"🔴 core/ mutation gate failed on main — raise a survivor task"*, with the gate
-  output tail and a link to the run. The distinctive title is filterable in the
-  GitHub-email flood (set a filter on it) and the issue stands as the "raise a
-  task" reminder until dealt with.
-- **No duplicates.** It dedups on the label: if an open `mutation-gate` issue
-  already exists it adds a one-line "failed again on `<sha>`" comment (a re-ping)
-  rather than opening a second — at most one open issue at a time.
-- **On success** it closes the standing issue. An open `mutation-gate` issue
-  therefore always means live survivor work; when the gate is green there is none.
-
-The workflow needs `issues: write` permission (declared in the workflow) and uses
-the built-in `GITHUB_TOKEN` — no external service or secret.
+The gate is no longer a CI job, so there's no auto-opened issue any more (TASK-336
+removed both the `.github/workflows/mutation.yml` gate and its `mutation-gate` issue
+notifier — a per-merge Actions run that burned minutes and reported to `main` where
+nobody watching PRs looked). You find survivors by **running the sweep** — the
+`claude-workflow/tools/mutation-all` output lists each repo's score, a survivor
+excerpt, and a full-log link; a non-zero exit is the red signal. Run it (or
+`npm run test:mutation` here) when you touch `core/` and drive survivors to zero
+before you push.
 
 To retire a survivor: **strengthen the unit test** so it asserts on the mutated
 behaviour (the common case), or — if the mutant is provably **equivalent** (no
