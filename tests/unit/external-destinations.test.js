@@ -1,4 +1,4 @@
-import { externalDestinations, launchExternalParams, externalTileHtml } from '../../core/external-destinations.js';
+import { externalDestinations, launchExternalParams, externalDoorHtml } from '../../core/external-destinations.js';
 
 describe('externalDestinations', () => {
   it('carries the Atlas entry with its exact config (name, icon, tv + remote urls)', () => {
@@ -28,16 +28,16 @@ describe('launchExternalParams', () => {
   });
 });
 
-describe('externalTileHtml', () => {
-  it('builds the icon placeholder + the destination name, in order', () => {
-    expect(externalTileHtml({ icon: '🗺️', name: 'Atlas' })).toBe(
-      '<div class="film-poster-placeholder">🗺️</div><div class="tile-title">Atlas</div>'
+describe('externalDoorHtml', () => {
+  it('builds the destination icon + name spans, in order', () => {
+    expect(externalDoorHtml({ icon: '🗺️', name: 'Atlas' })).toBe(
+      '<span class="door-ico">🗺️</span><span class="door-name">Atlas</span>'
     );
   });
 
   it('reflects a different destination (icon + name are data-driven, not hardcoded)', () => {
-    expect(externalTileHtml({ icon: '📚', name: 'Library' })).toBe(
-      '<div class="film-poster-placeholder">📚</div><div class="tile-title">Library</div>'
+    expect(externalDoorHtml({ icon: '📚', name: 'Library' })).toBe(
+      '<span class="door-ico">📚</span><span class="door-name">Library</span>'
     );
   });
 });

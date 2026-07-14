@@ -54,7 +54,7 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 .chip-create { font-weight: 700; padding-left: 17px; padding-right: 17px; }
 #door { display: flex; gap: 8px; flex-shrink: 0; }
 #door:empty { display: none; }
-.door-tile { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; padding: 13px 16px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface-hi); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.door-tile { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; padding: 8px 13px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .door-tile:active, .door-tile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #queue-actions { display: flex; gap: 10px; flex-shrink: 0; }
 #btn-play-queue, #btn-play-queue-music { flex: 1 1 0; min-width: 0; font-size: 15px; padding: 12px 16px; border-radius: var(--radius-sm); border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
@@ -113,12 +113,12 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 <div id="conn-status">connecting…</div>
 <div id="screen-bar"></div>
 <div id="sync-bar"></div>
-<div id="door"></div>
 <div id="queue-actions">
 <button id="btn-play-queue" type="button" style="display:none">&#127909; (0)</button>
 <button id="btn-play-queue-music" type="button" style="display:none">&#127925; (0)</button>
 </div>
 <div id="topbar">
+  <div id="door"></div>
   <div id="breadcrumb"></div>
   <div id="topbar-actions">
     <button id="btn-search" type="button" aria-label="Search">🔍</button>

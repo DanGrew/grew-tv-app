@@ -36,11 +36,11 @@ export function launchExternalParams(dest) {
   return { tvUrl: dest.tvUrl };
 }
 
-// Inner markup for a home-screen external tile: the door glyph as the poster
-// placeholder + the destination name. A pure HTML-string builder (no DOM), so the
-// screen just wraps it in a focusable element and wires the cross. Reuses the tile
-// CSS classes the home rails already style.
-export function externalTileHtml(dest) {
-  return '<div class="film-poster-placeholder">' + dest.icon + '</div>'
-    + '<div class="tile-title">' + dest.name + '</div>';
+// Inner markup for an external-destination "door" button: the destination icon +
+// its name, as two spans each surface styles its own way (the TV sidebar door, the
+// companion topbar door). A pure HTML-string builder (no DOM), so a surface just
+// wraps it in a focusable button and wires the cross.
+export function externalDoorHtml(dest) {
+  return '<span class="door-ico">' + dest.icon + '</span>'
+    + '<span class="door-name">' + dest.name + '</span>';
 }

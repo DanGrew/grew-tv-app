@@ -3,9 +3,7 @@ import { createTile } from '../../components/tile.js';
 import { buildTabs, buildTabRails, clampIndex, withPlaylistsRail } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { personGlyph } from '../../core/profile-config.js';
-import { externalDestinations, externalTileHtml } from '../../core/external-destinations.js';
-
-var PLAY_KEYS     = { Enter: true, ' ': true };
+import { externalDestinations, externalDoorHtml } from '../../core/external-destinations.js';
 
 // FEAT-020 (TASK-138): the browse screen is a content-type sidebar plus a
 // rail area. Selecting a sidebar tab swaps the rails to that content type's
@@ -26,6 +24,10 @@ function sidebarTabs() {
   return Array.from(document.querySelectorAll('.sidebar-tab'));
 }
 
+function sidebarDoors() {
+  return Array.from(document.querySelectorAll('.sidebar-door'));
+}
+
 function focusFirstTile() {
   [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); });
 }
@@ -36,6 +38,16 @@ function focusActiveTab() {
 
 function focusToggle() {
   document.querySelector('.sidebar-toggle').focus();
+}
+
+// The external-destination door sits at the foot of the sidebar, below the tabs.
+function focusFirstDoor() {
+  [document.querySelector('.sidebar-door')].filter(Boolean).forEach(function(d) { d.focus(); });
+}
+
+function focusLastTab() {
+  var tabs = sidebarTabs();
+  [tabs[tabs.length - 1]].filter(Boolean).forEach(function(t) { t.focus(); });
 }
 
 // BUG-007: the top-right profile control is the third focus target. It is the
@@ -74,18 +86,43 @@ function upFromTab(idx) {
   ({ true: focusToggle, false: function() { focusTab(idx - 1); } })[idx <= 0]();
 }
 
-// Sidebar zone: Up/Down move between tabs (each focus swaps the rails, below);
-// Right enters the rails; Left is the edge.
-export function sidebarArrow(e) {
-  e.preventDefault();
+// Down from the last tab drops onto the door row; from any other tab, the next tab
+// (focusFirstDoor no-ops when no door is configured, so focus simply stays put).
+function downFromTab(idx) {
+  var tabs = sidebarTabs();
+  ({ true: focusFirstDoor, false: function() { focusTab(idx + 1); } })[idx >= tabs.length - 1]();
+}
+
+// Sidebar zone, tab rows: Up/Down move between tabs (each focus swaps the rails,
+// below); Down off the last tab drops onto the door; Right enters the rails.
+function tabArrow(e) {
   var idx = sidebarTabs().indexOf(document.activeElement);
   var SMOVE = {
     ArrowUp:    function() { upFromTab(idx); },
-    ArrowDown:  function() { focusTab(idx + 1); },
+    ArrowDown:  function() { downFromTab(idx); },
     ArrowRight: function() { focusFirstTile(); },
     ArrowLeft:  function() {}
   };
   [SMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
+}
+
+// Sidebar zone, the door row below the tabs: Up returns to the last tab, Right
+// enters the rails; activation (Enter/Space) is the native button click.
+function doorArrow(e) {
+  var DMOVE = {
+    ArrowUp:    focusLastTab,
+    ArrowRight: focusFirstTile,
+    ArrowDown:  function() {},
+    ArrowLeft:  function() {}
+  };
+  [DMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
+}
+
+// The sidebar holds two kinds of focus stop — the content-type tabs and the
+// external-destination door beneath them — so route the arrow by which one is focused.
+export function sidebarArrow(e) {
+  e.preventDefault();
+  ({ true: doorArrow, false: tabArrow })[document.activeElement.classList.contains('sidebar-door')](e);
 }
 
 // Toggle zone: the collapse button above the tabs. Down drops to the first tab,
@@ -195,35 +232,20 @@ function railSection(rail) {
   return section;
 }
 
-// TASK-330 — a config-driven external-destination tile ("Atlas"), rendered as the
-// trailing home rail on every tab so it sits alongside the usual content and is
-// d-pad selectable through the existing positional rails model (it is a real
-// `.film-tile` in a `.rail-row`). Selecting it crosses the TV to the destination
-// (STATE.onExternal, wired by the page). Config + markup are pure core
-// (core/external-destinations.js); this only wraps + wires. A down destination
-// can't affect this — the tile is built from static config, never a fetch.
-function externalTile(dest) {
-  var tile = document.createElement('div');
-  tile.className = 'film-tile';
-  tile.tabIndex = 0;
-  tile.setAttribute('data-external', dest.id);
-  tile.innerHTML = externalTileHtml(dest);
-  tile.addEventListener('click', function() { STATE.onExternal(dest); });
-  tile.addEventListener('keydown', function(e) {
-    [dest].filter(function() { return PLAY_KEYS[e.key]; }).forEach(function(d) { e.preventDefault(); STATE.onExternal(d); });
-  });
-  return tile;
-}
-
-function externalRail() {
-  var section = document.createElement('div');
-  section.className = 'rail';
-  var row = document.createElement('div');
-  row.className = 'rail-row';
-  row.setAttribute('data-rail', 'external');
-  externalDestinations().forEach(function(dest) { row.appendChild(externalTile(dest)); });
-  section.appendChild(row);
-  return section;
+// TASK-330 — a config-driven external-destination "door" ("Atlas"), rendered as a
+// small icon button at the FOOT of the sidebar (the nav/control column), below the
+// content-type tabs — a "leave to another place" affordance, not a content tile.
+// Selecting it (native button Enter/Space, or a tap) crosses the TV to the
+// destination (STATE.onExternal, wired by the page). Icon + name markup is pure core
+// (externalDoorHtml); this only wraps + wires. A down destination can't affect this
+// — the button is built from static config, never a fetch.
+function doorButton(dest) {
+  var b = document.createElement('button');
+  b.className = 'sidebar-door';
+  b.setAttribute('data-external', dest.id);
+  b.innerHTML = externalDoorHtml(dest);
+  b.addEventListener('click', function() { STATE.onExternal(dest); });
+  return b;
 }
 
 function renderRailRows(rails) {
@@ -233,7 +255,6 @@ function renderRailRows(rails) {
     root.innerHTML = '<div class="home-empty">Nothing here yet</div>';
   });
   rails.forEach(function(rail) { root.appendChild(railSection(rail)); });
-  root.appendChild(externalRail());
 }
 
 function markActive(tabId) {
@@ -286,6 +307,7 @@ function renderSidebar(tabs) {
   bar.innerHTML = '';
   bar.appendChild(toggleButton());
   tabs.forEach(function(tab) { bar.appendChild(tabButton(tab)); });
+  externalDestinations().forEach(function(dest) { bar.appendChild(doorButton(dest)); });
 }
 
 // The tab currently shown — the page persists it so returning to browse lands
@@ -320,8 +342,6 @@ export function renderBrowse(server, cards, cwRows, labels, profile, person, onS
   selectTab([initialTab].filter(function(t) { return ids.indexOf(t) >= 0; }).concat(ids).concat(['films'])[0]);
   focusFirstTile();
 }
-
-export { PLAY_KEYS };
 
 export function setup() {
   registerScreen('screen-browse', {
