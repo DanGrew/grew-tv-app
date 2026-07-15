@@ -10,7 +10,7 @@ import { buildCrumbs } from '../../core/breadcrumb.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute } from '../../core/home-rails.js';
-import { externalDestinations, launchExternalParams } from '../../core/external-destinations.js';
+import { externalDestinations, launchExternalParams, destinationUrls } from '../../core/external-destinations.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { desyncOpenPage, tileOffDesynced } from '../../core/companion-button-modes.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
@@ -346,8 +346,9 @@ export function initPage() {
   // (core/external-destinations.js); a down destination can't affect this — the
   // tiles are built from static config, never a fetch.
   function crossExternal(dest) {
-    api.sendIntent('launchExternal', launchExternalParams(dest));
-    setTimeout(function() { window.location.href = dest.remoteUrl; }, 120);
+    var host = window.location.hostname;
+    api.sendIntent('launchExternal', launchExternalParams(dest, host));
+    setTimeout(function() { window.location.href = destinationUrls(dest, host).remoteUrl; }, 120);
   }
   function doorTile(dest) {
     var b = document.createElement('button');
