@@ -5,7 +5,9 @@ const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js')
 // Atlas button of its own (owner 2026-07-14 — the door lives only on the companion);
 // it only RECEIVES the companion's `launchExternal` intent over the app WS and
 // crosses itself to the carried tvUrl. Config lives in core/external-destinations.js
-// — grew-tv holds only the URL pair, no atlas code.
+// (port + paths, host-derived at cross time — BUG-054); grew-tv holds no atlas code.
+// This TV half just assigns whatever tvUrl the intent carries, so the injected value
+// below is arbitrary — it proves the cross fires, not how the URL is built.
 //
 // The atlas host is stubbed so the cross navigation lands on a controllable page
 // instead of the real (possibly-down) LAN atlas — this proves the URL fired without

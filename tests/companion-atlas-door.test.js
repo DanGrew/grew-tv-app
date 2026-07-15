@@ -8,10 +8,12 @@ const { installApi } = require('./fixtures/api.js');
 // navigation to remoteUrl. Config lives in core/external-destinations.js (shared
 // with the TV) — the mirror invariant.
 //
-// The atlas host is stubbed so the phone's cross navigation lands on a controllable
-// page instead of the real (possibly-down) LAN atlas.
-const ATLAS_HOST = /192\.168\.1\.242:8090/;
-const ATLAS_REMOTE_URL = /192\.168\.1\.242:8090\/app\/remote\.html/;
+// The door URL follows the host grew-tv was served from (BUG-054) — here the e2e serves
+// from localhost:3456, so the atlas resolves to localhost:8090 (NOT the baked-in Mini IP
+// it used to hardcode). The atlas host is stubbed so the phone's cross navigation lands
+// on a controllable page instead of the real (possibly-down) LAN atlas.
+const ATLAS_HOST = /localhost:8090/;
+const ATLAS_REMOTE_URL = /localhost:8090\/app\/remote\.html/;
 
 function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
@@ -50,7 +52,7 @@ test('Story 2: tapping the door sends launchExternal (crossing the TV) AND takes
   // TV half: a launchExternal intent carrying ONLY the atlas TV url.
   await expect.poll(() => intents.filter(i => i.intent === 'launchExternal').length).toBeGreaterThan(0);
   const cross = intents.find(i => i.intent === 'launchExternal');
-  expect(cross.params).toEqual({ tvUrl: 'http://192.168.1.242:8090/app/tv.html' });
+  expect(cross.params).toEqual({ tvUrl: 'http://localhost:8090/app/tv.html' });
   // Phone half: the companion walks itself to the atlas remote.
   await page.waitForURL(ATLAS_REMOTE_URL);
 });
