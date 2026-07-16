@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // Host-agnostic: the app derives its backend from the page origin (BUG-009), so
 // match by path glob, not a hardcoded host.
@@ -17,7 +18,7 @@ test('profile screen shown on load, Kids button focused', async ({ page }) => {
 });
 
 test('click Kids shows the content-type sidebar, landing on Series', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   // No mid-watch -> no Continue tab; tabs follow content present, fixed order.
   await expect(page.locator('.sidebar-tab')).toHaveText(['TV Series', 'Films', 'Home Movies']);
@@ -28,7 +29,7 @@ test('click Kids shows the content-type sidebar, landing on Series', async ({ pa
 });
 
 test('selecting the Films tab swaps in genre rails (A-Z), a film in each matching genre', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await expect(page.locator('.rail-title')).toHaveText(['Animation', 'Comedy']);
   // Toy Story (animation+comedy) appears in both rails; Nemo (type fallback) only Animation.
@@ -43,7 +44,7 @@ test('selecting the Films tab swaps in genre rails (A-Z), a film in each matchin
 // .click() triggers (Chrome/Android focus on click and masked the bug). Pre-fix
 // this assertion failed: the rail stayed on Series (only ['Animation']).
 test('Films tab switches the rail on a focus-less click (Safari/iOS WebKit)', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await expect(page.locator('.sidebar-tab[data-tab="series"]')).toHaveClass(/active/);
   await page.locator('.sidebar-tab[data-tab="films"]').dispatchEvent('click');
@@ -53,7 +54,7 @@ test('Films tab switches the rail on a focus-less click (Safari/iOS WebKit)', as
 });
 
 test('Home Movies tab shows Collections + Videos structural rails, no person rails (TASK-183)', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
   // millie-walk is a standalone home movie -> the Videos rail only (no series
   // collection in the fixture, no person rails).
@@ -70,7 +71,7 @@ test('each content-type tab leads with a Continue Watching rail of its in-progre
       { item_id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg', position_secs: 1200, duration_secs: 6000, last_watched: '2026-06-05T00:00:00Z', format: 'film', collection_id: null, collection_title: null }
     ] })
   }));
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   // No standalone Continue tab any more — it is a rail inside each tab.
   await expect(page.locator('.sidebar-tab')).toHaveText(['TV Series', 'Films', 'Home Movies']);
@@ -92,7 +93,7 @@ test('each content-type tab leads with a Continue Watching rail of its in-progre
 });
 
 test('Adults unlocks with the correct PIN and lands on its genre rails', async ({ page }) => {
-  await page.locator('#btn-adults').click();
+  await pickPerson(page, 'adults');
   await expect(page.locator('#pin-panel')).toHaveClass(/active/);
   await page.locator('.key[data-key="1"]').click();
   await page.locator('.key[data-key="2"]').click();
@@ -105,14 +106,14 @@ test('Adults unlocks with the correct PIN and lands on its genre rails', async (
 });
 
 test('Kids profile request is scoped server-side (no adults content)', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   const titles = await page.locator('.tile-title').allTextContents();
   expect(titles).not.toContain('The Dark Knight');
 });
 
 test('the profile control returns to the Who\'s watching picker (BUG-007)', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await expect(page.locator('#profile-label')).toContainText('Kids');
   // FEAT-033: the bar badges the active person's authored config.json emoji
@@ -123,7 +124,7 @@ test('the profile control returns to the Who\'s watching picker (BUG-007)', asyn
 });
 
 test('d-pad Up from the top rail reaches the profile control; Enter opens the picker', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.rail-row .film-tile').first().focus();
   await page.keyboard.press('ArrowUp');
@@ -133,7 +134,7 @@ test('d-pad Up from the top rail reaches the profile control; Enter opens the pi
 });
 
 test('switching profile re-requires the PIN to re-enter locked Adults (respect the lock)', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   // #screen-browse can be visible from static markup before the browse module
   // has wired #profile-label's click handler — CI's slower module eval then
@@ -142,20 +143,20 @@ test('switching profile re-requires the PIN to re-enter locked Adults (respect t
   await expect(page.locator('#profile-label')).toHaveText(/Kids/);
   await page.locator('#profile-label').click();
   await expect(page.locator('#screen-profile')).toBeVisible();
-  await page.locator('#btn-adults').click();
+  await pickPerson(page, 'adults');
   await expect(page.locator('#pin-panel')).toHaveClass(/active/);
 });
 
 test('browse 500 shows error screen', async ({ page }) => {
   await page.route(BROWSE_URL, route => route.fulfill({ status: 500 }));
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-error')).toBeVisible();
   await expect(page.locator('#screen-browse')).not.toBeVisible();
 });
 
 test('retry button on error returns to profile select', async ({ page }) => {
   await page.route(BROWSE_URL, route => route.fulfill({ status: 500 }));
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-error')).toBeVisible();
   // #screen-error renders from static markup before error.html's module attaches
   // #btn-retry's click handler (navTo profile), so under CI load an early click is
@@ -170,7 +171,7 @@ test('retry button on error returns to profile select', async ({ page }) => {
 });
 
 test('select standalone video plays directly with src set', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.film-tile[data-id="toy-story-main"]').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
@@ -186,7 +187,7 @@ test('select standalone video plays directly with src set', async ({ page }) => 
 test('companion select resolves an off-tab series to its detail, not the focused film (BUG-008)', async ({ page }) => {
   let appWs = null;
   await page.routeWebSocket(/:8766/, function(ws) { appWs = ws; });
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.film-tile[data-id="toy-story-main"]').first().focus();
   await expect(page.locator('.film-tile[data-id="bluey"]')).toHaveCount(0);
@@ -211,7 +212,7 @@ test('onSelect ignores an unknown card kind without throwing (BUG-009)', async (
       { kind: 'mystery', id: 'weird-x', title: 'Weird', poster: 'weird-x.jpg', type: 'animation', section: 'films', genres: null, people: null }
     ] }) });
   });
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await expect.poll(function() { return appWs !== null; }).toBe(true);
   await appWs.send(JSON.stringify({ type: 'intent', payload: { intent: 'select', params: { id: 'weird-x' } } }));
@@ -221,7 +222,7 @@ test('onSelect ignores an unknown card kind without throwing (BUG-009)', async (
 });
 
 test('Escape key returns to browse screen', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.film-tile[data-id="toy-story-main"]').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
@@ -231,7 +232,7 @@ test('Escape key returns to browse screen', async ({ page }) => {
 });
 
 test('Backspace key returns to browse screen', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.film-tile[data-id="toy-story-main"]').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
@@ -241,7 +242,7 @@ test('Backspace key returns to browse screen', async ({ page }) => {
 });
 
 test('focus returns to source tile after Escape', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.film-tile[data-id="toy-story-main"]').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
@@ -251,7 +252,7 @@ test('focus returns to source tile after Escape', async ({ page }) => {
 });
 
 test('Enter on focused video tile opens video screen', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.film-tile[data-id="toy-story-main"]').first().focus();
   await page.keyboard.press('Enter');
@@ -259,7 +260,7 @@ test('Enter on focused video tile opens video screen', async ({ page }) => {
 });
 
 test('arrow keys scroll within a rail', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   const first = page.locator('.rail-row[data-rail="genre:animation"] .film-tile').nth(0);
   const second = page.locator('.rail-row[data-rail="genre:animation"] .film-tile').nth(1);
@@ -270,7 +271,7 @@ test('arrow keys scroll within a rail', async ({ page }) => {
 });
 
 test('arrow down moves between genre rails', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.rail-row[data-rail="genre:animation"] .film-tile').first().focus();
   await page.keyboard.press('ArrowDown');
@@ -278,7 +279,7 @@ test('arrow down moves between genre rails', async ({ page }) => {
 });
 
 test('ArrowLeft at the first column hops into the sidebar; ArrowRight returns to the rails', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.rail-row[data-rail="genre:animation"] .film-tile').first().focus();
   await page.keyboard.press('ArrowLeft');
@@ -288,7 +289,7 @@ test('ArrowLeft at the first column hops into the sidebar; ArrowRight returns to
 });
 
 test('ArrowDown in the sidebar moves to the next tab and swaps the rails', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="series"]').focus();
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('.sidebar-tab[data-tab="films"]')).toBeFocused();
@@ -297,7 +298,7 @@ test('ArrowDown in the sidebar moves to the next tab and swaps the rails', async
 });
 
 test('ArrowUp from the top tab reaches the collapse toggle; Enter collapses the sidebar', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="series"]').focus();
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('.sidebar-toggle')).toBeFocused();
@@ -310,7 +311,7 @@ test('ArrowUp from the top tab reaches the collapse toggle; Enter collapses the 
 });
 
 test('collapsing the sidebar hides the Home breadcrumb so it cannot straddle the narrowed bar', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#breadcrumb')).toBeVisible();
   await page.locator('.sidebar-tab[data-tab="series"]').focus();
   await page.keyboard.press('ArrowUp');
@@ -322,7 +323,7 @@ test('collapsing the sidebar hides the Home breadcrumb so it cannot straddle the
 });
 
 test('from the toggle, ArrowDown returns to the first tab and ArrowUp reaches the profile control', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="series"]').focus();
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('.sidebar-toggle')).toBeFocused();
@@ -334,7 +335,7 @@ test('from the toggle, ArrowDown returns to the first tab and ArrowUp reaches th
 });
 
 async function goToVideoScreen(page) {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.film-tile[data-id="toy-story-main"]').first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
@@ -353,10 +354,25 @@ async function goToVideoScreen(page) {
   await expect(page.locator('#btn-cc')).toBeVisible();
 }
 
-async function goToSeriesEpisode(page) {
-  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+// TASK-329 (BUG-031's settle rule, applied to the series helper). #screen-video +
+// the play-pause focus only prove onEnter ran — the episode itself is built by a
+// LATER async chain (play-video -> WS snapshot -> swapVideo -> /api/next). Callers
+// that click #btn-next / #btn-prev or dispatch `ended` straight after were racing
+// it: under parallel load Next lands back on the same episode and `ended` fires
+// into a handler that doesn't know its successor yet. #video-upnext is the page's
+// LAST async signal (set once the Promise.all load AND /api/next have resolved), so
+// gating on it proves the page is fully primed. `upnext` is the expected line for
+// this episode — 'Start again' at the end of a series.
+async function goToEpisode(page, video, upnext) {
+  await page.goto('/app/homeview/video.html?video=' + video + '&series=bluey&from=detail');
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-play-pause')).toBeFocused();
+  await expect(page.locator('#video')).toHaveAttribute('src', new RegExp(video));
+  await expect(page.locator('#video-upnext')).toHaveText(upnext);
+}
+
+async function goToSeriesEpisode(page) {
+  await goToEpisode(page, 'bluey-s1e01', 'Up next: The Weekend');
 }
 
 async function mockVideoTime(page, currentTime, duration) {
@@ -411,7 +427,7 @@ test('Next works on an episode opened from a Continue Watching tile (BUG-005)', 
       { item_id: 'bluey-s1e01', title: 'Daddy Putdown', poster: 'bluey.jpg', position_secs: 200, duration_secs: 420, last_watched: '2026-06-06T00:00:00Z', collection_id: 'bluey', collection_title: 'Bluey' }
     ] })
   }));
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.rail-row[data-rail="continue"] .film-tile[data-id="bluey-s1e01"]').click();
   // Launched WITH series context threaded from the tile (the bug: this was absent).
@@ -431,8 +447,7 @@ test('Next works on an episode opened from a Continue Watching tile (BUG-005)', 
 
 // BUG-005 decision: Next at the last episode loops back to the first (no stop).
 test('Next loops last->first at the end of the series (BUG-005)', async ({ page }) => {
-  await page.goto('/app/homeview/video.html?video=bluey-s1e03&series=bluey&from=detail');
-  await expect(page.locator('#screen-video')).toBeVisible();
+  await goToEpisode(page, 'bluey-s1e03', 'Start again');
   await page.locator('#btn-next').click();
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/);
 });
@@ -593,7 +608,7 @@ test('subtitle track loads from the page origin, not a hardcoded host (BUG-009)'
 });
 
 test('CC button hidden for a video without subtitles', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.film-tile[data-id="finding-nemo-main"]').click();
   await expect(page.locator('#screen-video')).toBeVisible();
@@ -629,23 +644,25 @@ test('standalone film at end returns to its origin', async ({ page }) => {
   await expect(page.locator('#screen-browse')).toBeVisible({ timeout: 10000 });
 });
 
+// TASK-329: this test WAS the 2026-07-13 flake instance — `ended` was dispatched
+// as soon as #screen-video went visible, which only proves onEnter ran. `ended` is
+// a fire-ONCE event: dispatch it before /api/next has resolved and the handler has
+// no successor to count down to, so no overlay is ever built and the toBeVisible
+// just burns its (generous) timeout. The old fix reached for headroom (10s);
+// headroom can't rescue an event that fired too early. goToEpisode awaits the real
+// settle signal instead, so `ended` lands on a primed player every time.
 test('series at 100% shows an Up next countdown', async ({ page }) => {
-  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
-  await expect(page.locator('#screen-video')).toBeVisible();
+  await goToEpisode(page, 'bluey-s1e01', 'Up next: The Weekend');
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
-  // BUG-026 settle-signal class: the `ended`->countdown overlay is async; give the
-  // toBeVisible round-trip headroom so it doesn't flake under parallel CPU load.
-  await expect(page.locator('#upnext-overlay')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('#upnext-overlay')).toBeVisible();
   await expect(page.locator('#upnext-text')).toContainText('The Weekend');
 });
 
+// Same `ended`-before-primed race as the countdown test above (TASK-329).
 test('Up next countdown is cancellable and returns to detail', async ({ page }) => {
-  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
-  await expect(page.locator('#screen-video')).toBeVisible();
+  await goToEpisode(page, 'bluey-s1e01', 'Up next: The Weekend');
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
-  // BUG-026 settle-signal class: the `ended`->countdown overlay is async; give the
-  // toBeVisible round-trip headroom so it doesn't flake under parallel CPU load.
-  await expect(page.locator('#upnext-overlay')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('#upnext-overlay')).toBeVisible();
   await page.locator('#btn-upnext-cancel').click();
   await expect(page).toHaveURL(/detail\.html/);
 });

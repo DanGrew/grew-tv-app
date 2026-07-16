@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // Host-agnostic: the app derives its backend from the page origin (BUG-009).
 const BROWSE_URL = '**/api/browse**';
@@ -12,7 +13,7 @@ test.beforeEach(async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
   await page.goto('/app/homeview/profile.html');
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
 
@@ -276,7 +277,7 @@ test.describe('error screen entry', () => {
   test('error onEnter focuses retry button', async ({ page }) => {
     await page.route(BROWSE_URL, route => route.fulfill({ status: 500 }));
     await page.goto('/app/homeview/profile.html');
-    await page.locator('#btn-kids').click();
+    await pickPerson(page, 'kids');
     await expect(page.locator('#screen-error')).toBeVisible();
     await expect(page.locator('#btn-retry')).toBeFocused();
   });

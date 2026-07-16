@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-040 (TASK-248) + TASK-253 — queueing a track to Play Next. The old
 // standalone "＋ Queue" per-row button folded into the single "＋" add sheet: each
@@ -20,7 +21,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function openAlbum(page) {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();

@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-036 (TASK-212) — "Add all to playlist" bulk-add. The album-detail and
 // playlist-detail headers each carry an "＋ Add all to playlist" button that opens
@@ -19,7 +20,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function openAlbum(page) {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();
@@ -28,7 +29,7 @@ async function openAlbum(page) {
 }
 
 async function openPlaylist(page, id) {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="' + id + '"]').click();

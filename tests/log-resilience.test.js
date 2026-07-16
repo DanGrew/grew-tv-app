@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // TASK-213: app-side logging is strictly fire-and-forget. It must NEVER block or
 // surface — playback works even when the /log sink 404s or is unreachable — and
@@ -20,7 +21,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function enterKids(page) {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
 }
 

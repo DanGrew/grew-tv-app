@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // TASK-322 (FEAT-046) — the artist page is a SONG LIST of all the artist's tracks,
 // grouped by album (newest album first, track order within), reusing the album/
@@ -20,7 +21,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function enterArtist(page) {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="artist:ELO"]').click();

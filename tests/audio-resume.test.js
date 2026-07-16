@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // TASK-276 — the audio player no longer resumes mid-song. A track always loads at
 // 0, even when the server snapshot carries a saved current_position (the live
@@ -22,7 +23,7 @@ test.beforeEach(async ({ page }) => {
 // element and record any currentTime write. On the OLD code swapTrack passed
 // np.position (90) → a write of 90; on the NEW code it passes 0 → no write.
 test('returning to a track left mid-song restarts it at 0 — no resume seek (TASK-276)', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();

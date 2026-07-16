@@ -308,5 +308,18 @@ export function initProfilePage() {
     remote: {}
   });
 
-  loadConfig(SERVER).then(parseConfig).then(applyConfig).catch(noop);
+  // TASK-329 settle signal. applyConfig runs TWICE: once above with the
+  // placeholder defaultConfig(), then again when config.json lands — and it wipes
+  // #profile-cards and rebuilds every card, so the first-paint `#btn-kids` node is
+  // destroyed and replaced. Anything that resolved that node in the meantime is
+  // holding a corpse: the click lands mid-rebuild on a detached element and the
+  // actionability retry loop can burn its whole timeout under parallel load (the
+  // recurring `goToVideoScreen` timed out on #btn-kids flake, BUG-019 family).
+  // Stamp the container once the fetched config has SETTLED — applied or failed,
+  // either way no further rebuild is coming — so a caller can await the real
+  // signal instead of the first paint. (`.catch(noop)` before the stamp: an absent
+  // config.json still settles on the placeholder persons.)
+  function markSettled() { cardsEl.setAttribute('data-config', 'settled'); }
+
+  loadConfig(SERVER).then(parseConfig).then(applyConfig).catch(noop).then(markSettled);
 }

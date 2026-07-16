@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-018 (TASK-131) — always-on ambient lyrics on the audio player. A track
 // with an .lrc shows a rolling 3-line window (current ±1) that advances with
@@ -30,7 +31,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function openTrack(page, albumId, trackId) {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="' + albumId + '"]').click();
@@ -72,7 +73,7 @@ test('a track with no .lrc falls back to the big-cover art view, no lyric pane',
 });
 
 test('a music album whose track has an .lrc shows a Lyrics badge; one without does not', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   // ootb has a lyric track (hasLyrics) -> badge; elo-time has none -> no badge.

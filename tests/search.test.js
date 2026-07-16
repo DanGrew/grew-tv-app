@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installVideoPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-048 (TASK-324) — the TV app search overlay. A 🔍 button in the topbar opens
 // a modal panel (Videos|Music toggle · the REUSED create-playlist on-screen
@@ -26,7 +27,7 @@ async function typeKeys(page, word) {
 
 async function openBrowse(page) {
   await page.goto('/app/homeview/profile.html');
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   // Wait for the rails to render — proof the browse module script ran (and so
   // mountSearch wired the 🔍 handler). #screen-browse is the <body>, visible on

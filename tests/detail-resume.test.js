@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-017 / TASK-118: the standalone resume/restart prompt is gone. Progress
 // is backend state (/api/progress + /api/continue-watching), not localStorage.
@@ -19,7 +20,7 @@ function cwRoute(content) {
 const MID_WATCH = [{ item_id: EP1, position_secs: 200, duration_secs: 420, last_watched: 1000 }];
 
 async function goToBrowse(page) {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
 }
 

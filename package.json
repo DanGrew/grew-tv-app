@@ -6,6 +6,7 @@
     "test:unit": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "stryker run",
+    "test:flake": "node scripts/flake-hunt.js",
     "test": "playwright test --pass-with-no-tests",
     "contract:pull": "rm -rf /tmp/grew-tv-contract tests/.contract && git clone --depth 1 --filter=blob:none --sparse https://github.com/DanGrew/grew-tv.git /tmp/grew-tv-contract && git -C /tmp/grew-tv-contract sparse-checkout set media-manager/tests/contract && mkdir -p tests/.contract && cp /tmp/grew-tv-contract/media-manager/tests/contract/*.json tests/.contract/"
   },
