@@ -221,18 +221,34 @@ npm run test:unit   # vitest — unit tests for core/ (run locally)
 npm test            # playwright e2e — CI only; pre-push skips it
 ```
 
-**Flake-hunt gate (PR-only, TASK-329).** `.github/workflows/flake-hunt.yml` runs the
-**whole** e2e suite (playwright's own `tests/*.test.js` discovery — no curated
-subset, no quarantine allowlist) `--repeat-each=3 --retries=0`, sharded 4 ways, on
-`pull_request` **only** (no main run, no nightly). It asks a stricter question than
-`e2e-test`: not "does it pass?" but "is it *deterministically* green under parallel
-load?" — so a test that only survives on a retry is named on the PR instead of being
-masked. The normal e2e job keeps its retry behaviour for developer signal; the hunt is
-**advisory/non-blocking** (deliberately NOT in `pr-report`'s `needs`) and lands red,
-swept via follow-ups — never gold-plated to green, never a blanket skip list. Reproduce
-it locally with `npx playwright test --repeat-each=3 --retries=0`. A genuinely
-unrunnable test is excused **per-test with a one-line reason + a tracking follow-up**,
-in the test file itself.
+**Flake hunt — `npm run test:flake` (LOCAL, on demand, TASK-329).** Not a CI job:
+same trigger model as the mutation sweep (owner's call — a whole-suite ×3 run on every
+PR push isn't worth the Actions minutes). `scripts/flake-hunt.js` runs the **whole**
+suite (Playwright's own `tests/*.test.js` discovery — no curated subset, no quarantine
+allowlist to rot) `--repeat-each=3 --retries=0`, then prints a digest naming each test
+that wasn't deterministically green. It asks a stricter question than `npm test`: not
+"does it pass?" but "is it *deterministically* green under parallel load?"
+
+```bash
+npm run test:flake                      # whole suite x3, workers = cores (~4 min)
+npm run test:flake -- --repeat 5        # hunt harder
+npm run test:flake -- --workers 16      # hunt harder (more contention)
+npm run test:flake -- tests/foo.test.js # scope it while chasing one suite
+```
+
+**It only finds what it can starve.** The flake is a *load* phenomenon, so the hunt is
+only as good as the contention it creates — that's why it defaults to one worker per
+core (2× Playwright's default) rather than mirroring a plain test run. Calibration from
+TASK-329: at the stock default the suite went 1569/1569 green while CI's 2-core runners
+named a real flake (BUG-055) on the same commit; at `--workers 16` the same box
+reproduced it 3-for-3. **But the dial cuts both ways** — crank it far past your core
+count and a `toBeVisible` can miss purely from resource starvation, which is not a real
+settle-signal gap. Corroborate a finding (re-run it, or scope to that suite) before
+chasing it, and prefer the default when you want a trustworthy signal.
+
+Findings are **settle-signal gaps, not app bugs** — fix per the "residual flake" note
+below: never `--retries`, never a longer timeout, never a skip. Not fixing it now?
+Raise a follow-up so it isn't lost (that's how BUG-055 was raised).
 
 **Stryker mutation gate (`core/**`, TASK-305).** `npm run test:mutation` (Stryker +
 vitest-runner, `stryker.conf.json`, `mutate: ["core/**/*.js"]`) mutates every `core/`
@@ -326,7 +342,7 @@ the element you're about to use), never just the URL; keep auto-hiding player
 controls alive with a key press before interacting; and if a screen re-renders
 when its config/data lands, wait for the settle marker — a node from the first
 paint may be a corpse.** Don't paper over any of it with `--retries`; the
-flake-hunt gate below runs with retries off precisely so you can't.
+`npm run test:flake` hunt above runs with retries off precisely so you can't.
 
 **Running e2e from a secondary worktree — use your own port.** The Playwright
 `webServer` is a `python3 -m http.server 3456` with `reuseExistingServer` on
