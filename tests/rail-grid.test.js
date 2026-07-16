@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-028 (TASK-167) — the L3 "rail grid" page: a full poster grid of one
 // (section, rail), styled to the existing browse, breadcrumb Home > Section >
@@ -13,7 +14,7 @@ const SERIES_ANIMATION = '/app/homeview/rail-grid.html?section=series&rail=genre
 test.beforeEach(async ({ page }) => {
   await installApi(page);
   await page.goto('/app/homeview/profile.html');
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
 

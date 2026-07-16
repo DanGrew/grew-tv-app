@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS, VIDEOS } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-018/FEAT-027/FEAT-045 — music browse + album detail + <audio> player +
 // shuffle. The Music tab (titled "Music"), the Recently Played rail (TASK-318)
@@ -22,7 +23,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function enterKids(page) {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
 }
 

@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-031 (TASK-188): the full-screen Queue View off the audio player. Renders
 // the server `playback` snapshot's four sections (NOW PLAYING / PLAY NEXT /
@@ -21,7 +22,7 @@ test.beforeEach(async ({ page }) => {
 // Enter the audio player on the ootb album, starting at `trackId`. After entry
 // now-playing = trackId and from_source = the album tracks after it.
 async function enterPlayer(page, trackId, title) {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();

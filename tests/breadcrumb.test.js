@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 const SERIES_TILE = '.film-tile[data-id="bluey"]';
 const FILM_TILE = '.film-tile[data-id="toy-story-main"]';
@@ -8,7 +9,7 @@ test.beforeEach(async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
   await page.goto('/app/homeview/profile.html');
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
 

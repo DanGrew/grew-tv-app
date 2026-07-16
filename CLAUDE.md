@@ -221,6 +221,19 @@ npm run test:unit   # vitest — unit tests for core/ (run locally)
 npm test            # playwright e2e — CI only; pre-push skips it
 ```
 
+**Flake-hunt gate (PR-only, TASK-329).** `.github/workflows/flake-hunt.yml` runs the
+**whole** e2e suite (playwright's own `tests/*.test.js` discovery — no curated
+subset, no quarantine allowlist) `--repeat-each=3 --retries=0`, sharded 4 ways, on
+`pull_request` **only** (no main run, no nightly). It asks a stricter question than
+`e2e-test`: not "does it pass?" but "is it *deterministically* green under parallel
+load?" — so a test that only survives on a retry is named on the PR instead of being
+masked. The normal e2e job keeps its retry behaviour for developer signal; the hunt is
+**advisory/non-blocking** (deliberately NOT in `pr-report`'s `needs`) and lands red,
+swept via follow-ups — never gold-plated to green, never a blanket skip list. Reproduce
+it locally with `npx playwright test --repeat-each=3 --retries=0`. A genuinely
+unrunnable test is excused **per-test with a one-line reason + a tracking follow-up**,
+in the test file itself.
+
 **Stryker mutation gate (`core/**`, TASK-305).** `npm run test:mutation` (Stryker +
 vitest-runner, `stryker.conf.json`, `mutate: ["core/**/*.js"]`) mutates every `core/`
 module and reruns the unit suite against each mutant; a *survivor* is a mutation no
@@ -276,8 +289,9 @@ full suite repeatedly to "make sure" wastes time and tokens for no signal.
 **The residual flake is a test-side settle-signal gap, not an app bug (BUG-019,
 diagnosed 2026-06-28).** TASK-126 already killed the dominant cause (the live-WS
 person-lock collision — the `installApi` default `person_active` stub). What
-remained were tests that assert before the screen actually settles. Two confirmed
-mechanisms, both fixed in `player-reset` / `playlist-bulk-add`:
+remained were tests that assert before the screen actually settles. Three confirmed
+mechanisms — the first two fixed in `player-reset` / `playlist-bulk-add`, the third
+swept repo-wide by TASK-329:
 - **Auto-hide timer disarms a control mid-test.** The video player hides
   `#controls` 3s after the last input (`screen-video-player.js showControls`);
   when they hide, a focused button blurs. The video Reset tests armed `#btn-reset`
@@ -290,10 +304,29 @@ mechanisms, both fixed in `player-reset` / `playlist-bulk-add`:
   is a silent no-op and the sheet never opens. **Fix: await a render signal that
   proves init finished** (e.g. `.detail-row` first row visible), like the
   `openAlbum` helper does — never `toHaveURL`-then-interact.
+- **An async re-render replaces the node you resolved (TASK-329, the big one).**
+  The profile picker paints TWICE: `initProfilePage` renders the placeholder
+  persons (`child` / `grownup`) synchronously, then `loadConfig()` lands and
+  `applyConfig` wipes `#profile-cards` and rebuilds every card. So `#btn-kids`
+  **does not exist at first paint at all** — it only appears once config.json
+  resolves. Nearly every suite opened with a bare
+  `page.locator('#btn-kids').click()`, which had no settle signal and instead
+  leaned on Playwright's actionability retry loop to span the fetch + rebuild;
+  under parallel load that 10s budget ran out and the click "timed out on
+  `#btn-kids`" — the recurring `goToVideoScreen` flake. **Fix: `pickPerson(page,
+  id)` from `tests/fixtures/nav.js`, never a raw card click.** It awaits the
+  picker's own settle marker (`#profile-cards[data-config="settled"]`, stamped by
+  `screen-profile-page.js` once the fetched config is applied *or* failed). Same
+  shape bit the `ended`-driven up-next overlay: `ended` is a **fire-once** event, so
+  dispatching it before `/api/next` resolved meant no overlay was ever built and
+  extra `toBeVisible` timeout headroom could never rescue it — `goToEpisode` gates on
+  `#video-upnext` (the video page's last async signal) first.
 Rule for new suites: **await the real post-nav settle signal (a rendered row /
-the element you're about to use), never just the URL; and keep auto-hiding player
-controls alive with a key press before interacting.** Don't paper over either
-with `--retries`.
+the element you're about to use), never just the URL; keep auto-hiding player
+controls alive with a key press before interacting; and if a screen re-renders
+when its config/data lands, wait for the settle marker — a node from the first
+paint may be a corpse.** Don't paper over any of it with `--retries`; the
+flake-hunt gate below runs with retries off precisely so you can't.
 
 **Running e2e from a secondary worktree — use your own port.** The Playwright
 `webServer` is a `python3 -m http.server 3456` with `reuseExistingServer` on

@@ -86,6 +86,12 @@ test('reproduced path: playlist → pencil → Cancel lands back on the playlist
   await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
   await page.locator('#btn-rename-playlist').click();
   await expect(page).toHaveURL(/companion\/playlist-create\.html\?rename=pl-roadtrip/);
+  // TASK-329: never toHaveURL-then-interact. The URL changes at navigation START;
+  // the editor's module has not run yet, so #btn-cancel exists in the static markup
+  // with no click handler attached and the tap is a silent no-op (the toHaveURL
+  // below would then time out). The prefilled name is written by init, so it proves
+  // the handlers are wired.
+  await expect(page.locator('#pl-name')).toHaveValue('Road Trip');
   await page.locator('#btn-cancel').click();
   await expect(page).toHaveURL(/companion\/playlist\.html\?id=pl-roadtrip$/);
   await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
@@ -96,6 +102,9 @@ test('reproduced path: playlist → pencil → Save lands back on the playlist w
   await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
   await page.locator('#btn-rename-playlist').click();
   await expect(page).toHaveURL(/companion\/playlist-create\.html\?rename=pl-roadtrip/);
+  // TASK-329: await the prefill before typing over it (see the Cancel test above) —
+  // filling first lets init's prefill land AFTER our text and silently discard it.
+  await expect(page.locator('#pl-name')).toHaveValue('Road Trip');
   await page.locator('#pl-name').fill('Summer Trip');
   await page.locator('#btn-create').click();
   await expect(page).toHaveURL(/companion\/playlist\.html\?id=pl-roadtrip$/);

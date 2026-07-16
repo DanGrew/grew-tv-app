@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi } = require('./fixtures/api.js');
+const { profileSettled, pickPerson } = require('./fixtures/nav.js');
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
@@ -40,19 +41,19 @@ test('renders the per-person config.json emoji on the placeholder (FEAT-033)', a
 });
 
 test('Kids opens straight to browse with no PIN prompt', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
 
 test('Adults click reveals the PIN keypad, focused on the first key', async ({ page }) => {
-  await page.locator('#btn-adults').click();
+  await pickPerson(page, 'adults');
   await expect(page.locator('#pin-panel')).toHaveClass(/active/);
   await expect(page.locator('.key')).toHaveCount(12);
   await expect(page.locator('.key[data-key="1"]')).toBeFocused();
 });
 
 test('wrong PIN shakes, clears the dots, and stays on the profile screen', async ({ page }) => {
-  await page.locator('#btn-adults').click();
+  await pickPerson(page, 'adults');
   await page.locator('.key[data-key="9"]').click();
   await page.locator('.key[data-key="9"]').click();
   await page.locator('.key[data-key="9"]').click();
@@ -63,7 +64,7 @@ test('wrong PIN shakes, clears the dots, and stays on the profile screen', async
 });
 
 test('backspace key (⌫) removes the last entered digit', async ({ page }) => {
-  await page.locator('#btn-adults').click();
+  await pickPerson(page, 'adults');
   await page.locator('.key[data-key="1"]').click();
   await page.locator('.key[data-key="2"]').click();
   await expect(page.locator('.pin-dots span.on')).toHaveCount(2);
@@ -72,7 +73,7 @@ test('backspace key (⌫) removes the last entered digit', async ({ page }) => {
 });
 
 test('keypad is d-pad navigable', async ({ page }) => {
-  await page.locator('#btn-adults').click();
+  await pickPerson(page, 'adults');
   await expect(page.locator('.key[data-key="1"]')).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.key[data-key="2"]')).toBeFocused();
@@ -81,14 +82,14 @@ test('keypad is d-pad navigable', async ({ page }) => {
 });
 
 test('Enter on a focused key enters its digit', async ({ page }) => {
-  await page.locator('#btn-adults').click();
+  await pickPerson(page, 'adults');
   await expect(page.locator('.key[data-key="1"]')).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.locator('.pin-dots span.on')).toHaveCount(1);
 });
 
 test('correct PIN entered by d-pad unlocks Adults', async ({ page }) => {
-  await page.locator('#btn-adults').click();
+  await pickPerson(page, 'adults');
   await page.locator('.key[data-key="1"]').click();
   await page.locator('.key[data-key="2"]').click();
   await page.locator('.key[data-key="3"]').click();
@@ -97,7 +98,7 @@ test('correct PIN entered by d-pad unlocks Adults', async ({ page }) => {
 });
 
 test('Escape closes the keypad and returns focus to the Adults card', async ({ page }) => {
-  await page.locator('#btn-adults').click();
+  await pickPerson(page, 'adults');
   await expect(page.locator('#pin-panel')).toHaveClass(/active/);
   await page.keyboard.press('Escape');
   await expect(page.locator('#pin-panel')).not.toHaveClass(/active/);
@@ -114,6 +115,10 @@ test('cards are grouped into a kids row and an adults row', async ({ page }) => 
 });
 
 test('d-pad Up/Down move focus between the kids and adults rows', async ({ page }) => {
+  // TASK-329: settle before driving the d-pad. applyConfig re-runs when
+  // config.json lands and calls focusFirstCard — a late rebuild mid-test would
+  // yank focus back to the first card and fail the assertion below.
+  await profileSettled(page);
   await expect(page.locator('#btn-kids')).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('#btn-adults')).toBeFocused();
@@ -133,6 +138,8 @@ test('d-pad Left/Right walk within a row of several persons', async ({ page }) =
     }) });
   });
   await page.reload();
+  // TASK-329: settle first — see the Up/Down test above.
+  await profileSettled(page);
   await expect(page.locator('#btn-oliver')).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('#btn-millie')).toBeFocused();
@@ -170,7 +177,7 @@ test('renders one card per configured person, ids distinct from names', async ({
 test('picking a kid person needs no PIN and sets the active person', async ({ page }) => {
   await configRoute(page, ROSTER);
   await page.reload();
-  await page.locator('#btn-millie').click();
+  await pickPerson(page, 'millie');
   await expect(page.locator('#screen-browse')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('grew-tv-person'))).toBe('millie');
   expect(await page.evaluate(() => localStorage.getItem('grew-tv-profile'))).toBe('kids');
@@ -187,7 +194,7 @@ test('only adult persons carry a lock badge', async ({ page }) => {
 test("an adult person's own PIN gates it (default PIN is rejected)", async ({ page }) => {
   await configRoute(page, ROSTER);
   await page.reload();
-  await page.locator('#btn-mom').click();
+  await pickPerson(page, 'mom');
   // wrong (the default 1234) — Mom overrides it with 4321
   await '1234'.split('').reduce(function(p, d) {
     return p.then(function() { return page.locator('.key[data-key="' + d + '"]').click(); });
@@ -206,7 +213,7 @@ test("an adult person's own PIN gates it (default PIN is rejected)", async ({ pa
 test("the active person's content class filters browse", async ({ page }) => {
   await configRoute(page, ROSTER);
   await page.reload();
-  await page.locator('#btn-oliver').click();
+  await pickPerson(page, 'oliver');
   await expect(page.locator('#screen-browse')).toBeVisible();
   // kids browse (Series landing) holds the kids Bluey rail, never the
   // adults-only Dark Knight — the active person's class drove /api/browse.
@@ -220,7 +227,7 @@ test('absent config falls back to generic placeholder persons and still boots', 
   });
   await page.reload();
   await expect(page.locator('.profile-card')).toHaveCount(2);
-  await page.locator('#btn-child').click();
+  await pickPerson(page, 'child');
   await expect(page.locator('#screen-browse')).toBeVisible();
 });
 
@@ -256,7 +263,7 @@ test('person_active from the server proceeds straight to browse', async ({ page 
   await activeRoute(page);
   await configRoute(page, ROSTER);
   await page.reload();
-  await page.locator('#btn-millie').click();
+  await pickPerson(page, 'millie');
   await expect(page.locator('#screen-browse')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('grew-tv-person'))).toBe('millie');
 });
@@ -265,7 +272,7 @@ test('a person live on another screen prompts to take over, then proceeds', asyn
   await busyRoute(page);
   await configRoute(page, ROSTER);
   await page.reload();
-  await page.locator('#btn-oliver').click();
+  await pickPerson(page, 'oliver');
   await expect(page.locator('#takeover-panel')).toHaveClass(/active/);
   await expect(page.locator('#takeover-msg')).toContainText('Bedroom');
   // Confirm → resend with takeover:true → server acks person_active → browse.
@@ -277,7 +284,7 @@ test('cancelling the take-over prompt stays on the picker', async ({ page }) => 
   await busyRoute(page);
   await configRoute(page, ROSTER);
   await page.reload();
-  await page.locator('#btn-oliver').click();
+  await pickPerson(page, 'oliver');
   await expect(page.locator('#takeover-panel')).toHaveClass(/active/);
   await page.locator('#takeover-cancel').click();
   await expect(page.locator('#takeover-panel')).not.toHaveClass(/active/);
@@ -306,7 +313,7 @@ test('TASK-325: a passcode-bearing kid is locked, prompts for the PIN, then unlo
   await configRoute(page, PASSCODE_ROSTER);
   await page.reload();
   await expect(page.locator('#btn-evie .lock-badge')).toBeVisible();
-  await page.locator('#btn-evie').click();
+  await pickPerson(page, 'evie');
   await expect(page.locator('#pin-panel')).toHaveClass(/active/);
   // its own pin 4321 gates it (the default 1234 is never consulted for the lock)
   await typePin(page, '4321');
@@ -319,7 +326,7 @@ test('TASK-325: a passcode-less adult carries no lock and selects straight throu
   await page.reload();
   await expect(page.locator('#btn-dad .lock-badge')).toHaveCount(0);
   // one click lands on browse — no keypad ever interrupted the pick
-  await page.locator('#btn-dad').click();
+  await pickPerson(page, 'dad');
   await expect(page.locator('#screen-browse')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('grew-tv-person'))).toBe('dad');
 });

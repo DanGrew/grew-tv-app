@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // TASK-330 — the TV half of the external-destination "Atlas" door. The TV has NO
 // Atlas button of its own (owner 2026-07-14 — the door lives only on the companion);
@@ -27,7 +28,7 @@ test.beforeEach(async ({ page }) => {
 test('Story 2 (TV half): a launchExternal intent from the companion crosses the TV to the carried tvUrl', async ({ page }) => {
   let appWs = null;
   await page.routeWebSocket(/:8766/, ws => { appWs = ws; });
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await expect.poll(() => appWs !== null).toBe(true);
   await appWs.send(JSON.stringify({ type: 'intent', payload: { intent: 'launchExternal', params: { tvUrl: 'http://192.168.1.242:8090/app/tv.html' } } }));
@@ -39,7 +40,7 @@ test('a params-less launchExternal intent is a no-op, not a throw (stays on brow
   page.on('pageerror', e => errors.push(e.message));
   let appWs = null;
   await page.routeWebSocket(/:8766/, ws => { appWs = ws; });
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await expect.poll(() => appWs !== null).toBe(true);
   await appWs.send(JSON.stringify({ type: 'intent', payload: { intent: 'launchExternal' } }));
@@ -49,7 +50,7 @@ test('a params-less launchExternal intent is a no-op, not a throw (stays on brow
 });
 
 test('the TV home screen shows NO Atlas button (the door lives only on the companion)', async ({ page }) => {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await expect(page.locator('[data-external="atlas"]')).toHaveCount(0);
   // The usual content still renders.

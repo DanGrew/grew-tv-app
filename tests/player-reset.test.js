@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, installVideoPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { pickPerson } = require('./fixtures/nav.js');
 
 // TASK-142: a single Reset control in the player clears this item's backend
 // progress for the active person, then exits. Covers films/episodes (video
@@ -27,7 +28,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function enterKids(page) {
-  await page.locator('#btn-kids').click();
+  await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
 }
 
