@@ -18,9 +18,12 @@ function esc(s) {
     .replace(/>/g, '&gt;');
 }
 
+// TASK-360: a playlist tile is up to FOUR images in one poster slot, so a rail of
+// playlists costs 4x a normal rail. Same lazy/async treatment as the single-poster
+// path in components/tile.js — deferred off-screen, decoded off the critical path.
 function cell(url, span) {
   var spanStyle = span ? 'grid-column:1/3;' : '';
-  return '<img class="cover-mosaic-cell" alt="" src="' + esc(url) +
+  return '<img class="cover-mosaic-cell" alt="" loading="lazy" decoding="async" src="' + esc(url) +
     '" style="' + spanStyle + 'width:100%;height:100%;object-fit:cover;display:block">';
 }
 

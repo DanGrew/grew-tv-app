@@ -44,6 +44,15 @@ export function createTile(server, card, opts) {
     var img = document.createElement('img');
     img.className = 'film-poster';
     img.alt = '';
+    // TASK-359/360: a rail can hold far more tiles than fit on screen, and each
+    // poster costs a download AND a main-thread JPEG decode. `lazy` defers the
+    // ones nobody scrolls to; `async` keeps the decode of the ones on screen off
+    // the critical rendering path. setAttribute (not the property) so a browser
+    // that implements neither simply ignores them — the TV kiosk is old Chrome.
+    // Safe against reflow: .film-poster carries an aspect-ratio, so the box is
+    // already reserved before the image lands.
+    img.setAttribute('loading', 'lazy');
+    img.setAttribute('decoding', 'async');
     var placeholder = document.createElement('div');
     placeholder.className = 'film-poster-placeholder';
     var src = mediaUrl(server, m.poster);

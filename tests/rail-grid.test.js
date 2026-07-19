@@ -74,6 +74,18 @@ test('tiles are real posters (this is the TV grid, not the text companion)', asy
   await expect(page.locator('#rail-grid .film-tile .film-poster').first()).toBeAttached();
 });
 
+// TASK-360 — a grid holds far more tiles than fit on screen, and each poster costs
+// a download AND a main-thread JPEG decode. Both attributes are one-line deletions
+// that break nothing observable: the grid still renders, it just goes back to
+// eagerly fetching and decoding art nobody scrolled to, which is what bogs down the
+// weak TV client. Only this assertion notices.
+test('posters defer off-screen loading and decode off the critical path', async ({ page }) => {
+  await page.goto(FILMS_ANIMATION);
+  const poster = page.locator('#rail-grid .film-tile .film-poster').first();
+  await expect(poster).toHaveAttribute('loading', 'lazy');
+  await expect(poster).toHaveAttribute('decoding', 'async');
+});
+
 // BUG-049 — the Music "Recently Played" rail must build on the TV rail-grid page,
 // the same as browse. It's the L3 the companion drives when you drill into Recently
 // Played; the page must pass `recents` (off the continue-watching response) into
