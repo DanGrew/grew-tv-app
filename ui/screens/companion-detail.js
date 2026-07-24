@@ -28,7 +28,7 @@ export function initPage() {
     actionsEl: document.getElementById('actions')
   };
   var state = { seriesId: null, profile: null, person: null, series: null, progress: {}, activeSeason: null };
-  var addState = { add: null, queue: null, createHref: '', statusTimer: null };
+  var addState = { add: null, queue: null, queueLabel: '', createHref: '', statusTimer: null };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -89,14 +89,16 @@ export function initPage() {
     b.addEventListener('click', function() { addExisting(card.id, card.title); });
     return b;
   }
-  // TASK-253 — the sheet's top option: "▶ Play Next" (queue the track), above the
-  // playlist cards. Present only for the per-TRACK sheet (openAddSheet sets
-  // addState.queue); the album-level "Add all" sheet leaves it null. NOT `.add-choice`
-  // so the playlist-list assertions stay clean.
+  // TASK-253 — the sheet's top option: a queue action, above the playlist cards.
+  // TASK-362: BOTH sheets have one now, and the mode decides what it says — the
+  // per-track sheet queues one track ("☰ Play Next"), the album-level "Add all"
+  // sheet queues the whole album ("☰ Queue all album"). The label is assigned at
+  // open time (addState.queueLabel), never branched here (cyclomatic 1). NOT
+  // `.add-choice` so the playlist-list assertions stay clean.
   function queueChoiceBtn() {
     var b = document.createElement('button');
     b.className = 'add-queue';
-    b.textContent = '☰ Play Next';
+    b.textContent = addState.queueLabel;
     b.addEventListener('click', addState.queue);
     return b;
   }
@@ -117,16 +119,18 @@ export function initPage() {
   function openAddSheet(item) {
     addState.add = function(id) { return addToPlaylist(server, id, item.video.id); };
     addState.queue = function() { queueThenClose(item); };
+    addState.queueLabel = '☰ Play Next';
     addState.createHref = 'playlist-create.html?addTrack=' + encodeURIComponent(item.video.id) +
       '&profile=' + encodeURIComponent(activeProfile());
     loadAndShowSheet();
   }
   // Album-level "Add all to playlist" (TASK-212): snapshot the WHOLE album as a
-  // source. Same sheet, but each pick POSTs add-source instead of add-track, and no
-  // Play Next option (queue null — a per-track action).
+  // source. Same sheet, but each pick POSTs add-source instead of add-track.
+  // TASK-362: its top option queues the whole album (the slot used to be null).
   function openAddAllSheet() {
     addState.add = function(id) { return addSourceToPlaylist(server, id, 'album', state.seriesId); };
-    addState.queue = null;
+    addState.queue = queueAlbumThenClose;
+    addState.queueLabel = '☰ Queue all album';
     addState.createHref = 'playlist-create.html?addSourceType=album&addSourceId=' + encodeURIComponent(state.seriesId) +
       '&profile=' + encodeURIComponent(activeProfile());
     loadAndShowSheet();
@@ -150,6 +154,18 @@ export function initPage() {
       .catch(function() { showStatus('Could not queue track.'); });
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
+  // TASK-362 — the album-level twin: queue the WHOLE album to Play Next in ONE POST
+  // (queue-source), so the queue can never half-populate and the backend
+  // front-inserts the tracks as a block in album order. Per-person like queueTrack,
+  // so it stays live in Browse mode too. The count is built at the showStatus call
+  // site on purpose: a helper that formats it would have no DOM token and
+  // no-pure-fn-outside-core would push it into core/.
+  function queueAlbum() {
+    playbackAction(server, 'queue-source', state.person, { source_type: 'album', source_id: state.seriesId })
+      .then(function() { showStatus('Queued ' + state.series.items.length + ' tracks to Play Next'); })
+      .catch(function() { showStatus('Could not queue album.'); });
+  }
+  function queueAlbumThenClose() { closeAddSheet(); queueAlbum(); }
   // FEAT-040/TASK-249 — the VIDEO ＋ Queue: a series episode queues to the separate
   // video queue (queue-video, distinct from the music queue-track above). Same
   // per-person POST ⇒ works in BOTH modes (the play tile greys in Browse, this

@@ -50,7 +50,7 @@ export function initAlbumDetailPage() {
   // per mode too, so the rest of the sheet is mode-agnostic. The sheet owns its
   // keydown (stopPropagation) so the detail d-pad never fires beneath it, mirroring
   // the playlist-detail delete-confirm overlay.
-  var addState = { add: null, queue: null, createParams: {}, returnFocus: function() {}, cells: [], statusTimer: null };
+  var addState = { add: null, queue: null, queueLabel: '', createParams: {}, returnFocus: function() {}, cells: [], statusTimer: null };
 
   function focusAdd(i) { addState.cells[i].focus(); }
   function focusRow(id) {
@@ -88,17 +88,19 @@ export function initAlbumDetailPage() {
   }
   function onAddKey(e) { e.stopPropagation(); moveAdd(e); closeKeys(e); }
 
-  // TASK-253 — the sheet's top option: "▶ Play Next" (queue the track), above New
-  // playlist and the playlist cards. Present only for the per-TRACK sheet
-  // (openAddSheet sets addState.queue); the album-level "Add all" sheet
-  // (openAddSourceSheet) leaves queue null, so no Play Next there. Carries onAddKey
-  // so the d-pad walks it like every other sheet cell; NOT `.add-choice` so the
+  // TASK-253 — the sheet's top option: a queue action, above New playlist and the
+  // playlist cards. TASK-362: BOTH sheets now have one, and the mode decides what
+  // it says — the per-track sheet queues one track ("☰ Play Next"), the
+  // album-level "Add all" sheet queues the whole album ("☰ Queue all album").
+  // The label is assigned at open time (addState.queueLabel) rather than branched
+  // here, because ui/** is capped at cyclomatic complexity 1. Carries onAddKey so
+  // the d-pad walks it like every other sheet cell; NOT `.add-choice` so the
   // playlist-list assertions stay clean.
   function buildQueueChoice() {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'add-queue';
-    b.textContent = '☰ Play Next';
+    b.textContent = addState.queueLabel;
     b.addEventListener('click', addState.queue);
     b.addEventListener('keydown', onAddKey);
     document.getElementById('add-sheet-list').appendChild(b);
@@ -141,22 +143,36 @@ export function initAlbumDetailPage() {
       .catch(function() { showStatus('Could not queue track.'); });
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
+  // TASK-362 — queue the WHOLE album to Play Next: ONE POST (queue-source), so the
+  // queue can never half-populate, and the backend front-inserts the tracks as a
+  // block in album order. No skip — whatever is playing keeps playing. The count in
+  // the toast is built here at the call site on purpose: a helper that formats it
+  // would have no DOM token and no-pure-fn-outside-core would push it into core/.
+  function queueAlbum() {
+    playbackAction(SERVER, 'queue-source', getPerson(), { source_type: 'album', source_id: albumId })
+      .then(function() { showStatus('Queued ' + state.album.items.length + ' tracks to Play Next'); })
+      .catch(function() { showStatus('Could not queue album.'); });
+  }
+  function queueAlbumThenClose() { closeAddSheet(); queueAlbum(); }
 
   // Per-row: the single ＋ opens the sheet for ONE track — Play Next on top, playlist
   // cards below (TASK-253). Return focus to the track row it opened from.
   function openAddSheet(item) {
     addState.add = function(id) { return addToPlaylist(SERVER, id, item.video.id); };
     addState.queue = function() { queueThenClose(item); };
+    addState.queueLabel = '☰ Play Next';
     addState.createParams = { addTrack: item.video.id };
     addState.returnFocus = function() { focusRow(item.video.id); };
     loadAndShowSheet();
   }
-  // Header "Add all to playlist": bulk-add the whole album as a snapshot. No Play
-  // Next option (queue null — that is a per-track action). Return focus to the header
-  // button it opened from.
+  // Header "Add all to playlist": bulk-add the whole album as a snapshot. TASK-362:
+  // its top option queues the whole album instead of adding one track — the album
+  // sheet's queue slot used to be null. Return focus to the header button it opened
+  // from.
   function openAddSourceSheet() {
     addState.add = function(id) { return addSourceToPlaylist(SERVER, id, 'album', albumId); };
-    addState.queue = null;
+    addState.queue = queueAlbumThenClose;
+    addState.queueLabel = '☰ Queue all album';
     addState.createParams = { addSourceType: 'album', addSourceId: albumId };
     addState.returnFocus = function() { document.getElementById('btn-add-all').focus(); };
     loadAndShowSheet();
