@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, VIDEOS, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
-// TASK-362 — "Queue all album". The album header's "＋ Add all to playlist" sheet
+// TASK-362 — "Queue all album". The album header's "＋ Add all" sheet
 // gains a TOP option, "☰ Queue all album": one POST (queue-source) puts every track
 // on the album at the FRONT of Play Next, in album order, so the queue can never
 // half-populate. It fills the one sheet in the app that had no queue option — the

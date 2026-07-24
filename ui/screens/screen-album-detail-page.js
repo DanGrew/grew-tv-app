@@ -42,7 +42,7 @@ export function initAlbumDetailPage() {
 
   // FEAT-036/TASK-206 + TASK-212 — "Add to playlist" sheet. Two entry points share
   // one sheet: a per-row + Playlist control (screen-detail.appendAdd -> openAddSheet,
-  // adds ONE track) and the header "Add all to playlist" button (openAddSourceSheet,
+  // adds ONE track) and the header "＋ Add all" button (openAddSourceSheet,
   // bulk-adds the WHOLE album as a snapshot). The sheet lists the active profile's
   // playlists (loadBrowse already profile-filters, so every card is a valid target —
   // see core/playlist-pick) plus Create-new + Cancel. addState.add(id) is the POST

@@ -2,10 +2,12 @@ const { test, expect } = require('@playwright/test');
 const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
-// FEAT-036 (TASK-212) — "Add all to playlist" bulk-add. The album-detail and
-// playlist-detail headers each carry an "＋ Add all to playlist" button that opens
-// the same add sheet, but each pick POSTs add-source (a whole-album / whole-playlist
-// SNAPSHOT) instead of add-track. The playlist-detail sheet EXCLUDES the current
+// FEAT-036 (TASK-212) — bulk-add. The album-detail and playlist-detail headers each
+// carry a button that opens the same add sheet, but each pick POSTs add-source (a
+// whole-album / whole-playlist SNAPSHOT) instead of add-track. The labels differ:
+// album reads "＋ Add all" (TASK-362 put a queue action in its sheet, so the name
+// can no longer say "to playlist"), playlist-detail still reads "＋ Add all to
+// playlist" because its sheet is playlist-only (queue null). The playlist-detail sheet EXCLUDES the current
 // playlist (a playlist can't be added into itself). "New playlist" hands off to the
 // create screen carrying the bulk source so a brand-new playlist starts with it.
 
@@ -44,9 +46,9 @@ async function openPlaylist(page, id) {
 }
 
 // --- album-detail: add the whole album --------------------------------------
-test('album-detail header carries an Add all to playlist button', async ({ page }) => {
+test('album-detail header carries an Add all button', async ({ page }) => {
   await openAlbum(page);
-  await expect(page.locator('#btn-add-all')).toHaveText('＋ Add all to playlist');
+  await expect(page.locator('#btn-add-all')).toHaveText('＋ Add all');
 });
 
 test('Add all opens a sheet listing the active profile\'s playlists + New playlist', async ({ page }) => {

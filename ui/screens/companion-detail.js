@@ -124,9 +124,11 @@ export function initPage() {
       '&profile=' + encodeURIComponent(activeProfile());
     loadAndShowSheet();
   }
-  // Album-level "Add all to playlist" (TASK-212): snapshot the WHOLE album as a
-  // source. Same sheet, but each pick POSTs add-source instead of add-track.
-  // TASK-362: its top option queues the whole album (the slot used to be null).
+  // Album-level "＋ Add all" (TASK-212): snapshot the WHOLE album as a source.
+  // Same sheet, but each pick POSTs add-source instead of add-track.
+  // TASK-362: its top option queues the whole album (the slot used to be null),
+  // which is why the button no longer says "to playlist" — that sheet does more
+  // than playlists now. The playlist-detail button keeps the longer wording.
   function openAddAllSheet() {
     addState.add = function(id) { return addSourceToPlaylist(server, id, 'album', state.seriesId); };
     addState.queue = queueAlbumThenClose;
@@ -189,7 +191,7 @@ export function initPage() {
     var b = document.createElement('button');
     b.className = 'add-all-btn';
     b.id = 'btn-add-all';
-    b.textContent = '＋ Add all to playlist';
+    b.textContent = '＋ Add all';
     b.addEventListener('click', openAddAllSheet);
     els.actionsEl.appendChild(b);
   }
