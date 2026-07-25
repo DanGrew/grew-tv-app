@@ -466,7 +466,7 @@ async function installPlaybackBackend(page) {
   // action, echoed as now_playing.position, reset to 0 whenever now-playing
   // changes — like db/playback_engine.py). Only the now-playing track carries it;
   // queue entries stay at 0.
-  var state = { now: null, nowPos: 0, shuffle: false, repeat: false, sourceType: null, sourceId: null, override: [], source: [], then: [] };
+  var state = { now: null, nowEntry: null, nowPos: 0, shuffle: false, repeat: false, sourceType: null, sourceId: null, override: [], source: [], then: [] };
   var live = null;
   var seq = 0;
   function mkEntry(id) { seq += 1; return { entry_id: 'e' + seq, track_id: id }; }
@@ -483,11 +483,15 @@ async function installPlaybackBackend(page) {
     if (state.repeat) return order.map(mkEntry);
     return [];
   }
-  // Pending "Play Next" hides the durable playing head (front when it is the
-  // now-playing track) — it is playing, not pending (FEAT-040, mirrors the backend).
+  // Pending "Play Next" hides the durable playing head — it is playing, not
+  // pending (FEAT-040, mirrors the backend). BUG-058: the head is matched by
+  // ENTRY id, not track id, so a freshly queued copy of the track you are already
+  // playing (Play Next on it, or "Queue all album" on the album that is playing)
+  // is still listed. `nowEntry` mirrors the backend's current_entry_id: the entry
+  // being played when it came off the queue, null when playing from the source.
   function pendingOverride() {
     var q = state.override.slice();
-    return (q[0] && q[0].track_id === state.now) ? q.slice(1) : q;
+    return (q[0] && state.nowEntry && q[0].entry_id === state.nowEntry) ? q.slice(1) : q;
   }
   function snapshot() {
     return {
@@ -527,7 +531,7 @@ async function installPlaybackBackend(page) {
     'play-source': function(b) {
       var order = sourceOrder(b.source_type, b.source_id);
       state.sourceType = b.source_type; state.sourceId = b.source_id; state.shuffle = !!b.shuffle;
-      state.now = order[0] || null; state.nowPos = 0;
+      state.now = order[0] || null; state.nowEntry = null; state.nowPos = 0;
       state.source = order.slice(1).map(mkEntry);
       state.then = computeThen(order); state.override = [];
     },
@@ -535,7 +539,7 @@ async function installPlaybackBackend(page) {
     // a skip into the source advances the permutation past that track (so the
     // now-playing track never also sits in from_source).
     'play-track': function(b) {
-      state.now = b.track_id; state.nowPos = 0;
+      state.now = b.track_id; state.nowEntry = null; state.nowPos = 0;
       var queued = state.override.filter(function(e) { return e.track_id === b.track_id; })[0];
       [queued].filter(Boolean).forEach(function(e) { state.override = dropEntry(state.override, e.entry_id); });
       var i = sourceOrder(state.sourceType, state.sourceId).indexOf(b.track_id);
@@ -548,11 +552,14 @@ async function installPlaybackBackend(page) {
     // becomes now-playing — a played override entry STAYS in the queue (consumed
     // only when it finishes), a source entry is consumed as before.
     'next': function() {
-      [state.override[0]].filter(function(e) { return e && e.track_id === state.now; })
+      [state.override[0]].filter(function(e) { return e && state.nowEntry && e.entry_id === state.nowEntry; })
         .forEach(function(e) { state.override = dropEntry(state.override, e.entry_id); });
+      var fromQueue = state.override[0];
       var nextEntry = state.override.concat(state.source)[0];
       [nextEntry].filter(Boolean).forEach(function(e) {
         state.now = e.track_id; state.nowPos = 0;
+        // BUG-058: remember WHICH entry is playing (null once back on the source).
+        state.nowEntry = (fromQueue && e.entry_id === fromQueue.entry_id) ? e.entry_id : null;
         state.source = dropEntry(state.source, e.entry_id);
       });
     },
@@ -570,7 +577,9 @@ async function installPlaybackBackend(page) {
     // FEAT-040/TASK-254: play the override-queue head WITHOUT consuming it (durable
     // head, resumable on re-entry — matches api/playback play-queue). Empty -> no-op.
     'play-queue':         function() {
-      [state.override[0]].filter(Boolean).forEach(function(e) { state.now = e.track_id; state.nowPos = 0; });
+      [state.override[0]].filter(Boolean).forEach(function(e) {
+        state.now = e.track_id; state.nowEntry = e.entry_id; state.nowPos = 0;
+      });
     },
     'remove-queue-entry': function(b) {
       state.override = dropEntry(state.override, b.entry_id);

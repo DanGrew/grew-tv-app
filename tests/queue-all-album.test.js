@@ -111,6 +111,30 @@ test.describe('TV album detail', () => {
       ['Mr. Blue Sky', 'Sweet Talkin Woman', 'Sweet Talkin Woman']);
   });
 
+  // BUG-058 — queue the album that is ALREADY playing. The queued copy of track 1
+  // is a different ENTRY from the one playing, so it must stay in the queue: only
+  // the entry actually playing is hidden. While the head was matched by track_id,
+  // the second block's track 1 was swallowed (5 pending, not 6) and never played.
+  test('queueing the album that is already playing keeps its first track', async ({ page }) => {
+    await openAlbum(page);
+    await queueAllAlbum(page);
+    await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(/browse\.html/);
+    const browseUrl = page.url();
+    await page.locator('#btn-play-queue-music').click();          // head starts playing
+    await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
+    await page.goto(browseUrl);                                   // back for a second helping
+    await page.locator('.sidebar-tab[data-tab="music"]').click();
+    await page.locator('.film-tile[data-id="ootb"]').click();
+    await expect(page.locator('.detail-row')).toHaveCount(3);
+    await queueAllAlbum(page);
+    await page.keyboard.press('Escape');
+    // 6 pending: the 3 just queued (track 1 included — it is NOT the playing entry)
+    // plus the 2 trailing the head, plus the head's own entry which is no longer at
+    // the front. Only the playing entry is ever hidden, and only at the front.
+    await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 (6)');
+  });
+
   // Story 6 — the per-track sheet is untouched.
   test('the per-track ＋ sheet still reads ☰ Play Next and still queues one track', async ({ page }) => {
     await openAlbum(page);
