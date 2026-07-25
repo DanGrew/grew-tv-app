@@ -111,10 +111,12 @@ test.describe('TV album detail', () => {
       ['Mr. Blue Sky', 'Sweet Talkin Woman', 'Sweet Talkin Woman']);
   });
 
-  // BUG-058 — queue the album that is ALREADY playing. The queued copy of track 1
-  // is a different ENTRY from the one playing, so it must stay in the queue: only
-  // the entry actually playing is hidden. While the head was matched by track_id,
-  // the second block's track 1 was swallowed (5 pending, not 6) and never played.
+  // BUG-058 — queue the album that is ALREADY PLAYING off the queue. Two ways this
+  // used to go wrong, and the count alone can't tell them apart, so assert the rows:
+  //   * the queued copy of track 1 is a different ENTRY from the one playing, so it
+  //     must be listed (it was matched by track_id and swallowed);
+  //   * the new block goes BEHIND the playing head, so the head is neither displaced
+  //     into the pending list nor played a second time (it was front-pushed).
   test('queueing the album that is already playing keeps its first track', async ({ page }) => {
     await openAlbum(page);
     await queueAllAlbum(page);
@@ -129,10 +131,18 @@ test.describe('TV album detail', () => {
     await expect(page.locator('.detail-row')).toHaveCount(3);
     await queueAllAlbum(page);
     await page.keyboard.press('Escape');
-    // 6 pending: the 3 just queued (track 1 included — it is NOT the playing entry)
-    // plus the 2 trailing the head, plus the head's own entry which is no longer at
-    // the front. Only the playing entry is ever hidden, and only at the front.
-    await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 (6)');
+    // 5 pending: the whole album just queued (track 1 included), then the 2 that
+    // were already trailing the head. The head itself is playing, so it is hidden —
+    // exactly once, and not re-listed behind the new block.
+    await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 (5)');
+    await page.locator('#btn-play-queue-music').click();
+    await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
+    await page.keyboard.press('ArrowDown');
+    await page.locator('#btn-queue').click();
+    await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
+    await expect(page.locator('.q-row.queued .q-name')).toContainText(
+      ['Turn to Stone', 'Mr. Blue Sky', 'Sweet Talkin Woman',   // the fresh block
+       'Mr. Blue Sky', 'Sweet Talkin Woman']);                  // what trailed the head
   });
 
   // Story 6 — the per-track sheet is untouched.

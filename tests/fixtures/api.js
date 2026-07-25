@@ -526,6 +526,15 @@ async function installPlaybackBackend(page) {
     });
   }
   function dropEntry(list, entryId) { return list.filter(function(e) { return e.entry_id !== entryId; }); }
+  // BUG-058: newly queued entries land AFTER the playing durable head, never in
+  // front of it. The head stays in the queue while it plays, and both the hide in
+  // pendingOverride and the `next` handler only look at index 0 — so a head pushed
+  // to index 1 reads as pending and plays a second time. Mirrors the backend's
+  // _queue_head.
+  function insertQueued(entries) {
+    var at = (state.override[0] && state.override[0].entry_id === state.nowEntry) ? 1 : 0;
+    state.override = state.override.slice(0, at).concat(entries, state.override.slice(at));
+  }
 
   var ENGINE = {
     'play-source': function(b) {
@@ -566,13 +575,14 @@ async function installPlaybackBackend(page) {
     'previous': function() {},
     'toggle-shuffle': function() { state.shuffle = !state.shuffle; state.then = computeThen(sourceOrder(state.sourceType, state.sourceId)); },
     'toggle-repeat':  function() { state.repeat = !state.repeat; state.then = computeThen(sourceOrder(state.sourceType, state.sourceId)); },
-    'queue-track':        function(b) { state.override.unshift(mkEntry(b.track_id)); },
+    'queue-track':        function(b) { insertQueued([mkEntry(b.track_id)]); },
     // TASK-362: queue a WHOLE source — the block lands at the FRONT of the override
     // queue, in the source's own order (the backend materializes the block and
     // front-inserts it in one go; N unshifts would land it reversed). No skip: the
-    // now-playing track and the source permutation are untouched.
+    // now-playing track and the source permutation are untouched. "Front" is behind
+    // the playing head (insertQueued — BUG-058), not in front of it.
     'queue-source':       function(b) {
-      state.override = sourceOrder(b.source_type, b.source_id).map(mkEntry).concat(state.override);
+      insertQueued(sourceOrder(b.source_type, b.source_id).map(mkEntry));
     },
     // FEAT-040/TASK-254: play the override-queue head WITHOUT consuming it (durable
     // head, resumable on re-entry — matches api/playback play-queue). Empty -> no-op.
