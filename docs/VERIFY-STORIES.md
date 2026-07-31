@@ -379,8 +379,8 @@ DATA: first album, tracks 2 & 3.
 - **Dossier action-trail** (idea, not tracked) — show each snap's click-path so the
   dossier is judgeable without booting the app. Load-bearing IF this direction is
   adopted; not a committed task while the initiative is under review.
-- **This registry** — when adopted, this file (`verify-flows/STORIES.md`) is the
-  story source of truth; keep `COVERAGE.md`'s `(surface,state)` matrix as a
+- **This registry** — when adopted, this file (`docs/VERIFY-STORIES.md`) is the
+  story source of truth; keep `VERIFY-COVERAGE.md`'s `(surface,state)` matrix as a
   secondary gap-spotting section.
 - **Determinism inversions**: C10 (screen swatch false-diffs — accepted),
   C11/C12/T11/T12 (feed fixed progress, KEEP bars visible — the opposite of the

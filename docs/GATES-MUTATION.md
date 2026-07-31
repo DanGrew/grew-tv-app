@@ -1,4 +1,4 @@
-# App mutation testing (TASK-305 / SYS-016)
+# Mutation testing (TASK-305 / SYS-016)
 
 The `core/` unit suite has good line coverage, but coverage alone never proves a
 test would **fail** if the logic broke. Mutation testing does: it introduces a
@@ -119,3 +119,5 @@ Survivors are tracked as a follow-up under SYS-016 (see the app IMPL backlog,
 alongside TASK-315's coverage lift). The gate **landed red by design** (TASK-306):
 the point is to surface the gaps, not to gold-plate them away before the gate
 exists.
+
+**Refs:** [`GATES.md`](GATES.md) · [`GATES-TESTS.md`](GATES-TESTS.md)
