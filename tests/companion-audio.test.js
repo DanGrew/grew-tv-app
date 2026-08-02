@@ -338,7 +338,12 @@ test.describe('with a recorded browse trail', () => {
 test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () => {
   // A minimal app mock that does NOT echo the `navigate` intent — so the click's
   // trail trim is observable in place (the shared mockNav would teleport to
-  // artist.html, which legitimately re-pushes ELO and hides the trim).
+  // artist.html, which legitimately re-pushes ELO and hides the trim). BUG-061:
+  // also pushes a `playback` snapshot with an artist source (source_type/
+  // source_id), matching what real playback always carries by the time the
+  // audio page mounts — so the ELO crumb below comes from the SOURCE crumb
+  // (core/breadcrumb.js SOURCE_CRUMB.artist), not the pre-fix raw peek() of
+  // the trail's top-of-stack, which this test used to (accidentally) rely on.
   function mockNoNav(page, st) {
     return page.routeWebSocket(/:8766/, (ws) => {
       ws.onMessage(function(raw) {
@@ -347,6 +352,7 @@ test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () =
         if (m.type === 'snapshot_request') {
           ws.send(msg('context', { version: 2, context_id: 'audio', series_id: st.itemId, display: { id: st.episodeId, title: 'Mr. Blue Sky' } }));
           ws.send(msg('app_state', st));
+          ws.send(msg('playback', { now_playing: { track_id: st.episodeId, title: 'Mr. Blue Sky' }, source_type: 'artist', source_id: st.itemId }));
         }
       });
     });
@@ -355,8 +361,9 @@ test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () =
   test('tapping the items crumb keeps that entry as the trail top (so the landed page restores from it)', async ({ page }) => {
     await installApi(page);
     await mockNoNav(page, { itemId: 'ELO', episodeId: 'ootb-02' });
-    // A two-level trail: Home > Albums(browse) > ELO(artist). The player peeks the
-    // top (ELO) for its items crumb.
+    // A two-level trail: Home > Albums(browse) > ELO(artist source). The player
+    // shows Albums as the rail crumb (core/nav-trail.js railEntry — BUG-061) and
+    // ELO as the source crumb.
     await page.addInitScript(() => {
       sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
         { page: 'browse.html', params: { tab: 'music', rail: 'albums' }, label: 'Albums' },
@@ -423,6 +430,33 @@ test.describe('source crumb (BUG-044)', () => {
     const src = page.locator('#breadcrumb .crumb-link', { hasText: 'ELO' });
     await expect(src).toHaveAttribute('data-page', 'artist.html');
     await expect(src).toHaveAttribute('data-params', JSON.stringify({ artist: 'ELO' }));
+  });
+
+  // BUG-061: reached via browse > Music rail > artist > play a track, the artist
+  // page (companion-artist.js) pushUnique-s its OWN artist.html entry on top of
+  // the Music rail entry before playback starts — so the trail's top-of-stack is
+  // no longer "the rail you came from", it's the artist itself. Raw peek() handed
+  // that straight to playerCrumbs as the rail crumb, duplicating the artist
+  // source crumb right next to it and losing Music. railEntry() fixes it by
+  // skipping to the true browse.html rail entry.
+  test('artist flow: no duplicate artist crumb, the Music rail crumb is kept (regression)', async ({ page }) => {
+    await installApi(page);
+    const backend = await installPlaybackBackend(page);
+    backend.seed('play-source', { source_type: 'artist', source_id: 'ELO' });
+    backend.seed('play-track', { track_id: 'ootb-02' });
+    await page.addInitScript(() => {
+      sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
+        { page: 'browse.html', params: { tab: 'music' }, label: 'Music' },
+        { page: 'artist.html', params: { artist: 'ELO' }, label: 'ELO' }
+      ]));
+    });
+    await page.goto('/companion/audio.html');
+    await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
+    // Exactly one ELO crumb (the source), Music precedes it — not ELO twice.
+    await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home', 'Music', 'ELO']);
+    await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Mr. Blue Sky');
+    const rail = page.locator('#breadcrumb .crumb-link', { hasText: 'Music' });
+    await expect(rail).toHaveAttribute('data-page', 'browse.html');
   });
 
   test('a playlist source links playlist-detail with the playlist title', async ({ page }) => {

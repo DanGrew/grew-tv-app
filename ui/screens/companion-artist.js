@@ -6,7 +6,7 @@ import { artistTracks } from '../../core/artist-tracks.js';
 import { episodeLabel } from '../../core/detail-view.js';
 import { fmt } from '../../core/time.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
-import { pushUnique as pushTrail, trimOnCrumb, entries as entriesTrail } from '../../core/nav-trail.js';
+import { pushUnique as pushTrail, trimOnCrumb, entries as entriesTrail, railEntry } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
@@ -44,12 +44,11 @@ export function initPage() {
   // Breadcrumb trail (FEAT-021 / BUG-021): the artist page records its OWN
   // artist.html entry, so the rail it was reached through is the browse.html entry
   // sitting just BELOW that — build the middle crumb from that rail entry (Home ›
-  // Artists › Artist). A deep-link / fresh session has no browse entry, so fall back
-  // to the static Home › Music › Artist. Control: a crumb tap sends the `navigate`
-  // intent (TV teleports, companion follows). Browse: a local hop to the library.
-  function railEntry() {
-    return entriesTrail().filter(function(e) { return e.page === 'browse.html'; }).slice(-1)[0];
-  }
+  // Artists › Artist), via the shared core/nav-trail.js railEntry (BUG-061: also
+  // reused by companion-audio.js, which used to skip this and read raw peek()).
+  // A deep-link / fresh session has no browse entry, so fall back to the static
+  // Home › Music › Artist. Control: a crumb tap sends the `navigate` intent (TV
+  // teleports, companion follows). Browse: a local hop to the library.
   function localGo(page, params) { window.location.href = page + queryString(params); }
   function navigate(page, params) {
     // Trim the trail to the clicked ancestor (Home clears) so a later Back can't
@@ -58,7 +57,8 @@ export function initPage() {
     ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
   }
   function mountCrumbs(artistName) {
-    mountCompanionBreadcrumb('breadcrumb', ({ true: trailCrumbs(railEntry(), artistName), false: buildCrumbs('artist', { artistName: artistName }) })[Boolean(railEntry())], navigate);
+    var rail = railEntry(entriesTrail());
+    mountCompanionBreadcrumb('breadcrumb', ({ true: trailCrumbs(rail, artistName), false: buildCrumbs('artist', { artistName: artistName }) })[Boolean(rail)], navigate);
   }
 
   // A ♪ placeholder (consistent with the audio-player .cover placeholder) shown

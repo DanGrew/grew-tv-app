@@ -4,7 +4,7 @@ import { screenPage, displayTitle, queryString } from '../../core/companion-util
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
 import { playerCrumbs } from '../../core/breadcrumb.js';
-import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
+import { entries as entriesTrail, railEntry, trimOnCrumb } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
@@ -68,6 +68,11 @@ export function initPage() {
   // › Now Playing — so the source you're listening to always returns to its page.
   // The source crumb links to the TV detail page (the crumb navigate intent drives
   // the TV; Browse-mode local hops translate via LOCAL_PAGE below).
+  // BUG-061: the rail crumb comes from core/nav-trail.js railEntry(), not raw
+  // peek() — an artist source has the artist page's OWN entry on top of the
+  // trail (companion-artist.js pushUnique), and peek() would hand that straight
+  // back as the rail crumb too: identical to the source crumb below, so the
+  // trail rendered Home › NF › NF › leaf with the real rail never shown.
   var SOURCE_CRUMB = {
     album:    function() { return { label: state.sourceTitle, page: 'album-detail.html', params: { album: state.sourceId } }; },
     artist:   function() { return { label: state.sourceTitle, page: 'artist.html', params: { artist: state.sourceId } }; },
@@ -77,7 +82,7 @@ export function initPage() {
     return [SOURCE_CRUMB[state.sourceType]].filter(Boolean).map(function(fn) { return fn(); }).concat([null])[0];
   }
   function mountAudioCrumbs() {
-    mountCompanionBreadcrumb('breadcrumb', playerCrumbs(peekTrail(), sourceCrumb(), state.nowTitle), onCrumbNav);
+    mountCompanionBreadcrumb('breadcrumb', playerCrumbs(railEntry(entriesTrail()), sourceCrumb(), state.nowTitle), onCrumbNav);
   }
   // Browse mode: the crumb is a LOCAL hop (the intent would be suppressed anyway)
   // so you can reach the library without driving the TV. Control mode: the usual
