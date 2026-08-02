@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { push, pop, peek, truncateTo, truncateThrough, clear, pushUnique, entries, trimOnCrumb } from '../../core/nav-trail.js';
+import { push, pop, peek, truncateTo, truncateThrough, clear, pushUnique, entries, trimOnCrumb, railEntry } from '../../core/nav-trail.js';
 
 // sessionStorage does not exist in the `node` vitest environment — back it with
 // a plain in-memory Map, the same vi.stubGlobal approach state.test.js uses for
@@ -273,6 +273,36 @@ describe('nav-trail', () => {
     expect(all[1].page).toBe('artist.html');
     // pick the browse entry even though artist is on top
     expect(all.filter((e) => e.page === 'browse.html').slice(-1)[0].params.rail).toBe('artists');
+  });
+
+  describe('railEntry (BUG-061 — the true browse-rail ancestor, not raw peek())', () => {
+    it('an empty trail has no rail entry', () => {
+      expect(railEntry([])).toBe(undefined);
+    });
+
+    it('a lone browse.html entry is the rail entry', () => {
+      var rail = { page: 'browse.html', params: { tab: 'music' }, label: 'Music' };
+      expect(railEntry([rail])).toBe(rail);
+    });
+
+    it('skips a deeper self-recorded entry (artist.html) to find the browse.html rail beneath it', () => {
+      var rail = { page: 'browse.html', params: { tab: 'music' }, label: 'Music' };
+      var artist = { page: 'artist.html', params: { artist: 'NF' }, label: 'NF' };
+      // This is the exact shape BUG-061 reproduced from: companion-artist.js
+      // pushUnique-s its own artist.html entry on top of the browse rail.
+      expect(railEntry([rail, artist])).toBe(rail);
+    });
+
+    it('no browse.html entry on the trail at all has no rail entry', () => {
+      var artist = { page: 'artist.html', params: { artist: 'NF' }, label: 'NF' };
+      expect(railEntry([artist])).toBe(undefined);
+    });
+
+    it('picks the LAST browse.html entry when more than one is on the trail', () => {
+      var first = { page: 'browse.html', params: { tab: 'films' }, label: 'Films' };
+      var second = { page: 'browse.html', params: { tab: 'music' }, label: 'Music' };
+      expect(railEntry([first, second])).toBe(second);
+    });
   });
 
   it('entries is empty for a fresh trail', () => {

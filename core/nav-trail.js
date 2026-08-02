@@ -98,6 +98,17 @@ export function peek() {
   return stack[stack.length - 1];
 }
 
+// The nearest recorded browse.html entry in a trail array (as returned by
+// entries()) — the true browse-rail ancestor, skipping past a deeper entry a
+// screen pushed to describe itself (e.g. the companion artist page's own
+// pushUnique, FEAT-032/TASK-218). Plain peek()/top-of-stack is only "the rail
+// you came from" when nothing self-recorded on top of it; a caller building a
+// breadcrumb's rail crumb wants THIS, not peek(). Undefined when no
+// browse.html entry is on the trail (deep-link / fresh session).
+export function railEntry(entries) {
+  return entries.filter(function(e) { return e.page === 'browse.html'; }).slice(-1)[0];
+}
+
 // Breadcrumb ancestor-click (a sideways/up jump, not a drill): keep only the
 // clicked ancestor's own ancestors so the trail stays consistent with where you
 // now are. The clicked screen becomes current, so it is dropped from the trail
