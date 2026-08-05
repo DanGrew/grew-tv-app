@@ -85,6 +85,34 @@ test('Story 7 — closing the panel leaves browse exactly where it was', async (
   await expect(page.locator('.rail-title')).toHaveText(['Animation', 'Comedy']);
 });
 
+test.describe('Episode search (TASK-368)', () => {
+  test('Story 1 — a distinctive episode title surfaces an EPISODE result, series as its secondary line', async ({ page }) => {
+    await openBrowse(page);
+    await page.locator('#btn-search').click();
+    await typeKeys(page, 'hammerbarn');
+    const row = page.locator('.sr-row', { hasText: 'Hammerbarn' });
+    await expect(row).toBeVisible();
+    await expect(row.locator('.sr-tag')).toHaveText('EPISODE');
+    await expect(row.locator('.sr-sub')).toHaveText('Bluey · S1E3');
+  });
+
+  test('Story 3 — tapping the EPISODE result starts the episode itself, not the series detail page', async ({ page }) => {
+    await openBrowse(page);
+    await page.locator('#btn-search').click();
+    await typeKeys(page, 'hammerbarn');
+    await page.locator('.sr-row', { hasText: 'Hammerbarn' }).click();
+    await expect(page).toHaveURL(/video\.html\?video=bluey-s1e03&from=browse&series=bluey/);
+  });
+
+  test('Story 4 — searching the series name is unchanged: one SERIES card, no per-episode flood', async ({ page }) => {
+    await openBrowse(page);
+    await page.locator('#btn-search').click();
+    await typeKeys(page, 'bluey');
+    await expect(page.locator('.sr-row')).toHaveCount(1);
+    await expect(page.locator('.sr-row').first().locator('.sr-tag')).toHaveText('SERIES');
+  });
+});
+
 test.describe('Music search', () => {
   test.beforeEach(async ({ page }) => { await withMusic(page); });
 

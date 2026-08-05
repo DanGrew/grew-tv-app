@@ -104,6 +104,18 @@ export function loadTracks(serverUrl) {
   return getJson(serverUrl + '/api/tracks').then(function(r) { return [r.tracks].filter(Array.isArray).concat([[]])[0]; });
 }
 
+// TASK-368: the full video episode index — every episode with the fields the
+// search panel ranks + renders ({ id, title, series, series_id, season,
+// episode, cover }). A read-only projection (no schema change); the search
+// overlay derives its Videos EPISODE results from this the same way Music
+// derives track results from loadTracks — browse never lists a bound type
+// (an episode) as its own card. The backend wraps the list as
+// { episodes: [...] } — unwrap to the array the search candidates expect
+// (empty when absent).
+export function loadEpisodes(serverUrl) {
+  return getJson(serverUrl + '/api/episodes').then(function(r) { return [r.episodes].filter(Array.isArray).concat([[]])[0]; });
+}
+
 // Backend watch progress for one video (FEAT-017 source of truth). Returns the
 // zero-state record ({position_secs:0,...}) when nothing is saved, so the player
 // resumes by default without the old localStorage resume/restart prompt. The

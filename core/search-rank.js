@@ -54,6 +54,40 @@ export function videoItems(cards) {
     });
 }
 
+// EPISODE secondary line: the series title, plus "S<season>E<episode>" when
+// both are set (a loose episode in no series collection carries neither).
+function episodeSecondary(e) {
+  var se = [e.season, e.episode].every(function(n) { return n != null; })
+    ? 'S' + e.season + 'E' + e.episode : '';
+  return [e.series, se].filter(Boolean).join(' · ');
+}
+
+// An episode (from /api/episodes, TASK-368) routes like a standalone video —
+// the card is kind:'video' carrying the episode's own id + its series id (so
+// Next/Prev resolves series context exactly like a Continue Watching episode
+// tile does, screen-browse-page's catalog registration) — a tap PLAYS the
+// episode directly, never opens the series detail page. Distinct from a
+// series-name hit (videoItems above, unchanged: browse never lists an episode,
+// so searching "Not Going Out" still surfaces the one SERIES card, not a
+// per-episode flood). Ranked on title alone — an episode is found by its own
+// distinctive title, not the series it belongs to.
+function episodeItems(episodes) {
+  return (episodes || []).map(function(e) {
+    return {
+      title: e.title || '', poster: e.cover || null,
+      secondary: episodeSecondary(e), tag: 'EPISODE',
+      card: { kind: 'video', id: e.id, series: e.series_id },
+      fields: [e.title || '']
+    };
+  });
+}
+
+// The Videos search set: browse cards (films/series/home-movies) + the episode
+// index — one combined builder so a call site never hand-edits its own concat.
+export function allVideoItems(cards, episodes) {
+  return videoItems(cards).concat(episodeItems(episodes));
+}
+
 // A track (from /api/tracks) routes to ITS album AND starts playing: the card is
 // kind:'track' (cardRoute -> 'track'), carrying the track id + its album_id, so
 // each surface opens audio.html?album=<album_id>&track=<track_id> — the album's

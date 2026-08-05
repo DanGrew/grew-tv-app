@@ -2,7 +2,7 @@ import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, videoPlaybackAction, loadPlayback, loadTracks } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, videoPlaybackAction, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
@@ -102,18 +102,28 @@ export function initBrowsePage() {
   var catalog = {};
 
   // FEAT-048 (TASK-324) — the search overlay reads the live browse cards (Videos +
-  // the album/artist derivations) and the /api/tracks index (Music tracks); both
-  // fill after load, so the overlay pulls them through getters. A result tap reuses
+  // the album/artist derivations), the /api/tracks index (Music tracks) and the
+  // /api/episodes index (TASK-368, Videos EPISODE hits); all three fill after
+  // load, so the overlay pulls them through getters. A result tap reuses
   // onSelect (cardRoute routing), so search jumps go exactly where a tile tap does.
   var searchCards = [];
   var searchTracks = [];
+  var searchEpisodes = [];
   mountSearch({
     server: SERVER,
     getVideoCards: function() { return searchCards; },
     getTracks: function() { return searchTracks; },
+    getEpisodes: function() { return searchEpisodes; },
     onSelect: function(card) { onSelect(card); }
   });
   loadTracks(SERVER).then(function(t) { searchTracks = [t].filter(Array.isArray).concat([[]])[0]; }).catch(function() {});
+  // Episodes are not browse cards (bound types stay collection-only), so a
+  // companion `select` on an EPISODE search hit needs its own minimal video
+  // card registered here too — same reason CW episode rows are registered below.
+  loadEpisodes(SERVER).then(function(eps) {
+    searchEpisodes = [eps].filter(Array.isArray).concat([[]])[0];
+    searchEpisodes.forEach(function(e) { catalog[e.id] = { kind: 'video', id: e.id, series: e.series_id }; });
+  }).catch(function() {});
 
   // TASK-330 — cross the TV to an external destination on a companion tap. The atlas
   // (or any config destination) is a separate LAN app; navigating there is a page

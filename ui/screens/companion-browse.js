@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadContinueWatching, videoPlaybackAction, loadVideoPlayback, loadPlayback, loadTracks } from '../../core/app-api.js';
-import { videoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
+import { loadBrowse, loadContinueWatching, videoPlaybackAction, loadVideoPlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { queueCount } from '../../core/video-player-router.js';
 import { playNextCount } from '../../core/queue-view.js';
 import { screenPage, tileHint } from '../../core/companion-utils.js';
@@ -64,7 +64,7 @@ export function initPage() {
     profile: null, person: null,
     cards: [], cw: [], recents: [], labels: {}, progress: {},
     level: 'sections', section: null, rail: null,
-    tracks: [], searchDomain: 'videos', searchItems: []
+    tracks: [], episodes: [], searchDomain: 'videos', searchItems: []
   };
   var api = {};
   var updateBar = null;
@@ -529,12 +529,13 @@ export function initPage() {
   // FEAT-048 (TASK-324) — the search overlay. A SEPARATE surface over the drill:
   // opening/typing/closing never re-renders the Section/Rail/Grid rows (BUG-038),
   // so closing leaves the drill exactly where it was. Videos come from the browse
-  // cards; Music from /api/tracks (tracks) plus albums/artists derived from the
-  // cards. Both share core/search-rank with the TV app (mirror invariant).
+  // cards plus /api/episodes (TASK-368, EPISODE hits); Music from /api/tracks
+  // (tracks) plus albums/artists derived from the cards. Both share
+  // core/search-rank with the TV app (mirror invariant).
   var searchInput = document.getElementById('search-input');
   var searchResults = document.getElementById('search-results');
   var SEARCH_ITEMS = {
-    videos: function() { return videoItems(state.cards); },
+    videos: function() { return allVideoItems(state.cards, state.episodes); },
     music: function() { return musicItems(state.tracks, state.cards); }
   };
   function renderSearch() {
@@ -574,6 +575,7 @@ export function initPage() {
   searchInput.addEventListener('input', renderSearch);
   searchResults.addEventListener('click', onResultClick);
   loadTracks(server).then(function(t) { state.tracks = [t].filter(Array.isArray).concat([[]])[0]; }).catch(noop);
+  loadEpisodes(server).then(function(eps) { state.episodes = [eps].filter(Array.isArray).concat([[]])[0]; }).catch(noop);
 
   restoreTrail();
   renderDoor();

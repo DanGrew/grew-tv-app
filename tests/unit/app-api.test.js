@@ -2,7 +2,7 @@ import {
   loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, saveProgress,
   loadContinueWatching, loadConfig, loadSettings, saveSettings, scanDevices,
   mediaUrl, loadLyrics, resetProgress, playbackAction, videoPlaybackAction,
-  loadVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, createPlaylist,
+  loadVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
   addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
   deletePlaylist, renamePlaylist
 } from '../../core/app-api.js';
@@ -56,6 +56,27 @@ describe('loadTracks', () => {
   it('rejects on a non-ok response', async () => {
     fakeFetch({}, false);
     await expect(loadTracks('http://s')).rejects.toBe(500);
+  });
+});
+
+describe('loadEpisodes', () => {
+  it('GETs /api/episodes, no-store', async () => {
+    var calls = fakeFetch({ episodes: [{ id: 'bluey-s1e03', series_id: 'bluey' }] });
+    await loadEpisodes('http://s');
+    expect(calls[0].url).toBe('http://s/api/episodes');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('unwraps the { episodes: [...] } envelope to the episode array', async () => {
+    fakeFetch({ episodes: [{ id: 'bluey-s1e03', series_id: 'bluey' }] });
+    expect(await loadEpisodes('http://s')).toEqual([{ id: 'bluey-s1e03', series_id: 'bluey' }]);
+  });
+  it('yields an empty array when the envelope has no episodes', async () => {
+    fakeFetch({});
+    expect(await loadEpisodes('http://s')).toEqual([]);
+  });
+  it('rejects on a non-ok response', async () => {
+    fakeFetch({}, false);
+    await expect(loadEpisodes('http://s')).rejects.toBe(500);
   });
 });
 

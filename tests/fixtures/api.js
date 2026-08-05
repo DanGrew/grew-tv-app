@@ -96,6 +96,18 @@ const TRACKS = [
   { id: 'dancing-queen',title: 'Dancing Queen',       album: 'Arrival',         artist: 'ABBA', album_id: 'abba-arrival', cover: 'arrival.jpg' }
 ];
 
+// TASK-368 episode index: every video episode projected as { id, title, series,
+// series_id, season, episode, cover } — the shape GET /api/episodes returns and
+// the search overlay's Videos EPISODE results rank + render from. Reuses the
+// bluey episodes' own distinctive titles (VIDEOS above) so an episode search
+// query never collides with the "Bluey" series-name query. series_id points at
+// the series browse card so an EPISODE result carries series context (Next/Prev).
+const EPISODES = [
+  { id: 'bluey-s1e01', title: 'Daddy Putdown', series: 'Bluey', series_id: 'bluey', season: 1, episode: 1, cover: 'bluey.jpg' },
+  { id: 'bluey-s1e02', title: 'The Weekend',   series: 'Bluey', series_id: 'bluey', season: 1, episode: 2, cover: 'bluey.jpg' },
+  { id: 'bluey-s1e03', title: 'Hammerbarn',    series: 'Bluey', series_id: 'bluey', season: 1, episode: 3, cover: 'bluey.jpg' }
+];
+
 const ALBUMS = {
   ootb: {
     id: 'ootb', title: 'Out of the Blue', profile: 'kids', poster: 'ootb.jpg', format: 'album', artist: 'ELO',
@@ -288,6 +300,10 @@ async function installApi(page) {
   await page.route('**/api/tracks', function(route) {
     // Backend wraps the index as { tracks: [...] } (TASK-323 api/tracks.py).
     return json(route, 200, { tracks: TRACKS });
+  });
+  await page.route('**/api/episodes', function(route) {
+    // Backend wraps the index as { episodes: [...] } (TASK-368 api/episodes.py).
+    return json(route, 200, { episodes: EPISODES });
   });
   await page.route('**/api/album/*', function(route) {
     var a = albumResponse(lastSegment(route.request().url(), '/api/album/'));
@@ -765,7 +781,7 @@ async function installVideoPlaybackBackend(page) {
 }
 
 module.exports = {
-  VIDEOS, SERIES, ALBUMS, TRACKS, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, BROWSE, CONFIG, nextOf,
+  VIDEOS, SERIES, ALBUMS, TRACKS, EPISODES, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, BROWSE, CONFIG, nextOf,
   installApi, installPlaybackBackend, installVideoPlaybackBackend,
   // TASK-326: pure response builders + the CW row builder, so the stub<->contract
   // shape test can exercise the exact objects the routes above emit.
