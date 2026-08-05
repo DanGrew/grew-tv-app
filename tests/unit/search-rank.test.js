@@ -1,4 +1,4 @@
-import { videoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
+import { videoItems, allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 
 // FEAT-048 (TASK-324) — the search overlay's pure core. Videos come from browse
 // cards; Music mixes /api/tracks tracks with albums + artists derived from the
@@ -18,6 +18,13 @@ var CARDS = [
 var TRACKS = [
   { id: 'ootb-02', title: 'Mr. Blue Sky',  album: 'Out of the Blue', artist: 'ELO',  album_id: 'ootb',        cover: 'ootb.jpg' },
   { id: 'dq',      title: 'Dancing Queen', album: 'Arrival',         artist: 'ABBA', album_id: 'abba-arrival', cover: 'arr.jpg' }
+];
+
+// TASK-368 — episodes carry their own real title, distinct from the series
+// name; loose-ep is in no series collection (season/episode/series all null).
+var EPISODES = [
+  { id: 'ngo-01',   title: 'The Wedding', series: 'Not Going Out', series_id: 'series-ngo', season: 1, episode: 1, cover: 'ngo.jpg' },
+  { id: 'loose-ep', title: 'Loose',       series: null,            series_id: null,          season: null, episode: null, cover: null }
 ];
 
 describe('videoItems', () => {
@@ -57,6 +64,47 @@ describe('videoItems', () => {
     var items = videoItems([{ id: 'bare' }]);
     expect(items).toHaveLength(1); // no section -> defaults to films (non-music) -> a FILM
     expect(items[0]).toMatchObject({ title: '', poster: null, secondary: '', tag: 'FILM', fields: [''] });
+  });
+});
+
+describe('allVideoItems', () => {
+  it('appends the episode index after the browse video cards', () => {
+    var ids = allVideoItems(CARDS, EPISODES).map(function(i) { return i.card.id; });
+    expect(ids).toEqual(['toy-story-main', 'blue-planet', 'bluey', 'millie-walk', 'ngo-01', 'loose-ep']);
+  });
+  it('an EPISODE routes like a video (kind:video, its own id + series id), never the series card', () => {
+    var ep = allVideoItems([], EPISODES)[0];
+    expect(ep.tag).toBe('EPISODE');
+    expect(ep.title).toBe('The Wedding');
+    expect(ep.poster).toBe('ngo.jpg');
+    expect(ep.card).toEqual({ kind: 'video', id: 'ngo-01', series: 'series-ngo' });
+    expect(ep.fields).toEqual(['The Wedding']);
+  });
+  it('secondary is the series title plus S<season>E<episode> when both are set', () => {
+    expect(allVideoItems([], EPISODES)[0].secondary).toBe('Not Going Out · S1E1');
+  });
+  it('a loose episode (no series membership) has an empty secondary, null poster/series', () => {
+    var loose = allVideoItems([], EPISODES)[1];
+    expect(loose.secondary).toBe('');
+    expect(loose.poster).toBeNull();
+    expect(loose.card).toEqual({ kind: 'video', id: 'loose-ep', series: null });
+  });
+  it('omits the S/E label when only one of season/episode is set', () => {
+    var onlySeason = allVideoItems([], [{ id: 'p1', title: 'P1', series: 'S', series_id: 'sid', season: 1, episode: null, cover: null }])[0];
+    var onlyEpisode = allVideoItems([], [{ id: 'p2', title: 'P2', series: 'S', series_id: 'sid', season: null, episode: 2, cover: null }])[0];
+    expect(onlySeason.secondary).toBe('S');
+    expect(onlyEpisode.secondary).toBe('S');
+  });
+  it('fills blank defaults for a sparse episode', () => {
+    var item = allVideoItems([], [{ id: 'bare' }])[0];
+    expect(item).toMatchObject({ title: '', poster: null, secondary: '', tag: 'EPISODE', fields: [''] });
+  });
+  it('tolerates missing episodes/cards input', () => {
+    expect(allVideoItems(CARDS, null).map(function(i) { return i.card.id; }))
+      .toEqual(['toy-story-main', 'blue-planet', 'bluey', 'millie-walk']);
+    expect(allVideoItems(null, EPISODES).map(function(i) { return i.card.id; }))
+      .toEqual(['ngo-01', 'loose-ep']);
+    expect(allVideoItems(null, null)).toEqual([]);
   });
 });
 
@@ -159,6 +207,12 @@ describe('rankSearch', () => {
     ];
     var out = rankSearch('a', items).map(function(i) { return i.title; });
     expect(out).toEqual(['Apple', 'Banana', 'Cherry']);
+  });
+  it('an episode title surfaces the EPISODE hit; the series name does not (fields is title-only, TASK-368)', () => {
+    var items = allVideoItems([], EPISODES);
+    var titleHit = rankSearch('wedding', items).map(function(i) { return i.tag; });
+    expect(titleHit).toEqual(['EPISODE']);
+    expect(rankSearch('not going out', items)).toEqual([]);   // series name isn't ranked on
   });
   it('a matching artist name surfaces the artist, its albums AND its tracks (Story 5)', () => {
     var out = rankSearch('elo', musicItems(TRACKS, CARDS));

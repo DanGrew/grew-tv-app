@@ -1,5 +1,5 @@
 import { CHAR_KEYS, KEY_COLS, appendChar, backspace, gridIndex, typedChar } from '../../core/playlist-name.js';
-import { videoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
+import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 
 // FEAT-048 (TASK-324) — the TV search overlay. A modal panel (Videos|Music
 // toggle · on-screen keyboard · ranked results) that is a SEPARATE surface over
@@ -20,7 +20,7 @@ export function mountSearch(opts) {
   var keyCells = [];
 
   var DOMAIN_ITEMS = {
-    videos: function() { return videoItems(opts.getVideoCards()); },
+    videos: function() { return allVideoItems(opts.getVideoCards(), opts.getEpisodes()); },
     music: function() { return musicItems(opts.getTracks(), opts.getVideoCards()); }
   };
 

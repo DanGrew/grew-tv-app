@@ -92,6 +92,37 @@ test('Story 7 — closing the panel returns to browse exactly where I was (drill
   await expect(page.locator('.chip[data-section="series"]')).toHaveClass(/active/);
 });
 
+test.describe('Episode search (TASK-368)', () => {
+  test('Story 2 — a distinctive episode title surfaces the same EPISODE result (mirror invariant)', async ({ page }) => {
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+    await page.locator('#btn-search').click();
+    await page.locator('#search-input').fill('hammerbarn');
+    const row = page.locator('.sr-row', { hasText: 'Hammerbarn' });
+    await expect(row).toBeVisible();
+    await expect(row.locator('.sr-tag')).toHaveText('EPISODE');
+    await expect(row.locator('.sr-sub')).toHaveText('Bluey · S1E3');
+  });
+
+  test('Story 3 — tapping it drives the TV to select the episode itself, not the series', async ({ page }) => {
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+    await page.locator('#btn-search').click();
+    await page.locator('#search-input').fill('hammerbarn');
+    await page.locator('.sr-row', { hasText: 'Hammerbarn' }).click();
+    await expect.poll(() => intents.filter(i => i.intent === 'select').map(i => i.params.id)).toContain('bluey-s1e03');
+  });
+
+  test('Story 4 — searching the series name is unchanged: one SERIES result, no per-episode flood', async ({ page }) => {
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+    await page.locator('#btn-search').click();
+    await page.locator('#search-input').fill('bluey');
+    await expect(page.locator('.sr-row')).toHaveCount(1);
+    await expect(page.locator('.sr-row').first().locator('.sr-tag')).toHaveText('SERIES');
+  });
+});
+
 test.describe('Music search', () => {
   test.beforeEach(async ({ page }) => {
     await withMusic(page);
