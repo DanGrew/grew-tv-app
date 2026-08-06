@@ -186,8 +186,14 @@ test('select standalone video plays directly with src set', async ({ page }) => 
 // series' detail, not replay the focused film.
 test('companion select resolves an off-tab series to its detail, not the focused film (BUG-008)', async ({ page }) => {
   let appWs = null;
+  // BUG-055 pattern: every screen boots connectApp, so `appWs` can still resolve
+  // to profile.html's pre-nav socket. `framenavigated` fires at document commit —
+  // strictly before browse's own script (and its connectApp call) runs — so
+  // resetting on it guarantees the next capture is browse's OWN socket.
+  page.on('framenavigated', function(frame) { if (frame === page.mainFrame()) appWs = null; });
   await page.routeWebSocket(/:8766/, function(ws) { appWs = ws; });
   await pickPerson(page, 'kids');
+  await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator('.film-tile[data-id="toy-story-main"]').first().focus();
   await expect(page.locator('.film-tile[data-id="bluey"]')).toHaveCount(0);
@@ -205,6 +211,9 @@ test('onSelect ignores an unknown card kind without throwing (BUG-009)', async (
   var errors = [];
   page.on('pageerror', function(e) { errors.push(e.message); });
   let appWs = null;
+  // BUG-055 pattern: see BUG-008 above — reset on `framenavigated`, not after the
+  // fact, so a socket that reassigned before we could null it isn't lost.
+  page.on('framenavigated', function(frame) { if (frame === page.mainFrame()) appWs = null; });
   await page.routeWebSocket(/:8766/, function(ws) { appWs = ws; });
   await page.route('**/api/browse**', function(route) {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ profile: 'kids', content: [

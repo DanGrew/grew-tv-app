@@ -27,6 +27,12 @@ test.beforeEach(async ({ page }) => {
 
 test('Story 2 (TV half): a launchExternal intent from the companion crosses the TV to the carried tvUrl', async ({ page }) => {
   let appWs = null;
+  // BUG-055: every screen boots connectApp, so `appWs` can still resolve to
+  // profile.html's pre-nav socket. `framenavigated` fires at document commit —
+  // strictly before the destination page's own script (and its connectApp call)
+  // runs — so resetting on it guarantees the next capture is browse's OWN socket,
+  // never a stale one, regardless of how the two races land.
+  page.on('framenavigated', frame => { if (frame === page.mainFrame()) appWs = null; });
   await page.routeWebSocket(/:8766/, ws => { appWs = ws; });
   await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
