@@ -145,7 +145,7 @@ export function initVideoPage() {
       player.playVideo(record, from, 0);
       [mvUpNextItem(seq)].filter(Boolean).forEach(function(n) { player.setUpNext('Up next: ', n.title); });
       mountCrumbs();
-    });
+    }).catch(function() { navTo('error.html'); });
   }
   function mvGoNext() { [hasNext(seq)].filter(Boolean).forEach(function() { seq.index += 1; mvSwap(); }); }
   function mvGoPrev() { [hasPrev(seq)].filter(Boolean).forEach(function() { seq.index -= 1; mvSwap(); }); }
@@ -179,10 +179,10 @@ export function initVideoPage() {
     onNext:  ON_NEXT[isMusicVideo + ''],
     onPrev:  ON_PREV[isMusicVideo + ''],
     // Full app_state snapshot to the companion (FEAT-017): static context here,
-    // live position/playing/captions added by the player. musicVideo rides
-    // along so the companion mirror (Plane A only in this mode — TASK-374)
-    // knows to stop trusting the video-playback engine snapshot.
-    emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(Object.assign({}, snap, { musicVideo: isMusicVideo })); }); },
+    // live position/playing/captions added by the player. The music-video flag
+    // rides the CONTEXT push below, not this one — that is what the companion
+    // mirror reads to stop trusting the video-playback engine snapshot.
+    emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
     appContext: function() {
       return { screen: 'player', itemId: [seriesId].filter(Boolean).concat([loadedId, videoId]).filter(Boolean)[0], episodeId: [loadedId].filter(Boolean).concat([videoId])[0], profile: profile };
     },
@@ -263,7 +263,7 @@ export function initVideoPage() {
   }
   // Music-video entries (TASK-374): build the local seq, THEN begin (mvBegin
   // primes captions + series-mode + the first mvSwap) — none of these ever
-  // call sendAction, so the video engine's own state is untouched (Story 9).
+  // call sendAction, so the video engine's own state is untouched.
   function startMvItem() {
     seq = { items: [{ id: mvItem, title: '' }], index: 0 };
     mvBegin();

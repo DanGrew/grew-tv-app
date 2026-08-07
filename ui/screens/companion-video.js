@@ -194,16 +194,28 @@ export function initPage() {
     captureSeries(snap);
   }
 
-  // A music video (TASK-374) has no repeat concept and no queue (Story 8) — the
+  // A music video (TASK-374) has no repeat concept and no queue — the
   // repeat pill and the queue link hide outright; prev/next hide only for a lone
   // pick (mirrors the TV's own seriesMode-style ⏮/⏭ hide for a single item).
-  var HIDE_NAV = { 'true': function(multi) { return !multi; }, 'false': function() { return false; } };
+  function applyNav(hide) {
+    els.prev.classList.toggle('single', hide);
+    els.next.classList.toggle('single', hide);
+  }
+  // OFF music-video mode, ⏮/⏭ go BACK to the engine snapshot rather than being
+  // cleared — applySeriesMode owns `single` for a film/series, and a standalone
+  // film (a one-item source) must stay greyed. Clearing it here instead used to
+  // re-arm ⏮/⏭ on every film, because the TV's context push lands AFTER the
+  // snapshot in production (onIntent('play'/'video') only fire once the player
+  // has swapped the snapshot in). Before the first snapshot there is
+  // nothing to restore, so that branch is a no-op.
+  var HIDE_NAV = {
+    'true':  function(multi) { applyNav(!multi); },
+    'false': function() { [state.vsnap].filter(Boolean).forEach(function(s) { applySeriesMode(seriesMode(s)); }); }
+  };
   function applyMusicVideoMode(on, multi) {
     els.repeat.classList.toggle('hidden', on);
     els.queue.classList.toggle('hidden', on);
-    var hide = HIDE_NAV[on + ''](multi);
-    els.prev.classList.toggle('single', hide);
-    els.next.classList.toggle('single', hide);
+    HIDE_NAV[on + ''](multi);
   }
   function onVideoContext(payload) {
     els.ctxLabel.textContent = 'Now playing';

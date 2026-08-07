@@ -27,7 +27,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('Story 1 — a single music video pick plays in the video player, full picture and sound', async ({ page }) => {
+test('a single music video pick plays in the video player, full picture and sound', async ({ page }) => {
   const calls = engineCalls(page);
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
   await expect(page.locator('#screen-video')).toBeVisible();
@@ -40,7 +40,7 @@ test('Story 1 — a single music video pick plays in the video player, full pict
   expect(calls).toEqual([]); // never touches the video-playback engine or watch_progress
 });
 
-test('Story 2 — a music-video playlist plays through in the playlist\'s order, each starting as the one before ends', async ({ page }) => {
+test('a music-video playlist plays through in the playlist\'s order, each starting as the one before ends', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
   await expect(page.locator('#video-upnext')).toHaveText('Up next: No One Knows');
@@ -50,7 +50,7 @@ test('Story 2 — a music-video playlist plays through in the playlist\'s order,
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
 });
 
-test('Story 3 — an artist\'s music videos play through in order the same way', async ({ page }) => {
+test('an artist\'s music videos play through in order the same way', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoArtist=QOTSA&from=browse');
   // A-Z by title: "Head Like a Haunted House" before "No One Knows"; Muse's
   // "Starlight" (a different artist) is excluded from the sequence entirely.
@@ -61,7 +61,7 @@ test('Story 3 — an artist\'s music videos play through in order the same way',
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/); // no third item — no-op
 });
 
-test('Story 4 — the last video in a playthrough ends, playback stops cleanly back to browse', async ({ page }) => {
+test('the last video in a playthrough ends, playback stops cleanly back to browse', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
   await page.locator('#btn-next').click();
@@ -70,7 +70,7 @@ test('Story 4 — the last video in a playthrough ends, playback stops cleanly b
   await expect(page).toHaveURL(/browse\.html/);
 });
 
-test('Story 5 — stopped part-way and picked again starts from the beginning, no resume offered', async ({ page }) => {
+test('stopped part-way and picked again starts from the beginning, no resume offered', async ({ page }) => {
   const calls = engineCalls(page);
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
@@ -80,7 +80,7 @@ test('Story 5 — stopped part-way and picked again starts from the beginning, n
   expect(calls.some(function(u) { return u.indexOf('/api/progress/') > -1; })).toBe(false);
 });
 
-test('Story 6 — pause, resume, next and previous work as they do for a song', async ({ page }) => {
+test('pause, resume, next and previous work as they do for a song', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
   await expect(page.locator('#btn-play-pause')).toBeVisible();
   await page.locator('#btn-next').click();
@@ -91,7 +91,7 @@ test('Story 6 — pause, resume, next and previous work as they do for a song', 
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/); // already first — no-op, no wrap
 });
 
-test('Story 8 — nothing offers to queue a music video: the Video Queue button is hidden', async ({ page }) => {
+test('nothing offers to queue a music video: the Video Queue button is hidden', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
   await expect(page.locator('#btn-queue')).toBeHidden();
 });
@@ -102,7 +102,7 @@ test('a lone music video pick shows no ⏮/⏭ transport (single-item playthroug
   await expect(page.locator('#btn-next')).toBeHidden();
 });
 
-test('Story 9 (routing) — a music-video card selects the "music-video" route, not the plain video engine route', async ({ page }) => {
+test('a music-video card selects the "music-video" route, not the plain video engine route', async ({ page }) => {
   await installApi(page);
   await page.route('**/api/browse**', function(route) {
     return route.fulfill({
