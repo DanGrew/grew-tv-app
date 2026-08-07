@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
+const { installApi, installVideoPlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS } = require('./fixtures/api.js');
 
 // FEAT-040 (TV browse queue affordances): film tiles carry a ＋ badge (queue the
 // film to Play Next). TASK-259 replaced the single "▶ Play Queue (N)" pill with TWO
@@ -106,6 +106,24 @@ test('the two queue buttons show independently — video queued, music empty', a
   await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
   await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (1)');
   await expect(page.locator('#btn-play-queue-music')).toBeHidden();
+});
+
+// TASK-374/377: a music video is never queued to the film Play Next engine
+// (the owner ruled that engine out as its player entirely) — its tile must
+// carry no ＋ badge, unlike a plain film/video tile.
+test('a music-video tile carries no ＋ Queue badge', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await page.route('**/api/browse**', function(route) {
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    });
+  });
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await page.locator('.sidebar-tab[data-tab="music-videos"]').click();
+  await expect(page.locator('.film-tile[data-id="mv-01"]')).toBeVisible();
+  await expect(page.locator('.film-tile[data-id="mv-01"] .tile-queue')).toHaveCount(0);
 });
 
 test('rail-grid film tiles also carry the ＋ badge and queue', async ({ page }) => {

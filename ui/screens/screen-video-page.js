@@ -6,7 +6,7 @@ import { connectApp } from '../../core/app-ws.js';
 import { loadSeries, loadProgress, loadVideo, loadPlaylist, loadBrowse, videoPlaybackAction } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
-import { currentItem, hasNext, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist } from '../../core/music-video-playthrough.js';
+import { currentItem, hasNext, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist, startIndex } from '../../core/music-video-playthrough.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
@@ -49,6 +49,7 @@ export function initVideoPage() {
   var mvItem     = getParam('musicVideo');
   var mvPlaylist = getParam('musicVideoPlaylist');
   var mvArtist   = getParam('musicVideoArtist');
+  var mvTrack    = getParam('musicVideoTrack');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
   var person   = getPerson();
@@ -270,7 +271,11 @@ export function initVideoPage() {
   function startMvPlaylist() {
     loadPlaylist(SERVER, mvPlaylist)
       .then(function(pl) {
-        seq = { items: pl.items.map(function(it) { return it.video; }), index: 0 };
+        var items = pl.items.map(function(it) { return it.video; });
+        // TASK-376/377: reached from the playlist's own detail screen, tapping
+        // a specific track — the playthrough starts there, same as an audio
+        // playlist starts from the tapped track, then carries on in order.
+        seq = { items: items, index: startIndex(items, mvTrack) };
         mvBegin();
       })
       .catch(function() { navTo('error.html'); });

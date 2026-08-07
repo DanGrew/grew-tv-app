@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { currentItem, hasNext, hasPrev, upNextItem, isMulti, entryMode, musicVideosByArtist, compareByTitle } from '../../core/music-video-playthrough.js';
+import { currentItem, hasNext, hasPrev, upNextItem, isMulti, entryMode, musicVideosByArtist, compareByTitle, startIndex, playlistTrackTarget } from '../../core/music-video-playthrough.js';
 
 function seq(items, index) { return { items: items, index: index }; }
 function mv(id, title) { return { id: id, title: title }; }
@@ -138,5 +138,44 @@ describe('compareByTitle', () => {
   it('treats an untitled item as sorting first', () => {
     expect(compareByTitle({ title: null }, { title: 'Alpha' })).toBe(-1);
     expect(compareByTitle({ title: 'Alpha' }, { title: null })).toBe(1);
+  });
+});
+
+describe('startIndex', () => {
+  it('is the position of the item carrying the given id', () => {
+    expect(startIndex([mv('a'), mv('b'), mv('c')], 'b')).toBe(1);
+  });
+  it('is 0 when the id is at the front already', () => {
+    expect(startIndex([mv('a'), mv('b')], 'a')).toBe(0);
+  });
+  it('is the last position for the last id', () => {
+    expect(startIndex([mv('a'), mv('b'), mv('c')], 'c')).toBe(2);
+  });
+  it('is 0 when no id is given (no tapped track — start from the top)', () => {
+    expect(startIndex([mv('a'), mv('b')], undefined)).toBe(0);
+  });
+  it('is 0 when the given id is not in the list', () => {
+    expect(startIndex([mv('a'), mv('b')], 'nope')).toBe(0);
+  });
+  it('is 0 for an empty or absent list', () => {
+    expect(startIndex([], 'a')).toBe(0);
+    expect(startIndex(null, 'a')).toBe(0);
+  });
+});
+
+describe('playlistTrackTarget', () => {
+  var audioTarget = { page: 'audio.html', params: { playlist: 'pl-1', track: 'trk-1', from: 'detail-playlist' } };
+
+  it('sends a music-video item to the video player, not the audio target', () => {
+    var item = { video: { id: 'mv-1', itemType: 'music-video' } };
+    expect(playlistTrackTarget(item, 'pl-1', audioTarget)).toEqual({
+      page: 'video.html',
+      params: { musicVideoPlaylist: 'pl-1', musicVideoTrack: 'mv-1', from: 'detail-playlist' }
+    });
+  });
+
+  it('passes a track item straight through to the given audio target unchanged', () => {
+    var item = { video: { id: 'trk-1', itemType: 'track' } };
+    expect(playlistTrackTarget(item, 'pl-1', audioTarget)).toBe(audioTarget);
   });
 });

@@ -25,12 +25,16 @@ const VIDEOS = {
   'ib-s1e2':          { id: 'ib-s1e2',          title: 'Bunk Off',         profile: 'kids',   duration: 1500, poster: 'ib-s1e2.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true },
   'ib-s2e1':          { id: 'ib-s2e1',          title: 'The Field Trip',   profile: 'kids',   duration: 1500, poster: 'ib-s2e1.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true },
   // TASK-373/374: music videos. itemType 'music-video' (media video, resumable
-  // false) — the fixture doesn't model itemType (the app never reads it), but
+  // false) — a playlist-detail row reads it to pick its play target
+  // (TASK-376/377, core/music-video-playthrough.js playlistTrackTarget).
   // MV-01 carries subtitles so the player e2e can prove the CC track still
-  // resolves for a music video exactly as it does for a film.
-  'mv-01': { id: 'mv-01', title: 'Head Like a Haunted House', profile: 'kids', duration: 210, poster: 'mv-01.jpg', subtitles: 'mv-01.vtt', artist: 'QOTSA', available: true },
-  'mv-02': { id: 'mv-02', title: 'No One Knows',              profile: 'kids', duration: 195, poster: 'mv-02.jpg', subtitles: null,        artist: 'QOTSA', available: true },
-  'mv-03': { id: 'mv-03', title: 'Starlight',                 profile: 'kids', duration: 240, poster: 'mv-03.jpg', subtitles: null,        artist: 'Muse',  available: true }
+  // resolves for a music video exactly as it does for a film. It also carries
+  // its real ingested ext (TASK-377 never re-encodes — an Apple Music export
+  // stays .m4v) so the player e2e can prove the video src is built from the
+  // record's own ext, not a hardcoded .mp4 (that mismatch 404'd real playback).
+  'mv-01': { id: 'mv-01', title: 'Head Like a Haunted House', profile: 'kids', duration: 210, poster: 'mv-01.jpg', subtitles: 'mv-01.vtt', artist: 'QOTSA', itemType: 'music-video', ext: 'm4v', available: true },
+  'mv-02': { id: 'mv-02', title: 'No One Knows',              profile: 'kids', duration: 195, poster: 'mv-02.jpg', subtitles: null,        artist: 'QOTSA', itemType: 'music-video', available: true },
+  'mv-03': { id: 'mv-03', title: 'Starlight',                 profile: 'kids', duration: 240, poster: 'mv-03.jpg', subtitles: null,        artist: 'Muse',  itemType: 'music-video', available: true }
 };
 
 const SERIES = {
@@ -181,9 +185,9 @@ const PLAYLIST_CARDS = [
 // Kept OUT of the default BROWSE (mirrors MUSIC_CARDS/PLAYLIST_CARDS) — the
 // music-video e2e appends it via its own `/api/browse` override.
 const MUSIC_VIDEO_CARDS = [
-  { kind: 'video', id: 'mv-01', title: 'Head Like a Haunted House', poster: 'mv-01.jpg', duration: 210, section: 'music-videos', artist: 'QOTSA' },
-  { kind: 'video', id: 'mv-02', title: 'No One Knows',              poster: 'mv-02.jpg', duration: 195, section: 'music-videos', artist: 'QOTSA' },
-  { kind: 'video', id: 'mv-03', title: 'Starlight',                 poster: 'mv-03.jpg', duration: 240, section: 'music-videos', artist: 'Muse' },
+  { kind: 'video', id: 'mv-01', title: 'Head Like a Haunted House', poster: 'mv-01.jpg', duration: 210, section: 'music-videos', artist: 'QOTSA', itemType: 'music-video' },
+  { kind: 'video', id: 'mv-02', title: 'No One Knows',              poster: 'mv-02.jpg', duration: 195, section: 'music-videos', artist: 'QOTSA', itemType: 'music-video' },
+  { kind: 'video', id: 'mv-03', title: 'Starlight',                 poster: 'mv-03.jpg', duration: 240, section: 'music-videos', artist: 'Muse',  itemType: 'music-video' },
   { kind: 'series', id: 'pl-mv', title: 'QOTSA Videos', poster: null, section: 'music-videos', collectionType: 'music-video-playlist', artist: null, clipCount: 2 }
 ];
 

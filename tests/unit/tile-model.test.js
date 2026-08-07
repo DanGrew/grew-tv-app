@@ -142,6 +142,18 @@ describe('tileModel — defaults', () => {
   });
 });
 
+describe('tileModel — queueable (FEAT-040/TASK-374/377)', () => {
+  it('a plain video card is queueable', () => {
+    expect(tileModel({ kind: 'video', id: 'v' }, {}).queueable).toBe(true);
+  });
+  it('a music-video card is NOT queueable — that engine is never its player', () => {
+    expect(tileModel({ kind: 'video', id: 'mv', itemType: 'music-video' }, {}).queueable).toBe(false);
+  });
+  it('a non-video kind is never queueable regardless of itemType', () => {
+    expect(tileModel({ kind: 'series', id: 's' }, {}).queueable).toBe(false);
+  });
+});
+
 describe('tileModel — cover mosaic (FEAT-039)', () => {
   it('passes through a coverArt array for a playlist tile', () => {
     const m = tileModel({ kind: 'series', id: 'pl', section: 'music', coverArt: ['a.jpg', 'b.jpg'] }, {});

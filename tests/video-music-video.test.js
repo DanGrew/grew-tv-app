@@ -31,7 +31,9 @@ test('Story 1 — a single music video pick plays in the video player, full pict
   const calls = engineCalls(page);
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
   await expect(page.locator('#screen-video')).toBeVisible();
-  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
+  // Built from the record's OWN ext (m4v, TASK-377 never re-encodes), not a
+  // hardcoded .mp4 — that mismatch 404'd real playback.
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01\.m4v$/);
   // The light seq descriptor for a lone pick carries no title (only the id) —
   // the breadcrumb leaf must come from the fetched record, not stay blank.
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Head Like a Haunted House');
@@ -124,4 +126,43 @@ test('Story 9 (routing) — a music-video card selects the "music-video" route, 
   // and how a companion search hit already reaches an off-tab card, BUG-008).
   await appWs.send(JSON.stringify({ type: 'intent', payload: { intent: 'select', params: { id: 'mv-01' } } }));
   await expect(page).toHaveURL(/video\.html\?.*musicVideo=mv-01/);
+});
+
+test('a music-video playlist card opens its playlist detail, same as any other playlist (TASK-376 — not a direct playthrough)', async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/browse**', function(route) {
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    });
+  });
+  var appWs = null;
+  page.on('framenavigated', function(frame) { if (frame === page.mainFrame()) appWs = null; });
+  await page.routeWebSocket(/:8766/, function(ws) { appWs = ws; });
+  await page.goto('/app/homeview/profile.html');
+  await enterBrowse(page, 'kids');
+  await expect(page.locator('.rail-row .film-tile').first()).toBeVisible();
+  await expect.poll(function() { return appWs !== null; }).toBe(true);
+  await appWs.send(JSON.stringify({ type: 'intent', payload: { intent: 'select', params: { id: 'pl-mv' } } }));
+  await expect(page).toHaveURL(/playlist-detail\.html\?.*playlist=pl-mv/);
+});
+
+test('tapping a track inside a music-video playlist detail plays it through the video player, starting from that track (TASK-374/376/377)', async ({ page }) => {
+  const calls = engineCalls(page);
+  await installApi(page);
+  await page.goto('/app/homeview/playlist-detail.html?playlist=pl-mv');
+  await expect(page.locator('.detail-row[data-id="mv-02"]')).toBeVisible();
+  await page.locator('.detail-row[data-id="mv-02"]').click();
+  await expect(page).toHaveURL(/video\.html\?.*musicVideoPlaylist=pl-mv.*musicVideoTrack=mv-02/);
+  // Starts AT the tapped track (mv-02), not the playlist's own first item.
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
+  expect(calls).toEqual([]); // never the audio player, never the video-playback engine
+});
+
+test('a plain audio playlist is unaffected — tapping a track still plays through the audio player', async ({ page }) => {
+  await installApi(page);
+  await page.goto('/app/homeview/playlist-detail.html?playlist=pl-roadtrip');
+  await expect(page.locator('.detail-row').first()).toBeVisible();
+  await page.locator('.detail-row').first().click();
+  await expect(page).toHaveURL(/audio\.html\?.*playlist=pl-roadtrip/);
 });

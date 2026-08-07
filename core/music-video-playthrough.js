@@ -80,3 +80,28 @@ export function musicVideosByArtist(cards, artist) {
   var mine = cards.filter(function(c) { return c.section === 'music-videos' && c.artist === artist; });
   return mine.sort(compareByTitle);
 }
+
+// Where a playthrough should start within a resolved item list, given the id
+// of the item that was actually tapped (e.g. a track row inside a music-video
+// playlist's own detail screen, TASK-374/376) — 0 (the playlist's own order)
+// when no id was tapped, or the tapped id isn't found in the list.
+export function startIndex(items, id) {
+  if (!items) return 0;
+  var i = items.findIndex(function(it) { return it.id === id; });
+  return i === -1 ? 0 : i;
+}
+
+// Where a playlist-detail row tap sends you (TASK-374/376/377): a playlist may
+// hold audio tracks or, for a music-video playlist, music-video items — the
+// TAPPED item's own itemType decides the target, not the playlist's
+// collectionType, so a row never needs to know what kind of playlist it's in.
+// A music-video item always opens the video player's own client-owned
+// playthrough (never resume/restart — a music video never resumes, TASK-373);
+// anything else keeps the existing audio-player target as given.
+export function playlistTrackTarget(item, playlistId, audioTarget) {
+  if (item.video.itemType === 'music-video') {
+    return { page: 'video.html',
+      params: { musicVideoPlaylist: playlistId, musicVideoTrack: item.video.id, from: 'detail-playlist' } };
+  }
+  return audioTarget;
+}

@@ -61,6 +61,11 @@ export function tileModel(card, ctx) {
   // the renderer falls back to the single poster / placeholder.
   var coverArt = Array.isArray(card.coverArt) ? card.coverArt : [];
 
+  // FEAT-040's ＋ Queue badge targets the video Play-Next queue — a music video
+  // never rides that engine (TASK-374/377, the owner's explicit call), so a
+  // standalone video card is only queueable when it ISN'T one.
+  var queueable = kind === 'video' && card.itemType !== 'music-video';
+
   return {
     id: card.id,
     kind: kind,
@@ -72,6 +77,7 @@ export function tileModel(card, ctx) {
     showCC: !!cc,
     showLyrics: showLyrics,
     sub: sub,
-    music: music
+    music: music,
+    queueable: queueable
   };
 }

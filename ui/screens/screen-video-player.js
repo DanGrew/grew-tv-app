@@ -468,7 +468,7 @@ export function setup(config) {
     returnPage      = playFrom;
     _currentDisplay = { id: record.id, title: record.title };
     document.getElementById('video-upnext').textContent = '';
-    video.src       = mediaUrl(server, record.id + '.mp4');
+    video.src       = mediaUrl(server, record.id + '.' + [record.ext].filter(Boolean).concat(['mp4'])[0]);
     setSubtitleTrack(record);
     onIntent('play', { title: record.title });
     startPlayback(startSec);
