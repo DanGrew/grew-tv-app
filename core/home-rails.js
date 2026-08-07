@@ -50,17 +50,20 @@ export function buildRails(cards, progress) {
 //
 // SECTION_TITLE/SECTION_ORDER are pure presentation — a section's tab label and
 // fixed display order — NOT type routing. Sections (server-supplied):
-// 'series' | 'films' | 'home-movies' | 'music'.
+// 'series' | 'films' | 'home-movies' | 'music' | 'music-videos'.
 
 var SECTION_TITLE = {
   'series': 'TV Series',
   'films': 'Films',
   'home-movies': 'Home Movies',
-  'music': 'Music'
+  'music': 'Music',
+  'music-videos': 'Music Videos'
 };
 
 // Fixed display order; which tabs actually appear is data-driven (below).
-var SECTION_ORDER = ['series', 'films', 'home-movies', 'music'];
+// Music Videos sits right after Music (TASK-376) — the owner's shape is a
+// sibling of Music, not a shelf inside it.
+var SECTION_ORDER = ['series', 'films', 'home-movies', 'music', 'music-videos'];
 
 // A card's section. The backend stamps it on every browse card; fall back to
 // Films so an unstamped (legacy/typo) card is shown rather than silently dropped.
@@ -75,7 +78,9 @@ function sectionOf(card) { return card.section || 'films'; }
 // DOM-only (no-pure-fn-outside-core).
 export function cardRoute(card) {
   if (card.kind === 'artist') return 'artist';
-  if (card.collectionType === 'playlist') return 'playlist';
+  // A music-video playlist (TASK-376) is a user playlist like any other — the
+  // same state-DB route, just holding a different item type.
+  if (card.collectionType === 'playlist' || card.collectionType === 'music-video-playlist') return 'playlist';
   if (card.section === 'music') return 'album';
   return card.kind || 'video';
 }
@@ -328,6 +333,22 @@ function musicRails(cards, recents) {
     .concat(simpleRail('albums', 'Albums', albums));
 }
 
+// TASK-376 — the Music Videos section's rails: a Playlists rail (mirrors
+// Music's, own id so the Playlists-heading ＋ create affordance — keyed to
+// rail.id === 'playlists' — never attaches here, since creating a music-video
+// playlist is not this task's story), then a rail PER ARTIST holding that
+// artist's music videos directly — the owner's shape names a rail per artist,
+// not a single Artists-tile rail leading to a drill-down (that's Music's own
+// shape; this is its own contents). No Albums rail — music-video albums are
+// out of scope (owner, 2026-08-06).
+function musicVideoRails(cards) {
+  var mv = cards.filter(function(c) { return sectionOf(c) === 'music-videos'; });
+  var playlists = mv.filter(function(c) { return c.collectionType === 'music-video-playlist'; });
+  var videos = mv.filter(function(c) { return c.collectionType !== 'music-video-playlist' && c.artist; });
+  var artistRails = groupRails(videos, function(c) { return [c.artist]; }, function(slug) { return slug; }, 'mv-artist:');
+  return simpleRail('mv-playlists', 'Playlists', playlists).concat(artistRails);
+}
+
 // APP-ONLY: guarantee a Playlists rail on the TV Music tab even when there are no
 // playlists, so the browse screen always renders the "Playlists ＋" heading (the
 // create affordance lives on the heading now — TASK-235 — not as a rail tile). When
@@ -370,6 +391,7 @@ export function buildTabRails(sectionId, cards, cwRows, genreLabels, recents) {
   var all = (cards || []).map(withDurationSec);
   var byId = cardIndex(all);
   if (sectionId === 'music') return musicRails(all, recents);
+  if (sectionId === 'music-videos') return musicVideoRails(all);
   var inTab = all.filter(function(c) { return sectionOf(c) === sectionId; });
   if (sectionId === 'home-movies') {
     var collections = inTab.filter(function(c) { return c.kind === 'series'; });
