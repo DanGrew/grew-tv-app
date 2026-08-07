@@ -179,12 +179,11 @@ export function initBrowsePage() {
     // (audio.html fires play-source album -> play-track). Only search emits a
     // kind:'track' card; a browse tile never does.
     track:    function(card) { navTo('audio.html', { album: card.album, track: card.id, from: 'browse' }); },
-    // TASK-373/374: a music-video item plays through its own client-owned
-    // playthrough (never the plain 'video' route's server engine); a music-
-    // video playlist starts that playthrough directly — no detail/track-list
-    // page, "and that is the whole of it" (owner, 2026-08-06).
-    'music-video':          function(card) { navTo('video.html', { musicVideo: card.id, from: 'browse' }); },
-    'music-video-playlist': function(card) { navTo('video.html', { musicVideoPlaylist: card.id, from: 'browse' }); }
+    // TASK-373/374: a lone music-video item plays through its own client-owned
+    // playthrough (never the plain 'video' route's server engine). A music-
+    // video playlist card routes through 'playlist' like any other playlist
+    // (TASK-376) — see playlist-detail for how a music-video track plays.
+    'music-video': function(card) { navTo('video.html', { musicVideo: card.id, from: 'browse' }); }
   };
 
   // cardRoute (core) gives 'album' for a music card else the card's kind;

@@ -278,6 +278,94 @@ describe('playlists rail + routing (FEAT-036)', () => {
   });
 });
 
+// TASK-376 — Music Videos: a section of its own, sibling of Music. A rail PER
+// ARTIST holds that artist's music videos directly (no drill-down tile, unlike
+// Music's own Artists rail) plus a Playlists rail of music-video playlists.
+// Albums of music videos are explicitly out of scope (owner, 2026-08-06).
+const MUSIC_VIDEOS = [
+  { kind: 'video',  id: 'mv-haunted', title: 'Head Like a Haunted House', section: 'music-videos', artist: 'QOTSA' },
+  { kind: 'video',  id: 'mv-noone',   title: 'No One Knows',              section: 'music-videos', artist: 'QOTSA' },
+  { kind: 'video',  id: 'mv-chop',    title: 'Chop Suey!',                section: 'music-videos', artist: 'System of a Down' },
+  { kind: 'series', id: 'mv-pl-rock', title: 'Rock Faves',                section: 'music-videos', collectionType: 'music-video-playlist' }
+];
+
+describe('Music Videos section (TASK-376)', () => {
+  it('adds a Music Videos tab, titled Music Videos, right after Music', () => {
+    const combined = MUSIC.concat(MUSIC_VIDEOS);
+    expect(buildTabs(combined).map(t => t.id)).toEqual(['films', 'music', 'music-videos']);
+    expect(Object.fromEntries(buildTabs(combined).map(t => [t.id, t.title]))['music-videos']).toBe('Music Videos');
+  });
+
+  it('stays out of the way — no tab when there is no music-video content yet (Story 6)', () => {
+    expect(buildTabs(MUSIC).map(t => t.id)).not.toContain('music-videos');
+  });
+
+  it('shows a rail per artist (A-Z), each holding only that artist’s videos (A-Z by title)', () => {
+    const rails = buildTabRails('music-videos', MUSIC_VIDEOS, [], {});
+    expect(rails.map(r => r.id)).toEqual(['mv-playlists', 'mv-artist:QOTSA', 'mv-artist:System of a Down']);
+    expect(rails.map(r => r.title)).toEqual(['Playlists', 'QOTSA', 'System of a Down']);
+    const qotsa = rails.find(r => r.id === 'mv-artist:QOTSA');
+    expect(qotsa.items.map(c => c.id)).toEqual(['mv-haunted', 'mv-noone']); // A-Z by title
+    const sotd = rails.find(r => r.id === 'mv-artist:System of a Down');
+    expect(sotd.items.map(c => c.id)).toEqual(['mv-chop']);
+  });
+
+  it('the Playlists rail holds the music-video playlists', () => {
+    const rails = buildTabRails('music-videos', MUSIC_VIDEOS, [], {});
+    expect(rails.find(r => r.id === 'mv-playlists').items.map(c => c.id)).toEqual(['mv-pl-rock']);
+  });
+
+  it('omits the Playlists rail when there are no music-video playlists', () => {
+    const noPlaylist = MUSIC_VIDEOS.filter(c => c.collectionType !== 'music-video-playlist');
+    expect(buildTabRails('music-videos', noPlaylist, [], {}).some(r => r.id === 'mv-playlists')).toBe(false);
+  });
+
+  it('omits a music video with no artist from every rail', () => {
+    const noArtist = MUSIC_VIDEOS.concat([{ kind: 'video', id: 'mv-orphan', title: 'Orphan', section: 'music-videos' }]);
+    const rails = buildTabRails('music-videos', noArtist, [], {});
+    expect(rails.some(r => r.items.some(c => c.id === 'mv-orphan'))).toBe(false);
+  });
+
+  it('never leaks a music video into the Music tab’s Artists/Albums rails', () => {
+    const combined = MUSIC.concat(MUSIC_VIDEOS);
+    const musicRails = buildTabRails('music', combined, [], {});
+    expect(musicRails.every(r => r.items.every(c => c.section !== 'music-videos'))).toBe(true);
+  });
+
+  it('never leaks a music video into the Films tab', () => {
+    const combined = MUSIC.concat(MUSIC_VIDEOS);
+    expect(buildTabRails('films', combined, [], {}).every(r => r.items.every(c => c.section !== 'music-videos'))).toBe(true);
+  });
+
+  it('a music-video playlist card routes to the playlist detail, same as a music playlist', () => {
+    expect(cardRoute({ kind: 'series', section: 'music-videos', collectionType: 'music-video-playlist', id: 'mv-pl-rock' })).toBe('playlist');
+  });
+
+  it('a standalone music-video card routes to its own player entry, not the plain video route (TASK-374 — avoids the server-authoritative engine)', () => {
+    expect(cardRoute({ kind: 'video', section: 'music-videos', id: 'mv-haunted' })).toBe('music-video');
+  });
+
+  it('tolerates null cards', () => {
+    expect(buildTabRails('music-videos', null, [], {})).toEqual([]);
+  });
+
+  it('never pulls a non-music-videos card into a Music Videos rail (mixed sections)', () => {
+    const mixed = MUSIC.concat(MUSIC_VIDEOS);
+    const rails = buildTabRails('music-videos', mixed, [], {});
+    const allIds = rails.flatMap(r => r.items.map(c => c.id));
+    expect(allIds.sort()).toEqual(['mv-chop', 'mv-haunted', 'mv-noone', 'mv-pl-rock'].sort());
+  });
+
+  it('excludes a music-video playlist from the per-artist rails even when it carries an artist field', () => {
+    const withArtistedPlaylist = MUSIC_VIDEOS.concat([
+      { kind: 'series', id: 'mv-pl-qotsa', title: 'QOTSA Faves', section: 'music-videos', collectionType: 'music-video-playlist', artist: 'QOTSA' }
+    ]);
+    const rails = buildTabRails('music-videos', withArtistedPlaylist, [], {});
+    expect(rails.find(r => r.id === 'mv-artist:QOTSA').items.map(c => c.id)).toEqual(['mv-haunted', 'mv-noone']);
+    expect(rails.find(r => r.id === 'mv-playlists').items.map(c => c.id)).toEqual(['mv-pl-qotsa', 'mv-pl-rock']); // A-Z by title: QOTSA Faves, Rock Faves
+  });
+});
+
 // FEAT-029 — the Music tab's Artists rail + the artist drill-down. One tile per
 // distinct album artist (square art borrowed from their first album), routing to
 // the artist page; albumsByArtist powers that page's filtered album grid.
@@ -475,11 +563,11 @@ describe('cardRoute (browse navigation, FEAT-027)', () => {
   });
 
   // A music-video playlist reuses the generic 'series'-shaped playlist card
-  // (kind:'series', like a song playlist) but a DIFFERENT collectionType
-  // (TASK-373) — without this check it would fall through to the generic
-  // series route (detail.html) and 404 on a state-DB playlist id, not a series.
-  it('routes a music-video playlist to its own playthrough entry, not song-playlist or series detail', () => {
-    expect(cardRoute({ kind: 'series', section: 'music-videos', collectionType: 'music-video-playlist', id: 'pl-vids' })).toBe('music-video-playlist');
+  // (kind:'series', like a song playlist) and, per the owner (TASK-376), the
+  // SAME 'playlist' route as any other playlist — it opens the playlist
+  // detail screen rather than starting a direct playthrough.
+  it('routes a music-video playlist to the playlist detail, same as a song playlist', () => {
+    expect(cardRoute({ kind: 'series', section: 'music-videos', collectionType: 'music-video-playlist', id: 'pl-vids' })).toBe('playlist');
   });
 });
 
