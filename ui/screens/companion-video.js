@@ -164,18 +164,20 @@ export function initPage() {
     els.next.classList.toggle('single', !on);
     els.repeat.classList.toggle('single', !on);
   }
+  function applyVideoPlaybackSnap(snap) {
+    renderNowFromSnap(snap);
+    renderUpNext(snap);
+    renderRepeat(snap);
+    applySeriesMode(seriesMode(snap));
+  }
   // A music video (TASK-374) never broadcasts a video_playback snapshot, so a
   // push that arrives while one is playing (e.g. a reconnect replay) can only be
   // stale film/series state — ignore it entirely rather than let it clobber the
   // music-video title/up-next/repeat this companion is correctly showing.
+  var ON_VIDEO_PLAYBACK = { 'true': function() {}, 'false': applyVideoPlaybackSnap };
   function onVideoPlayback(snap) {
     state.vsnap = snap;
-    [state.musicVideo].filter(function(mv) { return !mv; }).forEach(function() {
-      renderNowFromSnap(snap);
-      renderUpNext(snap);
-      renderRepeat(snap);
-      applySeriesMode(seriesMode(snap));
-    });
+    ON_VIDEO_PLAYBACK[state.musicVideo + ''](snap);
   }
 
   // The active person rides the app_state (TASK-158); the Plane B POSTs key per
