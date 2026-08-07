@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>grew-tv</title>
+<style>
+:root {
+  --bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+  --surface: rgba(255,255,255,0.06);
+  --surface-hi: rgba(255,255,255,0.11);
+  --border: rgba(255,255,255,0.13);
+  --focus: #fff;
+  --text: rgba(255,255,255,0.95);
+  --text-muted: rgba(255,255,255,0.4);
+  --radius: 16px;
+  --dur: 0.18s;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); background-attachment: fixed; color: var(--text); font-family: var(--font); }
+body { display: flex; flex-direction: column; padding: 16px; gap: 14px; }
+h1 { font-size: 13px; font-weight: normal; color: var(--text-muted); text-align: center; text-transform: uppercase; letter-spacing: 1px; }
+#qp-message { flex: 1; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+#qp-message p { color: var(--text-muted); font-size: 18px; padding: 0 12px; }
+#qp-controls { flex: 1; display: none; flex-direction: column; justify-content: center; gap: 14px; }
+.qp-btn { padding: 26px 16px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-size: 26px; cursor: pointer; touch-action: manipulation; transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.qp-btn:active { background: var(--surface-hi); border-color: var(--focus); color: var(--focus); }
+.qp-btn:focus { outline: 2px solid var(--focus); }
+#qp-reconnect { padding: 14px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--surface); color: var(--text-muted); font-size: 16px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#qp-reconnect:active { border-color: var(--focus); color: var(--focus); }
+#qp-reconnect:focus { outline: 2px solid var(--focus); }
+</style>
+</head>
+<body>
+<h1>Quick Pause</h1>
+<div id="qp-message">
+  <p>Open the full companion once first to target a TV.</p>
+</div>
+<div id="qp-controls">
+  <button id="qp-prev" class="qp-btn" aria-label="Previous">&#9198;</button>
+  <button id="qp-toggle" class="qp-btn" aria-label="Play/Pause">&#9199;</button>
+  <button id="qp-next" class="qp-btn" aria-label="Next">&#9197;</button>
+</div>
+<button id="qp-reconnect">&#8635; Reconnect</button>
+<script type="module">
+import { initPage } from '../ui/screens/companion-quick-pause.js';
+initPage();
+</script>
+</body>
+</html>
