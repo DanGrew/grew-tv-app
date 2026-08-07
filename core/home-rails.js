@@ -69,13 +69,20 @@ function sectionOf(card) { return card.section || 'films'; }
 // Where selecting a browse card navigates: an artist tile (FEAT-029, synthesised
 // for the Music tab's Artists rail) opens the artist drill-down; a playlist card
 // (FEAT-036) opens the playlist detail (its own state-DB route, not /api/album);
-// any other music card (album) opens album detail; otherwise the card's own kind
-// ('video' plays, 'series' opens collection detail). Routes on `kind`/server
-// `section`/`collectionType`, never a type enum. Pure so the browse screen stays
-// DOM-only (no-pure-fn-outside-core).
+// a music-video-playlist card (TASK-373/374) starts its playthrough directly —
+// no detail/track-list page, the owner ruled that out ("play it, and that is the
+// whole of it"); a lone music-video card (section 'music-videos', TASK-373) plays
+// through the SAME player but MUST NOT route as a plain 'video' — that would fire
+// the server-authoritative engine action the owner ruled out reusing for a music
+// video (TASK-374); any other music card (album) opens album detail; otherwise
+// the card's own kind ('video' plays, 'series' opens collection detail). Routes
+// on `kind`/server `section`/`collectionType`, never a type enum. Pure so the
+// browse screen stays DOM-only (no-pure-fn-outside-core).
 export function cardRoute(card) {
   if (card.kind === 'artist') return 'artist';
+  if (card.collectionType === 'music-video-playlist') return 'music-video-playlist';
   if (card.collectionType === 'playlist') return 'playlist';
+  if (card.section === 'music-videos') return 'music-video';
   if (card.section === 'music') return 'album';
   return card.kind || 'video';
 }

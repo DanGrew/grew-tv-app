@@ -464,6 +464,23 @@ describe('cardRoute (browse navigation, FEAT-027)', () => {
     expect(cardRoute({ kind: 'series', format: 'album' })).toBe('series');
     expect(cardRoute({ kind: 'video', mediaType: 'audio' })).toBe('video');
   });
+
+  // TASK-373/374 — a music video is standalone: `kind` is still 'video' (media
+  // is video, same as a film), so without this check it would fall through to
+  // the plain 'video' route and fire the server-authoritative engine action the
+  // owner ruled out reusing for a music video. Its own 'music-video' route lets
+  // the browse screen send it into the player's own client-owned playthrough.
+  it('routes a music-video item to its own player entry, not the plain video route', () => {
+    expect(cardRoute({ kind: 'video', section: 'music-videos', id: 'mv1' })).toBe('music-video');
+  });
+
+  // A music-video playlist reuses the generic 'series'-shaped playlist card
+  // (kind:'series', like a song playlist) but a DIFFERENT collectionType
+  // (TASK-373) — without this check it would fall through to the generic
+  // series route (detail.html) and 404 on a state-DB playlist id, not a series.
+  it('routes a music-video playlist to its own playthrough entry, not song-playlist or series detail', () => {
+    expect(cardRoute({ kind: 'series', section: 'music-videos', collectionType: 'music-video-playlist', id: 'pl-vids' })).toBe('music-video-playlist');
+  });
 });
 
 // TASK-183 (FEAT-025 surviving slice) — the Home Movies tab augments the person
