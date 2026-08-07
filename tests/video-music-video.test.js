@@ -128,6 +128,28 @@ test('a music-video card selects the "music-video" route, not the plain video en
   await expect(page).toHaveURL(/video\.html\?.*musicVideo=mv-01/);
 });
 
+// The rail-grid page ("see all" for ONE rail) is how an artist's music videos are
+// reached: the companion's selectRail opens rail-grid for an `mv-artist:` rail,
+// then a pick there resolves through that page's own route table. It is a
+// SEPARATE table from the browse page's, so a new cardRoute value has to be added
+// to both — and an unknown route silently no-ops there rather than throwing,
+// which turns a missed entry into a dead tap instead of a visible error.
+test('picking a music video from the rail grid plays it, like the browse page does', async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/browse**', function(route) {
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    });
+  });
+  await page.goto('/app/homeview/profile.html');
+  await enterBrowse(page, 'kids');
+  await page.goto('/app/homeview/rail-grid.html?section=music-videos&rail=mv-artist:QOTSA');
+  await expect(page.locator('#screen-rail-grid')).toBeVisible();
+  await page.locator('.film-tile[data-id="mv-01"]').click();
+  await expect(page).toHaveURL(/video\.html\?.*musicVideo=mv-01/);
+});
+
 test('a music-video playlist card opens its playlist detail, same as any other playlist (TASK-376 — not a direct playthrough)', async ({ page }) => {
   await installApi(page);
   await page.route('**/api/browse**', function(route) {
