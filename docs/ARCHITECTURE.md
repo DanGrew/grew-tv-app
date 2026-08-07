@@ -100,6 +100,7 @@ module or a screen** — this index rots otherwise (it did).
 - `companion-queue.js` · `companion-video-queue.js`
 - `companion-playlist.js` · `companion-playlist-create.js`
 - `companion-breadcrumb.js` · `companion-screen-bar.js` · `companion-sync-bar.js` · `companion-error.js`
+- `companion-quick-pause.js` — the disconnected "background mode" page (TASK-367): no WS, three buttons POST straight to TASK-366's `/api/quick-intent/{action}`, targeting the device the full companion already persisted. No TV counterpart by design.
 
 ## Content
 

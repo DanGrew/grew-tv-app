@@ -352,6 +352,7 @@ export function initPage() {
   // and echoes the new lyricsOn back on app_state — reflectLyrics repaints the pill.
   els.lyrics.addEventListener('click', function() { api.sendIntent('lyrics'); });
   document.getElementById('c-queue').addEventListener('click', function() { window.location.href = 'queue.html'; });
+  document.getElementById('c-quickpause').addEventListener('click', function() { window.location.href = 'quick-pause.html'; });
   buildJump();
   setInterval(renderBar, 250);
 
