@@ -15,6 +15,14 @@ var CARDS = [
   { kind: 'series', id: 'pl-mix',         title: 'My Mix',       poster: null,        section: 'music', collectionType: 'playlist' }
 ];
 
+// TASK-376 — a music video (standalone, kind:'video') and a music-video
+// playlist (kind:'series') must both come back as Video search hits, tagged
+// MUSIC VIDEO — never FILM or SERIES (Story 5).
+var MUSIC_VIDEO_CARDS = [
+  { kind: 'video',  id: 'mv-haunted', title: 'Head Like a Haunted House', poster: 'mv.jpg', section: 'music-videos', artist: 'QOTSA' },
+  { kind: 'series', id: 'mv-pl-rock', title: 'Rock Faves',                poster: null,      section: 'music-videos', collectionType: 'music-video-playlist' }
+];
+
 var TRACKS = [
   { id: 'ootb-02', title: 'Mr. Blue Sky',  album: 'Out of the Blue', artist: 'ELO',  album_id: 'ootb',        cover: 'ootb.jpg' },
   { id: 'dq',      title: 'Dancing Queen', album: 'Arrival',         artist: 'ABBA', album_id: 'abba-arrival', cover: 'arr.jpg' }
@@ -59,6 +67,17 @@ describe('videoItems', () => {
   });
   it('tolerates missing input', () => {
     expect(videoItems(null)).toEqual([]);
+  });
+  it('tags a music video and a music-video playlist MUSIC VIDEO, never FILM or SERIES (TASK-376 Story 5)', () => {
+    var byId = {};
+    videoItems(MUSIC_VIDEO_CARDS).forEach(function(i) { byId[i.card.id] = i.tag; });
+    expect(byId['mv-haunted']).toBe('MUSIC VIDEO');
+    expect(byId['mv-pl-rock']).toBe('MUSIC VIDEO'); // kind:'series' would otherwise fall to SERIES
+  });
+  it('includes a music video among the Video items (unlike a music album/playlist)', () => {
+    var ids = videoItems(CARDS.concat(MUSIC_VIDEO_CARDS)).map(function(i) { return i.card.id; });
+    expect(ids).toContain('mv-haunted');
+    expect(ids).toContain('mv-pl-rock');
   });
   it('fills blank defaults for a sparse card (no section/title/poster/genre/year)', () => {
     var items = videoItems([{ id: 'bare' }]);

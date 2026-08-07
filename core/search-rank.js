@@ -24,10 +24,14 @@ function titleCaseWord(slug) {
     .join(' ');
 }
 
-// Videos: FILM / SERIES / HOME. Home Movies win over the kind (a home-movies
-// collection is kind:'series' but tags HOME); a non-home series is SERIES; the
-// rest (standalone videos) are FILM.
+// Videos: MUSIC VIDEO / FILM / SERIES / HOME. Music Videos (TASK-376) wins
+// over the kind first — a music-video item is kind:'video' and a music-video
+// playlist is kind:'series', and either must read as a music video, never a
+// film or a series (Story 5). Home Movies win next (a home-movies collection
+// is kind:'series' but tags HOME); a non-home series is SERIES; the rest
+// (standalone videos) are FILM.
 function videoTag(card) {
+  if (card.section === 'music-videos') return 'MUSIC VIDEO';
   if (card.section === 'home-movies') return 'HOME';
   if (card.kind === 'series') return 'SERIES';
   return 'FILM';
