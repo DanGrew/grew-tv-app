@@ -23,7 +23,18 @@ const VIDEOS = {
   // browse rail (opened by direct nav) so it can't disturb the rail-count suites.
   'ib-s1e1':          { id: 'ib-s1e1',          title: 'First Day',        profile: 'kids',   duration: 1500, poster: 'ib-s1e1.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true },
   'ib-s1e2':          { id: 'ib-s1e2',          title: 'Bunk Off',         profile: 'kids',   duration: 1500, poster: 'ib-s1e2.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true },
-  'ib-s2e1':          { id: 'ib-s2e1',          title: 'The Field Trip',   profile: 'kids',   duration: 1500, poster: 'ib-s2e1.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true }
+  'ib-s2e1':          { id: 'ib-s2e1',          title: 'The Field Trip',   profile: 'kids',   duration: 1500, poster: 'ib-s2e1.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true },
+  // TASK-373/374: music videos. itemType 'music-video' (media video, resumable
+  // false) — a playlist-detail row reads it to pick its play target
+  // (TASK-376/377, core/music-video-playthrough.js playlistTrackTarget).
+  // MV-01 carries subtitles so the player e2e can prove the CC track still
+  // resolves for a music video exactly as it does for a film. It also carries
+  // its real ingested ext (TASK-377 never re-encodes — an Apple Music export
+  // stays .m4v) so the player e2e can prove the video src is built from the
+  // record's own ext, not a hardcoded .mp4 (that mismatch 404'd real playback).
+  'mv-01': { id: 'mv-01', title: 'Head Like a Haunted House', profile: 'kids', duration: 210, poster: 'mv-01.jpg', subtitles: 'mv-01.vtt', artist: 'QOTSA', itemType: 'music-video', ext: 'm4v', available: true },
+  'mv-02': { id: 'mv-02', title: 'No One Knows',              profile: 'kids', duration: 195, poster: 'mv-02.jpg', subtitles: null,        artist: 'QOTSA', itemType: 'music-video', available: true },
+  'mv-03': { id: 'mv-03', title: 'Starlight',                 profile: 'kids', duration: 240, poster: 'mv-03.jpg', subtitles: null,        artist: 'Muse',  itemType: 'music-video', available: true }
 };
 
 const SERIES = {
@@ -145,6 +156,17 @@ const PLAYLISTS = {
   },
   'pl-empty': {
     id: 'pl-empty', title: 'Empty Mix', profile: 'kids', collectionType: 'playlist', poster: null, seasons: [], items: []
+  },
+  // TASK-373/374: a music-video playlist — same resolved-items shape as a song
+  // playlist (item.video), collectionType 'music-video-playlist' (holds a
+  // music-video, not a track). Two items so the playthrough e2e can prove
+  // in-order advance + the last-item stop.
+  'pl-mv': {
+    id: 'pl-mv', title: 'QOTSA Videos', profile: 'kids', collectionType: 'music-video-playlist', poster: null, seasons: [],
+    items: [
+      { season: null, episode: null, video: VIDEOS['mv-01'] },
+      { season: null, episode: null, video: VIDEOS['mv-02'] }
+    ]
   }
 };
 
@@ -154,6 +176,19 @@ const PLAYLISTS = {
 const PLAYLIST_CARDS = [
   { kind: 'series', id: 'pl-roadtrip', title: 'Road Trip', poster: null, type: null, section: 'music', collectionType: 'playlist', artist: null, clipCount: 2, tags: null, coverArt: ['ootb.jpg', 'abba.jpg'] },
   { kind: 'series', id: 'pl-empty',    title: 'Empty Mix', poster: null, type: null, section: 'music', collectionType: 'playlist', artist: null, clipCount: 0, tags: null }
+];
+
+// TASK-373/374 — Music Videos section browse cards: standalone music-video item
+// cards (section 'music-videos', distinct from 'music') plus the playlist card
+// (collectionType 'music-video-playlist'). MV-01/02 share an artist (QOTSA) for
+// the artist-playthrough e2e; MV-03 (Muse) proves the artist filter excludes them.
+// Kept OUT of the default BROWSE (mirrors MUSIC_CARDS/PLAYLIST_CARDS) — the
+// music-video e2e appends it via its own `/api/browse` override.
+const MUSIC_VIDEO_CARDS = [
+  { kind: 'video', id: 'mv-01', title: 'Head Like a Haunted House', poster: 'mv-01.jpg', duration: 210, section: 'music-videos', artist: 'QOTSA', itemType: 'music-video' },
+  { kind: 'video', id: 'mv-02', title: 'No One Knows',              poster: 'mv-02.jpg', duration: 195, section: 'music-videos', artist: 'QOTSA', itemType: 'music-video' },
+  { kind: 'video', id: 'mv-03', title: 'Starlight',                 poster: 'mv-03.jpg', duration: 240, section: 'music-videos', artist: 'Muse',  itemType: 'music-video' },
+  { kind: 'series', id: 'pl-mv', title: 'QOTSA Videos', poster: null, section: 'music-videos', collectionType: 'music-video-playlist', artist: null, clipCount: 2 }
 ];
 
 const BROWSE = {
@@ -781,7 +816,7 @@ async function installVideoPlaybackBackend(page) {
 }
 
 module.exports = {
-  VIDEOS, SERIES, ALBUMS, TRACKS, EPISODES, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, BROWSE, CONFIG, nextOf,
+  VIDEOS, SERIES, ALBUMS, TRACKS, EPISODES, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, MUSIC_VIDEO_CARDS, BROWSE, CONFIG, nextOf,
   installApi, installPlaybackBackend, installVideoPlaybackBackend,
   // TASK-326: pure response builders + the CW row builder, so the stub<->contract
   // shape test can exercise the exact objects the routes above emit.

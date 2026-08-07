@@ -3,9 +3,10 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { setupVideoQueue } from './screen-video-queue.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadSeries, loadProgress, videoPlaybackAction } from '../../core/app-api.js';
+import { loadSeries, loadProgress, loadVideo, loadPlaylist, loadBrowse, videoPlaybackAction } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
+import { currentItem, hasNext, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist, startIndex } from '../../core/music-video-playthrough.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
@@ -23,6 +24,14 @@ import { mountBreadcrumb } from './breadcrumb.js';
 // A STANDALONE FILM has no engine source type, so it stays a direct load — there
 // is nothing to advance to. Both paths resume from watch_progress (the single
 // source of truth for per-item position; the player saves there as it plays).
+//
+// A MUSIC VIDEO (single pick, a music-video playlist, or an artist's music
+// videos — TASK-374) is NEITHER of the above: it runs its own small, client-
+// owned playthrough (core/music-video-playthrough.js) — order + index live on
+// this page, never on a server engine, and never resuming (mv* functions
+// below). The owner explicitly ruled out routing it through the video engine
+// above or the separate music queue engine; reusing either was named as the
+// risk this task had to avoid.
 var SERVER = window.location.origin;
 
 var RESUME_BY_RESTART = {
@@ -37,10 +46,17 @@ export function initVideoPage() {
   var videoId  = getParam('video');
   var seriesId = getParam('series');
   var restart  = getParam('restart');
+  var mvItem     = getParam('musicVideo');
+  var mvPlaylist = getParam('musicVideoPlaylist');
+  var mvArtist   = getParam('musicVideoArtist');
+  var mvTrack    = getParam('musicVideoTrack');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
   var person   = getPerson();
   var isSeries = !!seriesId;
+  var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, isSeries: isSeries });
+  var MV_MODE = { mvItem: true, mvPlaylist: true, mvArtist: true };
+  var isMusicVideo = !!MV_MODE[mode];
   var wsApp = null;
   var player;
   var queue;
@@ -48,6 +64,7 @@ export function initVideoPage() {
   var loadedId = null;     // which item id is currently loaded in <video>
   var currentTitle = '';   // current item's title (for the breadcrumb leaf)
   var seriesTitle = null;  // cached series title for the middle crumb
+  var seq = { items: [], index: 0 };  // music-video mode only (core/music-video-playthrough)
 
   function sendAction(action, body) { videoPlaybackAction(SERVER, action, person, body).catch(function() {}); }
 
@@ -115,6 +132,39 @@ export function initVideoPage() {
     })[!!next + '']();
   }
 
+  // ── music-video playthrough (TASK-374): a client-owned seq, never the video
+  // engine above. Always starts at 0 — no loadProgress, no resume (the video
+  // player "assumes resume"; this deliberately never asks it to). No "Up next"
+  // countdown either — a music video advances directly, like a song
+  // (screen-audio-page's onEnded), not like a film's 5s overlay.
+  function mvSwap() {
+    var item = currentItem(seq);
+    loadVideo(SERVER, item.id).then(function(record) {
+      loadedId = record.id;
+      currentTitle = record.title;
+      player.playVideo(record, from, 0);
+      [mvUpNextItem(seq)].filter(Boolean).forEach(function(n) { player.setUpNext('Up next: ', n.title); });
+      mountCrumbs();
+    }).catch(function() { navTo('error.html'); });
+  }
+  function mvGoNext() { [hasNext(seq)].filter(Boolean).forEach(function() { seq.index += 1; mvSwap(); }); }
+  function mvGoPrev() { [hasPrev(seq)].filter(Boolean).forEach(function() { seq.index -= 1; mvSwap(); }); }
+  function mvEnded() {
+    ({ 'true': mvGoNext, 'false': function() { player.stop(); } })[hasNext(seq) + '']();
+  }
+  function mvBegin() {
+    player.setSeriesMode(mvIsMulti(seq));
+    document.getElementById('btn-queue').classList.add('hidden');
+    initCaptions(SERVER).then(mvSwap).catch(function() {});
+  }
+
+  // Music-video mode never fires a video-playback engine action (next/prev/end
+  // all resolve against the local seq instead) — the owner ruled out routing a
+  // music video through this engine (TASK-374).
+  var ON_ENDED = { 'true': mvEnded, 'false': advanceAuto };
+  var ON_NEXT  = { 'true': mvGoNext, 'false': function() { sendAction('next', {}); } };
+  var ON_PREV  = { 'true': mvGoPrev, 'false': function() { sendAction('previous', {}); } };
+
   player = setupPlayer({
     video: document.getElementById('video'),
     server: SERVER,
@@ -125,11 +175,13 @@ export function initVideoPage() {
       };
       [STOP_NAV[from]].filter(Boolean).concat([function() { navTo('browse.html'); }])[0]();
     },
-    onEnded: function() { advanceAuto(); },
-    onNext:  function() { sendAction('next', {}); },
-    onPrev:  function() { sendAction('previous', {}); },
+    onEnded: ON_ENDED[isMusicVideo + ''],
+    onNext:  ON_NEXT[isMusicVideo + ''],
+    onPrev:  ON_PREV[isMusicVideo + ''],
     // Full app_state snapshot to the companion (FEAT-017): static context here,
-    // live position/playing/captions added by the player.
+    // live position/playing/captions added by the player. The music-video flag
+    // rides the CONTEXT push below, not this one — that is what the companion
+    // mirror reads to stop trusting the video-playback engine snapshot.
     emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
     appContext: function() {
       return { screen: 'player', itemId: [seriesId].filter(Boolean).concat([loadedId, videoId]).filter(Boolean)[0], episodeId: [loadedId].filter(Boolean).concat([videoId])[0], profile: profile };
@@ -138,7 +190,7 @@ export function initVideoPage() {
       var VIDEO_CTX = { play: true, video: true };
       [wsApp].filter(Boolean).forEach(function(ws) {
         [VIDEO_CTX[intent]].filter(Boolean).forEach(function() {
-          ws.sendContext({ context_id: 'video', display: player.currentVideoDisplay() });
+          ws.sendContext({ context_id: 'video', display: player.currentVideoDisplay(), musicVideo: isMusicVideo, musicVideoMulti: mvIsMulti(seq) });
         });
       });
     }
@@ -209,9 +261,40 @@ export function initVideoPage() {
       .then(function() { sendAction('play-queue', {}); })
       .catch(function() {});
   }
+  // Music-video entries (TASK-374): build the local seq, THEN begin (mvBegin
+  // primes captions + series-mode + the first mvSwap) — none of these ever
+  // call sendAction, so the video engine's own state is untouched.
+  function startMvItem() {
+    seq = { items: [{ id: mvItem, title: '' }], index: 0 };
+    mvBegin();
+  }
+  function startMvPlaylist() {
+    loadPlaylist(SERVER, mvPlaylist)
+      .then(function(pl) {
+        var items = pl.items.map(function(it) { return it.video; });
+        // TASK-376/377: reached from the playlist's own detail screen, tapping
+        // a specific track — the playthrough starts there, same as an audio
+        // playlist starts from the tapped track, then carries on in order.
+        seq = { items: items, index: startIndex(items, mvTrack) };
+        mvBegin();
+      })
+      .catch(function() { navTo('error.html'); });
+  }
+  function startMvArtist() {
+    loadBrowse(SERVER, profile)
+      .then(function(browse) {
+        seq = { items: musicVideosByArtist(browse.content, mvArtist), index: 0 };
+        mvBegin();
+      })
+      .catch(function() { navTo('error.html'); });
+  }
   var ENTRY = {
-    'true':  startQueue,
-    'false': function() { ({ 'true': startSeries, 'false': startSingle })[isSeries + ''](); }
+    queue: startQueue,
+    mvPlaylist: startMvPlaylist,
+    mvArtist: startMvArtist,
+    mvItem: startMvItem,
+    series: startSeries,
+    single: startSingle
   };
-  ENTRY[!!getParam('playQueue') + '']();
+  ENTRY[mode]();
 }

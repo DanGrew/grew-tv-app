@@ -33,7 +33,12 @@ export function initRailGridPage() {
     album:    function(card) { navTo('album-detail.html', { album: card.id }); },
     playlist: function(card) { navTo('playlist-detail.html', { playlist: card.id }); },
     video:    function(card) { navTo('video.html', { video: card.id, from: 'grid', series: card.series }); },
-    series:   function(card) { navTo('detail.html', { series: card.id }); }
+    series:   function(card) { navTo('detail.html', { series: card.id }); },
+    // A music video plays through its own client-owned playthrough, never the
+    // video engine (TASK-374) — same target the browse page uses. Without this
+    // entry the lookup below silently no-ops, so a tap on this grid did nothing
+    // at all once cardRoute started returning 'music-video'.
+    'music-video': function(card) { navTo('video.html', { musicVideo: card.id, from: 'grid' }); }
   };
   function onSelect(card) {
     [SELECT[cardRoute(card)]].filter(Boolean).forEach(function(fn) { fn(card); });

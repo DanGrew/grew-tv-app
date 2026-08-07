@@ -341,8 +341,8 @@ describe('Music Videos section (TASK-376)', () => {
     expect(cardRoute({ kind: 'series', section: 'music-videos', collectionType: 'music-video-playlist', id: 'mv-pl-rock' })).toBe('playlist');
   });
 
-  it('a standalone music-video card routes to play (kind:video, the generic fallback)', () => {
-    expect(cardRoute({ kind: 'video', section: 'music-videos', id: 'mv-haunted' })).toBe('video');
+  it('a standalone music-video card routes to its own player entry, not the plain video route (TASK-374 — avoids the server-authoritative engine)', () => {
+    expect(cardRoute({ kind: 'video', section: 'music-videos', id: 'mv-haunted' })).toBe('music-video');
   });
 
   it('tolerates null cards', () => {
@@ -551,6 +551,23 @@ describe('cardRoute (browse navigation, FEAT-027)', () => {
     // section routes by kind, NOT to 'album' (fails on the pre-163 code).
     expect(cardRoute({ kind: 'series', format: 'album' })).toBe('series');
     expect(cardRoute({ kind: 'video', mediaType: 'audio' })).toBe('video');
+  });
+
+  // TASK-373/374 — a music video is standalone: `kind` is still 'video' (media
+  // is video, same as a film), so without this check it would fall through to
+  // the plain 'video' route and fire the server-authoritative engine action the
+  // owner ruled out reusing for a music video. Its own 'music-video' route lets
+  // the browse screen send it into the player's own client-owned playthrough.
+  it('routes a music-video item to its own player entry, not the plain video route', () => {
+    expect(cardRoute({ kind: 'video', section: 'music-videos', id: 'mv1' })).toBe('music-video');
+  });
+
+  // A music-video playlist reuses the generic 'series'-shaped playlist card
+  // (kind:'series', like a song playlist) and, per the owner (TASK-376), the
+  // SAME 'playlist' route as any other playlist — it opens the playlist
+  // detail screen rather than starting a direct playthrough.
+  it('routes a music-video playlist to the playlist detail, same as a song playlist', () => {
+    expect(cardRoute({ kind: 'series', section: 'music-videos', collectionType: 'music-video-playlist', id: 'pl-vids' })).toBe('playlist');
   });
 });
 

@@ -9,6 +9,7 @@ import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { gridIndex } from '../../core/playlist-name.js';
+import { playlistTrackTarget } from '../../core/music-video-playthrough.js';
 
 // FEAT-036 (TASK-204) playlist detail. A user playlist resolves into the same
 // detail shape as an album (/api/playlist), so this reuses the FEAT-017
@@ -31,7 +32,17 @@ export function initPlaylistDetailPage() {
     resume:  function(id) { return { playlist: playlistId, track: id, from: 'detail-playlist' }; },
     restart: function(id) { return { playlist: playlistId, track: id, from: 'detail-playlist', restart: '1' }; }
   };
-  function play(item, mode) { navTo('audio.html', PLAY_PARAMS[mode](item.video.id)); }
+  // TASK-374/376/377: a music-video playlist is a playlist like any other —
+  // same detail screen, same tap-a-row-to-play gesture (TASK-376) — but a row
+  // holding a music-video item opens the VIDEO player's own client-owned
+  // playthrough, not the audio player. playlistTrackTarget (core) decides
+  // which, off the tapped item's own itemType, not the playlist's
+  // collectionType — kept in core because it branches (ui/** stays cyclomatic-1).
+  function play(item, mode) {
+    var audioTarget = { page: 'audio.html', params: PLAY_PARAMS[mode](item.video.id) };
+    var target = playlistTrackTarget(item, playlistId, audioTarget);
+    navTo(target.page, target.params);
+  }
   function onPlayItem(item, i, mode) { play(item, mode); }
 
   // TASK-321: no header Play/Shuffle — entry focus lands on the first track row,

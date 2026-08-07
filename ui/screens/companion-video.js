@@ -42,9 +42,10 @@ export function initPage() {
     next: document.getElementById('c-next'),
     jump: document.getElementById('jump'),
     upnext: document.getElementById('upnext'),
-    reset: document.getElementById('c-reset')
+    reset: document.getElementById('c-reset'),
+    queue: document.getElementById('c-queue')
   };
-  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '' } };
+  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, crumb: { seriesId: null, seriesTitle: null, videoTitle: '' } };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -132,7 +133,13 @@ export function initPage() {
   // PLANE B transport: each fires the same server action the TV player fires
   // (TASK-222), keyed to the active person — the server advances the engine and
   // broadcasts the resolved `video_playback` snapshot, which repaints BOTH surfaces.
+  // A music video (TASK-374) never fires this — it has no video-playback engine
+  // session, so a companion tap sends the WS `next`/`prev` intent instead (Plane
+  // A), reaching the TV player's own local playthrough the same way toggle/skip
+  // already do.
   function sendVideoAction(action) { videoPlaybackAction(server, action, state.person).catch(noop); }
+  var PREV_ACTION = { 'true': function() { api.sendIntent('prev'); }, 'false': function() { sendVideoAction('previous'); } };
+  var NEXT_ACTION = { 'true': function() { api.sendIntent('next'); }, 'false': function() { sendVideoAction('next'); } };
 
   // ── server `video_playback` snapshot -> companion (the now-playing source of
   // truth, mirroring the TV). Now-playing + the breadcrumb leaf, the inline up-next
@@ -157,12 +164,20 @@ export function initPage() {
     els.next.classList.toggle('single', !on);
     els.repeat.classList.toggle('single', !on);
   }
-  function onVideoPlayback(snap) {
-    state.vsnap = snap;
+  function applyVideoPlaybackSnap(snap) {
     renderNowFromSnap(snap);
     renderUpNext(snap);
     renderRepeat(snap);
     applySeriesMode(seriesMode(snap));
+  }
+  // A music video (TASK-374) never broadcasts a video_playback snapshot, so a
+  // push that arrives while one is playing (e.g. a reconnect replay) can only be
+  // stale film/series state — ignore it entirely rather than let it clobber the
+  // music-video title/up-next/repeat this companion is correctly showing.
+  var ON_VIDEO_PLAYBACK = { 'true': function() {}, 'false': applyVideoPlaybackSnap };
+  function onVideoPlayback(snap) {
+    state.vsnap = snap;
+    ON_VIDEO_PLAYBACK[state.musicVideo + ''](snap);
   }
 
   // The active person rides the app_state (TASK-158); the Plane B POSTs key per
@@ -179,10 +194,35 @@ export function initPage() {
     captureSeries(snap);
   }
 
+  // A music video (TASK-374) has no repeat concept and no queue — the
+  // repeat pill and the queue link hide outright; prev/next hide only for a lone
+  // pick (mirrors the TV's own seriesMode-style ⏮/⏭ hide for a single item).
+  function applyNav(hide) {
+    els.prev.classList.toggle('single', hide);
+    els.next.classList.toggle('single', hide);
+  }
+  // OFF music-video mode, ⏮/⏭ go BACK to the engine snapshot rather than being
+  // cleared — applySeriesMode owns `single` for a film/series, and a standalone
+  // film (a one-item source) must stay greyed. Clearing it here instead used to
+  // re-arm ⏮/⏭ on every film, because the TV's context push lands AFTER the
+  // snapshot in production (onIntent('play'/'video') only fire once the player
+  // has swapped the snapshot in). Before the first snapshot there is
+  // nothing to restore, so that branch is a no-op.
+  var HIDE_NAV = {
+    'true':  function(multi) { applyNav(!multi); },
+    'false': function() { [state.vsnap].filter(Boolean).forEach(function(s) { applySeriesMode(seriesMode(s)); }); }
+  };
+  function applyMusicVideoMode(on, multi) {
+    els.repeat.classList.toggle('hidden', on);
+    els.queue.classList.toggle('hidden', on);
+    HIDE_NAV[on + ''](multi);
+  }
   function onVideoContext(payload) {
     els.ctxLabel.textContent = 'Now playing';
     els.title.textContent = displayTitle(payload);
     state.crumb.videoTitle = displayTitle(payload);
+    state.musicVideo = !!payload.musicVideo;
+    applyMusicVideoMode(state.musicVideo, !!payload.musicVideoMulti);
     mountVideoCrumbs();
   }
 
@@ -225,8 +265,8 @@ export function initPage() {
 
   els.toggle.addEventListener('click', function() { api.sendIntent('toggle'); });
   els.cc.addEventListener('click', function() { api.toggleCaptions(); });
-  els.prev.addEventListener('click', function() { sendVideoAction('previous'); });
-  els.next.addEventListener('click', function() { sendVideoAction('next'); });
+  els.prev.addEventListener('click', function() { PREV_ACTION[state.musicVideo + ''](); });
+  els.next.addEventListener('click', function() { NEXT_ACTION[state.musicVideo + ''](); });
   els.repeat.addEventListener('click', function() { sendVideoAction('toggle-repeat'); });
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
