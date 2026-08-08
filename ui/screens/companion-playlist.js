@@ -30,7 +30,7 @@ export function initPage() {
     ctxTitle: document.getElementById('ctx-title'),
     gridEl: document.getElementById('txtgrid')
   };
-  var state = { playlistId: null, profile: null, person: null, tracks: [], progress: {}, title: '' };
+  var state = { playlistId: null, profile: null, person: null, tracks: [], progress: {}, title: '', collectionType: null };
   var pop = { overlay: document.getElementById('row-pop-overlay'), menu: document.getElementById('row-pop'), openTrigger: null };
   var api = {};
   var updateBar = null;
@@ -85,6 +85,10 @@ export function initPage() {
   // addState.add(id) is the POST for the chosen mode (add-track vs add-source); queue /
   // createHref / exclude differ per mode, so the rest of the sheet is mode-agnostic.
   // The target gets a snapshot / append, so a toast confirms — no reload.
+  // TASK-378/BUG (found in manual testing): playlistCards' 3rd arg gates the sheet to
+  // THIS playlist's own collectionType (state.collectionType, captured off loadPlaylist)
+  // — a music-video playlist only offers other music-video playlists, never a song
+  // playlist, and vice versa; "New playlist" carries the same collectionType.
   var addState = { add: null, queue: null, createHref: '', statusTimer: null, exclude: null };
   function activeProfile() { return [state.profile].filter(Boolean).concat(['adults'])[0]; }
   function hideStatus() { document.getElementById('add-status').style.display = 'none'; }
@@ -129,7 +133,7 @@ export function initPage() {
   }
   function loadAndShowSheet() {
     loadBrowse(server, activeProfile())
-      .then(function(res) { showAddSheet(playlistCards([res.content].filter(Boolean).concat([[]])[0], addState.exclude)); })
+      .then(function(res) { showAddSheet(playlistCards([res.content].filter(Boolean).concat([[]])[0], addState.exclude, state.collectionType)); })
       .catch(function() { showStatus('Could not load playlists.'); });
   }
   // FEAT-040/TASK-248 — queue a track to PLAY NEXT (queue-track, per person; durable
@@ -146,7 +150,8 @@ export function initPage() {
     addState.add = function(id) { return addToPlaylist(server, id, card.id); };
     addState.queue = function() { queueThenClose(card); };
     addState.createHref = 'playlist-create.html?addTrack=' + encodeURIComponent(card.id) +
-      '&profile=' + encodeURIComponent(activeProfile());
+      '&profile=' + encodeURIComponent(activeProfile()) +
+      '&collectionType=' + encodeURIComponent(state.collectionType);
     addState.exclude = null;
     loadAndShowSheet();
   }
@@ -156,7 +161,8 @@ export function initPage() {
     addState.add = function(id) { return addSourceToPlaylist(server, id, 'playlist', state.playlistId); };
     addState.queue = null;
     addState.createHref = 'playlist-create.html?addSourceType=playlist&addSourceId=' + encodeURIComponent(state.playlistId) +
-      '&profile=' + encodeURIComponent(activeProfile());
+      '&profile=' + encodeURIComponent(activeProfile()) +
+      '&collectionType=' + encodeURIComponent(state.collectionType);
     addState.exclude = state.playlistId;
     loadAndShowSheet();
   }
@@ -343,6 +349,7 @@ export function initPage() {
       .then(function(p) {
         state.tracks = [p.items].filter(Boolean).concat([[]])[0];
         state.title = p.title;
+        state.collectionType = p.collectionType;
         els.ctxTitle.textContent = p.title;
         mountCrumbs(p.title);
         render();
