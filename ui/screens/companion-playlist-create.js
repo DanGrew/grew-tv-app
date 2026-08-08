@@ -27,6 +27,11 @@ export function initPage() {
   var addTrack = params.get('addTrack');
   var addSourceType = params.get('addSourceType');
   var addSourceId = params.get('addSourceId');
+  // TASK-378 — mirrors the TV create page's own `collectionType`: the Music
+  // Videos ＋ chip and the music-video player's "New playlist" both set it to
+  // `music-video-playlist`; absent falls through to createPlaylist's 'playlist'
+  // default.
+  var collectionType = params.get('collectionType');
 
   var nameEl = document.getElementById('pl-name');
   var errEl = document.getElementById('error-msg');
@@ -63,7 +68,7 @@ export function initPage() {
   var POST_CREATE = [[Boolean(addSourceId), addSourceThenDone], [Boolean(addTrack), addTrackThenDone], [true, cancel]];
   function afterCreate(rec) { POST_CREATE.filter(function(p) { return p[0]; })[0][1](rec); }
   function doCreate() {
-    createPlaylist(server, cleanName(nameEl.value), st.profile)
+    createPlaylist(server, cleanName(nameEl.value), st.profile, collectionType)
       .then(afterCreate)
       .catch(function() { showError('Could not create playlist. Try again.'); });
   }

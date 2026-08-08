@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { installApi, BROWSE, MUSIC_CARDS, MUSIC_VIDEO_CARDS } = require('./fixtures/api.js');
 
 // FEAT-028 / TASK-168 — the companion drill-down browse (replaces the flat
 // FEAT-020/TASK-139 tab+rails layout). The companion walks four levels —
@@ -180,6 +180,35 @@ test.describe('create-playlist affordance', () => {
     await page.locator('.chip[data-section="music"]').click();
     await page.locator('#rails-row [data-create-playlist]').click();
     await expect(page).toHaveURL(/companion\/playlist-create\.html/);
+  });
+});
+
+// TASK-378 — the same ＋ chip lives on the Music Videos section too, and carries
+// collectionType=music-video-playlist so the companion create page mints the
+// right kind (core/app-api.createPlaylist's 4th arg). Music's own chip carries no
+// collectionType (regression, covered above).
+test.describe('create-playlist affordance on Music Videos (TASK-378)', () => {
+  test.beforeEach(async ({ page }) => {
+    intents = [];
+    await installApi(page);
+    await mockApp(page, intents);
+    await page.route('**/api/browse**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    }));
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#sections-row .chip')).toContainText(['Music Videos']);
+  });
+
+  test('the create ＋ chip lives in the Music Videos rails row too', async ({ page }) => {
+    await page.locator('.chip[data-section="music-videos"]').click();
+    await expect(page.locator('#rails-row [data-create-playlist]')).toBeVisible();
+  });
+
+  test('the create ＋ chip carries collectionType=music-video-playlist', async ({ page }) => {
+    await page.locator('.chip[data-section="music-videos"]').click();
+    await page.locator('#rails-row [data-create-playlist]').click();
+    await expect(page).toHaveURL(/companion\/playlist-create\.html\?.*collectionType=music-video-playlist/);
   });
 });
 

@@ -1,4 +1,4 @@
-import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, albumsByArtist, artistFromId, withPlaylistsRail } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail } from '../../core/home-rails.js';
 
 // TASK-235 — the create affordance is the Playlists rail-heading ＋ button (in the
 // browse screen), not a synthetic card. withPlaylistsRail just GUARANTEES the rail
@@ -23,6 +23,31 @@ describe('withPlaylistsRail', () => {
   it('the synthesised Playlists rail sits directly after Recently Played (TASK-234/318)', () => {
     const out = withPlaylistsRail([{ id: 'recent', title: 'Recently Played', items: [] }, { id: 'artists', title: 'Artists', items: [] }]);
     expect(out.map(r => r.id)).toEqual(['recent', 'playlists', 'artists']);
+  });
+});
+
+// TASK-378 — the Music Videos twin of withPlaylistsRail: guarantees the
+// `mv-playlists` rail exists (empty if no music-video playlists yet) so the
+// Music Videos tab's "Playlists ＋" heading always renders too.
+describe('withMvPlaylistsRail', () => {
+  it('leaves an existing mv-playlists rail untouched (no injected create card)', () => {
+    const rails = [{ id: 'mv-artist:QOTSA', title: 'QOTSA', items: [{ id: 'mv1' }] }, { id: 'mv-playlists', title: 'Playlists', items: [{ id: 'mvpl1' }] }];
+    const out = withMvPlaylistsRail(rails);
+    expect(out.find(r => r.id === 'mv-playlists').items.map(i => i.id)).toEqual(['mvpl1']);
+    expect(out.find(r => r.id === 'mv-artist:QOTSA').items.map(i => i.id)).toEqual(['mv1']);
+  });
+  it('adds an EMPTY mv-playlists rail when none exists (heading-only state)', () => {
+    const out = withMvPlaylistsRail([{ id: 'mv-artist:QOTSA', title: 'QOTSA', items: [] }]);
+    const pl = out.find(r => r.id === 'mv-playlists');
+    expect(pl.items).toEqual([]);
+    expect(pl.title).toBe('Playlists');
+  });
+  it('the synthesised mv-playlists rail leads (no Recently Played rail to sit after in Music Videos)', () => {
+    const out = withMvPlaylistsRail([{ id: 'mv-artist:QOTSA', title: 'QOTSA', items: [] }, { id: 'mv-artist:Muse', title: 'Muse', items: [] }]);
+    expect(out.map(r => r.id)).toEqual(['mv-playlists', 'mv-artist:QOTSA', 'mv-artist:Muse']);
+  });
+  it('tolerates an empty rails list', () => {
+    expect(withMvPlaylistsRail([]).map(r => r.id)).toEqual(['mv-playlists']);
   });
 });
 

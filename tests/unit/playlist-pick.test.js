@@ -45,4 +45,24 @@ describe('playlistCards', () => {
     ];
     expect(playlistCards(content).map(function(c) { return c.id; })).toEqual(['pl-a', 'pl-b']);
   });
+
+  // TASK-378 — a 3rd arg picks which collectionType is offered, for the
+  // music-video "Add to playlist" sheet; a playlist holds one kind or the other,
+  // never both (docs/IDEA-MUSIC-VIDEOS.md), so the two lists never mix.
+  describe('collectionType (TASK-378)', () => {
+    var content = [
+      { id: 'pl-roadtrip', title: 'Road Trip', collectionType: 'playlist' },
+      { id: 'mv-pl-rock', title: 'Rock Faves', collectionType: 'music-video-playlist' }
+    ];
+    it('defaults to "playlist" when omitted (pre-378 behaviour unchanged)', () => {
+      expect(playlistCards(content).map(function(c) { return c.id; })).toEqual(['pl-roadtrip']);
+    });
+    it('offers only music-video-playlist cards when asked', () => {
+      expect(playlistCards(content, null, 'music-video-playlist').map(function(c) { return c.id; })).toEqual(['mv-pl-rock']);
+    });
+    it('excludeId still applies alongside collectionType', () => {
+      var withTwo = content.concat([{ id: 'mv-pl-other', title: 'Other', collectionType: 'music-video-playlist' }]);
+      expect(playlistCards(withTwo, 'mv-pl-rock', 'music-video-playlist').map(function(c) { return c.id; })).toEqual(['mv-pl-other']);
+    });
+  });
 });

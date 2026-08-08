@@ -3,10 +3,12 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { setupVideoQueue } from './screen-video-queue.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadSeries, loadProgress, loadVideo, loadPlaylist, loadBrowse, videoPlaybackAction } from '../../core/app-api.js';
+import { loadSeries, loadProgress, loadVideo, loadPlaylist, loadBrowse, videoPlaybackAction, addToPlaylist } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
 import { currentItem, hasNext, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist, startIndex } from '../../core/music-video-playthrough.js';
+import { playlistCards } from '../../core/playlist-pick.js';
+import { gridIndex } from '../../core/playlist-name.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
@@ -155,7 +157,72 @@ export function initVideoPage() {
   function mvBegin() {
     player.setSeriesMode(mvIsMulti(seq));
     document.getElementById('btn-queue').classList.add('hidden');
+    document.getElementById('btn-add-playlist').classList.remove('hidden');
     initCaptions(SERVER).then(mvSwap).catch(function() {});
+  }
+
+  // TASK-378 — "Add to playlist" for the CURRENTLY PLAYING music video (works from
+  // any mv entry mode — a lone pick, inside a music-video playlist, or an artist's
+  // videos — currentItem(seq) is always the one on screen). Music-video-only: the
+  // button stays hidden (CSS) for a series/film, and mvBegin is the only place that
+  // reveals it. One sheet, no Play Next option (that is the album-detail per-track
+  // sheet's own thing) — just the profile's music-video playlists + New playlist,
+  // mirroring screen-album-detail-page's openAddSheet almost verbatim so the two
+  // stay in lock-step.
+  var addState = { cells: [] };
+  function focusAdd(i) { addState.cells[i].focus(); }
+  function closeAddSheet() {
+    document.getElementById('add-sheet').style.display = 'none';
+    document.getElementById('btn-add-playlist').focus();
+  }
+  var addStatusTimer = null;
+  function hideAddStatus() { document.getElementById('add-status').style.display = 'none'; }
+  function showAddStatus(text) {
+    var el = document.getElementById('add-status');
+    el.textContent = text;
+    el.style.display = 'block';
+    clearTimeout(addStatusTimer);
+    addStatusTimer = setTimeout(hideAddStatus, 2500);
+  }
+  function addExisting(id, title) {
+    addToPlaylist(SERVER, id, currentItem(seq).id)
+      .then(function() { closeAddSheet(); showAddStatus('Added to ' + title); })
+      .catch(function() { closeAddSheet(); showAddStatus('Could not add to playlist.'); });
+  }
+  function createNewPlaylist() {
+    navTo('playlist-create.html', { addTrack: currentItem(seq).id, collectionType: 'music-video-playlist' });
+  }
+  function moveAdd(e) {
+    var i = addState.cells.indexOf(document.activeElement);
+    var ni = gridIndex(i, 1, addState.cells.length, e.key);
+    [ni].filter(function(x) { return x !== i; }).filter(function() { return i > -1; }).forEach(function(x) { e.preventDefault(); focusAdd(x); });
+  }
+  var ADD_CLOSE = { Escape: true, Backspace: true };
+  function closeKeys(e) {
+    [ADD_CLOSE[e.key]].filter(Boolean).forEach(function() { e.preventDefault(); closeAddSheet(); });
+  }
+  function onAddKey(e) { e.stopPropagation(); moveAdd(e); closeKeys(e); }
+  function buildPlaylistChoice(card) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'add-choice';
+    b.textContent = '♪ ' + card.title;
+    b.setAttribute('data-id', card.id);
+    b.addEventListener('click', function() { addExisting(card.id, card.title); });
+    b.addEventListener('keydown', onAddKey);
+    document.getElementById('add-sheet-list').appendChild(b);
+    return b;
+  }
+  function showAddSheet(cards) {
+    document.getElementById('add-sheet-list').innerHTML = '';
+    addState.cells = cards.map(buildPlaylistChoice).concat([document.getElementById('btn-add-create'), document.getElementById('btn-add-cancel')]);
+    document.getElementById('add-sheet').style.display = 'flex';
+    focusAdd(0);
+  }
+  function openAddSheet() {
+    loadBrowse(SERVER, profile)
+      .then(function(res) { showAddSheet(playlistCards(res.content, null, 'music-video-playlist')); })
+      .catch(function() { showAddStatus('Could not load playlists.'); });
   }
 
   // Music-video mode never fires a video-playback engine action (next/prev/end
@@ -208,6 +275,11 @@ export function initVideoPage() {
     onClose: function() { document.getElementById('btn-queue').focus(); }
   });
   document.getElementById('btn-queue').addEventListener('click', function() { queue.open(); });
+  document.getElementById('btn-add-playlist').addEventListener('click', openAddSheet);
+  document.getElementById('btn-add-create').addEventListener('click', createNewPlaylist);
+  document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
+  document.getElementById('btn-add-create').addEventListener('keydown', onAddKey);
+  document.getElementById('btn-add-cancel').addEventListener('keydown', onAddKey);
 
   var KEY_TARGET = {
     'true':  function(e) { queue.handleKey(e); },

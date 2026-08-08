@@ -103,7 +103,9 @@ export function initPage() {
   // chip (was a standalone button alongside the top sections row). It's always
   // appended when Music is open, so the first playlist is still creatable even with
   // zero playlists (the Playlists rail chip is omitted when empty). Mirrors the
-  // app's TASK-235 ＋-on-the-Playlists-heading affordance.
+  // app's TASK-235 ＋-on-the-Playlists-heading affordance. TASK-378 extends it to
+  // the Music Videos section too — openCreate picks the collectionType off
+  // CREATE_COLLECTION_TYPE, keyed by section.
   function createChip() {
     var c = chip('＋');
     c.classList.add('chip-create');
@@ -239,10 +241,11 @@ export function initPage() {
     buildTabs(state.cards).forEach(function(s) { els.sectionsRow.appendChild(sectionChip(s)); });
   }
 
+  var CREATE_SECTIONS = { music: true, 'music-videos': true };
   function renderRails() {
     els.railsRow.innerHTML = '';
     railList().forEach(function(r) { els.railsRow.appendChild(railChip(r)); });
-    [state.section].filter(function(s) { return s === 'music'; }).forEach(function() { els.railsRow.appendChild(createChip()); });
+    [state.section].filter(function(s) { return CREATE_SECTIONS[s]; }).forEach(function() { els.railsRow.appendChild(createChip()); });
   }
 
   function renderGrid() {
@@ -333,9 +336,15 @@ export function initPage() {
   // FEAT-036 (TASK-209) — the companion's create affordance links to the companion
   // create page, carrying the live profile so its picker preselects. TASK-236 moved
   // its trigger from a standalone section-level button to the ＋ rails-row chip
-  // (createChip, rendered in renderRails when Music is open).
+  // (createChip, rendered in renderRails when Music is open). TASK-378: the same
+  // chip on Music Videos carries `collectionType=music-video-playlist`; Music
+  // carries none, falling through to the create page's own 'playlist' default.
+  var CREATE_COLLECTION_TYPE = { 'music-videos': 'music-video-playlist' };
   function openCreate() {
-    window.location.href = 'playlist-create.html?profile=' + encodeURIComponent([state.profile].filter(Boolean).concat(['adults'])[0]);
+    var collectionType = CREATE_COLLECTION_TYPE[state.section];
+    var qs = 'profile=' + encodeURIComponent([state.profile].filter(Boolean).concat(['adults'])[0]) +
+      [collectionType].filter(Boolean).map(function(t) { return '&collectionType=' + encodeURIComponent(t); }).concat([''])[0];
+    window.location.href = 'playlist-create.html?' + qs;
   }
 
   // TASK-330 — the external-destination "door" (Atlas). One tap crosses BOTH

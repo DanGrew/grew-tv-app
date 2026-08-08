@@ -167,15 +167,18 @@ export function loadPlaylist(serverUrl, id) {
 }
 
 // Create a user playlist (FEAT-036/TASK-208). POST /api/playlists/create takes a
-// name + profile (kids|adults); the SERVER generates the slug id, so — unlike the
-// 204 delete/add/remove actions — create returns 200 + the created record. The
-// caller reads the new `id` to open its detail. Rejects on a non-2xx (e.g. a
-// blank/over-long name 400s) so the screen can show an error.
-export function createPlaylist(serverUrl, name, profile) {
+// name + profile (kids|adults) + collectionType (TASK-378 — "playlist" (holds a
+// track) or "music-video-playlist" (holds a music-video); the server defaults to
+// "playlist" when omitted, api/playlists.py _clean_collection_type); the SERVER
+// generates the slug id, so — unlike the 204 delete/add/remove actions — create
+// returns 200 + the created record. The caller reads the new `id` to open its
+// detail. Rejects on a non-2xx (e.g. a blank/over-long name 400s) so the screen
+// can show an error.
+export function createPlaylist(serverUrl, name, profile, collectionType) {
   return fetch(serverUrl + '/api/playlists/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: name, profile: profile })
+    body: JSON.stringify({ name: name, profile: profile, collection_type: [collectionType].filter(Boolean).concat(['playlist'])[0] })
   }).then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); });
 }
 

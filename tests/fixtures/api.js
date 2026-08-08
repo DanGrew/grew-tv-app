@@ -356,7 +356,10 @@ async function installApi(page) {
     var name = (body.name || '').trim();
     if (!name) return json(route, 400, { error: 'name must not be blank' });
     var id = 'pl-' + slugify(name);
-    playlists[id] = { id: id, title: name, profile: body.profile, collectionType: 'playlist', poster: null, seasons: [], items: [] };
+    // TASK-378 — mirrors api/playlists.py _clean_collection_type: defaults to
+    // 'playlist' when the request omits collection_type.
+    var collectionType = body.collection_type || 'playlist';
+    playlists[id] = { id: id, title: name, profile: body.profile, collectionType: collectionType, poster: null, seasons: [], items: [] };
     return json(route, 200, { id: id, name: name, profile: body.profile, track_ids: [], created: 't0', modified: 't0' });
   });
   await page.route('**/api/playlists/delete', function(route) {

@@ -68,9 +68,19 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 .seg-opt.on { background: var(--surface-hi); color: var(--focus); }
 .seg-opt:active { color: var(--focus); }
 .seg-opt:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
-#c-repeat.hidden, #c-queue.hidden { display: none; }
+#c-repeat.hidden, #c-queue.hidden, #c-add-playlist.hidden { display: none; }
 .desync-off { opacity: 0.35; pointer-events: none; }
 .browsing .transport, .browsing #jump, .browsing #c-reset { opacity: 0.35; pointer-events: none; }
+#add-sheet { display: none; position: fixed; inset: 0; z-index: 10; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); }
+.add-sheet-panel { background: #16213e; border: 2px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 24px; width: 100%; max-width: 360px; max-height: 76vh; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); }
+.add-sheet-title { font-size: 18px; text-align: center; }
+#add-sheet-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.add-choice { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.add-choice:active, .add-choice:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.add-sheet-act { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.add-sheet-act:active, .add-sheet-act:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#btn-add-create { border-color: #7ee787; color: #7ee787; }
+#add-status { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 </style>
 </head>
 <body>
@@ -98,8 +108,18 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 <div id="upnext" class="bignext"></div>
 <div class="footer-row">
   <button id="c-queue" class="reset-btn" aria-label="Queue">☰ Queue</button>
+  <button id="c-add-playlist" class="reset-btn hidden" aria-label="Add to playlist">＋ Playlist</button>
   <button id="c-reset" class="reset-btn" aria-label="Reset">&#8635; Reset</button>
 </div>
+<div id="add-sheet" role="dialog" aria-modal="true">
+  <div class="add-sheet-panel">
+    <div class="add-sheet-title">Add to playlist</div>
+    <div id="add-sheet-list"></div>
+    <button id="btn-add-create" class="add-sheet-act" type="button">&#65291; New playlist</button>
+    <button id="btn-add-cancel" class="add-sheet-act" type="button">Cancel</button>
+  </div>
+</div>
+<div id="add-status"></div>
 <script type="module">
 import { initPage } from '../ui/screens/companion-video.js';
 initPage();
