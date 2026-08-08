@@ -545,6 +545,30 @@ export function setup(config) {
     sampleFrameDrops();
   });
 
+  // BUG-061: Chromium binds a playing element's audio output to the CoreAudio
+  // device current when playback started; the Bluetooth speaker's own OS-level
+  // reconnect (bt-audio.sh) flips the macOS default afterwards but never rebinds
+  // the live element. devicechange fires on that default-output flip — tearing
+  // the element down and remounting (same src, same position) re-grabs whatever
+  // device is current now. A no-op while paused/idle — nothing to rebind.
+  function remountOnDeviceChange() {
+    var resumeAt   = video.currentTime;
+    var wasPlaying = !video.paused;
+    [wasPlaying].filter(Boolean).forEach(function() {
+      video.load();
+      var doPlay = function() { video.play().catch(function() {}); };
+      [video].filter(function(el) { return el.readyState >= 1; }).forEach(function() { video.currentTime = resumeAt; doPlay(); });
+      [video].filter(function(el) { return el.readyState < 1; }).forEach(function() {
+        video.addEventListener('loadedmetadata', function onMeta() {
+          video.removeEventListener('loadedmetadata', onMeta);
+          video.currentTime = resumeAt;
+          doPlay();
+        });
+      });
+    });
+  }
+  [navigator.mediaDevices].filter(Boolean).forEach(function(md) { md.addEventListener('devicechange', remountOnDeviceChange); });
+
   document.getElementById('btn-play-pause').addEventListener('click', togglePlayPause);
   document.getElementById('btn-prev').addEventListener('click', function() { onPrev(); });
   document.getElementById('btn-next').addEventListener('click', function() { emit('next'); onNext(); });
