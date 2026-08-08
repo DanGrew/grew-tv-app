@@ -167,8 +167,12 @@ export function initBrowsePage() {
   // drops the undefined param so it stays seriesless.
   // FEAT-039 (TASK-235): new-playlist creation moved off a rail tile onto the
   // Playlists rail-heading ＋ (createPlaylist below, passed to renderBrowse) — so
-  // there is no 'create-playlist' select route any more.
-  function createPlaylist() { navTo('playlist-create.html'); }
+  // there is no 'create-playlist' select route any more. TASK-378: the same ＋ now
+  // also lives on the Music Videos tab's Playlists rail — the collectionType the
+  // new playlist gets follows which tab it was opened from (undefined on Music
+  // falls through to the create page's own 'playlist' default).
+  var COLLECTION_TYPE_BY_TAB = { 'music-videos': 'music-video-playlist' };
+  function createPlaylist() { navTo('playlist-create.html', { collectionType: COLLECTION_TYPE_BY_TAB[getActiveTab()] }); }
   var SELECT = {
     artist:   function(card) { navTo('artist.html', { artist: card.artist }); },
     album:    function(card) { navTo('album-detail.html', { album: card.id }); },

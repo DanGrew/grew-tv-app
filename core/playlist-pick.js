@@ -12,10 +12,15 @@
 // used by the playlist-detail bulk-add sheet so a playlist is never offered as a
 // target for adding INTO itself (the add-source API 400s a self-add anyway, this
 // just hides the dead choice). Omitted/undefined keeps every playlist.
-export function playlistCards(browseContent, excludeId) {
+// `collectionType` (optional, TASK-378) picks which collectionType is offered —
+// "playlist" (a song playlist) by default, or "music-video-playlist" for the
+// music-video "Add to playlist" sheet — a playlist holds one or the other, never
+// both (docs/IDEA-MUSIC-VIDEOS.md).
+export function playlistCards(browseContent, excludeId, collectionType) {
   if (!browseContent) return [];
+  var want = [collectionType].filter(Boolean).concat(['playlist'])[0];
   return browseContent
-    .filter(function(c) { return c.collectionType === 'playlist'; })
+    .filter(function(c) { return c.collectionType === want; })
     .filter(function(c) { return c.id !== excludeId; })
     .map(function(c) { return { id: c.id, title: c.title }; });
 }

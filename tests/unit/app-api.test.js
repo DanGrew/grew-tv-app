@@ -194,7 +194,7 @@ describe('POST request shapes (method + json header + body + url)', () => {
     { name: 'playbackAction', run: () => playbackAction('http://s', 'next', 'mom', { track_id: 't1' }), url: 'http://s/api/playback/next?person=mom', body: { track_id: 't1' } },
     { name: 'videoPlaybackAction', run: () => videoPlaybackAction('http://s', 'play-source', 'dad', { source_id: 'bluey' }), url: 'http://s/api/video-playback/play-source?person=dad', body: { source_id: 'bluey' } },
     { name: 'saveSettings', run: () => saveSettings('http://s', { captionsOn: false }), url: 'http://s/api/settings', body: { captionsOn: false } },
-    { name: 'createPlaylist', run: () => createPlaylist('http://s', 'My Mix', 'kids'), url: 'http://s/api/playlists/create', body: { name: 'My Mix', profile: 'kids' } },
+    { name: 'createPlaylist', run: () => createPlaylist('http://s', 'My Mix', 'kids'), url: 'http://s/api/playlists/create', body: { name: 'My Mix', profile: 'kids', collection_type: 'playlist' } },
     { name: 'addToPlaylist', run: () => addToPlaylist('http://s', 'pl', 't1'), url: 'http://s/api/playlists/add-track', body: { playlist_id: 'pl', track_id: 't1' } },
     { name: 'addSourceToPlaylist', run: () => addSourceToPlaylist('http://s', 'pl', 'album', 'ootb'), url: 'http://s/api/playlists/add-source', body: { playlist_id: 'pl', source_type: 'album', source_id: 'ootb' } },
     { name: 'movePlaylistTrack', run: () => movePlaylistTrack('http://s', 'pl', 2, 'up'), url: 'http://s/api/playlists/move-track', body: { playlist_id: 'pl', index: 2, direction: 'up' } },
@@ -341,12 +341,19 @@ describe('loadAlbum / loadPlaylist', () => {
 });
 
 describe('createPlaylist', () => {
-  it('POSTs name + profile and resolves the created record on 200', async () => {
+  it('POSTs name + profile + a default collection_type of "playlist" and resolves the created record on 200', async () => {
     var calls = fakeFetch({ id: 'my-mix' });
     var rec = await createPlaylist('http://s', 'My Mix', 'kids');
     expect(calls[0].url).toBe('http://s/api/playlists/create');
-    expect(JSON.parse(calls[0].opts.body)).toEqual({ name: 'My Mix', profile: 'kids' });
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ name: 'My Mix', profile: 'kids', collection_type: 'playlist' });
     expect(rec).toEqual({ id: 'my-mix' });
+  });
+  // TASK-378 — a 4th arg names the collectionType (Music Videos' ＋ passes
+  // 'music-video-playlist'); omitted/undefined keeps the pre-378 'playlist' default.
+  it('POSTs the given collection_type when the 4th arg is passed', async () => {
+    var calls = fakeFetch({ id: 'qotsa-faves' });
+    await createPlaylist('http://s', 'QOTSA Faves', 'kids', 'music-video-playlist');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ name: 'QOTSA Faves', profile: 'kids', collection_type: 'music-video-playlist' });
   });
   it('rejects with the status on a non-2xx (e.g. blank name)', async () => {
     fakeFetch({}, false);

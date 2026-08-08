@@ -146,6 +146,11 @@ export function initPlaylistDetailPage() {
   // returnFocus / exclude differ per mode too, so the rest of the sheet is
   // mode-agnostic. The sheet owns its keydown (stopPropagation) so the detail d-pad
   // never fires beneath it, mirroring the delete-confirm overlay.
+  // TASK-378/BUG (found in manual testing): playlistCards' 3rd arg gates the sheet
+  // to THIS playlist's own collectionType (state.playlist.collectionType) — a
+  // music-video playlist must only ever offer other music-video playlists as an
+  // add target, never a song playlist, and vice versa; "New playlist" carries the
+  // same collectionType so it creates a matching-type target.
   var addState = { add: null, queue: null, createParams: {}, returnFocus: function() {}, exclude: null, cells: [], statusTimer: null };
   function focusAdd(i) { addState.cells[i].focus(); }
   function focusRow(id) {
@@ -214,7 +219,7 @@ export function initPlaylistDetailPage() {
   }
   function loadAndShowSheet() {
     loadBrowse(SERVER, profile)
-      .then(function(res) { showAddSheet(playlistCards(res.content, addState.exclude)); })
+      .then(function(res) { showAddSheet(playlistCards(res.content, addState.exclude, state.playlist.collectionType)); })
       .catch(function() { showStatus('Could not load playlists.'); });
   }
   // FEAT-040/TASK-248 — queue a track to PLAY NEXT (queue-track, per person; durable
@@ -231,7 +236,7 @@ export function initPlaylistDetailPage() {
   function openAddSheet(item) {
     addState.add = function(id) { return addToPlaylist(SERVER, id, item.video.id); };
     addState.queue = function() { queueThenClose(item); };
-    addState.createParams = { addTrack: item.video.id };
+    addState.createParams = { addTrack: item.video.id, collectionType: state.playlist.collectionType };
     addState.returnFocus = function() { focusRow(item.video.id); };
     addState.exclude = null;
     loadAndShowSheet();
@@ -243,7 +248,7 @@ export function initPlaylistDetailPage() {
   function openAddSourceSheet() {
     addState.add = function(id) { return addSourceToPlaylist(SERVER, id, 'playlist', playlistId); };
     addState.queue = null;
-    addState.createParams = { addSourceType: 'playlist', addSourceId: playlistId };
+    addState.createParams = { addSourceType: 'playlist', addSourceId: playlistId, collectionType: state.playlist.collectionType };
     addState.returnFocus = function() { document.getElementById('btn-add-all').focus(); };
     addState.exclude = playlistId;
     loadAndShowSheet();

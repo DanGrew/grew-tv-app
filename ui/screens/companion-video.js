@@ -1,5 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadSeries, videoPlaybackAction } from '../../core/app-api.js';
+import { loadSeries, videoPlaybackAction, loadBrowse, addToPlaylist } from '../../core/app-api.js';
 import { screenPage, displayTitle, seriesIdFromSnap, queryString } from '../../core/companion-utils.js';
 import { nowPlaying, upNextLine, seriesMode } from '../../core/video-player-router.js';
 import { fmt } from '../../core/time.js';
@@ -7,6 +7,7 @@ import { percent } from '../../core/progress.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { trimOnCrumb, entries as entriesTrail } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
+import { playlistCards } from '../../core/playlist-pick.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
@@ -43,9 +44,10 @@ export function initPage() {
     jump: document.getElementById('jump'),
     upnext: document.getElementById('upnext'),
     reset: document.getElementById('c-reset'),
-    queue: document.getElementById('c-queue')
+    queue: document.getElementById('c-queue'),
+    addPlaylist: document.getElementById('c-add-playlist')
   };
-  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, crumb: { seriesId: null, seriesTitle: null, videoTitle: '' } };
+  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '' } };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -188,6 +190,12 @@ export function initPage() {
 
   function onAppState(snap) {
     state.snap = snap;
+    // TASK-378 — the currently-playing item id + active profile, read straight off
+    // the app_state snapshot (screen-video-player's buildSnapshot always carries
+    // both); the Add-to-playlist sheet needs them to POST add-track and to
+    // profile-filter the offered playlists.
+    state.itemId = snap.itemId;
+    state.profile = snap.profile;
     capturePerson(snap);
     renderControls();
     renderBar();
@@ -215,6 +223,9 @@ export function initPage() {
   function applyMusicVideoMode(on, multi) {
     els.repeat.classList.toggle('hidden', on);
     els.queue.classList.toggle('hidden', on);
+    // TASK-378 — Add to playlist is the INVERSE of repeat/queue: it only makes
+    // sense FOR a music video, so it shows exactly when they hide.
+    els.addPlaylist.classList.toggle('hidden', !on);
     HIDE_NAV[on + ''](multi);
   }
   function onVideoContext(payload) {
@@ -263,6 +274,50 @@ export function initPage() {
     ({ 'false': armReset, 'true': fireReset })[String(resetArmed)]();
   }
 
+  // TASK-378 — "Add to playlist" for the currently-playing music video, the
+  // companion mirror of the TV player's own sheet (screen-video-page.js). Same
+  // shape as companion-detail's per-track sheet: profile-filtered music-video
+  // playlists (core/playlist-pick) plus New playlist + Cancel.
+  function activeProfile() { return [state.profile].filter(Boolean).concat(['adults'])[0]; }
+  function closeAddSheet() { document.getElementById('add-sheet').style.display = 'none'; }
+  function hideAddStatus() { document.getElementById('add-status').style.display = 'none'; }
+  var addStatusTimer = null;
+  function showAddStatus(text) {
+    var el = document.getElementById('add-status');
+    el.textContent = text;
+    el.style.display = 'block';
+    clearTimeout(addStatusTimer);
+    addStatusTimer = setTimeout(hideAddStatus, 2500);
+  }
+  function addExisting(id, title) {
+    addToPlaylist(server, id, state.itemId)
+      .then(function() { closeAddSheet(); showAddStatus('Added to ' + title); })
+      .catch(function() { closeAddSheet(); showAddStatus('Could not add to playlist.'); });
+  }
+  function createNewPlaylist() {
+    window.location.href = 'playlist-create.html?addTrack=' + encodeURIComponent(state.itemId) +
+      '&collectionType=music-video-playlist&profile=' + encodeURIComponent(activeProfile());
+  }
+  function choiceBtn(card) {
+    var b = document.createElement('button');
+    b.className = 'add-choice';
+    b.setAttribute('data-id', card.id);
+    b.textContent = '♪ ' + card.title;
+    b.addEventListener('click', function() { addExisting(card.id, card.title); });
+    return b;
+  }
+  function showAddSheet(cards) {
+    var list = document.getElementById('add-sheet-list');
+    list.innerHTML = '';
+    cards.map(choiceBtn).forEach(function(b) { list.appendChild(b); });
+    document.getElementById('add-sheet').style.display = 'flex';
+  }
+  function openAddSheet() {
+    loadBrowse(server, activeProfile())
+      .then(function(res) { showAddSheet(playlistCards([res.content].filter(Boolean).concat([[]])[0], null, 'music-video-playlist')); })
+      .catch(function() { showAddStatus('Could not load playlists.'); });
+  }
+
   els.toggle.addEventListener('click', function() { api.sendIntent('toggle'); });
   els.cc.addEventListener('click', function() { api.toggleCaptions(); });
   els.prev.addEventListener('click', function() { PREV_ACTION[state.musicVideo + ''](); });
@@ -272,6 +327,9 @@ export function initPage() {
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);
   document.getElementById('c-queue').addEventListener('click', function() { window.location.href = 'video-queue.html'; });
+  els.addPlaylist.addEventListener('click', openAddSheet);
+  document.getElementById('btn-add-create').addEventListener('click', createNewPlaylist);
+  document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
   buildJump();
   setInterval(renderBar, 250);
 

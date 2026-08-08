@@ -336,14 +336,14 @@ function musicRails(cards, recents) {
     .concat(simpleRail('albums', 'Albums', albums));
 }
 
-// TASK-376 — the Music Videos section's rails: a Playlists rail (mirrors
-// Music's, own id so the Playlists-heading ＋ create affordance — keyed to
-// rail.id === 'playlists' — never attaches here, since creating a music-video
-// playlist is not this task's story), then a rail PER ARTIST holding that
-// artist's music videos directly — the owner's shape names a rail per artist,
-// not a single Artists-tile rail leading to a drill-down (that's Music's own
-// shape; this is its own contents). No Albums rail — music-video albums are
-// out of scope (owner, 2026-08-06).
+// TASK-376 — the Music Videos section's rails: a Playlists rail (mirrors Music's,
+// own id `mv-playlists` — the Playlists-heading ＋ create affordance (TASK-378) is
+// keyed off rail.id and matches this id too, creating a `music-video-playlist`
+// here rather than a plain one), then a rail PER ARTIST holding that artist's
+// music videos directly — the owner's shape names a rail per artist, not a single
+// Artists-tile rail leading to a drill-down (that's Music's own shape; this is its
+// own contents). No Albums rail — music-video albums are out of scope (owner,
+// 2026-08-06).
 function musicVideoRails(cards) {
   var mv = cards.filter(function(c) { return sectionOf(c) === 'music-videos'; });
   var playlists = mv.filter(function(c) { return c.collectionType === 'music-video-playlist'; });
@@ -366,6 +366,19 @@ export function withPlaylistsRail(rails) {
   var newRail = { id: 'playlists', title: 'Playlists', items: [] };
   var at = rails.findIndex(function(r) { return r.id === 'recent'; }) + 1;
   return rails.slice(0, at).concat([newRail]).concat(rails.slice(at));
+}
+
+// TASK-378 — the Music Videos twin of withPlaylistsRail: guarantee an
+// always-present (possibly empty) `mv-playlists` rail so the Music Videos tab's
+// "Playlists ＋" heading always renders, even with zero music-video playlists yet
+// (musicVideoRails' simpleRail omits an empty rail outright). Music Videos has no
+// Recently Played rail to sit after (unlike Music), so the guaranteed rail simply
+// leads — matching where musicVideoRails already puts a real one.
+export function withMvPlaylistsRail(rails) {
+  var hasRail = rails.some(function(r) { return r.id === 'mv-playlists'; });
+  if (hasRail) return rails;
+  var newRail = { id: 'mv-playlists', title: 'Playlists', items: [] };
+  return [newRail].concat(rails);
 }
 
 // The sidebar tabs to show: a tab per section that has browse content, in fixed

@@ -1,6 +1,6 @@
 import { registerScreen } from '../../core/screen-registry.js';
 import { createTile } from '../../components/tile.js';
-import { buildTabs, buildTabRails, clampIndex, withPlaylistsRail } from '../../core/home-rails.js';
+import { buildTabs, buildTabRails, clampIndex, withPlaylistsRail, withMvPlaylistsRail } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { personGlyph } from '../../core/profile-config.js';
 
@@ -161,6 +161,10 @@ export function browseArrow(e) {
 // playlists (the old "＋ New Playlist" tile is gone). A plain clickable button —
 // creation is driven by mouse (desktop) or the companion (TV), so it needs no
 // d-pad focus stop. Opens the existing create flow (STATE.onCreatePlaylist).
+// TASK-378: the same heading ＋ also attaches to the Music Videos tab's own
+// Playlists rail (`mv-playlists`) — STATE.onCreatePlaylist itself decides which
+// collectionType the new playlist gets (screen-browse-page, keyed off the active
+// tab), this button stays rail-id-agnostic.
 function createPlaylistBtn() {
   var b = document.createElement('button');
   b.className = 'rail-create';
@@ -171,13 +175,15 @@ function createPlaylistBtn() {
   return b;
 }
 
+var PLUS_RAIL = { playlists: true, 'mv-playlists': true };
+
 function railSection(rail) {
   var section = document.createElement('div');
   section.className = 'rail';
   var h = document.createElement('div');
   h.className = 'rail-title';
   h.textContent = rail.title;
-  [rail.id].filter(function(id) { return id === 'playlists'; }).forEach(function() { h.appendChild(createPlaylistBtn()); });
+  [rail.id].filter(function(id) { return PLUS_RAIL[id]; }).forEach(function() { h.appendChild(createPlaylistBtn()); });
   section.appendChild(h);
   var row = document.createElement('div');
   row.className = 'rail-row';
@@ -206,15 +212,17 @@ function markActive(tabId) {
 }
 
 // Show one tab's rails (does not move focus — the caller decides). Called both on
-// initial render and whenever a sidebar tab gains focus. The Music tab is
-// augmented with an always-present (possibly empty) Playlists rail (withPlaylistsRail)
-// so the TV always renders the "Playlists ＋" heading; other tabs render
-// buildTabRails as-is.
+// initial render and whenever a sidebar tab gains focus. Music and Music Videos
+// are each augmented with their own always-present (possibly empty) Playlists
+// rail (withPlaylistsRail / withMvPlaylistsRail, TASK-378) so the TV always
+// renders the "Playlists ＋" heading there; other tabs render buildTabRails as-is.
+var RAIL_GUARANTEE = { music: withPlaylistsRail, 'music-videos': withMvPlaylistsRail };
 function selectTab(tabId) {
   STATE.activeTab = tabId;
   markActive(tabId);
   var rails = buildTabRails(tabId, STATE.cards, STATE.cw, STATE.labels, STATE.recents);
-  renderRailRows(({ true: function() { return withPlaylistsRail(rails); }, false: function() { return rails; } })[tabId === 'music']());
+  var guarantee = [RAIL_GUARANTEE[tabId]].filter(Boolean).concat([function(r) { return r; }])[0];
+  renderRailRows(guarantee(rails));
 }
 
 function tabButton(tab) {

@@ -16,6 +16,12 @@ import { CHAR_KEYS, KEY_COLS, appendChar, backspace, cleanName, isValidName, gri
 // create-from-a-track flow (the album Add-to-playlist sheet's "New playlist"
 // choice). When present, the new playlist is created, that track is added, then its
 // detail opens — so a brand-new playlist starts with the track that prompted it.
+//
+// TASK-378 (create only): a `collectionType` query param carries which kind of
+// playlist to create — the Music Videos Playlists-rail ＋ and the music-video
+// player's own "New playlist" both set it to `music-video-playlist`; absent (the
+// Music ＋, and every pre-378 caller) falls through to createPlaylist's own
+// 'playlist' default.
 var SERVER = window.location.origin;
 
 function defaultProfile() { return [getProfile()].filter(Boolean).concat(['adults'])[0]; }
@@ -47,6 +53,7 @@ export function initPlaylistCreatePage() {
   var addTrack = getParam('addTrack');
   var addSourceType = getParam('addSourceType');
   var addSourceId = getParam('addSourceId');
+  var collectionType = getParam('collectionType');
   function openNew(rec) { navTo('playlist-detail.html', { playlist: rec.id }); }
   // After create, apply any pending add — a single track (TASK-206) OR a whole
   // album/playlist snapshot (TASK-212) — then open the new playlist regardless of
@@ -57,7 +64,7 @@ export function initPlaylistCreatePage() {
   var POST_CREATE = [[Boolean(addSourceId), addSourceThenOpen], [Boolean(addTrack), addTrackThenOpen], [true, openNew]];
   function afterCreate(rec) { POST_CREATE.filter(function(p) { return p[0]; })[0][1](rec); }
   function doCreate() {
-    createPlaylist(SERVER, cleanName(st.name), st.profile)
+    createPlaylist(SERVER, cleanName(st.name), st.profile, collectionType)
       .then(afterCreate)
       .catch(function() { showError('Could not create playlist. Try again.'); });
   }
