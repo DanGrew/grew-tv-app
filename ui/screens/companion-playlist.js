@@ -77,6 +77,14 @@ export function initPage() {
   document.getElementById('btn-confirm-delete').addEventListener('click', doDelete);
   document.getElementById('btn-cancel-delete').addEventListener('click', hideConfirm);
 
+  // TASK-403 — the Downloads page is reachable from any playlist's detail
+  // page (this one), phone-only: it syncs to local storage on THIS phone,
+  // so there is no TV counterpart to mirror (unlike rename/delete above).
+  function goToDownloads() {
+    window.location.href = 'downloads.html?profile=' + encodeURIComponent(activeProfile());
+  }
+  document.getElementById('btn-download-playlist').addEventListener('click', goToDownloads);
+
   // FEAT-036/039 — the "Add to playlist" sheet, the companion mirror of the app
   // playlist detail's sheet (mirrors companion-detail.js too). ONE sheet, two entry
   // points: the per-track ＋ (openAddSheet — Play Next + add ONE track, TASK-262) and

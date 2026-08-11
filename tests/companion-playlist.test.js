@@ -181,6 +181,16 @@ test.describe('Road Trip playlist (2 tracks)', () => {
     await expect(page).toHaveURL(/companion\/playlist-create\.html\?rename=pl-roadtrip&name=Road%20Trip/);
   });
 
+  // TASK-403 — the Download button is icon-only (matching add-all/rename/delete)
+  // and navigates to the Downloads page, carrying the live profile so it lists
+  // the right playlists (the mock app_state sets profile 'kids').
+  test('TASK-403: Download is icon-only and navigates to the Downloads page with the live profile', async ({ page }) => {
+    await expect(page.locator('#btn-download-playlist')).toHaveText('\u{2913}');
+    await expect(page.locator('#btn-download-playlist')).toHaveAttribute('aria-label', 'Download');
+    await page.locator('#btn-download-playlist').click();
+    await expect(page).toHaveURL(/companion\/downloads\.html\?profile=kids$/);
+  });
+
   // FEAT-036 (TASK-211) — per-track reorder (↑ ↓) + remove (✕), the companion
   // mirror of the TV playlist detail's row controls. Each POSTs BY POSITION (the
   // installApi fixture mutates the playlist clone) then reloads the list.

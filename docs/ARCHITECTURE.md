@@ -68,6 +68,7 @@ module or a screen** — this index rots otherwise (it did).
 - `cover-mosaic.js` — playlist cover-mosaic markup (FEAT-039)
 - `playlist-name.js` / `playlist-pick.js` — create-playlist + "add to playlist" (FEAT-036)
 - `playlist-row-menu.js` — companion playlist row ⋮-popover logic: `rowActions` (which chips, edge-gated) + `popoverTop` (below/flip-above placement) (TASK-328)
+- `downloads-filename.js` / `downloads-sync.js` / `downloads-handle-store.js` / `downloads-synced.js` / `downloads-status-text.js` — offline playlist download to a local folder (TASK-403): sanitized `{artist} - {title}.{ext}` naming, the File System Access sync + `.m3u` write (dedup by filename presence), the IndexedDB-backed remembered folder handle + write-permission check, the synced-playlist-id set (localStorage), and the Downloads page's per-row status text
 - `external-destinations.js` — config-driven external-destination "door" (TASK-330): the `{ id, name, icon, port, tvPath, remotePath }` list (Atlas) + `destinationUrls(dest, host)` (builds the URLs against the caller's `location.hostname`, so the door follows grew-tv's own host — Mini/localhost/LAN-IP — instead of a baked-in address, BUG-054) + `launchExternalParams` (companion→TV intent shape). Static config, no runtime fetch — grew-tv holds no atlas specifics. Rendered as the companion `#door` pill in the sync-bar (Control/Browse) row (`companion-browse.js`); the TV has **no** Atlas button — it only receives the `launchExternal` intent (`screen-browse-page.js`) and crosses itself
 
 **Profile / device plane**
@@ -102,6 +103,7 @@ module or a screen** — this index rots otherwise (it did).
 - `companion-playlist.js` · `companion-playlist-create.js`
 - `companion-breadcrumb.js` · `companion-screen-bar.js` · `companion-sync-bar.js` · `companion-error.js`
 - `companion-quick-pause.js` — the disconnected "background mode" page (TASK-367): no WS, three buttons POST straight to TASK-366's `/api/quick-intent/{action}`, targeting the device the full companion already persisted. No TV counterpart by design.
+- `companion-downloads.js` — the Downloads page (TASK-403), reached from a Download button on `companion-playlist.js`'s manage-actions row: no WS (a phone-local folder choice, like `companion-quick-pause.js`), DOM glue only over the `downloads-*` core modules. No TV counterpart — syncing to this phone's storage has no TV analogue.
 
 ## Content
 

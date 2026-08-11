@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>grew-tv</title>
+<style>
+:root {
+  --bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+  --surface: rgba(255,255,255,0.06);
+  --surface-hi: rgba(255,255,255,0.11);
+  --border: rgba(255,255,255,0.13);
+  --focus: #fff;
+  --text: rgba(255,255,255,0.95);
+  --text-muted: rgba(255,255,255,0.4);
+  --ok: #7ee787;
+  --radius: 16px;
+  --radius-sm: 8px;
+  --dur: 0.18s;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); background-attachment: fixed; color: var(--text); font-family: var(--font); }
+body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
+h1 { font-size: 18px; text-align: center; flex-shrink: 0; }
+.panel { display: none; flex-direction: column; gap: 14px; flex: 1; min-height: 0; }
+.sub { font-size: 13px; color: var(--text-muted); line-height: 1.5; text-align: center; }
+.folder-card { background: var(--surface-hi); border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 16px; text-align: center; font-size: 13px; color: var(--text-muted); }
+.btn { background: var(--surface-hi); border: 2px solid var(--focus); color: var(--focus); border-radius: var(--radius-sm); padding: 12px; text-align: center; font-size: 15px; font-family: inherit; font-weight: 600; cursor: pointer; touch-action: manipulation; }
+.btn:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
+.btn:disabled { opacity: 0.4; }
+.folder-chip { display: flex; align-items: center; gap: 6px; background: var(--surface-hi); border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; font-size: 12px; color: var(--text-muted); align-self: center; }
+#pl-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; min-height: 0; }
+.pl-row { display: flex; align-items: center; gap: 10px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 11px 12px; }
+.pl-check { width: 20px; height: 20px; flex-shrink: 0; }
+.pl-check:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pl-meta { flex: 1; min-width: 0; }
+.pl-name { font-size: 14px; font-weight: 600; }
+.pl-status { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+#dl-status { font-size: 13px; color: var(--text-muted); text-align: center; min-height: 16px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<h1>Downloads</h1>
+<div id="unsupported" class="panel">
+  <div class="sub">This browser can't save files to your phone's storage — try Android Chrome.</div>
+</div>
+<div id="folder-picker" class="panel">
+  <div class="sub">Pick the folder on this phone where synced music should live. You only do this once.</div>
+  <div class="folder-card">No folder chosen — Musicolet (or any local player) will point at this same folder.</div>
+  <button id="btn-choose-folder" class="btn" type="button">Choose folder…</button>
+</div>
+<div id="playlist-panel" class="panel">
+  <div id="folder-chip" class="folder-chip"></div>
+  <div id="pl-list"></div>
+  <button id="btn-sync" class="btn" type="button">Sync selected (0)</button>
+</div>
+<div id="dl-status"></div>
+<script type="module">
+import { initPage } from '../ui/screens/companion-downloads.js';
+initPage();
+</script>
+</body>
+</html>
