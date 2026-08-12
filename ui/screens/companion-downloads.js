@@ -71,7 +71,7 @@ export function initPage() {
     name.textContent = pl.title;
     var status = document.createElement('div');
     status.className = 'pl-status';
-    status.textContent = playlistStatusText(pl.id, state.progress[pl.id]);
+    status.textContent = playlistStatusText(pl.id, state.progress[pl.id], pl.clipCount);
     meta.appendChild(name);
     meta.appendChild(status);
     row.appendChild(meta);
