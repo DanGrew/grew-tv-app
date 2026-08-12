@@ -85,9 +85,13 @@ export function initPage() {
   // TASK-403), which the app's normal http:// origin never satisfies — so this
   // one link crosses to the HTTPS door (TASK-404) instead of staying same-origin
   // like every other companion navigation. Port comes from /api/config at
-  // runtime (core/server-config.js), not hardcoded.
+  // runtime (core/server-config.js), not hardcoded. BUG-065: this page's own
+  // URL rides along as `back` so Downloads has a way to return to it (the
+  // cross-origin jump means the phone's own back button/gesture can't be
+  // relied on, e.g. companion added to the home screen with no browser chrome).
   function navigateToDownloads(httpsOrigin) {
-    var target = new URL('downloads.html?profile=' + encodeURIComponent(activeProfile()), window.location.href);
+    var back = encodeURIComponent(window.location.href);
+    var target = new URL('downloads.html?profile=' + encodeURIComponent(activeProfile()) + '&back=' + back, window.location.href);
     window.location.href = httpsOrigin + target.pathname + target.search;
   }
   function goToDownloads() {

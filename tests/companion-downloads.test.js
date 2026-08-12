@@ -98,6 +98,24 @@ async function routeBrowseWithPlaylists(page) {
   }));
 }
 
+test('BUG-065: Back returns to the page the Download button was reached from', async ({ page }) => {
+  await installApi(page);
+  await routeBrowseWithPlaylists(page);
+  const from = 'http://example.test/companion/playlist.html?id=pl-roadtrip';
+  await page.goto('/companion/downloads.html?profile=kids&back=' + encodeURIComponent(from));
+  await page.route(from, route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html>' }));
+  await page.locator('#btn-back').click();
+  await expect(page).toHaveURL(from);
+});
+
+test('BUG-065: Back falls back to the playlist library when reached without a back param', async ({ page }) => {
+  await installApi(page);
+  await routeBrowseWithPlaylists(page);
+  await page.goto('/companion/downloads.html?profile=kids');
+  await page.locator('#btn-back').click();
+  await expect(page).toHaveURL(/companion\/browse\.html\?profile=kids/);
+});
+
 test('TASK-403: shows the unsupported message when the browser lacks the folder picker API', async ({ page }) => {
   // Real Chromium implements showDirectoryPicker — delete it to stand in for
   // a browser that doesn't (e.g. iOS Safari), per story 7's feature-detect.

@@ -186,14 +186,18 @@ test.describe('Road Trip playlist (2 tracks)', () => {
   // not same-origin like every other companion link, since showDirectoryPicker
   // needs a secure context; the target port comes from /api/config.httpsPort
   // (installApi fixture: 8767), stubbed here since nothing really listens on it.
-  test('TASK-403/405: Download is icon-only and navigates to the Downloads page over HTTPS with the live profile', async ({ page }) => {
+  // BUG-065 — this page's own URL rides along as `back` so Downloads has a way
+  // to return here (the cross-origin jump means the phone's own back gesture
+  // can't be relied on).
+  test('TASK-403/405/BUG-065: Download navigates to the Downloads page over HTTPS, carrying a way back', async ({ page }) => {
     await page.route('https://localhost:8767/companion/downloads.html**', function(route) {
       return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html>' });
     });
+    const from = page.url();
     await expect(page.locator('#btn-download-playlist')).toHaveText('\u{2913}');
     await expect(page.locator('#btn-download-playlist')).toHaveAttribute('aria-label', 'Download');
     await page.locator('#btn-download-playlist').click();
-    await expect(page).toHaveURL('https://localhost:8767/companion/downloads.html?profile=kids');
+    await expect(page).toHaveURL('https://localhost:8767/companion/downloads.html?profile=kids&back=' + encodeURIComponent(from));
   });
 
   // FEAT-036 (TASK-211) — per-track reorder (↑ ↓) + remove (✕), the companion
