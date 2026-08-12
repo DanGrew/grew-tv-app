@@ -1,13 +1,15 @@
 const { defineConfig, devices } = require('@playwright/test');
 
+const PORT = process.env.CHECKS_LOCAL_PORT || 3456;
+
 module.exports = defineConfig({
   testDir: './tests',
   testIgnore: ['**/unit/**'],
   timeout: 10000,
   reporter: [['list']],
   webServer: {
-    command: 'python3 -m http.server 3456',
-    port: 3456,
+    command: `python3 -m http.server ${PORT}`,
+    port: PORT,
     reuseExistingServer: !process.env.CI,
     // `python3 -m http.server` logs EVERY request to stderr, which Playwright pipes
     // into the run output. Over a flake hunt (whole suite x3) that is ~9MB of noise
@@ -17,7 +19,7 @@ module.exports = defineConfig({
     stderr: process.env.GREW_HUSH_WEBSERVER ? 'ignore' : 'pipe'
   },
   use: {
-    baseURL: 'http://localhost:3456'
+    baseURL: `http://localhost:${PORT}`
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } }
