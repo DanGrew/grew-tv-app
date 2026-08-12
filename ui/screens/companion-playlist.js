@@ -1,5 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, mediaUrl } from '../../core/app-api.js';
+import { fetchHttpsOrigin } from '../../core/server-config.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
@@ -80,8 +81,17 @@ export function initPage() {
   // TASK-403 — the Downloads page is reachable from any playlist's detail
   // page (this one), phone-only: it syncs to local storage on THIS phone,
   // so there is no TV counterpart to mirror (unlike rename/delete above).
+  // TASK-405: Download needs a secure context (window.showDirectoryPicker,
+  // TASK-403), which the app's normal http:// origin never satisfies — so this
+  // one link crosses to the HTTPS door (TASK-404) instead of staying same-origin
+  // like every other companion navigation. Port comes from /api/config at
+  // runtime (core/server-config.js), not hardcoded.
+  function navigateToDownloads(httpsOrigin) {
+    var target = new URL('downloads.html?profile=' + encodeURIComponent(activeProfile()), window.location.href);
+    window.location.href = httpsOrigin + target.pathname + target.search;
+  }
   function goToDownloads() {
-    window.location.href = 'downloads.html?profile=' + encodeURIComponent(activeProfile());
+    fetchHttpsOrigin(server).then(navigateToDownloads);
   }
   document.getElementById('btn-download-playlist').addEventListener('click', goToDownloads);
 

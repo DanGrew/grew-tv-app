@@ -42,7 +42,7 @@ module or a screen** — this index rots otherwise (it did).
 - `app-ws.js` — TV-side app WebSocket connect (`connectApp`, FEAT-026 Ph2)
 - `companion-ws.js` — companion WS: targets ONE screen by `device_id` (TASK-158)
 - `ws-protocol.js` — message types + device/person registries, addressed relay
-- `server-config.js` — single source for the media-manager WS URL (`fetchWsUrl`)
+- `server-config.js` — single source for the media-manager WS URL (`fetchWsUrl`) and the HTTPS door's origin (`fetchHttpsOrigin`, TASK-405)
 - `companion-manifest.js` — companion manifest fetch
 - `remote.js` — WS watchdog (ping/reconnect)
 - `log.js` — app-side logging emitter (POST /log) + seek coalescer (TASK-213)
@@ -103,7 +103,7 @@ module or a screen** — this index rots otherwise (it did).
 - `companion-playlist.js` · `companion-playlist-create.js`
 - `companion-breadcrumb.js` · `companion-screen-bar.js` · `companion-sync-bar.js` · `companion-error.js`
 - `companion-quick-pause.js` — the disconnected "background mode" page (TASK-367): no WS, three buttons POST straight to TASK-366's `/api/quick-intent/{action}`, targeting the device the full companion already persisted. No TV counterpart by design.
-- `companion-downloads.js` — the Downloads page (TASK-403), reached from a Download button on `companion-playlist.js`'s manage-actions row: no WS (a phone-local folder choice, like `companion-quick-pause.js`), DOM glue only over the `downloads-*` core modules. No TV counterpart — syncing to this phone's storage has no TV analogue.
+- `companion-downloads.js` — the Downloads page (TASK-403), reached from a Download button on `companion-playlist.js`'s manage-actions row: no WS (a phone-local folder choice, like `companion-quick-pause.js`), DOM glue only over the `downloads-*` core modules. No TV counterpart — syncing to this phone's storage has no TV analogue. TASK-405: that one link crosses to the HTTPS door's origin (`server-config.js` `fetchHttpsOrigin`) instead of staying same-origin like every other companion navigation — `window.showDirectoryPicker` needs a secure context the app's normal `http://` origin never satisfies.
 
 ## Content
 

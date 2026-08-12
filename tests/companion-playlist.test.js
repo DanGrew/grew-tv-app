@@ -181,14 +181,19 @@ test.describe('Road Trip playlist (2 tracks)', () => {
     await expect(page).toHaveURL(/companion\/playlist-create\.html\?rename=pl-roadtrip&name=Road%20Trip/);
   });
 
-  // TASK-403 — the Download button is icon-only (matching add-all/rename/delete)
-  // and navigates to the Downloads page, carrying the live profile so it lists
-  // the right playlists (the mock app_state sets profile 'kids').
-  test('TASK-403: Download is icon-only and navigates to the Downloads page with the live profile', async ({ page }) => {
+  // TASK-403 — the Download button is icon-only (matching add-all/rename/delete).
+  // TASK-405 — it navigates to the Downloads page over the HTTPS door (TASK-404),
+  // not same-origin like every other companion link, since showDirectoryPicker
+  // needs a secure context; the target port comes from /api/config.httpsPort
+  // (installApi fixture: 8767), stubbed here since nothing really listens on it.
+  test('TASK-403/405: Download is icon-only and navigates to the Downloads page over HTTPS with the live profile', async ({ page }) => {
+    await page.route('https://localhost:8767/companion/downloads.html**', function(route) {
+      return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html>' });
+    });
     await expect(page.locator('#btn-download-playlist')).toHaveText('\u{2913}');
     await expect(page.locator('#btn-download-playlist')).toHaveAttribute('aria-label', 'Download');
     await page.locator('#btn-download-playlist').click();
-    await expect(page).toHaveURL(/companion\/downloads\.html\?profile=kids$/);
+    await expect(page).toHaveURL('https://localhost:8767/companion/downloads.html?profile=kids');
   });
 
   // FEAT-036 (TASK-211) — per-track reorder (↑ ↓) + remove (✕), the companion

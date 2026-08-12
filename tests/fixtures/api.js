@@ -453,8 +453,10 @@ async function installApi(page) {
   // (core/server-config.js fetchWsUrl) instead of hardcoding 8766. Serve 8766 here
   // so the resolved ws url stays ws://host:8766 and the routeWebSocket(/:8766/)
   // stub below still matches. (The TV app still hardcodes 8766 via connectApp.)
+  // TASK-405: same reasoning for httpsPort (core/server-config.js
+  // fetchHttpsOrigin) — 8767 matches the real backend's DEFAULT_HTTPS_PORT.
   await page.route('**/api/config', function(route) {
-    return json(route, 200, { wsPort: 8766, contentBase: '' });
+    return json(route, 200, { wsPort: 8766, httpsPort: 8767, contentBase: '' });
   });
   // Default WebSocket stub (FEAT-026). Every screen boots connectApp(ws://:8766),
   // a port the app HARDCODES (core/server-config.js WS_PORT). With no route these
