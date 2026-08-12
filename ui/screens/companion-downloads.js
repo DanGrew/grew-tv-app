@@ -16,7 +16,15 @@ var CHECK_TOGGLE = { true: false, false: true };
 
 export function initPage() {
   var server = window.location.origin;
-  var profile = [new URLSearchParams(window.location.search).get('profile')].filter(Boolean).concat(['adults'])[0];
+  var params = new URLSearchParams(window.location.search);
+  var profile = [params.get('profile')].filter(Boolean).concat(['adults'])[0];
+  // BUG-065: the Download button (companion-playlist.js) hands its own URL
+  // through as `back` so there's a way out — TASK-405 sends this page to the
+  // HTTPS door's origin, where the phone's own back gesture/button can't be
+  // relied on (e.g. companion pinned to the home screen, no browser chrome).
+  // Falls back to the playlist library if reached without it (direct link).
+  var back = [params.get('back')].filter(Boolean).concat(['browse.html?profile=' + encodeURIComponent(profile)])[0];
+  document.getElementById('btn-back').addEventListener('click', function() { window.location.href = back; });
   var els = {
     unsupported: document.getElementById('unsupported'),
     folderPicker: document.getElementById('folder-picker'),
