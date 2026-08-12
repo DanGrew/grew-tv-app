@@ -9,7 +9,7 @@ import { loadBrowse } from '../../core/app-api.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { getStoredHandle, setStoredHandle, ensureReadWritePermission } from '../../core/downloads-handle-store.js';
 import { syncCheckedPlaylists } from '../../core/downloads-sync.js';
-import { playlistStatusText } from '../../core/downloads-status-text.js';
+import { playlistStatusText, syncFailureText } from '../../core/downloads-status-text.js';
 
 var PANEL_DISPLAY = { true: 'flex', false: 'none' };
 var CHECK_TOGGLE = { true: false, false: true };
@@ -98,6 +98,15 @@ export function initPage() {
     render();
   }
 
+  // BUG-064 — syncCheckedPlaylists resolves { [playlistId]: { failed } } even
+  // when some tracks failed (it no longer throws for a per-track failure);
+  // this names what went wrong instead of the old generic "Sync failed."
+  // syncFailureText returns null on a clean sync, so the line is left as-is
+  // (the per-row status already reads Synced).
+  function reportSyncFailures(results) {
+    [syncFailureText(results)].filter(Boolean).forEach(showStatus);
+  }
+
   function onSyncClick() {
     var ids = checkedIds();
     state.syncing = true;
@@ -107,7 +116,7 @@ export function initPage() {
         var ACT = {
           true: function() {
             return syncCheckedPlaylists(state.handle, server, ids, onTrackProgress)
-              .then(function() { state.progress = {}; });
+              .then(function(results) { state.progress = {}; reportSyncFailures(results); });
           },
           false: function() { showStatus('Permission to write to the folder was not granted.'); return Promise.resolve(); }
         };

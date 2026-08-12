@@ -34,6 +34,16 @@ async function fetchAudioBlob(serverUrl, track) {
   return res.blob();
 }
 
+// BUG-064 — a thrown HTTP status (fetchAudioBlob / loadLyrics reject with the
+// bare `res.status` number) reads as "HTTP {status}"; a File System Access
+// error (DOMException/Error) carries its own .message; anything else falls
+// back to String(e) rather than an opaque "[object Object]".
+function trackErrorReason(e) {
+  if (typeof e === 'number') return 'HTTP ' + e;
+  if (e && e.message) return e.message;
+  return String(e);
+}
+
 // Write one track's audio (always) and .lrc (when it has lyrics), skipping
 // each file that already exists in the folder. Returns whether the audio
 // file was newly written (the m3u lists every track regardless).
@@ -69,19 +79,31 @@ export function m3uText(tracks) {
 
 // Sync one playlist's tracks into the folder, then (re)write its .m3u in
 // full. `onTrack(i, total)` (optional) reports progress as each track
-// finishes. Returns a summary: how many tracks total, newly written, and
-// already present (dedup count for the UI's status line).
+// finishes. BUG-064 — a single track's failure (fetch, FS write, lyrics
+// fetch) no longer aborts the rest of the batch: each track is caught
+// individually, and the .m3u lists only the tracks that actually have a file
+// on disk (succeeded this run, or already present) so it never references a
+// failed track's missing file. Returns a summary: how many tracks total,
+// newly written, already present (dedup count), and which failed
+// ({id, title, reason}) for the UI's status line.
 export async function syncPlaylist(dirHandle, serverUrl, playlist, onTrack) {
   var report = [onTrack].filter(Boolean).concat([function() {}])[0];
   var tracks = [playlist.items].filter(Array.isArray).concat([[]])[0].map(function(item) { return item.video; });
   var written = 0;
+  var ok = [];
+  var failed = [];
   for (var i = 0; i < tracks.length; i++) {
-    var wasWritten = await ensureTrackFiles(dirHandle, serverUrl, tracks[i]);
-    if (wasWritten) written++;
+    try {
+      var wasWritten = await ensureTrackFiles(dirHandle, serverUrl, tracks[i]);
+      if (wasWritten) written++;
+      ok.push(tracks[i]);
+    } catch (e) {
+      failed.push({ id: tracks[i].id, title: tracks[i].title, reason: trackErrorReason(e) });
+    }
     report(i + 1, tracks.length);
   }
-  await writeFile(dirHandle, playlistM3uFilename(playlist.title), m3uText(tracks));
-  return { total: tracks.length, written: written, alreadyPresent: tracks.length - written };
+  await writeFile(dirHandle, playlistM3uFilename(playlist.title), m3uText(ok));
+  return { total: tracks.length, written: written, alreadyPresent: ok.length - written, failed: failed };
 }
 
 // Sync a batch of checked playlists, by id, in order — the ui layer's Sync
@@ -103,9 +125,11 @@ export async function syncPlaylists(dirHandle, serverUrl, playlistIds, onProgres
 
 // The ui layer's whole Sync-tap job in one call: sync every checked
 // playlist, then mark each as synced (core/downloads-synced.js) so the
-// status line flips without the caller doing its own bookkeeping.
+// status line flips without the caller doing its own bookkeeping. BUG-064 —
+// a playlist with any failed track is NOT marked synced (its status line
+// would otherwise read "Synced" over an incomplete folder).
 export async function syncCheckedPlaylists(dirHandle, serverUrl, playlistIds, onProgress) {
   var results = await syncPlaylists(dirHandle, serverUrl, playlistIds, onProgress);
-  playlistIds.forEach(function(id) { markSynced(id); });
+  playlistIds.filter(function(id) { return results[id].failed.length === 0; }).forEach(markSynced);
   return results;
 }
