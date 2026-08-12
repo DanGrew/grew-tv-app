@@ -143,9 +143,16 @@ test('a standalone film plays THROUGH the engine (play-video) and keeps the Queu
   await installVideoPlaybackBackend(page);
   const played = page.waitForRequest(req =>
     req.url().includes('/api/video-playback/play-video') && req.method() === 'POST');
+  // swapVideo (screen-video-page.js) only calls playVideo — which sets #video's src —
+  // after this progress load resolves; that's the real signal playback started, not
+  // just the play-video POST being sent. Wait on it explicitly instead of racing the
+  // attribute assertion's own retry window against a slow CI runner.
+  const progressLoaded = page.waitForResponse(res =>
+    res.url().includes('/api/progress/finding-nemo-main') && res.request().method() === 'GET');
   await page.goto('/app/homeview/video.html?video=finding-nemo-main&from=browse');
   await expect(page.locator('#screen-video')).toBeVisible();
   expect(JSON.parse((await played).postData())).toEqual({ video_id: 'finding-nemo-main' });
+  await progressLoaded;
   await expect(page.locator('#video')).toHaveAttribute('src', /finding-nemo-main/);
   await expect(page.locator('#btn-queue')).toBeVisible();
   await page.locator('#btn-queue').click();
