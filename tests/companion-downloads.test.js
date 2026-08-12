@@ -98,6 +98,24 @@ async function routeBrowseWithPlaylists(page) {
   }));
 }
 
+test('BUG-065: Back returns to the page the Download button was reached from', async ({ page }) => {
+  await installApi(page);
+  await routeBrowseWithPlaylists(page);
+  const from = 'http://example.test/companion/playlist.html?id=pl-roadtrip';
+  await page.goto('/companion/downloads.html?profile=kids&back=' + encodeURIComponent(from));
+  await page.route(from, route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html>' }));
+  await page.locator('#btn-back').click();
+  await expect(page).toHaveURL(from);
+});
+
+test('BUG-065: Back falls back to the playlist library when reached without a back param', async ({ page }) => {
+  await installApi(page);
+  await routeBrowseWithPlaylists(page);
+  await page.goto('/companion/downloads.html?profile=kids');
+  await page.locator('#btn-back').click();
+  await expect(page).toHaveURL(/companion\/browse\.html\?profile=kids/);
+});
+
 test('TASK-403: shows the unsupported message when the browser lacks the folder picker API', async ({ page }) => {
   // Real Chromium implements showDirectoryPicker — delete it to stand in for
   // a browser that doesn't (e.g. iOS Safari), per story 7's feature-detect.
@@ -202,5 +220,30 @@ test.describe('with the File System Access API', () => {
     const files = await page.evaluate(() => Object.keys(window.__dlFiles));
     expect(files).toContain('Empty Mix.m3u');
     expect(files.filter(f => f === 'ELO - Sweet Talkin Woman.m4a')).toHaveLength(1);
+  });
+
+  // BUG-064 — one bad track no longer kills the whole sync.
+  test('BUG-064: a failed track does not abort the rest of the sync, and the status line names it', async ({ page }) => {
+    await page.route('**/media/ootb-01.m4a', route => route.fulfill({ status: 404 }));
+    await page.goto('/companion/downloads.html?profile=kids');
+    await page.locator('#btn-choose-folder').click();
+    await page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-check').check();
+    await page.locator('#btn-sync').click();
+    await expect(page.locator('#dl-status')).toHaveText('1 track failed — Turn to Stone (HTTP 404)');
+    const files = await page.evaluate(() => Object.keys(window.__dlFiles));
+    expect(files).toContain('ELO - Sweet Talkin Woman.m4a');
+    expect(files).not.toContain('ELO - Turn to Stone.m4a');
+    expect(files).toContain('Road Trip.m3u');
+    const m3u = await page.evaluate(() => window.__dlFiles['Road Trip.m3u']);
+    expect(m3u).not.toContain('Turn to Stone');
+  });
+
+  test('BUG-064: a playlist synced with a failed track is not marked Synced', async ({ page }) => {
+    await page.route('**/media/ootb-01.m4a', route => route.fulfill({ status: 404 }));
+    await page.goto('/companion/downloads.html?profile=kids');
+    await page.locator('#btn-choose-folder').click();
+    await page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-check').check();
+    await page.locator('#btn-sync').click();
+    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Not synced');
   });
 });

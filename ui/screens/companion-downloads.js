@@ -9,14 +9,22 @@ import { loadBrowse } from '../../core/app-api.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { getStoredHandle, setStoredHandle, ensureReadWritePermission } from '../../core/downloads-handle-store.js';
 import { syncCheckedPlaylists } from '../../core/downloads-sync.js';
-import { playlistStatusText } from '../../core/downloads-status-text.js';
+import { playlistStatusText, syncFailureText } from '../../core/downloads-status-text.js';
 
 var PANEL_DISPLAY = { true: 'flex', false: 'none' };
 var CHECK_TOGGLE = { true: false, false: true };
 
 export function initPage() {
   var server = window.location.origin;
-  var profile = [new URLSearchParams(window.location.search).get('profile')].filter(Boolean).concat(['adults'])[0];
+  var params = new URLSearchParams(window.location.search);
+  var profile = [params.get('profile')].filter(Boolean).concat(['adults'])[0];
+  // BUG-065: the Download button (companion-playlist.js) hands its own URL
+  // through as `back` so there's a way out — TASK-405 sends this page to the
+  // HTTPS door's origin, where the phone's own back gesture/button can't be
+  // relied on (e.g. companion pinned to the home screen, no browser chrome).
+  // Falls back to the playlist library if reached without it (direct link).
+  var back = [params.get('back')].filter(Boolean).concat(['browse.html?profile=' + encodeURIComponent(profile)])[0];
+  document.getElementById('btn-back').addEventListener('click', function() { window.location.href = back; });
   var els = {
     unsupported: document.getElementById('unsupported'),
     folderPicker: document.getElementById('folder-picker'),
@@ -98,6 +106,15 @@ export function initPage() {
     render();
   }
 
+  // BUG-064 — syncCheckedPlaylists resolves { [playlistId]: { failed } } even
+  // when some tracks failed (it no longer throws for a per-track failure);
+  // this names what went wrong instead of the old generic "Sync failed."
+  // syncFailureText returns null on a clean sync, so the line is left as-is
+  // (the per-row status already reads Synced).
+  function reportSyncFailures(results) {
+    [syncFailureText(results)].filter(Boolean).forEach(showStatus);
+  }
+
   function onSyncClick() {
     var ids = checkedIds();
     state.syncing = true;
@@ -107,7 +124,7 @@ export function initPage() {
         var ACT = {
           true: function() {
             return syncCheckedPlaylists(state.handle, server, ids, onTrackProgress)
-              .then(function() { state.progress = {}; });
+              .then(function(results) { state.progress = {}; reportSyncFailures(results); });
           },
           false: function() { showStatus('Permission to write to the folder was not granted.'); return Promise.resolve(); }
         };
