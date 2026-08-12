@@ -26,6 +26,29 @@ describe('playlistStatusText', () => {
     store['grew-tv.downloads.synced'] = JSON.stringify(['pl-a']);
     expect(playlistStatusText('pl-a', { done: 1, total: 2 })).toBe('Syncing — 1/2');
   });
+
+  // BUG-066 — the track count leads, before any sync starts.
+  describe('track count (BUG-066)', () => {
+    it('prefixes "N tracks" ahead of Not synced', () => {
+      expect(playlistStatusText('pl-a', undefined, 12)).toBe('12 tracks — Not synced');
+    });
+    it('prefixes "N tracks" ahead of Synced', () => {
+      store['grew-tv.downloads.synced'] = JSON.stringify(['pl-a']);
+      expect(playlistStatusText('pl-a', undefined, 12)).toBe('12 tracks — Synced');
+    });
+    it('singularises "1 track"', () => {
+      expect(playlistStatusText('pl-a', undefined, 1)).toBe('1 track — Not synced');
+    });
+    it('shows "0 tracks" for a valid empty playlist, not a blank prefix', () => {
+      expect(playlistStatusText('pl-a', undefined, 0)).toBe('0 tracks — Not synced');
+    });
+    it('omits the prefix when clipCount is absent (older caller / not yet loaded)', () => {
+      expect(playlistStatusText('pl-a', undefined, undefined)).toBe('Not synced');
+    });
+    it('does not prefix the mid-sync progress line', () => {
+      expect(playlistStatusText('pl-a', { done: 1, total: 2 }, 12)).toBe('Syncing — 1/2');
+    });
+  });
 });
 
 // BUG-064 — the post-sync status line naming what failed.

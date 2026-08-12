@@ -141,14 +141,16 @@ test.describe('with the File System Access API', () => {
     await expect(page.locator('#playlist-panel')).toBeHidden();
   });
 
-  test('choosing a folder lists every playlist, each Not synced', async ({ page }) => {
+  test('choosing a folder lists every playlist, each with its track count and Not synced', async ({ page }) => {
     await page.goto('/companion/downloads.html?profile=kids');
     await page.locator('#btn-choose-folder').click();
     await expect(page.locator('#playlist-panel')).toBeVisible();
     await expect(page.locator('#folder-chip')).toHaveText('GrewTV Music');
     await expect(page.locator('.pl-row')).toHaveCount(2);
-    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('Not synced');
-    await expect(page.locator('.pl-row', { hasText: 'Empty Mix' }).locator('.pl-status')).toHaveText('Not synced');
+    // BUG-066 — the track count shows before any sync starts (fixture: Road
+    // Trip clipCount 2, Empty Mix clipCount 0).
+    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Not synced');
+    await expect(page.locator('.pl-row', { hasText: 'Empty Mix' }).locator('.pl-status')).toHaveText('0 tracks — Not synced');
   });
 
   test('a folder chosen on an earlier visit is remembered — no repeat prompt on reload', async ({ page }) => {
@@ -166,7 +168,7 @@ test.describe('with the File System Access API', () => {
     await page.locator('#btn-choose-folder').click();
     await page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-check').check();
     await page.locator('#btn-sync').click();
-    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('Synced');
+    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Synced');
     const files = await page.evaluate(() => Object.keys(window.__dlFiles));
     expect(files).toContain('ELO - Sweet Talkin Woman.m4a');
     expect(files).toContain('ELO - Turn to Stone.m4a');
@@ -178,8 +180,8 @@ test.describe('with the File System Access API', () => {
     await page.locator('#btn-choose-folder').click();
     await page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-check').check();
     await page.locator('#btn-sync').click();
-    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('Synced');
-    await expect(page.locator('.pl-row', { hasText: 'Empty Mix' }).locator('.pl-status')).toHaveText('Not synced');
+    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Synced');
+    await expect(page.locator('.pl-row', { hasText: 'Empty Mix' }).locator('.pl-status')).toHaveText('0 tracks — Not synced');
   });
 
   test('the Sync button is disabled until a playlist is checked', async ({ page }) => {
@@ -208,12 +210,12 @@ test.describe('with the File System Access API', () => {
     await page.locator('#btn-choose-folder').click();
     await page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-check').check();
     await page.locator('#btn-sync').click();
-    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('Synced');
+    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Synced');
     expect(audioFetchCount).toBe(1);
 
     await page.locator('.pl-row', { hasText: 'Empty Mix' }).locator('.pl-check').check();
     await page.locator('#btn-sync').click();
-    await expect(page.locator('.pl-row', { hasText: 'Empty Mix' }).locator('.pl-status')).toHaveText('Synced');
+    await expect(page.locator('.pl-row', { hasText: 'Empty Mix' }).locator('.pl-status')).toHaveText('0 tracks — Synced');
     expect(audioFetchCount).toBe(1);
     const files = await page.evaluate(() => Object.keys(window.__dlFiles));
     expect(files).toContain('Empty Mix.m3u');
@@ -242,6 +244,6 @@ test.describe('with the File System Access API', () => {
     await page.locator('#btn-choose-folder').click();
     await page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-check').check();
     await page.locator('#btn-sync').click();
-    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('Not synced');
+    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Not synced');
   });
 });

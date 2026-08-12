@@ -1,15 +1,15 @@
 import { playlistCards } from '../../core/playlist-pick.js';
 
 describe('playlistCards', () => {
-  it('keeps only collectionType:playlist cards, reduced to {id,title}', () => {
+  it('keeps only collectionType:playlist cards, reduced to {id,title,clipCount}', () => {
     var content = [
       { kind: 'series', id: 'ootb', title: 'Out of the Blue', section: 'music', collectionType: undefined },
       { kind: 'series', id: 'pl-roadtrip', title: 'Road Trip', section: 'music', collectionType: 'playlist', clipCount: 2 },
       { kind: 'series', id: 'pl-empty', title: 'Empty Mix', section: 'music', collectionType: 'playlist', clipCount: 0 }
     ];
     expect(playlistCards(content)).toEqual([
-      { id: 'pl-roadtrip', title: 'Road Trip' },
-      { id: 'pl-empty', title: 'Empty Mix' }
+      { id: 'pl-roadtrip', title: 'Road Trip', clipCount: 2 },
+      { id: 'pl-empty', title: 'Empty Mix', clipCount: 0 }
     ]);
   });
 
