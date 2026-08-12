@@ -29,7 +29,7 @@ jobs:
           const { execSync } = require('child_process');
           if (!fs.existsSync('coverage/coverage-summary.json')) {
             fs.writeFileSync('coverage-report.md', '### Unit Test Coverage\n⚠️ Coverage data missing — tests may have failed.');
-            process.exit(0);
+            process.exit(1);
           }
           const cov = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
           const s = cov.total;
