@@ -28,3 +28,22 @@ export function fetchWsUrl(serverOrigin) {
     .then(function(c) { return wsUrl(location.hostname, c.wsPort); })
     .catch(function() { return wsUrl(location.hostname); });
 }
+
+// TASK-405: same shape as the WS port above, for the HTTPS door (TASK-404) — the
+// one other host detail a page loaded over plain http:// can't read off its own
+// URL. The Download link needs the app's own origin swapped for this one, not a
+// second port alongside it, so this returns a full origin rather than a URL.
+export var HTTPS_PORT = 8767;
+
+export function httpsOrigin(hostname, port) {
+  return 'https://' + hostname + ':' + (port != null ? port : HTTPS_PORT);
+}
+
+// Reads /api/config.httpsPort (authoritative) instead of hardcoding 8767, same
+// reasoning and same fallback behavior as fetchWsUrl.
+export function fetchHttpsOrigin(serverOrigin) {
+  return fetch(serverOrigin + '/api/config')
+    .then(function(r) { return r.json(); })
+    .then(function(c) { return httpsOrigin(location.hostname, c.httpsPort); })
+    .catch(function() { return httpsOrigin(location.hostname); });
+}
