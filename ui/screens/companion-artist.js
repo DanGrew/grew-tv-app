@@ -11,6 +11,7 @@ import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountRowStep } from './companion-row-step.js';
 
 // TASK-322 (FEAT-046) — the companion artist mirror: the same grouped SONG LIST as
 // the TV artist page (all the artist's tracks, grouped under album headers, newest
@@ -38,7 +39,8 @@ export function initPage() {
   // FEAT-038 (DSYNC-2c): the switch only changes mode. BROWSE greys the song rows
   // (they drive the TV); CONTROL reloads (reconnect).
   function reSync() { window.location.reload(); }
-  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
+  var applyRowStepMode = mountRowStep(mode, getApi);
+  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); applyRowStepMode(); }
   function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
   // Breadcrumb trail (FEAT-021 / BUG-021): the artist page records its OWN

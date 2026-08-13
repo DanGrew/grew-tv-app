@@ -46,6 +46,15 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
 });
 
+// TASK-408 — the companion ▲/▼ row-step buttons: while synced, they nudge the
+// TV's browse focus one rail row without a full navigate.
+test('the ▲/▼ row-step buttons send navigate_up/navigate_down while synced', async ({ page }) => {
+  await page.locator('#row-step .row-step-btn[aria-label="Focus row down"]').click();
+  await expect.poll(() => intents.some((i) => i.intent === 'navigate_down')).toBe(true);
+  await page.locator('#row-step .row-step-btn[aria-label="Focus row up"]').click();
+  await expect.poll(() => intents.some((i) => i.intent === 'navigate_up')).toBe(true);
+});
+
 test('L1 shows section chips from the server sections — no rails/grid/Back yet', async ({ page }) => {
   await expect(page.locator('#rails-wrap')).toBeHidden();
   await expect(page.locator('#grid-wrap')).toBeHidden();
@@ -352,6 +361,17 @@ test.describe('desync mode', () => {
     await expect(page.locator('#switch-profile')).not.toHaveClass(/desync-off/);
     await browseOpt(page).click();
     await expect(page.locator('#switch-profile')).toHaveClass(/desync-off/);
+  });
+
+  // TASK-408 story 4 — desynced, the row-step buttons read as inactive and emit
+  // nothing (the companion is browsing on its own).
+  test('the ▲/▼ row-step buttons grey out and emit nothing in Browse mode', async ({ page }) => {
+    await expect(page.locator('#row-step .row-step-btn[aria-label="Focus row down"]')).not.toHaveClass(/desync-off/);
+    await browseOpt(page).click();
+    await expect(page.locator('#row-step .row-step-btn[aria-label="Focus row down"]')).toHaveClass(/desync-off/);
+    await expect(page.locator('#row-step .row-step-btn[aria-label="Focus row up"]')).toHaveClass(/desync-off/);
+    await page.locator('#row-step .row-step-btn[aria-label="Focus row down"]').click({ force: true });
+    expect(intents.filter((i) => i.intent === 'navigate_down')).toHaveLength(0);
   });
 });
 

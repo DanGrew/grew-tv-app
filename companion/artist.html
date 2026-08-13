@@ -61,12 +61,16 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .seg-opt.on { background: var(--surface-hi); color: var(--focus); }
 .seg-opt:active { color: var(--focus); }
 .seg-opt:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
+#row-step { display: flex; gap: 8px; flex-shrink: 0; }
+.row-step-btn { font-size: 18px; line-height: 1; padding: 9px 15px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.row-step-btn:active, .row-step-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.row-step-btn.desync-off { opacity: 0.35; pointer-events: none; }
 </style>
 </head>
 <body>
 <div id="conn-status">connecting…</div>
 <div id="screen-bar"></div>
-<div id="sync-bar"></div>
+<div id="sync-bar"><div id="row-step"></div></div>
 <div id="breadcrumb"></div>
 <div id="ctx-title"></div>
 <div id="list-wrap"><div id="songlist"></div></div>

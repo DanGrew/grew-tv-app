@@ -12,6 +12,7 @@ import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountRowStep } from './companion-row-step.js';
 
 // Companion series context (TASK-118): the episode list with per-episode
 // progress, fetched straight from the backend (catalog + progress are backend
@@ -35,6 +36,7 @@ export function initPage() {
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
+  var applyRowStepMode = mountRowStep(mode, getApi);
 
   // FEAT-032 (TASK-218) / BUG-021: the breadcrumb is built from the recorded nav
   // trail's top — whatever it is. Opened from an artist's albums page, the top is
@@ -357,7 +359,7 @@ export function initPage() {
   // Toggle: going DESYNCED re-renders to grey the play controls; going SYNCED
   // re-runs the reconnect path (reload) to snap back to the TV.
   function reSync() { window.location.reload(); }
-  function onToggle(desynced) { ({ true: render, false: reSync })[desynced](); }
+  function onToggle(desynced) { applyRowStepMode(); ({ true: render, false: reSync })[desynced](); }
 
   document.getElementById('btn-add-create').addEventListener('click', createNew);
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);

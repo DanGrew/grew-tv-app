@@ -89,6 +89,15 @@ test('tapping a song sends the play intent with the track id (drives the TV)', a
   await expect.poll(() => sentIntents.some(p => p.intent === 'play' && p.params.id === 'ootb-01')).toBe(true);
 });
 
+// TASK-408 — the companion ▲/▼ row-step buttons: while synced, they nudge the
+// TV's browse focus one rail row without a full navigate.
+test('the ▲/▼ row-step buttons send navigate_up/navigate_down while synced', async ({ page }) => {
+  await page.locator('#row-step .row-step-btn[aria-label="Focus row down"]').click();
+  await expect.poll(() => sentIntents.some(p => p.intent === 'navigate_down')).toBe(true);
+  await page.locator('#row-step .row-step-btn[aria-label="Focus row up"]').click();
+  await expect.poll(() => sentIntents.some(p => p.intent === 'navigate_up')).toBe(true);
+});
+
 test('the breadcrumb Music crumb teleports the TV back to the Music tab', async ({ page }) => {
   await expect(page.locator('#breadcrumb .crumb-link')).toHaveCount(2);
   await page.locator('#breadcrumb .crumb-link').last().click();
@@ -146,6 +155,15 @@ test.describe('desync mode (Browse)', () => {
     await expect(page.locator('.song')).toHaveCount(5);
     await expect(page.locator('body')).toHaveClass(/browsing/);
     await expect(page.locator('.song').first()).toHaveClass(/desync-off/);
+  });
+
+  // TASK-408 story 4 — desynced, the row-step buttons read as inactive (not just
+  // silently no-op) and taps reach the TV.
+  test('the ▲/▼ row-step buttons grey out and emit nothing while desynced', async ({ page }) => {
+    await expect(page.locator('#row-step .row-step-btn[aria-label="Focus row down"]')).toHaveClass(/desync-off/);
+    await expect(page.locator('#row-step .row-step-btn[aria-label="Focus row up"]')).toHaveClass(/desync-off/);
+    await page.locator('#row-step .row-step-btn[aria-label="Focus row down"]').click({ force: true });
+    expect(sentIntents.filter(p => p.intent === 'navigate_down')).toHaveLength(0);
   });
 
   // BUG-029: companion browse opens the artist page with the prefixed rail-tile id

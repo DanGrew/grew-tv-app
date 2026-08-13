@@ -11,6 +11,7 @@ import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountRowStep } from './companion-row-step.js';
 
 // FEAT-036 (TASK-205) — the companion playlist context: mirrors the TV's playlist
 // detail (its flat track list). The TV's screen-playlist-detail-page pushes
@@ -44,7 +45,8 @@ export function initPage() {
   // (rename/delete/add/reorder/remove — per-person POSTs) stays live; reach the
   // library via Back (local hop). CONTROL reloads to re-run reconnect.
   function reSync() { window.location.reload(); }
-  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
+  var applyRowStepMode = mountRowStep(mode, getApi);
+  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); applyRowStepMode(); }
   function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
   // Back: Control drives the TV back; Browse is a local hop to the library.

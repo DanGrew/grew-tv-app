@@ -85,6 +85,9 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 .seg-opt:active { color: var(--focus); }
 .seg-opt:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
 .desync-off { opacity: 0.35; pointer-events: none; }
+#row-step { display: flex; gap: 8px; flex-shrink: 0; }
+.row-step-btn { font-size: 18px; line-height: 1; padding: 9px 15px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.row-step-btn:active, .row-step-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #topbar-actions { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 #btn-search { flex: 0 0 auto; font-size: 18px; line-height: 1; padding: 8px 13px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #btn-search:active, #btn-search:focus { outline: none; border-color: var(--focus); color: var(--focus); }
@@ -112,7 +115,7 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 <body>
 <div id="conn-status">connecting…</div>
 <div id="screen-bar"></div>
-<div id="sync-bar"><div id="door"></div></div>
+<div id="sync-bar"><div id="row-step"></div><div id="door"></div></div>
 <div id="queue-actions">
 <button id="btn-play-queue" type="button" style="display:none">&#127909; (0)</button>
 <button id="btn-play-queue-music" type="button" style="display:none">&#127925; (0)</button>
