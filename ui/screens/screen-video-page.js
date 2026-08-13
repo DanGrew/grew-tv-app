@@ -160,6 +160,7 @@ export function initVideoPage() {
     document.getElementById('btn-add-playlist').classList.remove('hidden');
     document.getElementById('btn-mv-shuffle').classList.toggle('hidden', !mvIsMulti(seq));
     document.getElementById('btn-mv-repeat').classList.toggle('hidden', !mvIsMulti(seq));
+    mvSetTransportOn();
     initCaptions(SERVER).then(mvSwap).catch(function() {});
   }
 

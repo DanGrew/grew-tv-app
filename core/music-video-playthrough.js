@@ -53,8 +53,15 @@ export function isMulti(seq) {
 
 // The seq a playthrough starts from — `order` is the playlist/artist's own
 // resolved order, captured once so a later shuffle-off can return to it.
-export function initSeq(items, index) {
-  return { items: items, index: index, order: items, shuffle: false, repeat: false };
+// Shuffle + Repeat both default ON (owner call): the tapped/first item still
+// plays first — a start never jumps you away from the item you picked, same
+// as toggleShuffle's own anchor rule — then a fresh fair shuffle of the rest
+// follows behind it. An empty/not-yet-loaded seq (the pre-fetch placeholder)
+// stays empty rather than anchoring a null.
+export function initSeq(items, index, rng) {
+  var current = items[index] || null;
+  var shuffled = current === null ? items : [current].concat(fairShuffle(items.filter(function(it) { return it !== current; }), rng));
+  return { items: shuffled, index: 0, order: items, shuffle: true, repeat: true };
 }
 
 // Fisher-Yates over an injectable rng (defaults to Math.random) — mirrors the

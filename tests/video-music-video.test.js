@@ -57,6 +57,7 @@ test('an artist\'s music videos play through in order the same way', async ({ pa
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
   await page.locator('#btn-next').click();
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
+  await page.locator('#btn-mv-repeat').click(); // TASK-407: repeat defaults on — off so the boundary is a no-op, not a wrap
   await page.locator('#btn-next').click();
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/); // no third item — no-op
 });
@@ -64,6 +65,7 @@ test('an artist\'s music videos play through in order the same way', async ({ pa
 test('the last video in a playthrough ends, playback stops cleanly back to browse', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
+  await page.locator('#btn-mv-repeat').click(); // TASK-407: repeat defaults on — off for this baseline-ending case
   await page.locator('#btn-next').click();
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
@@ -109,22 +111,22 @@ test('a lone music video pick shows no Shuffle/Repeat controls either — nothin
   await expect(page.locator('#btn-mv-repeat')).toBeHidden();
 });
 
-test('a multi-item music-video playthrough shows Shuffle + Repeat, both starting off', async ({ page }) => {
+test('a multi-item music-video playthrough shows Shuffle + Repeat, both starting on', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
   await expect(page.locator('#btn-mv-shuffle')).toBeVisible();
   await expect(page.locator('#btn-mv-repeat')).toBeVisible();
-  await expect(page.locator('#btn-mv-shuffle')).not.toHaveClass(/on/);
-  await expect(page.locator('#btn-mv-repeat')).not.toHaveClass(/on/);
-  await page.locator('#btn-mv-shuffle').click();
   await expect(page.locator('#btn-mv-shuffle')).toHaveClass(/on/);
-  await page.locator('#btn-mv-repeat').click();
   await expect(page.locator('#btn-mv-repeat')).toHaveClass(/on/);
+  await page.locator('#btn-mv-shuffle').click();
+  await expect(page.locator('#btn-mv-shuffle')).not.toHaveClass(/on/);
+  await page.locator('#btn-mv-repeat').click();
+  await expect(page.locator('#btn-mv-repeat')).not.toHaveClass(/on/);
 });
 
-test('turning Repeat on (Shuffle off) loops back to the first video after the last one, instead of ending', async ({ page }) => {
+test('with Repeat on (Shuffle off), the playthrough loops back to the first video after the last one, instead of ending', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
-  await page.locator('#btn-mv-repeat').click();
+  await page.locator('#btn-mv-shuffle').click(); // shuffle defaults on — off so the wrap lands on a fixed item
   await page.locator('#btn-next').click();
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
@@ -132,18 +134,17 @@ test('turning Repeat on (Shuffle off) loops back to the first video after the la
   await expect(page).not.toHaveURL(/browse\.html/);
 });
 
-test('with Shuffle on, reaching the end of the playthrough starts a fresh pass instead of stopping', async ({ page }) => {
+test('with Shuffle + Repeat on (the default), reaching the end of the playthrough starts a fresh pass instead of stopping', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
-  await page.locator('#btn-mv-shuffle').click();
-  await page.locator('#btn-mv-repeat').click();
   await page.locator('#btn-next').click(); // the last item of this 2-item pass
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
   await expect(page).not.toHaveURL(/browse\.html/);
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-0[12]/);
 });
 
-test('Repeat off (Shuffle off): the playthrough still ends cleanly at the last item, unaffected by TASK-407', async ({ page }) => {
+test('Repeat off: the playthrough still ends cleanly at the last item', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
+  await page.locator('#btn-mv-repeat').click(); // repeat defaults on — off for this baseline-ending case
   await page.locator('#btn-next').click();
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));

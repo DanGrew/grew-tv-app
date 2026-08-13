@@ -3,6 +3,10 @@ import { currentItem, hasNext, hasPrev, upNextItem, isMulti, entryMode, musicVid
 
 function seq(items, index) { return { items: items, index: index }; }
 function mv(id, title) { return { id: id, title: title }; }
+// A plain, unshuffled seq — shuffle/repeat both off — for tests that exercise
+// toggleShuffle/toggleRepeat/nextSeq's own logic independent of initSeq's
+// (now ON-by-default) starting state.
+function baseSeq(items, index) { return { items: items, index: index, order: items, shuffle: false, repeat: false }; }
 // A fixed-value rng (not the queue-style Math.random signature — fairShuffle
 // calls it once per swap) so every shuffle in a test is pinned and repeatable.
 function fixedRng(value) { return function() { return value; }; }
@@ -184,10 +188,32 @@ describe('playlistTrackTarget', () => {
 });
 
 describe('initSeq', () => {
-  it('carries the given items/index and captures order from items, shuffle/repeat off', () => {
-    expect(initSeq([mv('a'), mv('b')], 1)).toEqual({
-      items: [mv('a'), mv('b')], index: 1, order: [mv('a'), mv('b')], shuffle: false, repeat: false
+  it('shuffle and repeat both default ON', () => {
+    var result = initSeq(['a', 'b'], 0, fixedRng(0));
+    expect(result.shuffle).toBe(true);
+    expect(result.repeat).toBe(true);
+  });
+  it('anchors the item at the given index first, then a fresh shuffle of the rest', () => {
+    var result = initSeq(['a', 'b', 'c', 'd'], 1, fixedRng(0)); // current = 'b'
+    expect(result.items[0]).toBe('b');
+    expect(result.items.slice(1)).toEqual(fairShuffle(['a', 'c', 'd'], fixedRng(0)));
+    expect(result.index).toBe(0);
+  });
+  it('captures order from the given items, unshuffled', () => {
+    var result = initSeq(['a', 'b', 'c'], 0, fixedRng(0));
+    expect(result.order).toEqual(['a', 'b', 'c']);
+  });
+  it('is a no-op reorder for a single-item list', () => {
+    expect(initSeq(['a'], 0, fixedRng(0))).toEqual({
+      items: ['a'], index: 0, order: ['a'], shuffle: true, repeat: true
     });
+  });
+  it('is empty, not [null], for an empty items list (the pre-load placeholder)', () => {
+    expect(initSeq([], 0)).toEqual({ items: [], index: 0, order: [], shuffle: true, repeat: true });
+  });
+  it('defaults to Math.random when no rng is given', () => {
+    var result = initSeq(['a', 'b', 'c'], 0);
+    expect(result.items.slice().sort()).toEqual(['a', 'b', 'c']);
   });
 });
 
@@ -223,7 +249,7 @@ describe('fairShuffle', () => {
 
 describe('toggleShuffle', () => {
   it('turning ON anchors the current item first, then a fresh shuffle of the rest, index reset to 0', () => {
-    var s = initSeq(['a', 'b', 'c', 'd'], 1); // current = 'b'
+    var s = baseSeq(['a', 'b', 'c', 'd'], 1); // current = 'b'
     var result = toggleShuffle(s, fixedRng(0));
     expect(result.shuffle).toBe(true);
     expect(result.items[0]).toBe('b');
@@ -249,7 +275,7 @@ describe('toggleShuffle', () => {
     expect(result.items.slice(1)).toEqual(['b']);
   });
   it('leaves repeat and other fields untouched', () => {
-    var s = initSeq(['a', 'b'], 0);
+    var s = baseSeq(['a', 'b'], 0);
     s.repeat = true;
     expect(toggleShuffle(s, fixedRng(0)).repeat).toBe(true);
   });
@@ -260,16 +286,16 @@ describe('toggleShuffle', () => {
 
 describe('toggleRepeat', () => {
   it('flips repeat on', () => {
-    var s = initSeq(['a', 'b'], 0);
+    var s = baseSeq(['a', 'b'], 0);
     expect(toggleRepeat(s).repeat).toBe(true);
   });
   it('flips repeat off', () => {
-    var s = initSeq(['a', 'b'], 0);
+    var s = baseSeq(['a', 'b'], 0);
     s.repeat = true;
     expect(toggleRepeat(s).repeat).toBe(false);
   });
   it('leaves items/index/shuffle/order untouched', () => {
-    var s = initSeq(['a', 'b'], 1);
+    var s = baseSeq(['a', 'b'], 1);
     var result = toggleRepeat(s);
     expect(result.items).toEqual(['a', 'b']);
     expect(result.index).toBe(1);
@@ -302,13 +328,13 @@ describe('canAdvance', () => {
 
 describe('nextSeq', () => {
   it('advances the index when a later item exists in the current pass', () => {
-    var s = initSeq(['a', 'b', 'c'], 0);
+    var s = baseSeq(['a', 'b', 'c'], 0);
     var result = nextSeq(s);
     expect(result.index).toBe(1);
     expect(result.items).toEqual(['a', 'b', 'c']);
   });
   it('is unchanged at the last item when repeat is off', () => {
-    var s = initSeq(['a', 'b'], 1);
+    var s = baseSeq(['a', 'b'], 1);
     expect(nextSeq(s)).toBe(s);
   });
   it('wraps to index 0 of the base order at the last item when repeat is on and shuffle is off', () => {
