@@ -240,6 +240,18 @@ jobs:
           name: report-no-pure-fn-outside-core
           path: reports/no-pure-fn-outside-core.txt
 
+  no-missing-card-route:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p reports
+      - run: node scripts/arch-check.js no-missing-card-route reports/no-missing-card-route.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-no-missing-card-route
+          path: reports/no-missing-card-route.txt
+
   ui-cyclomatic:
     runs-on: ubuntu-latest
     steps:
@@ -449,6 +461,7 @@ jobs:
       - no-css-outside-styles
       - no-md-outside-docs
       - no-pure-fn-outside-core
+      - no-missing-card-route
       - no-fetch-in-app
       - no-storage-in-app
       - no-ws-in-app
@@ -494,6 +507,7 @@ jobs:
             row "no-css-outside-styles" "$(smry reports/no-css-outside-styles.txt)"
             row "no-md-outside-docs" "$(smry reports/no-md-outside-docs.txt)"
             row "no-pure-fn-outside-core" "$(smry reports/no-pure-fn-outside-core.txt)"
+            row "no-missing-card-route" "$(smry reports/no-missing-card-route.txt)"
             row "no-fetch-in-app" "$(smry reports/no-fetch-in-app.txt)"
             row "no-storage-in-app" "$(smry reports/no-storage-in-app.txt)"
             row "no-ws-in-app" "$(smry reports/no-ws-in-app.txt)"

@@ -445,6 +445,107 @@ if (rule === 'companion-in-layers') {
   }
 }
 
+if (rule === 'no-missing-card-route') {
+  // Every table that dispatches on cardRoute(card)'s return value must handle
+  // (or explicitly declare unhandled) every value core/home-rails.js's
+  // CARD_ROUTES lists (TASK-383) — a gap silently no-ops instead of failing CI
+  // (TASK-374 provenance). A table opts in by marking the line directly above
+  // its `var/const/let NAME = {...}` declaration with `// @card-route-table`,
+  // optionally `unhandled: routeA, routeB` for a route that table deliberately
+  // doesn't serve.
+  const routesSrc = read(path.join(ROOT, 'core', 'home-rails.js'));
+  const routesMatch = routesSrc.match(/CARD_ROUTES\s*=\s*\[([^\]]*)\]/);
+  const ALL_ROUTES = routesMatch
+    ? Array.from(routesMatch[1].matchAll(/['"]([\w-]+)['"]/g)).map(m => m[1])
+    : null;
+
+  if (!ALL_ROUTES) {
+    violations.push(`core/home-rails.js — no CARD_ROUTES array found (single source of truth for cardRoute()'s possible return values)`);
+  }
+
+  const MARKER = /@card-route-table(?:\s+unhandled:\s*([\w,\s-]+))?/;
+  const TABLE_DECL = /\b(?:var|const|let)\s+(\w+)\s*=\s*\{/;
+
+  // Strip // line comments first — an explanatory comment between entries can
+  // itself contain a comma, which would otherwise read as a top-level separator.
+  function stripLineComments(text) {
+    return text.split('\n').map(line => {
+      const idx = line.indexOf('//');
+      return idx === -1 ? line : line.slice(0, idx);
+    }).join('\n');
+  }
+
+  // Top-level keys of an object literal (the text starting at its opening `{`
+  // through the matching `}`) — depth-tracked so a value's own nested object
+  // (e.g. a navTo() params literal) never masquerades as a table entry.
+  function topLevelKeys(objLiteral) {
+    const clean = stripLineComments(objLiteral);
+    const keys = [];
+    let depth = 0;
+    let segStart = null;
+    const KEY = /^\s*(?:'([\w-]+)'|"([\w-]+)"|(\w[\w-]*))\s*:/;
+    function push(seg) {
+      const m = seg.match(KEY);
+      if (m) keys.push(m[1] || m[2] || m[3]);
+    }
+    for (let i = 0; i < clean.length; i++) {
+      const ch = clean[i];
+      if (ch === '{') { depth++; if (depth === 1) segStart = i + 1; continue; }
+      if (ch === '}') { if (depth === 1) push(clean.slice(segStart, i)); depth--; continue; }
+      if (ch === ',' && depth === 1) { push(clean.slice(segStart, i)); segStart = i + 1; }
+    }
+    return keys;
+  }
+
+  function checkTables(lines, label) {
+    for (let i = 0; i < lines.length && ALL_ROUTES; i++) {
+      const markerMatch = lines[i].match(MARKER);
+      if (!markerMatch) continue;
+      const unhandled = (markerMatch[1] || '').split(',').map(s => s.trim()).filter(Boolean);
+
+      let declLine = -1, name = null;
+      for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+        const declMatch = lines[j].match(TABLE_DECL);
+        if (declMatch) { declLine = j; name = declMatch[1]; break; }
+      }
+      if (declLine === -1) {
+        violations.push(`${label}:${i + 1} — @card-route-table marker has no 'var/const/let NAME = {' within 4 lines`);
+        continue;
+      }
+
+      const fullText = lines.slice(declLine).join('\n');
+      const braceStart = fullText.indexOf('{');
+      let depth = 0, k = braceStart;
+      for (; k < fullText.length; k++) {
+        if (fullText[k] === '{') depth++;
+        else if (fullText[k] === '}') { depth--; if (depth === 0) break; }
+      }
+      const objLiteral = fullText.slice(braceStart, k + 1);
+      const declared = new Set([...topLevelKeys(objLiteral), ...unhandled]);
+      const missing = ALL_ROUTES.filter(r => !declared.has(r));
+      if (missing.length > 0) {
+        violations.push(`${label}:${declLine + 1} — '${name}' is missing cardRoute value(s) [${missing.join(', ')}] — add a handler, or list them in the @card-route-table 'unhandled:' comment above it`);
+      }
+    }
+  }
+
+  getAllFiles(path.join(ROOT, 'core'), ['.js']).concat(getAllFiles(path.join(ROOT, 'ui'), ['.js'])).forEach(file => {
+    const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+    scanned.push(rel);
+    checkTables(read(file).split('\n'), rel);
+  });
+
+  getAppAndCompanionHtml().forEach(file => {
+    const html = read(file);
+    const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+    extractInlineScripts(html).forEach((script, i) => {
+      const label = `${rel} (block ${i + 1})`;
+      scanned.push(label);
+      checkTables(script.split('\n'), label);
+    });
+  });
+}
+
 if (rule === 'no-logic-in-inline-callbacks') {
   getAppAndCompanionHtml().forEach(file => {
     const html = read(file);

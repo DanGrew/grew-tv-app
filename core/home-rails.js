@@ -80,6 +80,13 @@ function sectionOf(card) { return card.section || 'films'; }
 // album detail; otherwise the card's own kind ('video' plays, 'series' opens
 // collection detail). Routes on `kind`/server `section`/`collectionType`, never
 // a type enum. Pure so the browse screen stays DOM-only (no-pure-fn-outside-core).
+//
+// CARD_ROUTES is every value the function below can return — the single source
+// of truth both a consumer table and arch-check's `no-missing-card-route` rule
+// read (TASK-383). Add a new return branch below -> add its value here too, or
+// the check can't see the new route to enforce it.
+export var CARD_ROUTES = ['artist', 'playlist', 'music-video', 'album', 'video', 'series', 'track'];
+
 export function cardRoute(card) {
   if (card.kind === 'artist') return 'artist';
   if (card.collectionType === 'playlist' || card.collectionType === 'music-video-playlist') return 'playlist';

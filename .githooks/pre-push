@@ -19,6 +19,7 @@ node scripts/arch-check.js no-css-outside-styles   "$TMPDIR_HOOK/no-css.txt"    
 node scripts/arch-check.js no-md-outside-docs      "$TMPDIR_HOOK/no-md.txt"           || fail "no-md-outside-docs"
 node scripts/arch-check.js no-json-in-repo         "$TMPDIR_HOOK/no-json-in-repo.txt" || fail "no-json-in-repo"
 node scripts/arch-check.js no-pure-fn-outside-core "$TMPDIR_HOOK/no-pure-fn.txt"      || fail "no-pure-fn-outside-core"
+node scripts/arch-check.js no-missing-card-route   "$TMPDIR_HOOK/no-missing-route.txt" || fail "no-missing-card-route"
 
 echo "[pre-push] TV checks..."
 node scripts/tv-check.js tv-focus-rings   "$TMPDIR_HOOK/tv-focus.txt"   || fail "tv-focus-rings"

@@ -1,4 +1,4 @@
-import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail } from '../../core/home-rails.js';
 
 // TASK-235 — the create affordance is the Playlists rail-heading ＋ button (in the
 // browse screen), not a synthetic card. withPlaylistsRail just GUARANTEES the rail
@@ -593,6 +593,16 @@ describe('cardRoute (browse navigation, FEAT-027)', () => {
   // detail screen rather than starting a direct playthrough.
   it('routes a music-video playlist to the playlist detail, same as a song playlist', () => {
     expect(cardRoute({ kind: 'series', section: 'music-videos', collectionType: 'music-video-playlist', id: 'pl-vids' })).toBe('playlist');
+  });
+});
+
+// TASK-383 — CARD_ROUTES is the single source of truth arch-check's
+// no-missing-card-route rule reads to enforce every dispatch table handles (or
+// declares unhandled) every route cardRoute() can return; it must stay exactly
+// the set cardRoute()'s branches above actually produce.
+describe('CARD_ROUTES', () => {
+  it('lists every value cardRoute() can return', () => {
+    expect(CARD_ROUTES).toEqual(['artist', 'playlist', 'music-video', 'album', 'video', 'series', 'track']);
   });
 });
 

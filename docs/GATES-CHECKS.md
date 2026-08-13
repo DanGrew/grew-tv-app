@@ -98,6 +98,17 @@ Read this BEFORE writing screen code — these gate the PR in CI even when local
   Capture person FIRST / keep `onAppState` minimal, and an e2e that asserts
   `req.url()` contains `person=<id>` guards it (an empty-person POST still 204s in
   the fixture's global state, so assert the person, not just that the POST fired).
+- **A new `cardRoute()` return value must be added to `core/home-rails.js`'s
+  `CARD_ROUTES` list AND handled (or declared unhandled) by every table that
+  dispatches on it.** `no-missing-card-route` (TASK-383) walks `core/**`/`ui/**`
+  for tables marked `// @card-route-table` on the line directly above their
+  `var/const/let NAME = {...}`, and fails red naming any `CARD_ROUTES` value
+  missing from that table's keys. Declare a route the table deliberately
+  doesn't serve with `// @card-route-table unhandled: routeA, routeB` on that
+  same marker line (e.g. `core/companion-button-modes.js`'s `DESYNC_PAGE` — a
+  video/music-video "plays" rather than opening a page, so it has neither).
+  Adding a brand-new consumer table (FEAT-041 is the likely next one) means
+  adding the marker too — an unmarked table is invisible to the check.
 - **A `core/` logic change ships tests that would FAIL if the logic broke —
   `core/**` is mutation-gated by Stryker (TASK-305).** Coverage proves a line ran;
   mutation proves a test *catches* a change to it. Assert the actual values and
@@ -139,7 +150,7 @@ same loop, e.g.:
 ```bash
 for r in no-dom-in-core no-ui-imports no-stray-files no-app-exports no-guard-chain \
   no-filter-conditional app-index-only no-media-outside-assets no-css-outside-styles \
-  no-md-outside-docs no-json-in-repo no-pure-fn-outside-core; do
+  no-md-outside-docs no-json-in-repo no-pure-fn-outside-core no-missing-card-route; do
   node scripts/arch-check.js $r /tmp/$r.txt || echo "FAIL $r";
 done
 for r in tv-focus-rings tv-min-font-size tv-no-blank-screen; do
