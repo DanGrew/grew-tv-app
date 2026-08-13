@@ -16,6 +16,7 @@ import { desyncOpenPage, tileOffDesynced } from '../../core/companion-button-mod
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountRowStep } from './companion-row-step.js';
 
 // FEAT-028 / TASK-168 — companion drill-down browse (replaces the flat
 // FEAT-020/TASK-139 tab + all-rails + flat-search layout). The companion walks
@@ -72,6 +73,7 @@ export function initPage() {
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
+  var applyRowStepMode = mountRowStep(mode, getApi);
 
   function chip(text) {
     var b = document.createElement('button');
@@ -379,6 +381,7 @@ export function initPage() {
     document.getElementById('switch-profile').classList.toggle('desync-off', mode.isDesynced());
     document.getElementById('btn-play-queue').classList.toggle('desync-off', mode.isDesynced());
     document.getElementById('btn-play-queue-music').classList.toggle('desync-off', mode.isDesynced());
+    applyRowStepMode();
   }
 
   function render() {

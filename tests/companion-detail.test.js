@@ -205,6 +205,23 @@ test('TASK-321: an album companion has no Play-next button (video series keeps i
   await expect(page.locator('.play-next-btn')).toHaveCount(0);
 });
 
+// TASK-408 — the companion ▲/▼ row-step buttons: while synced, they nudge the
+// TV's browse focus one rail row without a full navigate.
+test('the ▲/▼ row-step buttons send navigate_up/navigate_down while synced', async ({ page }) => {
+  const intents = [];
+  await installApi(page);
+  await mockAppRec(page, {
+    context: { context_id: 'detail', series_id: 'bluey' },
+    appState: { screen: 'detail', itemId: 'bluey', profile: 'kids' }
+  }, intents);
+  await page.goto('/companion/detail.html');
+  await expect(page.locator('.tile-btn').first()).toBeVisible();
+  await page.locator('#row-step .row-step-btn[aria-label="Focus row down"]').click();
+  await expect.poll(() => intents.some((i) => i.intent === 'navigate_down')).toBe(true);
+  await page.locator('#row-step .row-step-btn[aria-label="Focus row up"]').click();
+  await expect.poll(() => intents.some((i) => i.intent === 'navigate_up')).toBe(true);
+});
+
 // FEAT-038 (TASK-230) — desynced detail. The companion arrives via browse's local
 // link (detail.html?id=…) while the TV is elsewhere, so it self-loads the series
 // from the id instead of waiting for the TV's context echo; it does not follow the
@@ -238,6 +255,18 @@ test.describe('desync mode', () => {
     await page.goto('/companion/detail.html?id=bluey');
     await expect(page.locator('.play-next-btn')).toHaveClass(/desync-off/);
     await expect(page.locator('.tile-btn').first()).toHaveClass(/desync-off/);
+  });
+
+  // TASK-408 story 4 — desynced, the row-step buttons read as inactive too.
+  test('the ▲/▼ row-step buttons grey out and emit nothing while desynced', async ({ page }) => {
+    const intents = [];
+    await installApi(page);
+    await mockElsewhere(page, intents);
+    await page.goto('/companion/detail.html?id=bluey');
+    await expect(page.locator('#row-step .row-step-btn[aria-label="Focus row down"]')).toHaveClass(/desync-off/);
+    await expect(page.locator('#row-step .row-step-btn[aria-label="Focus row up"]')).toHaveClass(/desync-off/);
+    await page.locator('#row-step .row-step-btn[aria-label="Focus row down"]').click({ force: true });
+    expect(intents.filter((i) => i.intent === 'navigate_down')).toHaveLength(0);
   });
 
   test('TASK-243: no Back button — breadcrumb Home is a local hop to browse, no intent to the TV', async ({ page }) => {

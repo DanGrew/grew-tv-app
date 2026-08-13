@@ -102,6 +102,12 @@ module or a screen** — this index rots otherwise (it did).
 - `companion-queue.js` · `companion-video-queue.js`
 - `companion-playlist.js` · `companion-playlist-create.js`
 - `companion-breadcrumb.js` · `companion-screen-bar.js` · `companion-sync-bar.js` · `companion-error.js`
+- `companion-row-step.js` — the ▲/▼ row-step control (TASK-408), mounted by the 4
+  browse-family mirrors (`companion-browse.js` for browse+rail-grid,
+  `companion-detail.js` for series+album detail, `companion-artist.js`,
+  `companion-playlist.js`): sends the existing `navigate_up`/`navigate_down`
+  intents (already gated synced-only by `companion-ws.js`'s `sendIntent`) and
+  greys itself while desynced, like every other TV-driving control.
 - `companion-quick-pause.js` — the disconnected "background mode" page (TASK-367): no WS, three buttons POST straight to TASK-366's `/api/quick-intent/{action}`, targeting the device the full companion already persisted. No TV counterpart by design.
 - `companion-downloads.js` — the Downloads page (TASK-403), reached from a Download button on `companion-playlist.js`'s manage-actions row: no WS (a phone-local folder choice, like `companion-quick-pause.js`), DOM glue only over the `downloads-*` core modules. No TV counterpart — syncing to this phone's storage has no TV analogue. TASK-405: that one link crosses to the HTTPS door's origin (`server-config.js` `fetchHttpsOrigin`) instead of staying same-origin like every other companion navigation — `window.showDirectoryPicker` needs a secure context the app's normal `http://` origin never satisfies. BUG-065: since that cross-origin jump means the phone's own back gesture/button can't be relied on, the originating page's URL rides along as a `back` query param (read straight off `window.location.href` before the jump) and a plain `#btn-back` link returns to it — falls back to the playlist library if reached without one.
 
