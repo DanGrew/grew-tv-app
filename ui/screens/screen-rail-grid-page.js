@@ -27,7 +27,10 @@ export function initRailGridPage() {
   // playlist, mirroring the browse page). cardRoute (core) picks by the server
   // `section`/`collectionType`, never a type enum. A CW episode tile carries
   // `series` (its owning collection) so the player can run Next/Prev from a tile
-  // launch (BUG-005); a film has none and navTo drops it.
+  // launch (BUG-005); a film has none and navTo drops it. `track` is search-only
+  // (TASK-383) — a rail-grid tile's card always comes from /api/browse or
+  // continue-watching, never search, so it can never be handed one.
+  // @card-route-table unhandled: track
   var SELECT = {
     artist:   function(card) { navTo('artist.html', { artist: card.artist }); },
     album:    function(card) { navTo('album-detail.html', { album: card.id }); },

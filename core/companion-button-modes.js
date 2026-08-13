@@ -33,9 +33,14 @@ export function actionEnabled(action, desynced) {
 // Which browse-tile destinations a desynced companion can open on its own, and
 // the COMPANION page that self-loads each from a URL id. series/album -> detail,
 // playlist -> playlist, artist -> artist (DSYNC-2c). A bare video/film only
-// "plays" (a TV action), so it has no desync page. cardRoute() (core/home-rails.js)
-// is the input. NB a playlist MUST route to playlist.html (loadPlaylist /
-// /api/playlist) — sending a playlist id to detail.html hits /api/series and 404s.
+// "plays" (a TV action), so it has no desync page — same for a lone music video
+// (TASK-383): it plays through video.html too, never a local page. `track` is
+// search-only and openItemLocal's card always comes from a browse tile, never a
+// search result, so this table can never be handed one either. cardRoute()
+// (core/home-rails.js) is the input. NB a playlist MUST route to playlist.html
+// (loadPlaylist / /api/playlist) — sending a playlist id to detail.html hits
+// /api/series and 404s.
+// @card-route-table unhandled: video, music-video, track
 var DESYNC_PAGE = { series: 'detail.html', album: 'detail.html', playlist: 'playlist.html', artist: 'artist.html' };
 export function desyncOpenPage(route) { return DESYNC_PAGE[route] || null; }
 export function tileOpenableDesynced(route) { return desyncOpenPage(route) != null; }

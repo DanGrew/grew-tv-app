@@ -173,6 +173,7 @@ export function initBrowsePage() {
   // falls through to the create page's own 'playlist' default).
   var COLLECTION_TYPE_BY_TAB = { 'music-videos': 'music-video-playlist' };
   function createPlaylist() { navTo('playlist-create.html', { collectionType: COLLECTION_TYPE_BY_TAB[getActiveTab()] }); }
+  // @card-route-table
   var SELECT = {
     artist:   function(card) { navTo('artist.html', { artist: card.artist }); },
     album:    function(card) { navTo('album-detail.html', { album: card.id }); },
