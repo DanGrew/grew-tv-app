@@ -62,7 +62,7 @@ module or a screen** — this index rots otherwise (it did).
 - `queue-view.js` / `queue-tabs.js` / `queue-crumb.js` — music Queue View (FEAT-031/039)
 - `video-queue-view.js` — video Queue View model + markup (FEAT-040)
 - `video-player-router.js` — persistent video-player view-router (FEAT-037)
-- `music-video-playthrough.js` — client-owned playthrough for a single music video, a music-video playlist or an artist's music videos: order + index, no server engine, no repeat, no resume (TASK-374)
+- `music-video-playthrough.js` — client-owned playthrough for a single music video, a music-video playlist or an artist's music videos: order + index + Shuffle/Repeat, no server engine, no resume (TASK-374/407)
 - `player-math.js` — pure video-player render arithmetic: `progressPct` / `clampTime` / `wrapIndex` / `frameDrop` (TASK-305)
 - `lrc.js` — LRC parse + rolling-frame lyric selection (FEAT-018)
 - `cover-mosaic.js` — playlist cover-mosaic markup (FEAT-039)

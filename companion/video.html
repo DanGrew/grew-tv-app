@@ -68,7 +68,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 .seg-opt.on { background: var(--surface-hi); color: var(--focus); }
 .seg-opt:active { color: var(--focus); }
 .seg-opt:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
-#c-repeat.hidden, #c-queue.hidden, #c-add-playlist.hidden { display: none; }
+#c-repeat.hidden, #c-shuffle.hidden, #c-queue.hidden, #c-add-playlist.hidden { display: none; }
 .desync-off { opacity: 0.35; pointer-events: none; }
 .browsing .transport, .browsing #jump, .browsing #c-reset { opacity: 0.35; pointer-events: none; }
 #add-sheet { display: none; position: fixed; inset: 0; z-index: 10; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); }
@@ -98,6 +98,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
   <button id="c-toggle" aria-label="Play/Pause">⏯</button>
   <button id="c-next" aria-label="Next">⏭</button>
   <button id="c-repeat" class="rp" aria-label="Repeat">🔁</button>
+  <button id="c-shuffle" class="rp hidden" aria-label="Shuffle">🔀</button>
   <button id="c-cc" class="cc" aria-label="Subtitles">CC</button>
 </div>
 <div class="transport">

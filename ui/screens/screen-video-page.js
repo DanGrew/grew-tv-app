@@ -6,7 +6,7 @@ import { connectApp } from '../../core/app-ws.js';
 import { loadSeries, loadProgress, loadVideo, loadPlaylist, loadBrowse, videoPlaybackAction, addToPlaylist } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
-import { currentItem, hasNext, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist, startIndex } from '../../core/music-video-playthrough.js';
+import { currentItem, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist, startIndex, initSeq, toggleShuffle, toggleRepeat, canAdvance, nextSeq } from '../../core/music-video-playthrough.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { gridIndex } from '../../core/playlist-name.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -66,7 +66,7 @@ export function initVideoPage() {
   var loadedId = null;     // which item id is currently loaded in <video>
   var currentTitle = '';   // current item's title (for the breadcrumb leaf)
   var seriesTitle = null;  // cached series title for the middle crumb
-  var seq = { items: [], index: 0 };  // music-video mode only (core/music-video-playthrough)
+  var seq = initSeq([], 0);  // music-video mode only (core/music-video-playthrough)
 
   function sendAction(action, body) { videoPlaybackAction(SERVER, action, person, body).catch(function() {}); }
 
@@ -149,16 +149,44 @@ export function initVideoPage() {
       mountCrumbs();
     }).catch(function() { navTo('error.html'); });
   }
-  function mvGoNext() { [hasNext(seq)].filter(Boolean).forEach(function() { seq.index += 1; mvSwap(); }); }
+  function mvGoNext() { [canAdvance(seq)].filter(Boolean).forEach(function() { seq = nextSeq(seq); mvSwap(); }); }
   function mvGoPrev() { [hasPrev(seq)].filter(Boolean).forEach(function() { seq.index -= 1; mvSwap(); }); }
   function mvEnded() {
-    ({ 'true': mvGoNext, 'false': function() { player.stop(); } })[hasNext(seq) + '']();
+    ({ 'true': mvGoNext, 'false': function() { player.stop(); } })[canAdvance(seq) + '']();
   }
   function mvBegin() {
     player.setSeriesMode(mvIsMulti(seq));
     document.getElementById('btn-queue').classList.add('hidden');
     document.getElementById('btn-add-playlist').classList.remove('hidden');
+    document.getElementById('btn-mv-shuffle').classList.toggle('hidden', !mvIsMulti(seq));
+    document.getElementById('btn-mv-repeat').classList.toggle('hidden', !mvIsMulti(seq));
     initCaptions(SERVER).then(mvSwap).catch(function() {});
+  }
+
+  // TASK-407 — Shuffle + Repeat, TV side. The pill's on/off state mirrors
+  // seq.shuffle/repeat straight onto the buttons; the companion mirror reads
+  // the same two flags off the context push below (mirror invariant).
+  function mvSetTransportOn() {
+    document.getElementById('btn-mv-shuffle').classList.toggle('on', !!seq.shuffle);
+    document.getElementById('btn-mv-repeat').classList.toggle('on', !!seq.repeat);
+  }
+  function mvToggleShuffle() { seq = toggleShuffle(seq); mvSetTransportOn(); sendVideoContext(); }
+  function mvToggleRepeat() { seq = toggleRepeat(seq); mvSetTransportOn(); sendVideoContext(); }
+
+  // The music-video context push (also fired on every new video load, below) —
+  // pulled out so a shuffle/repeat toggle can re-send it immediately, without
+  // waiting for the next video to start, so the companion's pills never lag.
+  function sendVideoContext() {
+    [wsApp].filter(Boolean).forEach(function(ws) {
+      ws.sendContext({
+        context_id: 'video',
+        display: player.currentVideoDisplay(),
+        musicVideo: isMusicVideo,
+        musicVideoMulti: mvIsMulti(seq),
+        musicVideoShuffle: !!seq.shuffle,
+        musicVideoRepeat: !!seq.repeat
+      });
+    });
   }
 
   // TASK-378 — "Add to playlist" for the CURRENTLY PLAYING music video (works from
@@ -255,11 +283,7 @@ export function initVideoPage() {
     },
     onIntent: function(intent) {
       var VIDEO_CTX = { play: true, video: true };
-      [wsApp].filter(Boolean).forEach(function(ws) {
-        [VIDEO_CTX[intent]].filter(Boolean).forEach(function() {
-          ws.sendContext({ context_id: 'video', display: player.currentVideoDisplay(), musicVideo: isMusicVideo, musicVideoMulti: mvIsMulti(seq) });
-        });
-      });
+      [VIDEO_CTX[intent]].filter(Boolean).forEach(sendVideoContext);
     }
   });
 
@@ -280,6 +304,8 @@ export function initVideoPage() {
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
   document.getElementById('btn-add-create').addEventListener('keydown', onAddKey);
   document.getElementById('btn-add-cancel').addEventListener('keydown', onAddKey);
+  document.getElementById('btn-mv-shuffle').addEventListener('click', mvToggleShuffle);
+  document.getElementById('btn-mv-repeat').addEventListener('click', mvToggleRepeat);
 
   var KEY_TARGET = {
     'true':  function(e) { queue.handleKey(e); },
@@ -293,7 +319,7 @@ export function initVideoPage() {
   // Breadcrumb crumbs on the companion send a `navigate` intent (FEAT-021);
   // everything else routes to the player's d-pad/transport remote.
   function appIntent(intent, params) {
-    var EXTRA = { navigate: function() { navTo(params.page, params.params); } };
+    var EXTRA = { navigate: function() { navTo(params.page, params.params); }, toggleShuffle: mvToggleShuffle, toggleRepeat: mvToggleRepeat };
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
@@ -337,7 +363,7 @@ export function initVideoPage() {
   // primes captions + series-mode + the first mvSwap) — none of these ever
   // call sendAction, so the video engine's own state is untouched.
   function startMvItem() {
-    seq = { items: [{ id: mvItem, title: '' }], index: 0 };
+    seq = initSeq([{ id: mvItem, title: '' }], 0);
     mvBegin();
   }
   function startMvPlaylist() {
@@ -347,7 +373,7 @@ export function initVideoPage() {
         // TASK-376/377: reached from the playlist's own detail screen, tapping
         // a specific track — the playthrough starts there, same as an audio
         // playlist starts from the tapped track, then carries on in order.
-        seq = { items: items, index: startIndex(items, mvTrack) };
+        seq = initSeq(items, startIndex(items, mvTrack));
         mvBegin();
       })
       .catch(function() { navTo('error.html'); });
@@ -355,7 +381,7 @@ export function initVideoPage() {
   function startMvArtist() {
     loadBrowse(SERVER, profile)
       .then(function(browse) {
-        seq = { items: musicVideosByArtist(browse.content, mvArtist), index: 0 };
+        seq = initSeq(musicVideosByArtist(browse.content, mvArtist), 0);
         mvBegin();
       })
       .catch(function() { navTo('error.html'); });

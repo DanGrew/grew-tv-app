@@ -102,6 +102,54 @@ test('a lone music video pick shows no ⏮/⏭ transport (single-item playthroug
   await expect(page.locator('#btn-next')).toBeHidden();
 });
 
+// TASK-407 — Shuffle + Repeat, TV side.
+test('a lone music video pick shows no Shuffle/Repeat controls either — nothing to shuffle or repeat', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
+  await expect(page.locator('#btn-mv-shuffle')).toBeHidden();
+  await expect(page.locator('#btn-mv-repeat')).toBeHidden();
+});
+
+test('a multi-item music-video playthrough shows Shuffle + Repeat, both starting off', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
+  await expect(page.locator('#btn-mv-shuffle')).toBeVisible();
+  await expect(page.locator('#btn-mv-repeat')).toBeVisible();
+  await expect(page.locator('#btn-mv-shuffle')).not.toHaveClass(/on/);
+  await expect(page.locator('#btn-mv-repeat')).not.toHaveClass(/on/);
+  await page.locator('#btn-mv-shuffle').click();
+  await expect(page.locator('#btn-mv-shuffle')).toHaveClass(/on/);
+  await page.locator('#btn-mv-repeat').click();
+  await expect(page.locator('#btn-mv-repeat')).toHaveClass(/on/);
+});
+
+test('turning Repeat on (Shuffle off) loops back to the first video after the last one, instead of ending', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
+  await page.locator('#btn-mv-repeat').click();
+  await page.locator('#btn-next').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
+  await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
+  await expect(page).not.toHaveURL(/browse\.html/);
+});
+
+test('with Shuffle on, reaching the end of the playthrough starts a fresh pass instead of stopping', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
+  await page.locator('#btn-mv-shuffle').click();
+  await page.locator('#btn-mv-repeat').click();
+  await page.locator('#btn-next').click(); // the last item of this 2-item pass
+  await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
+  await expect(page).not.toHaveURL(/browse\.html/);
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-0[12]/);
+});
+
+test('Repeat off (Shuffle off): the playthrough still ends cleanly at the last item, unaffected by TASK-407', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
+  await page.locator('#btn-next').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
+  await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
+  await expect(page).toHaveURL(/browse\.html/);
+});
+
 test('a music-video card selects the "music-video" route, not the plain video engine route', async ({ page }) => {
   await installApi(page);
   await page.route('**/api/browse**', function(route) {
