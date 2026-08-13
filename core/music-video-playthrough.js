@@ -5,15 +5,20 @@
 // core/video-player-router.js; the music queue engine) — the owner
 // deliberately ruled out routing a music video through either, so this module
 // is its own small sequence, not a third view-model over one of theirs.
-// No repeat/wrap (a playthrough stops cleanly at its last item) and no resume
-// (every item always starts at 0 — TASK-373 already keeps a music video out of
-// watch_progress backend-side; this module never reads or models a position).
+// No resume (every item always starts at 0 — TASK-373 already keeps a music
+// video out of watch_progress backend-side; this module never reads or models
+// a position). TASK-407 adds Shuffle + Repeat, still client-owned.
 
-// seq: { items: [{id, title, ...}], index }. items is never mutated here — the
-// page builds a fresh seq (from a single pick, a resolved playlist or a
-// filtered artist list) and this module only reads it.
+// seq: { items: [{id, title, ...}], index, order, shuffle, repeat }. items is
+// never mutated here — the page builds a fresh seq (from a single pick, a
+// resolved playlist or a filtered artist list, via initSeq) and this module
+// only reads it or returns a fresh one. `order` is the playthrough's own
+// resolved order, captured once at initSeq so toggling shuffle off can
+// re-anchor to it; `shuffle`/`repeat` default falsy so every pre-TASK-407
+// caller (a bare {items, index} literal) is unaffected.
 function itemsOf(seq) { return (seq && seq.items) || []; }
 function indexOf(seq) { return (seq && seq.index) || 0; }
+function orderOf(seq) { return (seq && seq.order) || itemsOf(seq); }
 
 // The item the player should be showing right now, or null for an empty seq.
 export function currentItem(seq) {
@@ -41,6 +46,93 @@ export function upNextItem(seq) {
 // meaningful then (mirrors video-player-router.seriesMode).
 export function isMulti(seq) {
   return itemsOf(seq).length > 1;
+}
+
+// TASK-407 — Shuffle + Repeat. Gated everywhere on isMulti (story 4: a lone
+// pick has nothing to shuffle or repeat).
+
+// The seq a playthrough starts from — `order` is the playlist/artist's own
+// resolved order, captured once so a later shuffle-off can return to it.
+// Shuffle + Repeat both default ON (owner call): the tapped/first item still
+// plays first — a start never jumps you away from the item you picked, same
+// as toggleShuffle's own anchor rule — then a fresh fair shuffle of the rest
+// follows behind it. An empty/not-yet-loaded seq (the pre-fetch placeholder)
+// stays empty rather than anchoring a null.
+export function initSeq(items, index, rng) {
+  var current = items[index] || null;
+  var shuffled = current === null ? items : [current].concat(fairShuffle(items.filter(function(it) { return it !== current; }), rng));
+  return { items: shuffled, index: 0, order: items, shuffle: true, repeat: true };
+}
+
+// Fisher-Yates over an injectable rng (defaults to Math.random) — mirrors the
+// shipped audio engine's fair_shuffle (grew-tv's
+// media-manager/db/playback_engine.py): every element appears exactly once
+// before any repeat. Returns a new array; `items` is untouched. The
+// injectable rng keeps a test deterministic.
+export function fairShuffle(items, rng) {
+  var pick = rng || Math.random;
+  var a = items.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(pick() * (i + 1));
+    var tmp = a[i];
+    a[i] = a[j];
+    a[j] = tmp;
+  }
+  return a;
+}
+
+// Flip shuffle and rebuild the current pass — mirrors the shipped engine's
+// toggle_shuffle wrap rule: ON anchors the CURRENTLY PLAYING item first
+// (unchanged — a shuffle toggle never jumps mid-track), then lays a fresh
+// fair shuffle of the rest of the base order behind it; OFF re-anchors to the
+// base order at the playing item's own position, so ordered playback resumes
+// from where you are, not the top.
+export function toggleShuffle(seq, rng) {
+  if (!seq) return seq;
+  var on = !seq.shuffle;
+  var base = orderOf(seq);
+  var current = currentItem(seq);
+  var items = on ? [current].concat(fairShuffle(base.filter(function(it) { return it !== current; }), rng)) : base;
+  var index = on ? 0 : Math.max(0, base.indexOf(current));
+  return Object.assign({}, seq, { shuffle: on, items: items, index: index });
+}
+
+// Flip repeat only — no rebuild (mirrors the shipped engine's toggle_repeat).
+export function toggleRepeat(seq) {
+  if (!seq) return seq;
+  return Object.assign({}, seq, { repeat: !seq.repeat });
+}
+
+// True while a later item exists in the CURRENT pass, or (repeat on) the
+// playthrough would wrap into a fresh one — the ⏭/auto-advance gate that
+// replaces a bare hasNext check once repeat can keep a multi-item playthrough
+// going past its last item.
+export function canAdvance(seq) {
+  return hasNext(seq) || (isMulti(seq) && !!seq.repeat);
+}
+
+// The playthrough after moving forward one step: a later item in the current
+// pass advances the index; exhausting a repeating pass wraps to a fresh one —
+// freshly shuffled when shuffle is on (story 2), the same base order from the
+// top when it's off (story 3) — mirroring the shipped engine's advance()
+// exhaustion branch. Returns `seq` unchanged when canAdvance is false
+// (repeat-off exhaustion) — the caller's cue to stop instead.
+export function nextSeq(seq, rng) {
+  if (hasNext(seq)) return Object.assign({}, seq, { index: indexOf(seq) + 1 });
+  if (!canAdvance(seq)) return seq;
+  var base = orderOf(seq);
+  var items = seq.shuffle ? fairShuffle(base, rng) : base;
+  return Object.assign({}, seq, { items: items, index: 0 });
+}
+
+// The Shuffle/Repeat visibility split for the video page + its companion
+// mirror (story 4/5 — both surfaces must agree): Shuffle only ever applies to
+// a multi-item music-video playthrough; Repeat already exists for a
+// film/series (unaffected — always visible there) and additionally applies to
+// a multi-item music-video playthrough, hiding only for a single pick.
+export function mvTransportVisibility(isMusicVideo, isMultiSeq) {
+  var multi = !!isMusicVideo && !!isMultiSeq;
+  return { shuffle: multi, repeat: multi || !isMusicVideo };
 }
 
 // Which entry function should run for a video.html load, in priority order:

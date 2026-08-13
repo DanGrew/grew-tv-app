@@ -2,6 +2,7 @@ import { connect } from '../../core/companion-ws.js';
 import { loadSeries, videoPlaybackAction, loadBrowse, addToPlaylist } from '../../core/app-api.js';
 import { screenPage, displayTitle, seriesIdFromSnap, queryString } from '../../core/companion-utils.js';
 import { nowPlaying, upNextLine, seriesMode } from '../../core/video-player-router.js';
+import { mvTransportVisibility } from '../../core/music-video-playthrough.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
@@ -39,6 +40,7 @@ export function initPage() {
     toggle: document.getElementById('c-toggle'),
     cc: document.getElementById('c-cc'),
     repeat: document.getElementById('c-repeat'),
+    shuffle: document.getElementById('c-shuffle'),
     prev: document.getElementById('c-prev'),
     next: document.getElementById('c-next'),
     jump: document.getElementById('jump'),
@@ -142,6 +144,14 @@ export function initPage() {
   function sendVideoAction(action) { videoPlaybackAction(server, action, state.person).catch(noop); }
   var PREV_ACTION = { 'true': function() { api.sendIntent('prev'); }, 'false': function() { sendVideoAction('previous'); } };
   var NEXT_ACTION = { 'true': function() { api.sendIntent('next'); }, 'false': function() { sendVideoAction('next'); } };
+  // TASK-407 — Repeat rides the same Plane A/Plane B split as prev/next above:
+  // a music video's repeat lives in the TV's own client-owned seq (WS intent),
+  // never the video-playback engine. Shuffle is mv-only — its button is
+  // hidden outright for a film/series (applyMusicVideoMode), so the 'false'
+  // branch here is unreachable in practice; kept as a safe no-op rather than
+  // an assumption a stray tap can't happen.
+  var REPEAT_ACTION = { 'true': function() { api.sendIntent('toggleRepeat'); }, 'false': function() { sendVideoAction('toggle-repeat'); } };
+  var SHUFFLE_ACTION = { 'true': function() { api.sendIntent('toggleShuffle'); }, 'false': function() {} };
 
   // ── server `video_playback` snapshot -> companion (the now-playing source of
   // truth, mirroring the TV). Now-playing + the breadcrumb leaf, the inline up-next
@@ -202,9 +212,9 @@ export function initPage() {
     captureSeries(snap);
   }
 
-  // A music video (TASK-374) has no repeat concept and no queue — the
-  // repeat pill and the queue link hide outright; prev/next hide only for a lone
-  // pick (mirrors the TV's own seriesMode-style ⏮/⏭ hide for a single item).
+  // A music video (TASK-374) has no queue — the queue link hides outright;
+  // prev/next hide only for a lone pick (mirrors the TV's own seriesMode-style
+  // ⏮/⏭ hide for a single item).
   function applyNav(hide) {
     els.prev.classList.toggle('single', hide);
     els.next.classList.toggle('single', hide);
@@ -220,20 +230,40 @@ export function initPage() {
     'true':  function(multi) { applyNav(!multi); },
     'false': function() { [state.vsnap].filter(Boolean).forEach(function(s) { applySeriesMode(seriesMode(s)); }); }
   };
+  // TASK-407 — Repeat now ALSO applies to a multi-item music-video playthrough
+  // (it hid outright before); Shuffle is new and mv-only. mvTransportVisibility
+  // is the one gate both this companion mirror and the TV read (story 4/5), so
+  // the two surfaces can never disagree on when the pair shows.
   function applyMusicVideoMode(on, multi) {
-    els.repeat.classList.toggle('hidden', on);
+    var vis = mvTransportVisibility(on, multi);
+    els.repeat.classList.toggle('hidden', !vis.repeat);
+    els.shuffle.classList.toggle('hidden', !vis.shuffle);
     els.queue.classList.toggle('hidden', on);
     // TASK-378 — Add to playlist is the INVERSE of repeat/queue: it only makes
     // sense FOR a music video, so it shows exactly when they hide.
     els.addPlaylist.classList.toggle('hidden', !on);
     HIDE_NAV[on + ''](multi);
   }
+  // Repeat's/Shuffle's on/off state during a music video comes off the
+  // context push's own flags (the client-owned seq, never the video-playback
+  // engine snapshot — onVideoPlayback already ignores that snapshot outright
+  // while state.musicVideo is true, so there is no ordering race with
+  // renderRepeat below). Left alone for a film/series, where renderRepeat
+  // (off the engine snapshot) is the sole owner of the on/off state.
+  var SET_MV_ON = {
+    'true': function(payload) {
+      els.repeat.classList.toggle('on', !!payload.musicVideoRepeat);
+      els.shuffle.classList.toggle('on', !!payload.musicVideoShuffle);
+    },
+    'false': function() {}
+  };
   function onVideoContext(payload) {
     els.ctxLabel.textContent = 'Now playing';
     els.title.textContent = displayTitle(payload);
     state.crumb.videoTitle = displayTitle(payload);
     state.musicVideo = !!payload.musicVideo;
     applyMusicVideoMode(state.musicVideo, !!payload.musicVideoMulti);
+    SET_MV_ON[state.musicVideo + ''](payload);
     mountVideoCrumbs();
   }
 
@@ -322,7 +352,8 @@ export function initPage() {
   els.cc.addEventListener('click', function() { api.toggleCaptions(); });
   els.prev.addEventListener('click', function() { PREV_ACTION[state.musicVideo + ''](); });
   els.next.addEventListener('click', function() { NEXT_ACTION[state.musicVideo + ''](); });
-  els.repeat.addEventListener('click', function() { sendVideoAction('toggle-repeat'); });
+  els.repeat.addEventListener('click', function() { REPEAT_ACTION[state.musicVideo + ''](); });
+  els.shuffle.addEventListener('click', function() { SHUFFLE_ACTION[state.musicVideo + ''](); });
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);

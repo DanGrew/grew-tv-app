@@ -31,7 +31,11 @@ async function installMusicVideoBackend(page, opts) {
         snapshot_request: function() {
           ws.send(JSON.stringify({
             type: 'context',
-            payload: { context_id: 'video', version: 1, display: { id: o.id, title: o.title }, musicVideo: true, musicVideoMulti: !!o.multi }
+            payload: {
+              context_id: 'video', version: 1, display: { id: o.id, title: o.title },
+              musicVideo: true, musicVideoMulti: !!o.multi,
+              musicVideoShuffle: !!o.shuffle, musicVideoRepeat: !!o.repeat
+            }
           }));
           ws.send(JSON.stringify({ type: 'app_state', payload: { person: 'kids', profile: 'kids', screen: 'player' } }));
         }
@@ -63,13 +67,54 @@ test('pause/resume and next/previous drive the TV over the WS intent rail, never
   expect(backend.videoPlaybackPosts).toEqual([]);
 });
 
-test('a music video offers no repeat and no queue on the companion', async ({ page }) => {
+test('a music video offers no queue on the companion', async ({ page }) => {
   await installApi(page);
   await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: true });
   await page.goto('/companion/video.html');
   await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
-  await expect(page.locator('#c-repeat')).toBeHidden();
   await expect(page.locator('#c-queue')).toBeHidden();
+});
+
+// TASK-407 — Repeat now ALSO applies to a multi-item music-video playthrough
+// (it hid outright before TASK-407); Shuffle is new and mv-only. Both mirror
+// the TV's own isMulti gate (story 4/5).
+test('a lone music video pick hides Shuffle/Repeat on the companion — nothing to shuffle or repeat', async ({ page }) => {
+  await installApi(page);
+  await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: false });
+  await page.goto('/companion/video.html');
+  await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
+  await expect(page.locator('#c-repeat')).toBeHidden();
+  await expect(page.locator('#c-shuffle')).toBeHidden();
+});
+
+test('a multi-item music-video playthrough shows Shuffle + Repeat on the companion, mirroring the TV', async ({ page }) => {
+  await installApi(page);
+  await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: true });
+  await page.goto('/companion/video.html');
+  await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
+  await expect(page.locator('#c-repeat')).toBeVisible();
+  await expect(page.locator('#c-shuffle')).toBeVisible();
+});
+
+test('Shuffle/Repeat on/off state on the companion mirrors the TV context', async ({ page }) => {
+  await installApi(page);
+  await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: true, shuffle: true, repeat: true });
+  await page.goto('/companion/video.html');
+  await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
+  await expect(page.locator('#c-repeat')).toHaveClass(/on/);
+  await expect(page.locator('#c-shuffle')).toHaveClass(/on/);
+});
+
+test('tapping Repeat/Shuffle on the companion drives the TV over the WS intent rail, never the video-playback engine', async ({ page }) => {
+  await installApi(page);
+  const backend = await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: true });
+  await page.goto('/companion/video.html');
+  await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
+  await page.locator('#c-repeat').click();
+  await page.locator('#c-shuffle').click();
+  const intentTypes = backend.intents.filter(function(m) { return m.type === 'intent'; }).map(function(m) { return m.payload.intent; });
+  expect(intentTypes).toEqual(expect.arrayContaining(['toggleRepeat', 'toggleShuffle']));
+  expect(backend.videoPlaybackPosts).toEqual([]);
 });
 
 test('a lone music video pick greys ⏮/⏭ on the companion (single-item playthrough)', async ({ page }) => {
