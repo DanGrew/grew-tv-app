@@ -129,6 +129,8 @@ test('reuses the FEAT-021 breadcrumb — trail builds Home › Section › Rail 
 });
 
 test('Switch profile drives the picker — navigate intent echoes a profile context, companion follows (BUG-007)', async ({ page }) => {
+  // TASK-412 — Profile now lives inside the header's popout menu.
+  await page.locator('#btn-status').click();
   await page.locator('#switch-profile').click();
   await expect(page).toHaveURL(/companion\/profile\.html$/);
 });
@@ -307,6 +309,12 @@ function browseOpt(page) { return page.locator('.seg-opt').filter({ hasText: 'Br
 function controlOpt(page) { return page.locator('.seg-opt').filter({ hasText: 'Control' }); }
 
 test.describe('desync mode', () => {
+  // TASK-412 — the Control/Browse switch now lives inside the header's popout
+  // menu; open it before every test in this block interacts with it.
+  test.beforeEach(async ({ page }) => {
+    await page.locator('#btn-status').click();
+  });
+
   test('Control/Browse segmented switch flips', async ({ page }) => {
     await expect(controlOpt(page)).toHaveClass(/on/);
     await expect(browseOpt(page)).not.toHaveClass(/on/);
@@ -399,6 +407,8 @@ test.describe('music Play Queue button', () => {
     await page.goto('/companion/browse.html');
     await expect(page.locator('#btn-play-queue-music')).toBeVisible();
     await expect(page.locator('#btn-play-queue-music')).not.toHaveClass(/desync-off/);
+    // TASK-412 — Mode now lives inside the header's popout menu.
+    await page.locator('#btn-status').click();
     await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
     await expect(page.locator('#btn-play-queue-music')).toHaveClass(/desync-off/);
   });

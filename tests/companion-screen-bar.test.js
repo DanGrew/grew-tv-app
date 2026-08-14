@@ -41,6 +41,11 @@ function mockApp(page, received) {
 
 function types(received) { return received.map(function(m) { return m.type; }); }
 
+// TASK-412 — Screen now lives inside the header's popout menu (#status-menu),
+// opened only via #btn-status. Interacting with #screen-bar's buttons needs the
+// menu open first, same as a real tap would.
+function openMenu(page) { return page.locator('#btn-status').click(); }
+
 test.beforeEach(async ({ page }) => {
   await installApi(page);
 });
@@ -49,6 +54,7 @@ test('>1 screen, none chosen → renders the chooser, not an empty grid (BUG-013
   const received = [];
   await mockApp(page, received);
   await page.goto('/companion/browse.html');
+  await openMenu(page);
 
   // The chooser is shown with both screens to pick from...
   await expect(page.locator('#screen-bar')).toContainText('Pick a screen');
@@ -65,6 +71,7 @@ test('each screen button carries its derived colour swatch; distinct screens dif
   const received = [];
   await mockApp(page, received);
   await page.goto('/companion/browse.html');
+  await openMenu(page);
   await expect(page.locator('#screen-bar .screen-btn')).toHaveCount(2);
 
   // device_id → deterministic palette colour: tv-a #42a5f5, tv-b #ffee58.
@@ -80,6 +87,7 @@ test('the bound current-screen pill shows that screen colour (TASK-178)', async 
   const received = [];
   await mockApp(page, received);
   await page.goto('/companion/browse.html');
+  await openMenu(page);
   await page.locator('#screen-bar .screen-btn[data-id="tv-a"]').click();
   await expect(page.locator('#screen-bar .screen-current')).toContainText('Living Room');
   await expect(page.locator('#screen-bar .screen-current .screen-swatch'))
@@ -90,6 +98,7 @@ test('picking a screen re-targets (register_companion + snapshot_request) and re
   const received = [];
   await mockApp(page, received);
   await page.goto('/companion/browse.html');
+  await openMenu(page);
   await expect(page.locator('#screen-bar .screen-btn')).toHaveCount(2);
 
   await page.locator('#screen-bar .screen-btn[data-id="tv-a"]').click();
@@ -111,6 +120,7 @@ test('re-targeting another screen is a device-plane MOVE — no activate_person 
   const received = [];
   await mockApp(page, received);
   await page.goto('/companion/browse.html');
+  await openMenu(page);
   await page.locator('#screen-bar .screen-btn[data-id="tv-a"]').click();
   await expect(page.locator('#sections-row .chip').first()).toBeVisible();
 

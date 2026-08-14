@@ -89,7 +89,10 @@ async function bootTv(browser, base, opts = {}) {
 async function openCompanionBrowse(browser, base) {
   const p = await (await browser.newContext({ viewport: { width: 430, height: 1280 } })).newPage();
   await p.goto(base + '/companion/browse.html');
-  await p.locator('#screen-bar .screen-current', { hasText: 'Screen' }).waitFor({ timeout: 15000 }); // bound
+  // TASK-412: #screen-bar now lives inside the closed-by-default #status-menu, so
+  // its default 'visible' wait would hang — 'attached' is the bound signal instead
+  // (mountScreenBar only renders .screen-current once bound, open or not).
+  await p.locator('#screen-bar .screen-current', { hasText: 'Screen' }).waitFor({ state: 'attached', timeout: 15000 }); // bound
   await p.locator('#sections-row .chip').first().waitFor({ timeout: 15000 }); // catalog loaded
   return p;
 }

@@ -16,6 +16,7 @@ import { desyncOpenPage, tileOffDesynced } from '../../core/companion-button-mod
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 // FEAT-028 / TASK-168 — companion drill-down browse (replaces the flat
 // FEAT-020/TASK-139 tab + all-rails + flat-search layout). The companion walks
@@ -589,6 +590,7 @@ export function initPage() {
   restoreTrail();
   renderDoor();
   mountSyncBar(mode, onToggle);
+  mountStatusMenu();
   api = connect(server, onContext, function(s) { els.connStatus.textContent = s; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, setBound);
 }

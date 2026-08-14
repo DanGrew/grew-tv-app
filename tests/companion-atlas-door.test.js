@@ -48,6 +48,8 @@ test('Story 1 (mirror): an Atlas door tile renders on the companion home', async
 });
 
 test('Story 2: tapping the door sends launchExternal (crossing the TV) AND takes the phone to the atlas remote', async ({ page }) => {
+  // TASK-412 — the door now lives inside the header's popout menu.
+  await page.locator('#btn-status').click();
   await page.locator('#door .door-tile[data-external="atlas"]').click();
   // TV half: a launchExternal intent carrying ONLY the atlas TV url.
   await expect.poll(() => intents.filter(i => i.intent === 'launchExternal').length).toBeGreaterThan(0);
