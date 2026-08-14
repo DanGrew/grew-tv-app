@@ -51,23 +51,31 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 .crumb-link { background: none; border: none; padding: 2px 4px; margin: 0; color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); touch-action: manipulation; transition: color var(--dur) var(--ease); }
 .crumb-link:active { color: var(--focus); }
 .crumb-link:focus { outline: 1px solid var(--focus); }
-#screen-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; flex-shrink: 0; }
+#screen-bar { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
 #screen-bar:empty { display: none; }
-.screen-bar-label { width: 100%; font-size: 12px; color: var(--text-muted); text-align: center; text-transform: uppercase; letter-spacing: 1px; }
-.screen-list { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 100%; }
-.screen-current { padding: 8px 14px; border: 2px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 14px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.screen-bar-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+.screen-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.screen-current { width: 100%; padding: 10px 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .screen-current:active, .screen-current:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-.screen-btn { padding: 10px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 15px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.screen-btn { width: 100%; padding: 10px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .screen-btn:active, .screen-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .screen-btn.on { border-color: var(--focus); color: var(--focus); }
 .screen-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
-.screen-btn, .screen-current { display: inline-flex; align-items: center; gap: 8px; }
-#sync-bar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; padding: 2px; }
+.screen-btn, .screen-current { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-start; }
+.screen-btn-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sync-bar { display: flex; }
+#sync-bar .seg { width: 100%; }
+#sync-bar .seg-opt { flex: 1 1 0; }
 .seg { display: inline-flex; flex: 0 0 auto; border: 2px solid var(--border); border-radius: 999px; overflow: hidden; }
-.seg-opt { font-size: 14px; padding: 8px 16px; border: none; background: transparent; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
+.seg-opt { font-size: 13px; padding: 8px 10px; white-space: nowrap; border: none; background: transparent; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
 .seg-opt.on { background: var(--surface-hi); color: var(--focus); }
 .seg-opt:active { color: var(--focus); }
 .seg-opt:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
+#topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; position: relative; }
+#btn-status { flex: 0 0 auto; font-size: 18px; line-height: 1; padding: 8px 13px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#btn-status:active, #btn-status:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#status-menu { display: none; flex-direction: column; gap: 14px; position: absolute; top: calc(100% + 8px); right: 0; z-index: 15; width: max-content; max-width: min(320px, calc(100vw - 24px)); padding: 16px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
+#status-menu.open { display: flex; }
 #c-repeat.hidden, #c-shuffle.hidden, #c-queue.hidden, #c-add-playlist.hidden { display: none; }
 .desync-off { opacity: 0.35; pointer-events: none; }
 .browsing .transport, .browsing #jump, .browsing #c-reset { opacity: 0.35; pointer-events: none; }
@@ -85,8 +93,13 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 </head>
 <body>
 <div id="conn-status">connecting…</div>
-<div id="screen-bar"></div>
-<div id="sync-bar"></div>
+<div id="topbar-actions">
+  <button id="btn-status" type="button" aria-label="Menu">☰</button>
+  <div id="status-menu">
+    <div id="sync-bar"></div>
+    <div id="screen-bar"></div>
+  </div>
+</div>
 <div id="breadcrumb"></div>
 <div id="ctx-label"></div>
 <div id="now-title"></div>

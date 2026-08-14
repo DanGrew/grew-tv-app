@@ -4,6 +4,7 @@ import { companionQueueHtml } from '../../core/queue-view.js';
 import { screenPage } from '../../core/companion-utils.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 // FEAT-031 (TASK-189) companion Queue View — the phone mirror of the TV Queue
 // View (screen-queue.js). It renders the four-section server `playback`
@@ -86,6 +87,7 @@ export function initPage() {
   els.back.addEventListener('click', function() { window.location.href = 'audio.html'; });
   render(null);
   mountSyncBar(mode, onModeChange);
+  mountStatusMenu();
   applyMode();
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, noop, { onPlayback: render, mode: mode });
 }

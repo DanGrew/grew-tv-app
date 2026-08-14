@@ -11,6 +11,7 @@ import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 // FEAT-036 (TASK-205) — the companion playlist context: mirrors the TV's playlist
 // detail (its flat track list). The TV's screen-playlist-detail-page pushes
@@ -417,6 +418,7 @@ export function initPage() {
   }
 
   mountSyncBar(mode, onModeChange);
+  mountStatusMenu();
   applyMode();
   // Browse-mode entry: browse linked here with ?id=…, so load that playlist
   // ourselves (loadPlaylist / /api/playlist) instead of waiting for the TV echo.

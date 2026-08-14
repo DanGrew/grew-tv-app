@@ -290,6 +290,7 @@ test.describe('breadcrumb nav', () => {
   // changes mode (no jump): it greys the transport in place (body.browsing) so there
   // are no dead clicks; the breadcrumb is a local hop to the library, keeping Browse.
   test('Browse toggles mode in place (no jump) and greys the transport', async ({ page }) => {
+    await page.locator('#btn-status').click();
     await expect(page.locator('.seg-opt').filter({ hasText: 'Control' })).toHaveClass(/on/);
     await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
     await expect(page).toHaveURL(/companion\/audio\.html$/);     // stayed on the player
@@ -298,6 +299,7 @@ test.describe('breadcrumb nav', () => {
   });
 
   test('in Browse mode the breadcrumb is a local hop to the library (stays desynced)', async ({ page }) => {
+    await page.locator('#btn-status').click();
     await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
     await page.locator('#breadcrumb .crumb-link').first().click();
     await expect(page).toHaveURL(/companion\/browse\.html$/);
@@ -480,6 +482,7 @@ test.describe('source crumb (BUG-044)', () => {
     backend.seed('play-track', { track_id: 'ootb-02' });
     await page.goto('/companion/audio.html');
     await expect(page.locator('#breadcrumb .crumb-link', { hasText: 'Out of the Blue' })).toBeVisible();
+    await page.locator('#btn-status').click();
     await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
     await expect(page.locator('body')).toHaveClass(/browsing/);
     await page.locator('#breadcrumb .crumb-link', { hasText: 'Out of the Blue' }).click();

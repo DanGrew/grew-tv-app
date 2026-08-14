@@ -15,6 +15,7 @@ import {
 import { groupRows } from '../../core/profile-rows.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { clear as clearTrail } from '../../core/nav-trail.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 var KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'ok'];
 var KEY_LABEL = { back: '⌫', ok: '✓' };
@@ -237,6 +238,7 @@ export function initPage() {
 
   els.takeoverConfirm.addEventListener('click', confirmTakeover);
   els.takeoverCancel.addEventListener('click', cancelTakeover);
+  mountStatusMenu();
 
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, noop, onDevices,
     { onPersonActive: onPersonActive, onPersonBusy: onPersonBusy });

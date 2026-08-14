@@ -11,6 +11,7 @@ import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 // TASK-322 (FEAT-046) — the companion artist mirror: the same grouped SONG LIST as
 // the TV artist page (all the artist's tracks, grouped under album headers, newest
@@ -167,6 +168,7 @@ export function initPage() {
   }
 
   mountSyncBar(mode, onModeChange);
+  mountStatusMenu();
   applyMode();
   // Browse-mode entry: browse linked here with ?id=<artist>, so seed the artist
   // ourselves (captureArtist loads its songs once the profile arrives). The

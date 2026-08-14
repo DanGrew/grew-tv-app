@@ -4,6 +4,7 @@ import { companionVideoQueueHtml } from '../../core/video-queue-view.js';
 import { screenPage } from '../../core/companion-utils.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 // FEAT-040 (TASK-250) companion Video Queue View — the phone mirror of the TV
 // Video Queue View (screen-video-queue.js). It renders the server `video_playback`
@@ -95,6 +96,7 @@ export function initPage() {
   els.back.addEventListener('click', function() { window.location.href = 'video.html'; });
   render(null);
   mountSyncBar(mode, onModeChange);
+  mountStatusMenu();
   applyMode();
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, noop, { onVideoPlayback: render, mode: mode });
 }

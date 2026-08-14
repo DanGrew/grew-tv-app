@@ -9,6 +9,7 @@ import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 // Companion audio context (FEAT-018 TASK-132 / FEAT-037 TASK-245). The music
 // analogue of companion-video: live transport + now-playing, plus the album track
@@ -357,6 +358,7 @@ export function initPage() {
   setInterval(renderBar, 250);
 
   mountSyncBar(mode, onModeChange);
+  mountStatusMenu();
   applyMode();
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode, onPlayback: onPlayback });
   updateBar = mountScreenBar(getApi, noop);

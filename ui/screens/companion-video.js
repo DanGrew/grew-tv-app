@@ -12,6 +12,7 @@ import { playlistCards } from '../../core/playlist-pick.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 // Companion player transport (FEAT-017 + FEAT-037/TASK-223). Two planes, by design
 // (the music-companion migration hasn't landed yet, so the shared intent rail must
@@ -365,6 +366,7 @@ export function initPage() {
   setInterval(renderBar, 250);
 
   mountSyncBar(mode, onModeChange);
+  mountStatusMenu();
   applyMode();
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode, onVideoPlayback: onVideoPlayback });
   updateBar = mountScreenBar(getApi, noop);

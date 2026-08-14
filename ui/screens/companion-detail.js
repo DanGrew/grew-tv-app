@@ -12,6 +12,7 @@ import { createCompanionMode } from '../../core/companion-mode.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 // Companion series context (TASK-118): the episode list with per-episode
 // progress, fetched straight from the backend (catalog + progress are backend
@@ -363,6 +364,7 @@ export function initPage() {
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
 
   mountSyncBar(mode, onToggle);
+  mountStatusMenu();
   // Desynced entry: browse linked here with ?id=…, so load that collection
   // ourselves rather than waiting for the TV's context echo (which won't come).
   [new URLSearchParams(window.location.search).get('id')].filter(Boolean).forEach(function(id) {
