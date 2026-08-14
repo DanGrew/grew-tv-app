@@ -43,11 +43,14 @@ test('Story 1: the menu is closed by default; tapping the header icon opens it l
   await expect(page.locator('#status-menu')).not.toHaveClass(/open/);
   await page.locator('#btn-status').click();
   await expect(page.locator('#status-menu')).toHaveClass(/open/);
-  await expect(page.locator('#status-menu .menu-label')).toHaveText('Mode');
   await expect(page.locator('#status-menu #sync-bar .seg-opt')).toHaveCount(2);
   await expect(page.locator('#status-menu #screen-bar')).toBeVisible();
   await expect(page.locator('#status-menu #switch-profile')).toHaveText('👤 Switch profile');
   await expect(page.locator('#status-menu #door .door-tile[data-external="atlas"]')).toHaveText('🗺️ Atlas');
+  // The Mode pills stretch to fill the row's width, unlike a content-sized pill.
+  const segWidth = await page.locator('#sync-bar .seg').evaluate((el) => el.getBoundingClientRect().width);
+  const rowWidth = await page.locator('#sync-bar').evaluate((el) => el.getBoundingClientRect().width);
+  expect(Math.abs(segWidth - rowWidth)).toBeLessThan(1);
 });
 
 test('Story 2: tapping elsewhere — a grid tile, a rail chip — does not close the menu, and the drill underneath stays usable', async ({ page }) => {
@@ -65,4 +68,20 @@ test('Story 3: tapping the header icon again is the only thing that closes it', 
   await expect(page.locator('#status-menu')).toHaveClass(/open/);
   await page.locator('#btn-status').click();
   await expect(page.locator('#status-menu')).not.toHaveClass(/open/);
+});
+
+// Search + the menu icon sit at the very top — directly below the connection
+// status line, above the queue quick-play buttons and the breadcrumb — and the
+// open menu renders entirely below the icon row, never overlapping it.
+test('Search and the menu icon sit above everything else, below the connection status; the open menu never overlaps them', async ({ page }) => {
+  const order = await page.evaluate(() =>
+    Array.from(document.body.children).map((el) => el.id));
+  expect(order.indexOf('conn-status')).toBeLessThan(order.indexOf('topbar-actions'));
+  expect(order.indexOf('topbar-actions')).toBeLessThan(order.indexOf('queue-actions'));
+  expect(order.indexOf('topbar-actions')).toBeLessThan(order.indexOf('breadcrumb'));
+
+  await page.locator('#btn-status').click();
+  const iconBox = await page.locator('#btn-status').boundingBox();
+  const menuBox = await page.locator('#status-menu').boundingBox();
+  expect(menuBox.y).toBeGreaterThanOrEqual(iconBox.y + iconBox.height);
 });

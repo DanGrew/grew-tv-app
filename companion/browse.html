@@ -48,7 +48,6 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 #queue-status { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 #btn-back { align-self: flex-start; flex-shrink: 0; font-size: 14px; padding: 9px 16px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #btn-back:active, #btn-back:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-#topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; position: relative; z-index: 16; }
 #switch-profile { width: 100%; text-align: left; font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #switch-profile:active, #switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .chip-create { font-weight: 700; padding-left: 17px; padding-right: 17px; }
@@ -79,19 +78,19 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 .screen-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
 .screen-btn, .screen-current { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-start; }
 #sync-bar { display: flex; }
+#sync-bar .seg { width: 100%; }
+#sync-bar .seg-opt { flex: 1 1 0; }
 .seg { display: inline-flex; flex: 0 0 auto; border: 2px solid var(--border); border-radius: 999px; overflow: hidden; }
 .seg-opt { font-size: 14px; padding: 8px 16px; border: none; background: transparent; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
 .seg-opt.on { background: var(--surface-hi); color: var(--focus); }
 .seg-opt:active { color: var(--focus); }
 .seg-opt:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
 .desync-off { opacity: 0.35; pointer-events: none; }
-#topbar-actions { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+#topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; position: relative; }
 #btn-search, #btn-status { flex: 0 0 auto; font-size: 18px; line-height: 1; padding: 8px 13px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #btn-search:active, #btn-search:focus, #btn-status:active, #btn-status:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-#status-menu { display: none; flex-direction: column; gap: 14px; position: fixed; top: 56px; right: 12px; left: 12px; z-index: 15; max-width: 320px; margin-left: auto; padding: 16px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
+#status-menu { display: none; flex-direction: column; gap: 14px; position: absolute; top: calc(100% + 8px); right: 0; z-index: 15; width: max-content; max-width: min(320px, calc(100vw - 24px)); padding: 16px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 #status-menu.open { display: flex; }
-.menu-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.menu-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
 #search-panel { display: none; position: fixed; inset: 0; z-index: 20; flex-direction: column; gap: 12px; padding: 14px 12px; background: linear-gradient(135deg, #14142a 0%, #12203a 45%, #0c2a4e 100%); }
 #search-panel.open { display: flex; }
 #search-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; }
@@ -115,23 +114,21 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 </head>
 <body>
 <div id="conn-status">connecting…</div>
+<div id="topbar-actions">
+  <button id="btn-search" type="button" aria-label="Search">🔍</button>
+  <button id="btn-status" type="button" aria-label="Menu">☰</button>
+  <div id="status-menu">
+    <div id="sync-bar"></div>
+    <div id="screen-bar"></div>
+    <button id="switch-profile" type="button">👤 Switch profile</button>
+    <div id="door"></div>
+  </div>
+</div>
 <div id="queue-actions">
 <button id="btn-play-queue" type="button" style="display:none">&#127909; (0)</button>
 <button id="btn-play-queue-music" type="button" style="display:none">&#127925; (0)</button>
 </div>
-<div id="topbar">
-  <div id="breadcrumb"></div>
-  <div id="topbar-actions">
-    <button id="btn-search" type="button" aria-label="Search">🔍</button>
-    <button id="btn-status" type="button" aria-label="Menu">☰</button>
-  </div>
-</div>
-<div id="status-menu">
-  <div class="menu-row"><span class="menu-label">Mode</span><div id="sync-bar"></div></div>
-  <div id="screen-bar"></div>
-  <button id="switch-profile" type="button">👤 Switch profile</button>
-  <div id="door"></div>
-</div>
+<div id="breadcrumb"></div>
 <div id="drill">
   <div class="ph-section">Sections</div>
   <div id="sections-row" class="chip-row"></div>
