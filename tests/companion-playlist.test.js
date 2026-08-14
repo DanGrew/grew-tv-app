@@ -101,6 +101,13 @@ test.describe('Road Trip playlist (2 tracks)', () => {
     await expect(page).toHaveURL(/companion\/browse\.html$/);
   });
 
+  // TASK-415 — the popout menu's Switch profile, ported from companion-browse.js.
+  test('Switch profile drives the picker — navigate intent echoes a profile context, companion follows (BUG-007)', async ({ page }) => {
+    await page.locator('#btn-status').click();
+    await page.locator('#switch-profile').click();
+    await expect(page).toHaveURL(/companion\/profile\.html$/);
+  });
+
   // BUG-021: a playlist reached THROUGH a rail (trail top = the browse.html rail
   // entry) showed only the static Home > playlist — the rail crumb was dropped and
   // there was no rail crumb to retrace. It must show the rail and retrace to it.

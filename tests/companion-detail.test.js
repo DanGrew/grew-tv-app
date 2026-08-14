@@ -144,6 +144,20 @@ test('BUG-021: a detail reached via a rail shows the rail crumb and retraces it'
   await expect.poll(() => intents.filter((i) => i.intent === 'navigate' && i.params.page === 'browse.html' && i.params.params.rail === 'continue').length).toBeGreaterThan(0);
 });
 
+// TASK-415 — the popout menu's Switch profile, ported from companion-browse.js.
+test('Switch profile sends the navigate intent to the picker (BUG-007)', async ({ page }) => {
+  const intents = [];
+  await installApi(page);
+  await mockAppRec(page, {
+    context: { context_id: 'detail', series_id: 'bluey' },
+    appState: { screen: 'detail', itemId: 'bluey', profile: 'kids' }
+  }, intents);
+  await page.goto('/companion/detail.html');
+  await page.locator('#btn-status').click();
+  await page.locator('#switch-profile').click();
+  await expect.poll(() => intents.filter((i) => i.intent === 'navigate' && i.params.page === 'profile.html').length).toBeGreaterThan(0);
+});
+
 test('FEAT-032/TASK-243: a series detail (no artist parent) — no Back button, breadcrumb Home returns to browse', async ({ page }) => {
   const intents = [];
   await installApi(page);

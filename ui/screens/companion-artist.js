@@ -8,9 +8,11 @@ import { fmt } from '../../core/time.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { pushUnique as pushTrail, trimOnCrumb, entries as entriesTrail, railEntry } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
+import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 // TASK-322 (FEAT-046) — the companion artist mirror: the same grouped SONG LIST as
 // the TV artist page (all the artist's tracks, grouped under album headers, newest
@@ -166,7 +168,9 @@ export function initPage() {
     });
   }
 
+  document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });
   mountSyncBar(mode, onModeChange);
+  mountStatusMenu();
   applyMode();
   // Browse-mode entry: browse linked here with ?id=<artist>, so seed the artist
   // ourselves (captureArtist loads its songs once the profile arrives). The

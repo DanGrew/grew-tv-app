@@ -9,9 +9,11 @@ import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { seasonsOf, hasSeasonChips, chipClass, seasonLabel, visibleItems, defaultSeason } from '../../core/seasons.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
+import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 // Companion series context (TASK-118): the episode list with per-episode
 // progress, fetched straight from the backend (catalog + progress are backend
@@ -357,12 +359,21 @@ export function initPage() {
   // Toggle: going DESYNCED re-renders to grey the play controls; going SYNCED
   // re-runs the reconnect path (reload) to snap back to the TV.
   function reSync() { window.location.reload(); }
-  function onToggle(desynced) { ({ true: render, false: reSync })[desynced](); }
+  // Switch profile drives the TV, so it greys out while desynced too (the WS
+  // layer already no-ops its intent; this is the visible half — no dead click).
+  function applySwitchProfile() { document.getElementById('switch-profile').classList.toggle('desync-off', mode.isDesynced()); }
+  function onToggle(desynced) {
+    applySwitchProfile();
+    ({ true: render, false: reSync })[desynced]();
+  }
 
   document.getElementById('btn-add-create').addEventListener('click', createNew);
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
+  document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });
 
   mountSyncBar(mode, onToggle);
+  mountStatusMenu();
+  applySwitchProfile();
   // Desynced entry: browse linked here with ?id=…, so load that collection
   // ourselves rather than waiting for the TV's context echo (which won't come).
   [new URLSearchParams(window.location.search).get('id')].filter(Boolean).forEach(function(id) {

@@ -8,10 +8,12 @@ import { percent } from '../../core/progress.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { trimOnCrumb, entries as entriesTrail } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
+import { switchProfileTarget } from '../../core/switch-profile.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
+import { mountStatusMenu } from './companion-status-menu.js';
 
 // Companion player transport (FEAT-017 + FEAT-037/TASK-223). Two planes, by design
 // (the music-companion migration hasn't landed yet, so the shared intent rail must
@@ -361,10 +363,12 @@ export function initPage() {
   els.addPlaylist.addEventListener('click', openAddSheet);
   document.getElementById('btn-add-create').addEventListener('click', createNewPlaylist);
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
+  document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });
   buildJump();
   setInterval(renderBar, 250);
 
   mountSyncBar(mode, onModeChange);
+  mountStatusMenu();
   applyMode();
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode, onVideoPlayback: onVideoPlayback });
   updateBar = mountScreenBar(getApi, noop);
