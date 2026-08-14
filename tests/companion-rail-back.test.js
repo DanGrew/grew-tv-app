@@ -49,12 +49,12 @@ async function openMusicBrowse(page) {
   }));
   await mockApp(page);
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#sections-row .chip')).toContainText(['Music']);
+  await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music']);
 }
 
 test('BUG-021: drill Music → Playlists rail → playlist, then back via the rail crumb lands on the Playlists grid', async ({ page }) => {
   await openMusicBrowse(page);
-  await page.locator('.chip[data-section="music"]').click();
+  await page.locator('.dock-tab[data-section="music"]').click();
   await page.locator('#rails-row .chip[data-rail="playlists"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="pl-roadtrip"]')).toBeVisible();
   await page.locator('#txtgrid .ph-txt[data-id="pl-roadtrip"]').click();
@@ -71,7 +71,7 @@ test('BUG-021: drill Music → Playlists rail → playlist, then back via the ra
 
 test('BUG-021: drill Music → Artists rail → artist, then back via the rail crumb lands on the Artists grid', async ({ page }) => {
   await openMusicBrowse(page);
-  await page.locator('.chip[data-section="music"]').click();
+  await page.locator('.dock-tab[data-section="music"]').click();
   await page.locator('#rails-row .chip[data-rail="artists"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="artist:ELO"]')).toBeVisible();
   await page.locator('#txtgrid .ph-txt[data-id="artist:ELO"]').click();

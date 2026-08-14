@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
     status: 200, contentType: 'text/html', body: '<!doctype html><title>atlas remote</title>REMOTE'
   }));
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+  await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
 });
 
 test('Story 1 (mirror): an Atlas door tile renders on the companion home', async ({ page }) => {

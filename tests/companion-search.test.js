@@ -47,7 +47,7 @@ test.beforeEach(async ({ page }) => {
 
 test('Story 1 — tapping 🔍 opens a panel with a Videos|Music toggle and a focused text field', async ({ page }) => {
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+  await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
   await expect(page.locator('#search-panel')).toBeHidden();
   await page.locator('#btn-search').click();
   await expect(page.locator('#search-panel')).toBeVisible();
@@ -58,7 +58,7 @@ test('Story 1 — tapping 🔍 opens a panel with a Videos|Music toggle and a fo
 
 test('Story 2 — Videos + a query shows ranked results with a thumbnail + type tag; tap routes to its detail', async ({ page }) => {
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+  await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
   await page.locator('#btn-search').click();
   await page.locator('#search-input').fill('blu');
   const row = page.locator('.sr-row', { hasText: 'Bluey' });
@@ -80,7 +80,7 @@ test('empty / blank query shows no results (nothing until >=1 char)', async ({ p
 
 test('Story 7 — closing the panel returns to browse exactly where I was (drill untouched)', async ({ page }) => {
   await page.goto('/companion/browse.html');
-  await page.locator('.chip[data-section="series"]').click();
+  await page.locator('.dock-tab[data-section="series"]').click();
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
   await page.locator('#btn-search').click();
@@ -89,13 +89,13 @@ test('Story 7 — closing the panel returns to browse exactly where I was (drill
   await expect(page.locator('#search-panel')).toBeHidden();
   // The drill is untouched — still the animation grid, breadcrumb intact.
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
-  await expect(page.locator('.chip[data-section="series"]')).toHaveClass(/active/);
+  await expect(page.locator('.dock-tab[data-section="series"]')).toHaveClass(/active/);
 });
 
 test.describe('Episode search (TASK-368)', () => {
   test('Story 2 — a distinctive episode title surfaces the same EPISODE result (mirror invariant)', async ({ page }) => {
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+    await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
     await page.locator('#btn-search').click();
     await page.locator('#search-input').fill('hammerbarn');
     const row = page.locator('.sr-row', { hasText: 'Hammerbarn' });
@@ -106,7 +106,7 @@ test.describe('Episode search (TASK-368)', () => {
 
   test('Story 3 — tapping it drives the TV to select the episode itself, not the series', async ({ page }) => {
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+    await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
     await page.locator('#btn-search').click();
     await page.locator('#search-input').fill('hammerbarn');
     await page.locator('.sr-row', { hasText: 'Hammerbarn' }).click();
@@ -115,7 +115,7 @@ test.describe('Episode search (TASK-368)', () => {
 
   test('Story 4 — searching the series name is unchanged: one SERIES result, no per-episode flood', async ({ page }) => {
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+    await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
     await page.locator('#btn-search').click();
     await page.locator('#search-input').fill('bluey');
     await expect(page.locator('.sr-row')).toHaveCount(1);
@@ -127,7 +127,7 @@ test.describe('Music search', () => {
   test.beforeEach(async ({ page }) => {
     await withMusic(page);
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#sections-row .chip')).toContainText(['Music']);
+    await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music']);
   });
 
   test('Story 3/5 — Music + an artist name shows mixed TRACK, ALBUM and ARTIST results ranked closest-first', async ({ page }) => {

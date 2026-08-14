@@ -93,7 +93,7 @@ async function openCompanionBrowse(browser, base) {
   // its default 'visible' wait would hang — 'attached' is the bound signal instead
   // (mountScreenBar only renders .screen-current once bound, open or not).
   await p.locator('#screen-bar .screen-current', { hasText: 'Screen' }).waitFor({ state: 'attached', timeout: 15000 }); // bound
-  await p.locator('#sections-row .chip').first().waitFor({ timeout: 15000 }); // catalog loaded
+  await p.locator('#section-dock .dock-tab').first().waitFor({ timeout: 15000 }); // catalog loaded
   return p;
 }
 

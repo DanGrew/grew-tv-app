@@ -19,10 +19,11 @@
   --dur: 0.18s;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --dock-h: 64px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; background: var(--bg); background-attachment: fixed; color: var(--text); font-family: var(--font); }
-body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
+body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var(--dock-h)) 12px; gap: 10px; }
 #conn-status { font-size: 13px; font-family: monospace; color: var(--text-muted); text-align: center; height: 16px; flex-shrink: 0; }
 #drill { flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; display: flex; flex-direction: column; gap: 14px; }
 #drill::-webkit-scrollbar, .chip-row::-webkit-scrollbar, #txtgrid::-webkit-scrollbar { display: none; }
@@ -30,7 +31,6 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 .chip-row { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding-bottom: 2px; flex-shrink: 0; }
 .chip { white-space: nowrap; background: var(--surface-hi); border: 2px solid var(--border); border-radius: 999px; padding: 9px 15px; font-size: 14px; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease); }
 .chip.active { color: var(--focus); border-color: var(--focus); box-shadow: var(--focus-glow); }
-.chip.dim { opacity: 0.5; }
 .chip:active, .chip:focus { outline: none; color: var(--focus); border-color: var(--focus); }
 #rails-wrap, #grid-wrap { display: flex; flex-direction: column; gap: 8px; }
 #grid-count { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
@@ -48,6 +48,12 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 #queue-status { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 #btn-back { align-self: flex-start; flex-shrink: 0; font-size: 14px; padding: 9px 16px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #btn-back:active, #btn-back:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#section-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; height: var(--dock-h); display: flex; background: #16213e; border-top: 2px solid var(--border); box-shadow: 0 -4px 24px rgba(0,0,0,0.35); }
+.dock-tab { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: none; border: none; border-top: 3px solid transparent; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease); }
+.dock-tab-icon { font-size: 20px; line-height: 1; }
+.dock-tab-label { font-size: 11px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.dock-tab.active { color: var(--focus); border-top-color: var(--focus); }
+.dock-tab:active, .dock-tab:focus { outline: none; color: var(--focus); }
 #switch-profile { width: 100%; text-align: left; font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #switch-profile:active, #switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .chip-create { font-weight: 700; padding-left: 17px; padding-right: 17px; }
@@ -131,8 +137,6 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
 </div>
 <div id="breadcrumb"></div>
 <div id="drill">
-  <div class="ph-section">Sections</div>
-  <div id="sections-row" class="chip-row"></div>
   <div id="rails-wrap">
     <div class="ph-section">Rails</div>
     <div id="rails-row" class="chip-row"></div>
@@ -143,6 +147,7 @@ body { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
   </div>
   <button id="btn-back" type="button">‹ Back</button>
 </div>
+<nav id="section-dock"></nav>
 <div id="queue-status"></div>
 <div id="search-panel">
   <div id="search-head">

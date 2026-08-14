@@ -43,7 +43,7 @@ test.beforeEach(async ({ page }) => {
   await installApi(page);
   await mockApp(page, intents);
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
+  await expect(page.locator('#section-dock .dock-tab-label')).toHaveText(['TV Series', 'Films', 'Home Movies']);
 });
 
 test('L1 shows section chips from the server sections — no rails/grid/Back yet', async ({ page }) => {
@@ -54,8 +54,8 @@ test('L1 shows section chips from the server sections — no rails/grid/Back yet
 });
 
 test('L1→L2: tapping a section opens its rail chips + emits a navigate intent', async ({ page }) => {
-  await page.locator('.chip[data-section="series"]').click();
-  await expect(page.locator('.chip[data-section="series"]')).toHaveClass(/active/);
+  await page.locator('.dock-tab[data-section="series"]').click();
+  await expect(page.locator('.dock-tab[data-section="series"]')).toHaveClass(/active/);
   await expect(page.locator('#rails-wrap')).toBeVisible();
   await expect(page.locator('#rails-row .chip[data-rail="genre:animation"]')).toHaveText('Animation');
   await expect(page.locator('#grid-wrap')).toBeHidden();
@@ -64,7 +64,7 @@ test('L1→L2: tapping a section opens its rail chips + emits a navigate intent'
 });
 
 test('L2→L3: tapping a rail shows bare text tiles (no posters) + emits an open-grid navigate', async ({ page }) => {
-  await page.locator('.chip[data-section="series"]').click();
+  await page.locator('.dock-tab[data-section="series"]').click();
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#grid-wrap')).toBeVisible();
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
@@ -74,7 +74,7 @@ test('L2→L3: tapping a rail shows bare text tiles (no posters) + emits an open
 });
 
 test('L3→L4: tapping a tile emits `select` and follows the echoed context to the item screen', async ({ page }) => {
-  await page.locator('.chip[data-section="series"]').click();
+  await page.locator('.dock-tab[data-section="series"]').click();
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await page.locator('#txtgrid .ph-txt[data-id="bluey"]').click();
   await expect.poll(() => intents.map(function(i) { return i.intent; })).toContain('select');
@@ -84,17 +84,17 @@ test('L3→L4: tapping a tile emits `select` and follows the echoed context to t
 });
 
 test('chip sideways-jump: a different SECTION chip swaps rails without Back', async ({ page }) => {
-  await page.locator('.chip[data-section="series"]').click();
+  await page.locator('.dock-tab[data-section="series"]').click();
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#grid-wrap')).toBeVisible();
-  await page.locator('.chip[data-section="films"]').click();
-  await expect(page.locator('.chip[data-section="films"]')).toHaveClass(/active/);
+  await page.locator('.dock-tab[data-section="films"]').click();
+  await expect(page.locator('.dock-tab[data-section="films"]')).toHaveClass(/active/);
   await expect(page.locator('#rails-row .chip')).toHaveText(['Animation', 'Comedy']);
   await expect(page.locator('#grid-wrap')).toBeHidden();
 });
 
 test('chip sideways-jump: a different RAIL chip swaps the grid + emits a fresh open-grid', async ({ page }) => {
-  await page.locator('.chip[data-section="films"]').click();
+  await page.locator('.dock-tab[data-section="films"]').click();
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="toy-story-main"]')).toBeVisible();
   await page.locator('#rails-row .chip[data-rail="genre:comedy"]').click();
@@ -105,7 +105,7 @@ test('chip sideways-jump: a different RAIL chip swaps the grid + emits a fresh o
 });
 
 test('Back collapses exactly one level: grid → rails → sections', async ({ page }) => {
-  await page.locator('.chip[data-section="series"]').click();
+  await page.locator('.dock-tab[data-section="series"]').click();
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#grid-wrap')).toBeVisible();
   await page.locator('#btn-back').click();
@@ -115,12 +115,12 @@ test('Back collapses exactly one level: grid → rails → sections', async ({ p
   await page.locator('#btn-back').click();
   await expect(page.locator('#rails-wrap')).toBeHidden();
   await expect(page.locator('#btn-back')).toBeHidden();
-  await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
+  await expect(page.locator('#section-dock .dock-tab-label')).toHaveText(['TV Series', 'Films', 'Home Movies']);
 });
 
 test('reuses the FEAT-021 breadcrumb — trail builds Home › Section › Rail as you drill', async ({ page }) => {
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Home');
-  await page.locator('.chip[data-section="films"]').click();
+  await page.locator('.dock-tab[data-section="films"]').click();
   await expect(page.locator('#breadcrumb .crumb-link')).toHaveText('Home');
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Films');
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
@@ -145,8 +145,8 @@ test('an in-progress section leads with a Continue rail; its grid tile shows the
     });
   });
   await page.reload();
-  await expect(page.locator('.chip[data-section="series"]')).toBeVisible();
-  await page.locator('.chip[data-section="series"]').click();
+  await expect(page.locator('.dock-tab[data-section="series"]')).toBeVisible();
+  await page.locator('.dock-tab[data-section="series"]').click();
   await expect(page.locator('#rails-row .chip[data-rail="continue"]')).toHaveText('Continue Watching');
   await page.locator('#rails-row .chip[data-rail="continue"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey-s1e01"] .nm')).toHaveText('Bluey · Daddy Putdown');
@@ -169,17 +169,17 @@ test.describe('create-playlist affordance', () => {
       body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat(MUSIC_CARDS) })
     }));
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#sections-row .chip')).toContainText(['Music']);
+    await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music']);
   });
 
   test('the create ＋ chip is absent until the Music section is open, then lives in the rails row', async ({ page }) => {
     await expect(page.locator('[data-create-playlist]')).toHaveCount(0);
-    await page.locator('.chip[data-section="music"]').click();
+    await page.locator('.dock-tab[data-section="music"]').click();
     await expect(page.locator('#rails-row [data-create-playlist]')).toBeVisible();
   });
 
   test('the create ＋ chip opens the companion create page even with zero playlists', async ({ page }) => {
-    await page.locator('.chip[data-section="music"]').click();
+    await page.locator('.dock-tab[data-section="music"]').click();
     await page.locator('#rails-row [data-create-playlist]').click();
     await expect(page).toHaveURL(/companion\/playlist-create\.html/);
   });
@@ -199,16 +199,16 @@ test.describe('create-playlist affordance on Music Videos (TASK-378)', () => {
       body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
     }));
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#sections-row .chip')).toContainText(['Music Videos']);
+    await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music Videos']);
   });
 
   test('the create ＋ chip lives in the Music Videos rails row too', async ({ page }) => {
-    await page.locator('.chip[data-section="music-videos"]').click();
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
     await expect(page.locator('#rails-row [data-create-playlist]')).toBeVisible();
   });
 
   test('the create ＋ chip carries collectionType=music-video-playlist', async ({ page }) => {
-    await page.locator('.chip[data-section="music-videos"]').click();
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
     await page.locator('#rails-row [data-create-playlist]').click();
     await expect(page).toHaveURL(/companion\/playlist-create\.html\?.*collectionType=music-video-playlist/);
   });
@@ -236,11 +236,11 @@ test.describe('Recently Played rail (companion mirror)', () => {
       ] })
     }));
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#sections-row .chip')).toContainText(['Music']);
+    await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music']);
   });
 
   test('the Music section leads with a Recently Played rail chip; its grid lists the recents newest-first', async ({ page }) => {
-    await page.locator('.chip[data-section="music"]').click();
+    await page.locator('.dock-tab[data-section="music"]').click();
     await expect(page.locator('#rails-row .chip').first()).toHaveText('Recently Played');
     await page.locator('#rails-row .chip[data-rail="recent"]').click();
     await expect(page.locator('#txtgrid .ph-txt')).toHaveCount(2);
@@ -254,7 +254,7 @@ test.describe('Recently Played rail (companion mirror)', () => {
 // the items you came from, not the sections root. The trail is sessionStorage, so
 // it survives the page reload when the companion follows the TV back to browse.
 test('FEAT-032: drilling records the grid position in the nav trail', async ({ page }) => {
-  await page.locator('.chip[data-section="series"]').click();
+  await page.locator('.dock-tab[data-section="series"]').click();
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#grid-wrap')).toBeVisible();
   const trail = await page.evaluate(() => JSON.parse(sessionStorage.getItem('grew-tv:nav-trail')));
@@ -269,7 +269,7 @@ test('FEAT-032: a recorded grid trail restores the grid level on load, not the s
   await page.reload();
   await expect(page.locator('#grid-wrap')).toBeVisible();
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
-  await expect(page.locator('.chip[data-section="series"]')).toHaveClass(/active/);
+  await expect(page.locator('.dock-tab[data-section="series"]')).toHaveClass(/active/);
   // Restore must DRIVE the TV to the matching rail-grid (not just seed the
   // companion): a tile tap emits `select`, which the TV's rail-grid page routes —
   // if the TV isn't on that rail-grid the tap is dropped. Proves they re-sync.
@@ -277,11 +277,11 @@ test('FEAT-032: a recorded grid trail restores the grid level on load, not the s
 });
 
 test('FEAT-032: collapsing back to the sections root clears the trail (next load starts at top)', async ({ page }) => {
-  await page.locator('.chip[data-section="series"]').click();
+  await page.locator('.dock-tab[data-section="series"]').click();
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await page.locator('#btn-back').click();
   await page.locator('#btn-back').click();
-  await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
+  await expect(page.locator('#section-dock .dock-tab-label')).toHaveText(['TV Series', 'Films', 'Home Movies']);
   const trail = await page.evaluate(() => sessionStorage.getItem('grew-tv:nav-trail'));
   expect(trail).toBeNull();
 });
@@ -298,7 +298,7 @@ test('FEAT-032: a deeper artist entry on top of the browse entry does NOT reset 
   await page.reload();
   await expect(page.locator('#grid-wrap')).toBeVisible();
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
-  await expect(page.locator('.chip[data-section="series"]')).toHaveClass(/active/);
+  await expect(page.locator('.dock-tab[data-section="series"]')).toHaveClass(/active/);
 });
 
 // FEAT-038 (TASK-230) — companion desync mode. SYNCED is the default (every test
@@ -325,7 +325,7 @@ test.describe('desync mode', () => {
 
   test('Browse mode drills locally and emits NO intents (TV untouched)', async ({ page }) => {
     await browseOpt(page).click();
-    await page.locator('.chip[data-section="series"]').click();
+    await page.locator('.dock-tab[data-section="series"]').click();
     await expect(page.locator('#rails-wrap')).toBeVisible();
     await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
     await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"]')).toBeVisible();
@@ -334,7 +334,7 @@ test.describe('desync mode', () => {
 
   test('Browse mode tile tap opens detail locally with ?id (no select intent)', async ({ page }) => {
     await browseOpt(page).click();
-    await page.locator('.chip[data-section="series"]').click();
+    await page.locator('.dock-tab[data-section="series"]').click();
     await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
     await page.locator('#txtgrid .ph-txt[data-id="bluey"]').click();
     await page.waitForURL('**/companion/detail.html?id=bluey');
@@ -347,12 +347,12 @@ test.describe('desync mode', () => {
   // jumped the TV to the Playlists rail + 404'd). After Control the trail is gone.
   test('Control clears the local drill trail (follows the TV, does not drive it)', async ({ page }) => {
     await browseOpt(page).click();
-    await page.locator('.chip[data-section="series"]').click();
+    await page.locator('.dock-tab[data-section="series"]').click();
     await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
     await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"]')).toBeVisible();
     expect(await page.evaluate(() => sessionStorage.getItem('grew-tv:nav-trail'))).not.toBeNull();
     await controlOpt(page).click();   // -> reSync: clearTrail() + reload
-    await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+    await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
     expect(await page.evaluate(() => sessionStorage.getItem('grew-tv:nav-trail'))).toBeNull();
   });
 
@@ -386,7 +386,7 @@ test.describe('music Play Queue button', () => {
   test('hidden when the music queue is empty', async ({ page }) => {
     await musicMock(page, [], []);
     await page.goto('/companion/browse.html');
-    await expect(page.locator('#sections-row .chip').first()).toBeVisible();  // settled
+    await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();  // settled
     await expect(page.locator('#btn-play-queue-music')).toBeHidden();
   });
 

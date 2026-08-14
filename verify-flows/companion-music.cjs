@@ -15,7 +15,7 @@ runFlow({
   id: 'music',
   setup: async (browser, base) => { await bootTv(browser, base); return openCompanionBrowse(browser, base); },
   steps: [
-    { name: '01-music', fn: async p => { await p.locator('#sections-row .chip', { hasText: 'Music' }).first().click(); await chip(p, 'Albums').waitFor(); } },
+    { name: '01-music', fn: async p => { await p.locator('#section-dock .dock-tab', { hasText: 'Music' }).first().click(); await chip(p, 'Albums').waitFor(); } },
     { name: '02-albums', fn: async p => { await chip(p, 'Albums').click(); await p.locator('#txtgrid .ph-txt').first().waitFor(); } },
     { name: '03-album-detail', fn: async p => { await p.locator('#txtgrid .ph-txt').first().click(); await p.waitForURL(/detail\.html/, { timeout: 15000 }); await p.locator('#ctx-title').waitFor(); await p.locator('button').filter({ hasText: /^\s*1\.\s/ }).first().waitFor(); } },
     { name: '04-audio', fn: async p => { await p.locator('button').filter({ hasText: /^\s*1\.\s/ }).first().click(); await p.waitForURL(/audio\.html/, { timeout: 15000 }); await p.locator('#c-toggle').waitFor(); } },
