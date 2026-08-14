@@ -53,7 +53,7 @@ export function initPage() {
     connStatus: document.getElementById('conn-status'),
     door: document.getElementById('door'),
     drill: document.getElementById('drill'),
-    sectionsRow: document.getElementById('sections-row'),
+    sectionDock: document.getElementById('section-dock'),
     railsWrap: document.getElementById('rails-wrap'),
     railsRow: document.getElementById('rails-row'),
     gridWrap: document.getElementById('grid-wrap'),
@@ -81,14 +81,32 @@ export function initPage() {
     return b;
   }
 
-  function sectionChip(s) {
-    var c = chip(s.title);
-    c.setAttribute('data-section', s.id);
-    c.classList.toggle('active', s.id === state.section);
-    // Other sections dim once one is active (mockup L2/L3 breadcrumb styling).
-    c.classList.toggle('dim', [state.section].filter(Boolean).filter(function(other) { return other !== s.id; }).length > 0);
-    c.addEventListener('click', function() { selectSection(s.id); });
-    return c;
+  // TASK-410 — the section picker is a bottom-pinned dock (one tab per section),
+  // not the old chip row, so it never scrolls out of view. Icon is presentation
+  // only, keyed by the same section ids buildTabs() returns; no per-section
+  // plumbing needed for a new section, just an entry here.
+  var SECTION_ICON = {
+    'series': '📺',
+    'films': '🎬',
+    'home-movies': '🏠',
+    'music': '🎵',
+    'music-videos': '🎶'
+  };
+  function dockTab(s) {
+    var b = document.createElement('button');
+    b.className = 'dock-tab';
+    b.setAttribute('data-section', s.id);
+    b.classList.toggle('active', s.id === state.section);
+    var icon = document.createElement('span');
+    icon.className = 'dock-tab-icon';
+    icon.textContent = [SECTION_ICON[s.id]].filter(Boolean).concat(['●'])[0];
+    var label = document.createElement('span');
+    label.className = 'dock-tab-label';
+    label.textContent = s.title;
+    b.appendChild(icon);
+    b.appendChild(label);
+    b.addEventListener('click', function() { selectSection(s.id); });
+    return b;
   }
 
   function railChip(r) {
@@ -238,8 +256,8 @@ export function initPage() {
   function txtTile(card) { return CELL[String(cardRoute(card) === 'video')](card); }
 
   function renderSections() {
-    els.sectionsRow.innerHTML = '';
-    buildTabs(state.cards).forEach(function(s) { els.sectionsRow.appendChild(sectionChip(s)); });
+    els.sectionDock.innerHTML = '';
+    buildTabs(state.cards).forEach(function(s) { els.sectionDock.appendChild(dockTab(s)); });
   }
 
   var CREATE_SECTIONS = { music: true, 'music-videos': true };

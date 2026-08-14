@@ -42,7 +42,7 @@ test('Play Queue button shows the count and drives the TV to start the queue', a
   await mockApp(page, intents);
   await mockQueue(page, 2);
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+  await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
   await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (2)');
   await page.locator('#btn-play-queue').click();
   await expect.poll(() => intents.find(i => i.intent === 'navigate' && i.params.page === 'video.html')).toBeTruthy();
@@ -56,7 +56,7 @@ test('Play Queue button is hidden when the queue is empty', async ({ page }) => 
   await mockApp(page, intents);
   await mockQueue(page, 0);
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+  await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
   await expect(page.locator('#btn-play-queue')).toBeHidden();
 });
 
@@ -67,6 +67,6 @@ test('Play Queue greys out in Browse (desync) mode — it drives the TV', async 
   await mockApp(page, intents);
   await mockQueue(page, 1);
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#sections-row .chip').first()).toBeVisible();
+  await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
   await expect(page.locator('#btn-play-queue')).toHaveClass(/desync-off/);
 });

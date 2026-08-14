@@ -32,11 +32,11 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/video-playback/queue-video**',
     route => route.fulfill({ status: 204, body: '' }));
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
+  await expect(page.locator('#section-dock .dock-tab-label')).toHaveText(['TV Series', 'Films', 'Home Movies']);
 });
 
 async function openFilmsGrid(page) {
-  await page.locator('.chip[data-section="films"]').click();
+  await page.locator('.dock-tab[data-section="films"]').click();
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="toy-story-main"]')).toBeVisible();
 }
@@ -64,7 +64,7 @@ test('the film play tile still opens — ＋ Queue does not hijack it', async ({
 });
 
 test('series tiles get NO ＋ Queue control (they queue per episode on the detail page)', async ({ page }) => {
-  await page.locator('.chip[data-section="series"]').click();
+  await page.locator('.dock-tab[data-section="series"]').click();
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"]')).toBeVisible();
   await expect(page.locator('.ph-cell-queue')).toHaveCount(0);

@@ -59,7 +59,7 @@ mirrors, shared `core/`). Same arcs, different mechanics.
 ### Companion (remote — drives a bound TV over WS)
 - **Boot**: `bootTv(browser, base, {profileBtn:'#btn-mom', pin:'1111'})` then
   `openCompanionBrowse(browser, base)` → bound companion on `browse.html`.
-- **Browse**: `#sections-row .chip` (TV Series / Films / Music / Home Movies) →
+- **Browse**: `#section-dock .dock-tab` (TV Series / Films / Music / Home Movies) →
   `#rails-row .chip` (rails/genres) → `#txtgrid .ph-txt` (tiles).
 - **Play**: tap tile/track → the TV plays; companion follows to `video.html` /
   `audio.html`; toggle = `#c-toggle` (▶/⏸); music queue btn `#c-queue`.

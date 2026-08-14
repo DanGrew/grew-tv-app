@@ -19,7 +19,7 @@ runFlow({
   setup: async (browser, base) => { await bootTv(browser, base); return openCompanionBrowse(browser, base); },
   steps: [
     { name: '01-artists', fn: async p => {
-      await p.locator('#sections-row .chip', { hasText: 'Music' }).first().click();
+      await p.locator('#section-dock .dock-tab', { hasText: 'Music' }).first().click();
       await chip(p, 'Artists').waitFor();
       await chip(p, 'Artists').click();
       await p.locator('#txtgrid .ph-txt').first().waitFor();

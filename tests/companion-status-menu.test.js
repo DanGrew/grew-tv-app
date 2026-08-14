@@ -36,7 +36,7 @@ test.beforeEach(async ({ page }) => {
   await installApi(page);
   await mockApp(page, intents);
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#sections-row .chip')).toHaveText(['TV Series', 'Films', 'Home Movies']);
+  await expect(page.locator('#section-dock .dock-tab-label')).toHaveText(['TV Series', 'Films', 'Home Movies']);
 });
 
 test('Story 1: the menu is closed by default; tapping the header icon opens it listing Mode/Screen/Profile/Atlas', async ({ page }) => {
@@ -55,7 +55,7 @@ test('Story 1: the menu is closed by default; tapping the header icon opens it l
 
 test('Story 2: tapping elsewhere — a grid tile, a rail chip — does not close the menu, and the drill underneath stays usable', async ({ page }) => {
   await page.locator('#btn-status').click();
-  await page.locator('.chip[data-section="series"]').click();
+  await page.locator('.dock-tab[data-section="series"]').click();
   await expect(page.locator('#status-menu')).toHaveClass(/open/);
   await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#status-menu')).toHaveClass(/open/);
