@@ -286,6 +286,13 @@ test.describe('breadcrumb nav', () => {
     await expect(page).toHaveURL(/companion\/browse\.html$/);
   });
 
+  // TASK-415 — the popout menu's Switch profile, ported from companion-browse.js.
+  test('Switch profile drives the picker — navigate intent echoes a profile context, companion follows (BUG-007)', async ({ page }) => {
+    await page.locator('#btn-status').click();
+    await page.locator('#switch-profile').click();
+    await expect(page).toHaveURL(/companion\/profile\.html$/);
+  });
+
   // FEAT-038 (TASK-230): the player carries the Control/Browse switch. Browse ONLY
   // changes mode (no jump): it greys the transport in place (body.browsing) so there
   // are no dead clicks; the breadcrumb is a local hop to the library, keeping Browse.

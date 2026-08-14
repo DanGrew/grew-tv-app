@@ -79,3 +79,21 @@ test('back returns to the now-playing companion screen', async ({ page }) => {
   await page.locator('#btn-back').click();
   await expect(page).toHaveURL(/companion\/audio\.html$/);
 });
+
+// TASK-415 — the popout menu's Switch profile, ported from companion-browse.js.
+// The wiring only needs the WS connected (installPlaybackBackend's snapshot loop
+// is unrelated), so this records raw intents over a minimal socket instead.
+test('Switch profile sends the navigate intent to the picker (BUG-007)', async ({ page }) => {
+  const intents = [];
+  await installApi(page);
+  await page.routeWebSocket(/:8766/, ws => {
+    ws.onMessage(raw => {
+      const m = JSON.parse(raw);
+      if (m.type === 'intent') intents.push(m.payload);
+    });
+  });
+  await page.goto('/companion/queue.html');
+  await page.locator('#btn-status').click();
+  await page.locator('#switch-profile').click();
+  await expect.poll(() => intents.filter(i => i.intent === 'navigate' && i.params.page === 'profile.html').length).toBeGreaterThan(0);
+});

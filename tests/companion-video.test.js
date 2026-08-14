@@ -79,6 +79,23 @@ test('play/pause stays on the legacy intent rail — it is NOT a video-playback 
   expect(posts).toHaveLength(0);
 });
 
+// TASK-415 — the popout menu's Switch profile, ported from companion-browse.js.
+// The module beforeEach's playback-backend socket doesn't echo `navigate`, so
+// this re-registers a minimal recorder and re-navigates for its own connection.
+test('Switch profile sends the navigate intent to the picker (BUG-007)', async ({ page }) => {
+  const intents = [];
+  await page.routeWebSocket(/:8766/, ws => {
+    ws.onMessage(raw => {
+      const m = JSON.parse(raw);
+      if (m.type === 'intent') intents.push(m.payload);
+    });
+  });
+  await page.goto('/companion/video.html');
+  await page.locator('#btn-status').click();
+  await page.locator('#switch-profile').click();
+  await expect.poll(() => intents.filter(i => i.intent === 'navigate' && i.params.page === 'profile.html').length).toBeGreaterThan(0);
+});
+
 // BUG-045 — the Queue and Reset buttons are live, full-opacity, clickable controls, but
 // their `.reset-btn` resting style painted the label in `var(--text-muted)` — the same
 // muted look the page uses for genuinely-disabled controls (`opacity:0.35`). An enabled

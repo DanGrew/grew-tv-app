@@ -6,6 +6,7 @@ import { percent } from '../../core/progress.js';
 import { playerCrumbs } from '../../core/breadcrumb.js';
 import { entries as entriesTrail, railEntry, trimOnCrumb } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
+import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
@@ -354,6 +355,9 @@ export function initPage() {
   els.lyrics.addEventListener('click', function() { api.sendIntent('lyrics'); });
   document.getElementById('c-queue').addEventListener('click', function() { window.location.href = 'queue.html'; });
   document.getElementById('c-quickpause').addEventListener('click', function() { window.location.href = 'quick-pause.html'; });
+  // BUG-007: same switch-profile path the browse companion uses — drives the TV
+  // to the picker via `navigate`, which echoes a `profile` context onContext follows.
+  document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });
   buildJump();
   setInterval(renderBar, 250);
 

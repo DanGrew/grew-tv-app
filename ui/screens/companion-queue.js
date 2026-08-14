@@ -3,6 +3,7 @@ import { playbackAction } from '../../core/app-api.js';
 import { companionQueueHtml } from '../../core/queue-view.js';
 import { screenPage } from '../../core/companion-utils.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
+import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 import { mountStatusMenu } from './companion-status-menu.js';
 
@@ -85,6 +86,7 @@ export function initPage() {
   }
 
   els.back.addEventListener('click', function() { window.location.href = 'audio.html'; });
+  document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });
   render(null);
   mountSyncBar(mode, onModeChange);
   mountStatusMenu();

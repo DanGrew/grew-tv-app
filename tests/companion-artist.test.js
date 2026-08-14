@@ -95,6 +95,13 @@ test('the breadcrumb Music crumb teleports the TV back to the Music tab', async 
   await expect(page).toHaveURL(/companion\/browse\.html$/);
 });
 
+// TASK-415 — the popout menu's Switch profile, ported from companion-browse.js.
+test('Switch profile drives the picker — navigate intent echoes a profile context, companion follows (BUG-007)', async ({ page }) => {
+  await page.locator('#btn-status').click();
+  await page.locator('#switch-profile').click();
+  await expect(page).toHaveURL(/companion\/profile\.html$/);
+});
+
 test('FEAT-032: loading the artist page records it on the nav trail (so a child can return here)', async ({ page }) => {
   await expect(page.locator('#ctx-title')).toHaveText('ELO');
   const trail = await page.evaluate(() => JSON.parse(sessionStorage.getItem('grew-tv:nav-trail')));

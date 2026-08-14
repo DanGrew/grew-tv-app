@@ -84,6 +84,9 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 #status-menu.open { display: flex; }
 .desync-off { opacity: 0.35; pointer-events: none; }
 .browsing #queue-body { opacity: 0.35; pointer-events: none; }
+#switch-profile { width: 100%; text-align: left; font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#switch-profile:active, #switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.browsing #switch-profile { opacity: 0.35; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -92,6 +95,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
   <button id="btn-status" type="button" aria-label="Menu">☰</button>
   <div id="status-menu">
     <div id="sync-bar"></div>
+    <button id="switch-profile" type="button">&#128100; Switch profile</button>
   </div>
 </div>
 <button id="btn-back" class="back" aria-label="Back to player">‹ Now Playing</button>

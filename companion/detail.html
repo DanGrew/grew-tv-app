@@ -91,16 +91,19 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 #btn-status:active, #btn-status:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #status-menu { display: none; flex-direction: column; gap: 14px; position: absolute; top: calc(100% + 8px); right: 0; z-index: 15; width: max-content; max-width: min(320px, calc(100vw - 24px)); padding: 16px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 #status-menu.open { display: flex; }
+#switch-profile { width: 100%; text-align: left; font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#switch-profile:active, #switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .desync-off { opacity: 0.35; pointer-events: none; }
 </style>
 </head>
 <body>
 <div id="conn-status">connecting\u2026</div>
 <div id="topbar-actions">
-  <button id="btn-status" type="button" aria-label="Menu">\u2630</button>
+  <button id="btn-status" type="button" aria-label="Menu">&#9776;</button>
   <div id="status-menu">
     <div id="sync-bar"></div>
     <div id="screen-bar"></div>
+    <button id="switch-profile" type="button">&#128100; Switch profile</button>
   </div>
 </div>
 <div id="breadcrumb"></div>

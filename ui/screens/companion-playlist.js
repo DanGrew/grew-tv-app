@@ -8,6 +8,7 @@ import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { rowActions, popoverTop } from '../../core/playlist-row-menu.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
+import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
@@ -417,6 +418,7 @@ export function initPage() {
     });
   }
 
+  document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });
   mountSyncBar(mode, onModeChange);
   mountStatusMenu();
   applyMode();
