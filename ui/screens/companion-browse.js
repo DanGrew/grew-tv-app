@@ -5,7 +5,7 @@ import { queueCount } from '../../core/video-player-router.js';
 import { playNextCount } from '../../core/queue-view.js';
 import { screenPage, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
-import { buildTabs, buildTabRails } from '../../core/home-rails.js';
+import { buildTabs, railsForSection } from '../../core/home-rails.js';
 import { firstRailId, pageOffset, swipeTarget, stepIndex, arrowDisabled, shouldActivateDrag } from '../../core/rail-pager.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
@@ -120,7 +120,12 @@ export function initPage() {
     return b;
   }
 
-  function railList() { return buildTabRails(state.section, state.cards, state.cw, state.labels, state.recents); }
+  // TASK-424 — ＋ is gated on landing on the Playlists rail, so railList() needs
+  // core's railsForSection (the always-present, possibly-empty rail the TV
+  // already guaranteed itself, TASK-234/378) rather than bare buildTabRails —
+  // otherwise a zero-playlist Music/Music Videos section never has a
+  // 'playlists'/'mv-playlists' rail to land ＋ on at all.
+  function railList() { return railsForSection(state.section, state.cards, state.cw, state.labels, state.recents); }
 
   // The picked rail (its tiles), or an empty stand-in so callers stay branch-free.
   function activeRail() {
@@ -252,8 +257,12 @@ export function initPage() {
     buildTabs(state.cards).forEach(function(s) { els.sectionDock.appendChild(dockTab(s)); });
   }
 
-  var CREATE_SECTIONS = { music: true, 'music-videos': true };
+  // TASK-424 — ＋ shows only on the section's own Playlists rail (playlists /
+  // mv-playlists), not the whole section, so a section+rail combined key drives
+  // one flat lookup — still cyclomatic-1, no if/&&.
+  var CREATE_RAILS = { 'music:playlists': true, 'music-videos:mv-playlists': true };
   var CREATE_DISPLAY = { true: 'inline-flex', false: 'none' };
+  function createRailKey() { return state.section + ':' + state.rail; }
   function renderRails() {
     var list = railList();
     var idx = railIndex();
@@ -262,7 +271,7 @@ export function initPage() {
     list.forEach(function(r, i) { els.pagerDots.appendChild(pagerDot(r, i, idx)); });
     els.pagerPrev.disabled = arrowDisabled(idx, list.length, 'prev');
     els.pagerNext.disabled = arrowDisabled(idx, list.length, 'next');
-    els.pagerCreate.style.display = CREATE_DISPLAY[Boolean(CREATE_SECTIONS[state.section])];
+    els.pagerCreate.style.display = CREATE_DISPLAY[Boolean(CREATE_RAILS[createRailKey()])];
   }
 
   function renderGrid() {
@@ -353,8 +362,9 @@ export function initPage() {
   // FEAT-036 (TASK-209) — the companion's create affordance links to the companion
   // create page, carrying the live profile so its picker preselects. TASK-236 moved
   // its trigger from a standalone section-level button to a ＋ chip; TASK-411 moved
-  // that chip again, into the pager head (#pager-create, shown by renderRails when
-  // Music/Music Videos is open). TASK-378: the same chip on Music Videos carries
+  // that chip into the pager head; TASK-424 moved it again, beside Back in
+  // #bottom-bar (#pager-create, shown by renderRails when landed on the section's
+  // own Playlists rail). TASK-378: the same chip on Music Videos carries
   // `collectionType=music-video-playlist`; Music carries none, falling through to
   // the create page's own 'playlist' default.
   var CREATE_COLLECTION_TYPE = { 'music-videos': 'music-video-playlist' };
@@ -448,7 +458,7 @@ export function initPage() {
     false: function(id) { navigate('browse.html', { tab: id }); }
   };
   function selectSection(id) {
-    var railId = firstRailId(buildTabRails(id, state.cards, state.cw, state.labels, state.recents));
+    var railId = firstRailId(railsForSection(id, state.cards, state.cw, state.labels, state.recents));
     SELECT_SECTION[Boolean(railId)](id, railId);
   }
   function selectRail(id) { navigate('rail-grid.html', { section: state.section, rail: id }); }

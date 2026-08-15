@@ -181,7 +181,7 @@ test.describe('create-playlist affordance', () => {
     await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music']);
   });
 
-  test('the create ＋ button is absent until the Music section is open, then lives in the pager head', async ({ page }) => {
+  test('the create ＋ button is absent until the Music section is open, then lives beside Back', async ({ page }) => {
     await expect(page.locator('[data-create-playlist]')).toBeHidden();
     await page.locator('.dock-tab[data-section="music"]').click();
     await expect(page.locator('#pager-create')).toBeVisible();
@@ -191,6 +191,37 @@ test.describe('create-playlist affordance', () => {
     await page.locator('.dock-tab[data-section="music"]').click();
     await page.locator('#pager-create').click();
     await expect(page).toHaveURL(/companion\/playlist-create\.html/);
+  });
+
+  // TASK-424 — the button is scoped to the Playlists rail, not the whole Music
+  // section: stepping onto Artists (music's 2nd rail — Playlists/Artists/Albums,
+  // no Recently Played with zero recents) hides it, stepping back re-shows it.
+  test('the create ＋ button hides off the Playlists rail and reappears stepping back onto it', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="music"]').click();
+    await expect(page.locator('#pager-create')).toBeVisible();
+    await page.locator('#pager-next').click();
+    await expect(page.locator('#pager-name')).toHaveText('Artists');
+    await expect(page.locator('#pager-create')).toBeHidden();
+    await page.locator('#pager-prev').click();
+    await expect(page.locator('#pager-name')).toHaveText('Playlists');
+    await expect(page.locator('#pager-create')).toBeVisible();
+  });
+
+  // TASK-424 — the wobble fix: ＋ lives in #bottom-bar next to Back, nowhere near
+  // .pager-head, so #pager-prev/#pager-next must land at the exact same screen
+  // position whether ＋ is showing (Playlists) or hidden (Artists) — not just
+  // "roughly close".
+  test('toggling the create ＋ button never shifts #pager-prev/#pager-next, even by a pixel', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="music"]').click();
+    await expect(page.locator('#pager-create')).toBeVisible();
+    const prevShown = await page.locator('#pager-prev').boundingBox();
+    const nextShown = await page.locator('#pager-next').boundingBox();
+    await page.locator('#pager-next').click();
+    await expect(page.locator('#pager-create')).toBeHidden();
+    const prevHidden = await page.locator('#pager-prev').boundingBox();
+    const nextHidden = await page.locator('#pager-next').boundingBox();
+    expect(prevHidden).toEqual(prevShown);
+    expect(nextHidden).toEqual(nextShown);
   });
 });
 
@@ -211,7 +242,7 @@ test.describe('create-playlist affordance on Music Videos (TASK-378)', () => {
     await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music Videos']);
   });
 
-  test('the create ＋ button lives in the Music Videos pager head too', async ({ page }) => {
+  test('the create ＋ button lives beside Back on Music Videos too', async ({ page }) => {
     await page.locator('.dock-tab[data-section="music-videos"]').click();
     await expect(page.locator('#pager-create')).toBeVisible();
   });
@@ -220,6 +251,16 @@ test.describe('create-playlist affordance on Music Videos (TASK-378)', () => {
     await page.locator('.dock-tab[data-section="music-videos"]').click();
     await page.locator('#pager-create').click();
     await expect(page).toHaveURL(/companion\/playlist-create\.html\?.*collectionType=music-video-playlist/);
+  });
+
+  // TASK-424 — same rail-scoping as Music: mv-playlists leads (musicVideoRails
+  // always puts it first), stepping onto the next (an artist) rail hides ＋.
+  test('the create ＋ button hides off the mv-playlists rail', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
+    await expect(page.locator('#pager-create')).toBeVisible();
+    await page.locator('#pager-next').click();
+    await expect(page.locator('#pager-name')).not.toHaveText('Playlists');
+    await expect(page.locator('#pager-create')).toBeHidden();
   });
 });
 

@@ -359,14 +359,14 @@ function musicVideoRails(cards) {
   return simpleRail('mv-playlists', 'Playlists', playlists).concat(artistRails);
 }
 
-// APP-ONLY: guarantee a Playlists rail on the TV Music tab even when there are no
-// playlists, so the browse screen always renders the "Playlists ＋" heading (the
-// create affordance lives on the heading now — TASK-235 — not as a rail tile). When
+// Guarantee a Playlists rail on the Music tab even when there are no playlists,
+// so the browse screen always renders the "Playlists ＋" heading (the create
+// affordance lives on the heading now — TASK-235 — not as a rail tile). When
 // musicRails (simpleRail) omitted the empty rail, synthesise an empty one and place
 // it directly AFTER Recently Played (TASK-234/318 order; leading when nothing has
-// been played). The companion has its own create path (TASK-209/236) and does NOT
-// call this. Pure (no DOM) so it lives in core; the browse screen calls it for the
-// music tab after buildTabRails.
+// been played). Pure (no DOM) so it lives in core; both the TV browse screen and
+// the companion (TASK-424 — ＋ is now gated on landing on this rail) call it for
+// the music tab after buildTabRails.
 export function withPlaylistsRail(rails) {
   var hasRail = rails.some(function(r) { return r.id === 'playlists'; });
   if (hasRail) return rails;
@@ -429,4 +429,15 @@ export function buildTabRails(sectionId, cards, cwRows, genreLabels, recents) {
   return continueRail(sectionId, cwRows, byId)
     .concat(simpleRail('boxsets', 'Box Sets', boxsets))
     .concat(genreRails);
+}
+
+// buildTabRails, with the Music/Music Videos Playlists rail guaranteed present
+// (withPlaylistsRail/withMvPlaylistsRail) — shared by the TV browse screen and
+// the companion (TASK-424, whose ＋ create affordance is gated on landing on
+// that rail, so it can't be left to `simpleRail`'s omit-if-empty).
+var RAIL_GUARANTEE = { music: withPlaylistsRail, 'music-videos': withMvPlaylistsRail };
+export function railsForSection(sectionId, cards, cwRows, genreLabels, recents) {
+  var rails = buildTabRails(sectionId, cards, cwRows, genreLabels, recents);
+  var guarantee = [RAIL_GUARANTEE[sectionId]].filter(Boolean).concat([function(r) { return r; }])[0];
+  return guarantee(rails);
 }

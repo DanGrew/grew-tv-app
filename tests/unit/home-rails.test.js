@@ -1,4 +1,4 @@
-import { buildRails, buildTabs, buildTabRails, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, railsForSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail } from '../../core/home-rails.js';
 
 // TASK-235 — the create affordance is the Playlists rail-heading ＋ button (in the
 // browse screen), not a synthetic card. withPlaylistsRail just GUARANTEES the rail
@@ -388,6 +388,33 @@ describe('Music Videos section (TASK-376)', () => {
     const rails = buildTabRails('music-videos', withArtistedPlaylist, [], {});
     expect(rails.find(r => r.id === 'mv-artist:QOTSA').items.map(c => c.id)).toEqual(['mv-haunted', 'mv-noone']);
     expect(rails.find(r => r.id === 'mv-playlists').items.map(c => c.id)).toEqual(['mv-pl-qotsa', 'mv-pl-rock']); // A-Z by title: QOTSA Faves, Rock Faves
+  });
+});
+
+// TASK-424 — railsForSection wraps buildTabRails with the Music/Music Videos
+// Playlists-rail guarantee (withPlaylistsRail/withMvPlaylistsRail), shared by
+// the TV browse screen and the companion (whose ＋ create affordance is gated
+// on landing on that rail — buildTabRails alone can't be trusted to have it).
+describe('railsForSection (TASK-424)', () => {
+  it('guarantees the Playlists rail on Music even with zero playlists', () => {
+    const rails = railsForSection('music', MUSIC, [], {});
+    expect(rails.some(r => r.id === 'playlists')).toBe(true);
+  });
+
+  it('guarantees the mv-playlists rail on Music Videos even with zero playlists', () => {
+    const noPlaylist = MUSIC_VIDEOS.filter(c => c.collectionType !== 'music-video-playlist');
+    const rails = railsForSection('music-videos', noPlaylist, [], {});
+    expect(rails.some(r => r.id === 'mv-playlists')).toBe(true);
+  });
+
+  it('leaves a real Playlists rail as buildTabRails already built it (no double-injection)', () => {
+    expect(railsForSection('music', WITH_PLAYLISTS, [], {}))
+      .toEqual(buildTabRails('music', WITH_PLAYLISTS, [], {}));
+  });
+
+  it('passes every other section through unchanged — no guarantee to apply', () => {
+    expect(railsForSection('films', MUSIC, [], {}))
+      .toEqual(buildTabRails('films', MUSIC, [], {}));
   });
 });
 
