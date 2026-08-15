@@ -33,6 +33,19 @@ async function dragGrid(page, dx, dy) {
   const box = await page.locator('#txtgrid').boundingBox();
   const startX = box.x + box.width / 2;
   const startY = box.y + Math.min(box.height / 2, 20);
+  await dragFrom(page, startX, startY, dx, dy);
+}
+
+// TASK-425 — same gesture, started below the last tile row (the enlarged
+// empty zone within #grid-wrap, down to #section-dock) rather than on a tile.
+async function dragBelowGrid(page, dx, dy) {
+  const box = await page.locator('#grid-wrap').boundingBox();
+  const startX = box.x + box.width / 2;
+  const startY = box.y + box.height - 10;
+  await dragFrom(page, startX, startY, dx, dy);
+}
+
+async function dragFrom(page, startX, startY, dx, dy) {
   await page.mouse.move(startX, startY);
   await page.mouse.down();
   const steps = 6;
@@ -86,4 +99,23 @@ test('a predominantly-vertical drag does not page the rail (left for the grid\'s
   await dragGrid(page, 10, 80);
   await expect(page.locator('#pager-name')).toHaveText('Animation');
   expect(intents.slice(before).filter((i) => i.intent === 'navigate')).toHaveLength(0);
+});
+
+// TASK-425 — Animation is a single-row rail (Toy Story, Finding Nemo), so
+// #grid-wrap's flex-fill leaves empty space below the tiles, down to the dock.
+test('a leftward drag started below the last tile row pages the rail exactly as a drag on a tile does', async ({ page }) => {
+  await dragBelowGrid(page, -80, 0);
+  await expect(page.locator('#pager-name')).toHaveText('Comedy');
+  await expect(page.locator('#txtgrid .ph-txt')).toHaveText(['Toy Story']);
+  expect(intents).toContainEqual(expect.objectContaining({ intent: 'navigate', params: { page: 'rail-grid.html', params: { section: 'films', rail: 'genre:comedy' } } }));
+});
+
+test('a tap in the enlarged empty area below the tiles is not a drag — no rail change, no tile opened', async ({ page }) => {
+  const before = intents.length;
+  const box = await page.locator('#grid-wrap').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height - 10);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(page.locator('#pager-name')).toHaveText('Animation');
+  expect(intents.slice(before)).toHaveLength(0);
 });

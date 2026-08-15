@@ -33,7 +33,7 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
 .chip.active { color: var(--focus); border-color: var(--focus); box-shadow: var(--focus-glow); }
 .chip:active, .chip:focus { outline: none; color: var(--focus); border-color: var(--focus); }
 #rails-wrap, #grid-wrap { display: flex; flex-direction: column; gap: 8px; }
-#grid-wrap { overflow-x: hidden; }
+#grid-wrap { overflow-x: hidden; flex: 1; touch-action: pan-y; }
 #grid-count { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
 #txtgrid { display: grid; grid-template-columns: 1fr; gap: 7px; touch-action: pan-y; }
 .pager-head { display: flex; align-items: center; gap: 8px; }
