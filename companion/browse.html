@@ -37,7 +37,7 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
 #grid-count { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
 #txtgrid { display: grid; grid-template-columns: 1fr; gap: 7px; touch-action: pan-y; }
 .pager-head { display: flex; align-items: center; gap: 8px; }
-#pager-create { align-self: center; }
+#bottom-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .pager-info { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; }
 .pager-name { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .pager-dots { display: flex; align-items: center; gap: 6px; }
@@ -58,7 +58,7 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
 .ph-cell-queue { flex: 0 0 auto; align-self: center; padding: 6px 14px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); font-size: 20px; color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .ph-cell-queue:active, .ph-cell-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #queue-status { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
-#btn-back { align-self: flex-start; flex-shrink: 0; font-size: 14px; padding: 9px 16px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#btn-back { flex-shrink: 0; font-size: 14px; padding: 9px 16px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #btn-back:active, #btn-back:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #section-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; height: var(--dock-h); display: flex; background: #16213e; border-top: 2px solid var(--border); box-shadow: 0 -4px 24px rgba(0,0,0,0.35); }
 .dock-tab { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: none; border: none; border-top: 3px solid transparent; color: var(--text-muted); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease); }
@@ -158,13 +158,15 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
       </div>
       <button id="pager-next" class="pager-arrow" type="button" aria-label="Next rail">&#8250;</button>
     </div>
-    <button id="pager-create" class="chip chip-create" type="button" data-create-playlist aria-label="New playlist" style="display:none">&#65291;</button>
   </div>
   <div id="grid-wrap">
     <div id="grid-count"></div>
     <div id="txtgrid"></div>
   </div>
-  <button id="btn-back" type="button">‹ Back</button>
+  <div id="bottom-bar">
+    <button id="btn-back" type="button">‹ Back</button>
+    <button id="pager-create" class="chip chip-create" type="button" data-create-playlist aria-label="New playlist" style="display:none">&#65291;</button>
+  </div>
 </div>
 <nav id="section-dock"></nav>
 <div id="queue-status"></div>

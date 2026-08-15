@@ -181,7 +181,7 @@ test.describe('create-playlist affordance', () => {
     await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music']);
   });
 
-  test('the create ＋ button is absent until the Music section is open, then lives in the pager head', async ({ page }) => {
+  test('the create ＋ button is absent until the Music section is open, then lives beside Back', async ({ page }) => {
     await expect(page.locator('[data-create-playlist]')).toBeHidden();
     await page.locator('.dock-tab[data-section="music"]').click();
     await expect(page.locator('#pager-create')).toBeVisible();
@@ -207,9 +207,10 @@ test.describe('create-playlist affordance', () => {
     await expect(page.locator('#pager-create')).toBeVisible();
   });
 
-  // TASK-424 — the wobble fix: ＋ sits outside .pager-head's flex flow now, so
-  // #pager-prev/#pager-next must land at the exact same screen position whether
-  // ＋ is showing (Playlists) or hidden (Artists) — not just "roughly close".
+  // TASK-424 — the wobble fix: ＋ lives in #bottom-bar next to Back, nowhere near
+  // .pager-head, so #pager-prev/#pager-next must land at the exact same screen
+  // position whether ＋ is showing (Playlists) or hidden (Artists) — not just
+  // "roughly close".
   test('toggling the create ＋ button never shifts #pager-prev/#pager-next, even by a pixel', async ({ page }) => {
     await page.locator('.dock-tab[data-section="music"]').click();
     await expect(page.locator('#pager-create')).toBeVisible();
@@ -241,7 +242,7 @@ test.describe('create-playlist affordance on Music Videos (TASK-378)', () => {
     await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music Videos']);
   });
 
-  test('the create ＋ button lives in the Music Videos pager head too', async ({ page }) => {
+  test('the create ＋ button lives beside Back on Music Videos too', async ({ page }) => {
     await page.locator('.dock-tab[data-section="music-videos"]').click();
     await expect(page.locator('#pager-create')).toBeVisible();
   });

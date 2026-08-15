@@ -362,8 +362,9 @@ export function initPage() {
   // FEAT-036 (TASK-209) — the companion's create affordance links to the companion
   // create page, carrying the live profile so its picker preselects. TASK-236 moved
   // its trigger from a standalone section-level button to a ＋ chip; TASK-411 moved
-  // that chip again, into the pager head (#pager-create, shown by renderRails when
-  // Music/Music Videos is open). TASK-378: the same chip on Music Videos carries
+  // that chip into the pager head; TASK-424 moved it again, beside Back in
+  // #bottom-bar (#pager-create, shown by renderRails when landed on the section's
+  // own Playlists rail). TASK-378: the same chip on Music Videos carries
   // `collectionType=music-video-playlist`; Music carries none, falling through to
   // the create page's own 'playlist' default.
   var CREATE_COLLECTION_TYPE = { 'music-videos': 'music-video-playlist' };
