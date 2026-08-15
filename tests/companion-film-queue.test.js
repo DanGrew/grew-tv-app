@@ -37,7 +37,6 @@ test.beforeEach(async ({ page }) => {
 
 async function openFilmsGrid(page) {
   await page.locator('.dock-tab[data-section="films"]').click();
-  await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="toy-story-main"]')).toBeVisible();
 }
 
@@ -65,7 +64,6 @@ test('the film play tile still opens — ＋ Queue does not hijack it', async ({
 
 test('series tiles get NO ＋ Queue control (they queue per episode on the detail page)', async ({ page }) => {
   await page.locator('.dock-tab[data-section="series"]').click();
-  await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"]')).toBeVisible();
   await expect(page.locator('.ph-cell-queue')).toHaveCount(0);
 });

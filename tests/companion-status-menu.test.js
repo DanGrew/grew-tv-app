@@ -53,14 +53,14 @@ test('Story 1: the menu is closed by default; tapping the header icon opens it l
   expect(Math.abs(segWidth - rowWidth)).toBeLessThan(1);
 });
 
-test('Story 2: tapping elsewhere — a grid tile, a rail chip — does not close the menu, and the drill underneath stays usable', async ({ page }) => {
+test('Story 2: tapping elsewhere — a section dock tab, a pager dot — does not close the menu, and the drill underneath stays usable', async ({ page }) => {
   await page.locator('#btn-status').click();
-  await page.locator('.dock-tab[data-section="series"]').click();
+  await page.locator('.dock-tab[data-section="films"]').click();
   await expect(page.locator('#status-menu')).toHaveClass(/open/);
-  await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
+  await page.locator('#pager-dots .pager-dot[data-rail="genre:comedy"]').click();
   await expect(page.locator('#status-menu')).toHaveClass(/open/);
   // The drill actually advanced underneath the still-open menu.
-  await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"]')).toBeVisible();
+  await expect(page.locator('#txtgrid .ph-txt')).toHaveText(['Toy Story']);
 });
 
 test('Story 3: tapping the header icon again is the only thing that closes it', async ({ page }) => {

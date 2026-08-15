@@ -52,10 +52,9 @@ async function openMusicBrowse(page) {
   await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music']);
 }
 
-test('BUG-021: drill Music → Playlists rail → playlist, then back via the rail crumb lands on the Playlists grid', async ({ page }) => {
+test('BUG-021: drill Music (auto-lands on Playlists, its first rail) → playlist, then back via the rail crumb lands on the Playlists grid', async ({ page }) => {
   await openMusicBrowse(page);
   await page.locator('.dock-tab[data-section="music"]').click();
-  await page.locator('#rails-row .chip[data-rail="playlists"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="pl-roadtrip"]')).toBeVisible();
   await page.locator('#txtgrid .ph-txt[data-id="pl-roadtrip"]').click();
   await page.waitForURL('**/companion/playlist.html');
@@ -66,13 +65,13 @@ test('BUG-021: drill Music → Playlists rail → playlist, then back via the ra
   await page.waitForURL('**/companion/browse.html');
   await expect(page.locator('#grid-wrap')).toBeVisible();
   await expect(page.locator('#txtgrid .ph-txt[data-id="pl-roadtrip"]')).toBeVisible();
-  await expect(page.locator('#rails-row .chip[data-rail="playlists"]')).toHaveClass(/active/);
+  await expect(page.locator('.pager-dot[data-rail="playlists"]')).toHaveClass(/active/);
 });
 
-test('BUG-021: drill Music → Artists rail → artist, then back via the rail crumb lands on the Artists grid', async ({ page }) => {
+test('BUG-021: drill Music → Artists rail (a pager dot) → artist, then back via the rail crumb lands on the Artists grid', async ({ page }) => {
   await openMusicBrowse(page);
   await page.locator('.dock-tab[data-section="music"]').click();
-  await page.locator('#rails-row .chip[data-rail="artists"]').click();
+  await page.locator('#pager-dots .pager-dot[data-rail="artists"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="artist:ELO"]')).toBeVisible();
   await page.locator('#txtgrid .ph-txt[data-id="artist:ELO"]').click();
   await page.waitForURL('**/companion/artist.html');
@@ -81,5 +80,5 @@ test('BUG-021: drill Music → Artists rail → artist, then back via the rail c
   await page.waitForURL('**/companion/browse.html');
   await expect(page.locator('#grid-wrap')).toBeVisible();
   await expect(page.locator('#txtgrid .ph-txt[data-id="artist:ELO"]')).toBeVisible();
-  await expect(page.locator('#rails-row .chip[data-rail="artists"]')).toHaveClass(/active/);
+  await expect(page.locator('.pager-dot[data-rail="artists"]')).toHaveClass(/active/);
 });

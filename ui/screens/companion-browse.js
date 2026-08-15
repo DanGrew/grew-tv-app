@@ -6,6 +6,7 @@ import { playNextCount } from '../../core/queue-view.js';
 import { screenPage, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, buildTabRails } from '../../core/home-rails.js';
+import { firstRailId, pageOffset, swipeTarget, stepIndex, arrowDisabled, shouldActivateDrag } from '../../core/rail-pager.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
@@ -24,12 +25,13 @@ import { mountStatusMenu } from './companion-status-menu.js';
 // tap funnels through navigate(), which BOTH emits the existing FEAT-017
 // `navigate` intent (the app teleports the TV + echoes context — no new
 // protocol) AND optimistically applies the matching local drill, so the view
-// re-renders now and never waits a LAN round-trip per tap. The section + rail
-// chip rows persist as the breadcrumb (chips = trail); tapping a different chip
-// is a sideways jump, Back collapses exactly one level. Tiles are bare text
+// re-renders now and never waits a LAN round-trip per tap. The section dock and
+// the rail pager (TASK-411 — dots/arrows/swipe, replacing the old rail chip
+// row) both persist as the breadcrumb (= trail); picking a different section or
+// rail is a sideways jump, Back collapses exactly one level. Tiles are bare text
 // labels — zero <img>, so ~0 image requests (posters live on the TV, fixing the
-// poster-concurrency "half-loaded" issue). Section + rail chip lists come from
-// the SAME shared core/home-rails helpers the app groups by, so the two surfaces
+// poster-concurrency "half-loaded" issue). Section + rail lists come from the
+// SAME shared core/home-rails helpers the app groups by, so the two surfaces
 // never drift. L4 (item detail/transport) is the existing companion screen,
 // reached when the app echoes the item context after a tile `select`.
 
@@ -55,7 +57,11 @@ export function initPage() {
     drill: document.getElementById('drill'),
     sectionDock: document.getElementById('section-dock'),
     railsWrap: document.getElementById('rails-wrap'),
-    railsRow: document.getElementById('rails-row'),
+    pagerPrev: document.getElementById('pager-prev'),
+    pagerNext: document.getElementById('pager-next'),
+    pagerName: document.getElementById('pager-name'),
+    pagerDots: document.getElementById('pager-dots'),
+    pagerCreate: document.getElementById('pager-create'),
     gridWrap: document.getElementById('grid-wrap'),
     gridCount: document.getElementById('grid-count'),
     txtgrid: document.getElementById('txtgrid'),
@@ -73,13 +79,6 @@ export function initPage() {
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
-
-  function chip(text) {
-    var b = document.createElement('button');
-    b.className = 'chip';
-    b.textContent = text;
-    return b;
-  }
 
   // TASK-410 — the section picker is a bottom-pinned dock (one tab per section),
   // not the old chip row, so it never scrolls out of view. Icon is presentation
@@ -109,29 +108,16 @@ export function initPage() {
     return b;
   }
 
-  function railChip(r) {
-    var c = chip(r.title);
-    c.setAttribute('data-rail', r.id);
-    c.classList.toggle('active', r.id === state.rail);
-    c.addEventListener('click', function() { selectRail(r.id); });
-    return c;
-  }
-
-  // FEAT-039 (TASK-236) — the companion create affordance now lives INSIDE the
-  // Music section, as a subtle ＋ chip in the rails row beside the Playlists rail
-  // chip (was a standalone button alongside the top sections row). It's always
-  // appended when Music is open, so the first playlist is still creatable even with
-  // zero playlists (the Playlists rail chip is omitted when empty). Mirrors the
-  // app's TASK-235 ＋-on-the-Playlists-heading affordance. TASK-378 extends it to
-  // the Music Videos section too — openCreate picks the collectionType off
-  // CREATE_COLLECTION_TYPE, keyed by section.
-  function createChip() {
-    var c = chip('＋');
-    c.classList.add('chip-create');
-    c.setAttribute('data-create-playlist', '');
-    c.setAttribute('aria-label', 'New playlist');
-    c.addEventListener('click', openCreate);
-    return c;
+  // TASK-411 — one dot per rail in the pager head; the dot for the current
+  // rail is the visually-distinct one, tapping any dot jumps straight there.
+  function pagerDot(r, i, idx) {
+    var b = document.createElement('button');
+    b.className = 'pager-dot';
+    b.classList.toggle('active', i === idx);
+    b.setAttribute('data-rail', r.id);
+    b.setAttribute('aria-label', r.title);
+    b.addEventListener('click', function() { selectRail(r.id); });
+    return b;
   }
 
   function railList() { return buildTabRails(state.section, state.cards, state.cw, state.labels, state.recents); }
@@ -140,6 +126,12 @@ export function initPage() {
   function activeRail() {
     return [railList().filter(function(r) { return r.id === state.rail; })[0]]
       .filter(Boolean).concat([{ title: '', items: [] }])[0];
+  }
+
+  // Index of the current rail within railList() — 0 (not -1) with no match,
+  // so pager math never has to special-case "no rail chosen yet".
+  function railIndex() {
+    return Math.max(railList().map(function(r) { return r.id; }).indexOf(state.rail), 0);
   }
 
   // Transient confirmation toast for ＋ Queue (mirrors the companion-detail
@@ -261,10 +253,16 @@ export function initPage() {
   }
 
   var CREATE_SECTIONS = { music: true, 'music-videos': true };
+  var CREATE_DISPLAY = { true: 'inline-flex', false: 'none' };
   function renderRails() {
-    els.railsRow.innerHTML = '';
-    railList().forEach(function(r) { els.railsRow.appendChild(railChip(r)); });
-    [state.section].filter(function(s) { return CREATE_SECTIONS[s]; }).forEach(function() { els.railsRow.appendChild(createChip()); });
+    var list = railList();
+    var idx = railIndex();
+    els.pagerName.textContent = railTitle();
+    els.pagerDots.innerHTML = '';
+    list.forEach(function(r, i) { els.pagerDots.appendChild(pagerDot(r, i, idx)); });
+    els.pagerPrev.disabled = arrowDisabled(idx, list.length, 'prev');
+    els.pagerNext.disabled = arrowDisabled(idx, list.length, 'next');
+    els.pagerCreate.style.display = CREATE_DISPLAY[Boolean(CREATE_SECTIONS[state.section])];
   }
 
   function renderGrid() {
@@ -354,10 +352,11 @@ export function initPage() {
 
   // FEAT-036 (TASK-209) — the companion's create affordance links to the companion
   // create page, carrying the live profile so its picker preselects. TASK-236 moved
-  // its trigger from a standalone section-level button to the ＋ rails-row chip
-  // (createChip, rendered in renderRails when Music is open). TASK-378: the same
-  // chip on Music Videos carries `collectionType=music-video-playlist`; Music
-  // carries none, falling through to the create page's own 'playlist' default.
+  // its trigger from a standalone section-level button to a ＋ chip; TASK-411 moved
+  // that chip again, into the pager head (#pager-create, shown by renderRails when
+  // Music/Music Videos is open). TASK-378: the same chip on Music Videos carries
+  // `collectionType=music-video-playlist`; Music carries none, falling through to
+  // the create page's own 'playlist' default.
   var CREATE_COLLECTION_TYPE = { 'music-videos': 'music-video-playlist' };
   function openCreate() {
     var collectionType = CREATE_COLLECTION_TYPE[state.section];
@@ -440,7 +439,18 @@ export function initPage() {
     [TARGET[page]].filter(Boolean).forEach(function(fn) { fn(); });
   }
 
-  function selectSection(id) { navigate('browse.html', { tab: id }); }
+  // TASK-411 — picking a section lands straight on its first rail's grid
+  // (over the same navigate()/selectRail path a dot/arrow/swipe uses), not an
+  // in-between screen with a pager and no grid to swipe. An empty section
+  // (no rails) falls back to the plain browse.html target.
+  var SELECT_SECTION = {
+    true:  function(id, railId) { navigate('rail-grid.html', { section: id, rail: railId }); },
+    false: function(id) { navigate('browse.html', { tab: id }); }
+  };
+  function selectSection(id) {
+    var railId = firstRailId(buildTabRails(id, state.cards, state.cw, state.labels, state.recents));
+    SELECT_SECTION[Boolean(railId)](id, railId);
+  }
   function selectRail(id) { navigate('rail-grid.html', { section: state.section, rail: id }); }
 
   // Tapping a tile. SYNCED: send `select`; the app's rail-grid routes it to the
@@ -467,6 +477,80 @@ export function initPage() {
     [BACK[state.level]].filter(Boolean).forEach(function(fn) { fn(); });
   }
   els.back.addEventListener('click', back);
+
+  // TASK-411 — ‹ › step one rail at a time, same funnel a dot/swipe lands
+  // through; a disabled arrow (arrowDisabled, applied in renderRails) never
+  // fires this, the same-id guard here is belt-and-braces.
+  function stepRail(dir) {
+    var list = railList();
+    var target = list[stepIndex(railIndex(), list.length, dir)];
+    [target].filter(Boolean).filter(function(r) { return r.id !== state.rail; }).forEach(function(r) { selectRail(r.id); });
+  }
+  els.pagerPrev.addEventListener('click', function() { stepRail('prev'); });
+  els.pagerNext.addEventListener('click', function() { stepRail('next'); });
+  els.pagerCreate.addEventListener('click', openCreate);
+
+  // TASK-411 — drag the grid horizontally to page between rails. Direction is
+  // decided once, early (shouldActivateDrag): a vertical-leaning drag is left
+  // alone for the page's own scroll (touch-action: pan-y backs this up at the
+  // CSS layer), a horizontal one pages, with resistance at either end
+  // (pageOffset) and a released drag past threshold landing via the SAME
+  // selectRail() path a dot/arrow tap uses (swipeTarget).
+  var drag = null;
+  function paintDrag(dx) {
+    els.txtgrid.style.transform = 'translateX(' + pageOffset(dx, railIndex(), railList().length) + 'px)';
+  }
+  function activateDrag(e, d, dx) {
+    d.active = true;
+    e.preventDefault();
+    paintDrag(dx);
+  }
+  function trackDrag(e, d, dx, dy) {
+    d.dx = dx;
+    ({ true: activateDrag, false: noop })[shouldActivateDrag(d.active, dx, dy)](e, d, dx);
+  }
+  function onGridPointerMove(e) {
+    [drag].filter(Boolean).filter(function(d) { return d.id === e.pointerId; })
+      .forEach(function(d) { trackDrag(e, d, e.clientX - d.x, e.clientY - d.y); });
+  }
+  function landSwipe(dx) {
+    var list = railList();
+    var target = list[swipeTarget(dx, railIndex(), list.length)];
+    [target].filter(Boolean).filter(function(r) { return r.id !== state.rail; }).forEach(function(r) { selectRail(r.id); });
+  }
+  // A drag that actually paged swallows the synthesized click its release
+  // would otherwise fire on whatever tile ends up under the pointer.
+  function swallowClick(e) { e.preventDefault(); e.stopPropagation(); }
+  function guardClick() { els.txtgrid.addEventListener('click', swallowClick, { capture: true, once: true }); }
+  function settleDrag(d) {
+    els.txtgrid.style.transition = 'transform var(--dur) var(--ease)';
+    els.txtgrid.style.transform = '';
+    ({ true: landSwipe, false: noop })[d.active](d.dx);
+    ({ true: guardClick, false: noop })[d.active]();
+  }
+  function endGesture() {
+    window.removeEventListener('pointermove', onGridPointerMove);
+    window.removeEventListener('pointerup', onGridPointerUp);
+    window.removeEventListener('pointercancel', onGridPointerCancel);
+  }
+  function onGridPointerUp(e) {
+    endGesture();
+    [drag].filter(Boolean).filter(function(d) { return d.id === e.pointerId; }).forEach(settleDrag);
+    drag = null;
+  }
+  function onGridPointerCancel() {
+    endGesture();
+    els.txtgrid.style.transform = '';
+    drag = null;
+  }
+  function onGridPointerDown(e) {
+    drag = { x: e.clientX, y: e.clientY, id: e.pointerId, active: false, dx: 0 };
+    els.txtgrid.style.transition = 'none';
+    window.addEventListener('pointermove', onGridPointerMove);
+    window.addEventListener('pointerup', onGridPointerUp);
+    window.addEventListener('pointercancel', onGridPointerCancel);
+  }
+  els.txtgrid.addEventListener('pointerdown', onGridPointerDown);
 
   // Render ONCE after both browse + continue-watching settle (the FEAT-020
   // double-render request storm is moot here — text-only — but a single render

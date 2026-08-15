@@ -81,7 +81,6 @@ test('empty / blank query shows no results (nothing until >=1 char)', async ({ p
 test('Story 7 — closing the panel returns to browse exactly where I was (drill untouched)', async ({ page }) => {
   await page.goto('/companion/browse.html');
   await page.locator('.dock-tab[data-section="series"]').click();
-  await page.locator('#rails-row .chip[data-rail="genre:animation"]').click();
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
   await page.locator('#btn-search').click();
   await expect(page.locator('#search-panel')).toBeVisible();
