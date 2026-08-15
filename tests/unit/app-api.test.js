@@ -1,7 +1,7 @@
 import {
   loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, saveProgress,
   loadContinueWatching, loadConfig, loadSettings, saveSettings, scanDevices,
-  mediaUrl, loadLyrics, resetProgress, playbackAction, videoPlaybackAction,
+  mediaUrl, loadLyrics, resetProgress, playbackAction, videoPlaybackAction, musicVideoPlaybackAction,
   loadVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
   addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
   deletePlaylist, renamePlaylist
@@ -193,6 +193,7 @@ describe('POST request shapes (method + json header + body + url)', () => {
     { name: 'saveProgress', run: () => saveProgress('http://s', 'a', 90, 600, 'oliver'), url: 'http://s/api/progress/a?person=oliver', body: { position_secs: 90, duration_secs: 600 } },
     { name: 'playbackAction', run: () => playbackAction('http://s', 'next', 'mom', { track_id: 't1' }), url: 'http://s/api/playback/next?person=mom', body: { track_id: 't1' } },
     { name: 'videoPlaybackAction', run: () => videoPlaybackAction('http://s', 'play-source', 'dad', { source_id: 'bluey' }), url: 'http://s/api/video-playback/play-source?person=dad', body: { source_id: 'bluey' } },
+    { name: 'musicVideoPlaybackAction', run: () => musicVideoPlaybackAction('http://s', 'play-video', 'kids', { video_id: 'mv-01' }), url: 'http://s/api/music-video-playback/play-video?person=kids', body: { video_id: 'mv-01' } },
     { name: 'saveSettings', run: () => saveSettings('http://s', { captionsOn: false }), url: 'http://s/api/settings', body: { captionsOn: false } },
     { name: 'createPlaylist', run: () => createPlaylist('http://s', 'My Mix', 'kids'), url: 'http://s/api/playlists/create', body: { name: 'My Mix', profile: 'kids', collection_type: 'playlist' } },
     { name: 'addToPlaylist', run: () => addToPlaylist('http://s', 'pl', 't1'), url: 'http://s/api/playlists/add-track', body: { playlist_id: 'pl', track_id: 't1' } },
@@ -299,6 +300,21 @@ describe('videoPlaybackAction', () => {
     var calls = fakeFetch({});
     await videoPlaybackAction('http://s', 'next');
     expect(calls[0].url).toBe('http://s/api/video-playback/next?person=');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({});
+  });
+});
+
+describe('musicVideoPlaybackAction', () => {
+  it('POSTs /api/music-video-playback/{action} with the person and body', async () => {
+    var calls = fakeFetch({});
+    await musicVideoPlaybackAction('http://s', 'toggle-shuffle', 'kids', { foo: 1 });
+    expect(calls[0].url).toBe('http://s/api/music-video-playback/toggle-shuffle?person=kids');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ foo: 1 });
+  });
+  it('defaults an absent person and body', async () => {
+    var calls = fakeFetch({});
+    await musicVideoPlaybackAction('http://s', 'next');
+    expect(calls[0].url).toBe('http://s/api/music-video-playback/next?person=');
     expect(JSON.parse(calls[0].opts.body)).toEqual({});
   });
 });

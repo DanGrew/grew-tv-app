@@ -214,9 +214,10 @@ export function initPage() {
     captureSeries(snap);
   }
 
-  // A music video (TASK-374) has no queue — the queue link hides outright;
-  // prev/next hide only for a lone pick (mirrors the TV's own seriesMode-style
-  // ⏮/⏭ hide for a single item).
+  // FEAT-418 (TASK-420): a music video now HAS a queue (its own engine, on its
+  // own channel) — the link stays visible in both modes and repoints instead
+  // of hiding (QUEUE_HREF below). prev/next still hide only for a lone pick
+  // (mirrors the TV's own seriesMode-style ⏮/⏭ hide for a single item).
   function applyNav(hide) {
     els.prev.classList.toggle('single', hide);
     els.next.classList.toggle('single', hide);
@@ -240,9 +241,8 @@ export function initPage() {
     var vis = mvTransportVisibility(on, multi);
     els.repeat.classList.toggle('hidden', !vis.repeat);
     els.shuffle.classList.toggle('hidden', !vis.shuffle);
-    els.queue.classList.toggle('hidden', on);
-    // TASK-378 — Add to playlist is the INVERSE of repeat/queue: it only makes
-    // sense FOR a music video, so it shows exactly when they hide.
+    // TASK-378 — Add to playlist is the INVERSE of repeat/shuffle: it only
+    // makes sense FOR a music video, so it shows exactly when they hide.
     els.addPlaylist.classList.toggle('hidden', !on);
     HIDE_NAV[on + ''](multi);
   }
@@ -359,7 +359,11 @@ export function initPage() {
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);
-  document.getElementById('c-queue').addEventListener('click', function() { window.location.href = 'video-queue.html'; });
+  // FEAT-418 (TASK-420): the queue link now goes to whichever queue matches the
+  // current mode — the music-video Queue View for a music video, the film/
+  // series Video Queue View otherwise.
+  var QUEUE_HREF = { 'true': 'music-video-queue.html', 'false': 'video-queue.html' };
+  document.getElementById('c-queue').addEventListener('click', function() { window.location.href = QUEUE_HREF[state.musicVideo + '']; });
   els.addPlaylist.addEventListener('click', openAddSheet);
   document.getElementById('btn-add-create').addEventListener('click', createNewPlaylist);
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);

@@ -51,9 +51,11 @@ test('the Add to playlist button shows for a music video, hidden for a film/seri
   await page.goto('/companion/video.html');
   await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
   await expect(page.locator('#c-add-playlist')).toBeVisible();
-  // and the reverse of repeat/queue, which hide for a music video.
+  // and the reverse of repeat, which hides for a music video. The queue link
+  // (FEAT-418/TASK-420) stays visible for a music video too — it repoints
+  // to its own Queue View rather than hiding.
   await expect(page.locator('#c-repeat')).toBeHidden();
-  await expect(page.locator('#c-queue')).toBeHidden();
+  await expect(page.locator('#c-queue')).toBeVisible();
 });
 
 test('tapping it offers only the profile\'s music-video playlists + New playlist', async ({ page }) => {

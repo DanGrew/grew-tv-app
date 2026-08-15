@@ -67,12 +67,17 @@ test('pause/resume and next/previous drive the TV over the WS intent rail, never
   expect(backend.videoPlaybackPosts).toEqual([]);
 });
 
-test('a music video offers no queue on the companion', async ({ page }) => {
+// FEAT-418 (TASK-420): the queue link now stays visible for a music video and
+// repoints to its OWN Queue View instead of hiding — superseded the
+// pre-TASK-420 "no queue" behaviour.
+test('a music video\'s queue link stays visible and points at the music-video Queue View', async ({ page }) => {
   await installApi(page);
   await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: true });
   await page.goto('/companion/video.html');
   await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
-  await expect(page.locator('#c-queue')).toBeHidden();
+  await expect(page.locator('#c-queue')).toBeVisible();
+  await page.locator('#c-queue').click();
+  await expect(page).toHaveURL(/music-video-queue\.html/);
 });
 
 // TASK-407 — Repeat now ALSO applies to a multi-item music-video playthrough

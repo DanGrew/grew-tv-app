@@ -75,6 +75,24 @@ export function videoPlaybackAction(serverUrl, action, person, body) {
   });
 }
 
+// FEAT-418 (TASK-419/420): server-authoritative MUSIC-VIDEO playback, the
+// music-video twin of playbackAction/videoPlaybackAction. Posts an action to
+// the separate /api/music-video-playback endpoint (play-source / play-video /
+// next / previous / toggle-shuffle / toggle-repeat / queue-video /
+// remove-queue-entry / move-queue-entry); the server applies the pure
+// music-video engine transition, persists the per-person playback-state, and
+// broadcasts the resolved `music_video_playback` snapshot over its OWN
+// per-person relay channel (kept separate from music's and video's own).
+// Contract: 204 accept / 400 bad input / never 500. `person` (FEAT-026) keys
+// the per-person state.
+export function musicVideoPlaybackAction(serverUrl, action, person, body) {
+  return fetch(serverUrl + '/api/music-video-playback/' + encodeURIComponent(action) + '?person=' + encodeURIComponent(person || ''), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
+  });
+}
+
 // FEAT-040 (Play Queue): read-only video playback snapshot for a person — lets a
 // non-player screen (browse) read the override queue (to offer "Play Queue").
 export function loadVideoPlayback(serverUrl, person) {

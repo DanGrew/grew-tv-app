@@ -2,8 +2,9 @@ import { getParam, getProfile, getPerson, navTo, initCaptions } from '../../core
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { setupVideoQueue } from './screen-video-queue.js';
+import { setupMusicVideoQueue } from './screen-music-video-queue.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadSeries, loadProgress, loadVideo, loadPlaylist, loadBrowse, videoPlaybackAction, addToPlaylist } from '../../core/app-api.js';
+import { loadSeries, loadProgress, loadVideo, loadPlaylist, loadBrowse, videoPlaybackAction, musicVideoPlaybackAction, addToPlaylist } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
 import { currentItem, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist, startIndex, initSeq, toggleShuffle, toggleRepeat, canAdvance, nextSeq } from '../../core/music-video-playthrough.js';
@@ -32,8 +33,13 @@ import { mountBreadcrumb } from './breadcrumb.js';
 // owned playthrough (core/music-video-playthrough.js) — order + index live on
 // this page, never on a server engine, and never resuming (mv* functions
 // below). The owner explicitly ruled out routing it through the video engine
-// above or the separate music queue engine; reusing either was named as the
-// risk this task had to avoid.
+// above or the music engine; reusing either was named as the risk this task
+// had to avoid. FEAT-418 (TASK-419/420) later added a THIRD, dedicated
+// music-video engine on its own channel purely to back a Queue View overlay
+// (`queue`, `sendMvAction` below) — actual advance/prev/shuffle/repeat still
+// runs on the client-owned seq untouched; the two are deliberately separate
+// state until a future task (if any) migrates playthrough itself onto the
+// engine.
 var SERVER = window.location.origin;
 
 var RESUME_BY_RESTART = {
@@ -69,6 +75,10 @@ export function initVideoPage() {
   var seq = initSeq([], 0);  // music-video mode only (core/music-video-playthrough)
 
   function sendAction(action, body) { videoPlaybackAction(SERVER, action, person, body).catch(function() {}); }
+  // FEAT-418 (TASK-419/420): the music-video Queue View's own action sender —
+  // POSTs to the separate /api/music-video-playback engine, never the video
+  // engine above (mirrors sendAction's shape exactly).
+  function sendMvAction(action, body) { musicVideoPlaybackAction(SERVER, action, person, body).catch(function() {}); }
 
   // Breadcrumb (FEAT-021): a film is Home > Title; a series episode is Home >
   // Series > Episode. The series title is fetched once (graceful 'Series'
@@ -156,7 +166,6 @@ export function initVideoPage() {
   }
   function mvBegin() {
     player.setSeriesMode(mvIsMulti(seq));
-    document.getElementById('btn-queue').classList.add('hidden');
     document.getElementById('btn-add-playlist').classList.remove('hidden');
     document.getElementById('btn-mv-shuffle').classList.toggle('hidden', !mvIsMulti(seq));
     document.getElementById('btn-mv-repeat').classList.toggle('hidden', !mvIsMulti(seq));
@@ -288,15 +297,20 @@ export function initVideoPage() {
     }
   });
 
-  // FEAT-040 (TASK-250): the Video Queue View overlay hangs off the player. While
-  // open it owns the d-pad (its own grid nav + Back to close); closed, keys drive
-  // the transport as before. Each row control fires a video-playback action — the
+  // FEAT-040 (TASK-250) / FEAT-418 (TASK-420): the Queue View overlay hangs off
+  // the player, sharing the SAME #queue-overlay/#queue-body/#queue-crumb DOM and
+  // #btn-queue trigger for both modes (isMusicVideo is fixed for the whole page
+  // load, so exactly one controller is ever live). While open it owns the d-pad
+  // (its own grid nav + Back to close); closed, keys drive the transport as
+  // before. Each row control fires an action against the mode's OWN engine — the
   // server broadcasts the new snapshot, which repaints the overlay (no local math).
-  queue = setupVideoQueue({
+  var SETUP_QUEUE = { 'true': setupMusicVideoQueue, 'false': setupVideoQueue };
+  var SEND_QUEUE_ACTION = { 'true': sendMvAction, 'false': sendAction };
+  queue = SETUP_QUEUE[isMusicVideo + '']({
     root: document.getElementById('queue-overlay'),
     body: document.getElementById('queue-body'),
     crumb: document.getElementById('queue-crumb'),
-    onAction: function(action, body) { sendAction(action, body); },
+    onAction: function(action, body) { SEND_QUEUE_ACTION[isMusicVideo + ''](action, body); },
     onClose: function() { document.getElementById('btn-queue').focus(); }
   });
   document.getElementById('btn-queue').addEventListener('click', function() { queue.open(); });
@@ -324,7 +338,11 @@ export function initVideoPage() {
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
-  wsApp = connectApp(window.location.origin, appIntent, { onVideoPlayback: applySnapshot });
+  // FEAT-418 (TASK-419/420): a music-video snapshot only ever repaints the
+  // Queue View overlay — it never drives now-playing/prev/next (that stays the
+  // client-owned seq above), unlike applySnapshot's full video-engine handling.
+  function applyMvQueueSnapshot(snap) { queue.applySnapshot(snap); }
+  wsApp = connectApp(window.location.origin, appIntent, { onVideoPlayback: applySnapshot, onMusicVideoPlayback: applyMvQueueSnapshot });
 
   document.addEventListener('keydown', dispatchKey);
 
