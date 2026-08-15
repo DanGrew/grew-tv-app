@@ -1,6 +1,6 @@
 import { registerScreen } from '../../core/screen-registry.js';
 import { createTile } from '../../components/tile.js';
-import { buildTabs, buildTabRails, clampIndex, withPlaylistsRail, withMvPlaylistsRail } from '../../core/home-rails.js';
+import { buildTabs, railsForSection, clampIndex } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { personGlyph } from '../../core/profile-config.js';
 
@@ -212,17 +212,14 @@ function markActive(tabId) {
 }
 
 // Show one tab's rails (does not move focus — the caller decides). Called both on
-// initial render and whenever a sidebar tab gains focus. Music and Music Videos
-// are each augmented with their own always-present (possibly empty) Playlists
-// rail (withPlaylistsRail / withMvPlaylistsRail, TASK-378) so the TV always
-// renders the "Playlists ＋" heading there; other tabs render buildTabRails as-is.
-var RAIL_GUARANTEE = { music: withPlaylistsRail, 'music-videos': withMvPlaylistsRail };
+// initial render and whenever a sidebar tab gains focus. core's railsForSection
+// augments Music/Music Videos with their own always-present (possibly empty)
+// Playlists rail (TASK-378, shared with the companion — TASK-424) so the TV
+// always renders the "Playlists ＋" heading there; other tabs pass through as-is.
 function selectTab(tabId) {
   STATE.activeTab = tabId;
   markActive(tabId);
-  var rails = buildTabRails(tabId, STATE.cards, STATE.cw, STATE.labels, STATE.recents);
-  var guarantee = [RAIL_GUARANTEE[tabId]].filter(Boolean).concat([function(r) { return r; }])[0];
-  renderRailRows(guarantee(rails));
+  renderRailRows(railsForSection(tabId, STATE.cards, STATE.cw, STATE.labels, STATE.recents));
 }
 
 function tabButton(tab) {
