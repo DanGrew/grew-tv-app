@@ -93,9 +93,14 @@ test('pause, resume, next and previous work as they do for a song', async ({ pag
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/); // already first — no-op, no wrap
 });
 
-test('nothing offers to queue a music video: the Video Queue button is hidden', async ({ page }) => {
+// FEAT-418 (TASK-420): the Queue button now opens the music-video Queue View
+// (its own engine, tests/music-video-queue.test.js) instead of hiding —
+// superseded the pre-TASK-420 "queue is hidden" behaviour.
+test('the Queue button is visible for a music video and opens the music-video Queue View', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
-  await expect(page.locator('#btn-queue')).toBeHidden();
+  await expect(page.locator('#btn-queue')).toBeVisible();
+  await page.locator('#btn-queue').click();
+  await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
 });
 
 test('a lone music video pick shows no ⏮/⏭ transport (single-item playthrough)', async ({ page }) => {

@@ -136,6 +136,14 @@ export function connect(serverOrigin, onContext, onStatus, onAppState, onDevices
       video_playback: function() {
         [o.onVideoPlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
       },
+      // FEAT-418 (TASK-419/420): the server-authoritative MUSIC-VIDEO `playback`
+      // snapshot, on its OWN per-person channel (kept separate from music's and
+      // video's own). The same snapshot the TV overlay renders (app-ws.js
+      // onMusicVideoPlayback) — the companion Queue View mirror repaints from
+      // this. Replayed on (re)connect via snapshot_request so the companion re-syncs.
+      music_video_playback: function() {
+        [o.onMusicVideoPlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
+      },
       // FEAT-026 person-plane verdicts for a companion-initiated person pick. The
       // backend replies to whoever SENT activate_person (it reads device_id from
       // the payload, not the socket), so when the companion activates a person on

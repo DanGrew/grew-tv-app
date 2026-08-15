@@ -61,6 +61,7 @@ module or a screen** — this index rots otherwise (it did).
 - `breadcrumb.js` / `nav-trail.js` — ancestor-chain + sticky nav trail (FEAT-021/032)
 - `queue-view.js` / `queue-tabs.js` / `queue-crumb.js` — music Queue View (FEAT-031/039)
 - `video-queue-view.js` — video Queue View model + markup (FEAT-040)
+- `music-video-queue-view.js` — music-video Queue View model + markup, mirroring `queue-view.js`'s every-row-editable bucketing (FEAT-418/TASK-420) against its own `music_video_playback` snapshot (TASK-419), with poster art and no now-playing position
 - `video-player-router.js` — persistent video-player view-router (FEAT-037)
 - `music-video-playthrough.js` — client-owned playthrough for a single music video, a music-video playlist or an artist's music videos: order + index + Shuffle/Repeat, no server engine, no resume (TASK-374/407)
 - `player-math.js` — pure video-player render arithmetic: `progressPct` / `clampTime` / `wrapIndex` / `frameDrop` (TASK-305)
@@ -93,13 +94,14 @@ module or a screen** — this index rots otherwise (it did).
 - `screen-video-player.js` — video transport (graduated skips, auto-hide controls)
 - `screen-audio-player.js` — audio transport (FEAT-018)
 - `screen-queue.js` / `screen-video-queue.js` — Queue View overlays (FEAT-031/040)
+- `screen-music-video-queue.js` — music-video Queue View overlay (FEAT-418/TASK-420), sharing `screen-video-page.js`'s `#queue-overlay` DOM + `#btn-queue` trigger with `screen-video-queue.js` (mode-selected, never both live)
 - `screen-search.js` — TV search overlay (🔍): reuses the create-playlist on-screen keyboard, ranked results via `core/search-rank` (TASK-324; companion mirror lives in `companion-browse.js`)
 - `screen-error.js` — error screen · `breadcrumb.js` / `device-badge.js` — trail + badge mounts
 
 **Companion mirrors** (`companion-*.js`, back `companion/*.html`)
 - `companion-profile.js` · `companion-browse.js` · `companion-detail.js`
 - `companion-artist.js` · `companion-audio.js` · `companion-video.js`
-- `companion-queue.js` · `companion-video-queue.js`
+- `companion-queue.js` · `companion-video-queue.js` · `companion-music-video-queue.js` — the music-video Queue View mirror (FEAT-418/TASK-420); ships `mountScreenBar` from the start (TASK-417's gap, not repeated here)
 - `companion-playlist.js` · `companion-playlist-create.js`
 - `companion-breadcrumb.js` · `companion-screen-bar.js` · `companion-sync-bar.js` · `companion-error.js`
 - `companion-status-menu.js` — the header popout menu (TASK-412, rolled out to every companion page by TASK-415): opens/closes `#status-menu` off a single `#btn-status` icon, never on an outside tap. Consolidates whichever of Mode (`companion-sync-bar.js`), Screen (`companion-screen-bar.js`), Profile (`#switch-profile`) and Atlas (`#door`) a page renders into one menu by relocating their existing container elements in the HTML — those mounts are unchanged. `browse.html` is the only page carrying all four; the rest show the subset they already had (e.g. `queue.html`/`video-queue.html` show Mode only, `profile.html` shows Screen only).

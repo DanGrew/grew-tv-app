@@ -820,9 +820,92 @@ async function installVideoPlaybackBackend(page) {
   return { seed: seed, snapshot: snapshot };
 }
 
+// FEAT-418 (TASK-419/420): a lean record + re-broadcast mock for the
+// music-video Queue View e2e — NOT a full engine simulation like
+// installVideoPlaybackBackend's ENGINE table (deliberately: this task assumes
+// items are already queued, e.g. via TASK-419's play-source, and only needs
+// something in the queue to render against). Seeded with a snapshot shaped
+// like build_snapshot's own (now_playing/play_next/from_source/then/shuffle/
+// repeat), it applies move/remove/toggle/play-video against the seeded lists
+// by entry_id (mirrors music_video_playback_engine.py's own
+// move_queue_entry/remove_queue_entry) and re-pushes over the
+// `music_video_playback` channel — proof the TV overlay and the companion
+// mirror both repaint from a LIVE snapshot, not a static fixture. Answers
+// BOTH the TV's app-ws handshake (register_device/activate_person) and the
+// companion-ws one (list_devices/register_companion/snapshot_request) so one
+// fixture backs both surfaces.
+async function installMusicVideoQueueBackend(page, seedSnap) {
+  var snap = JSON.parse(JSON.stringify(seedSnap));
+  var live = null;
+  var posts = [];
+  function push() {
+    [live].filter(Boolean).forEach(function(ws) { ws.send(JSON.stringify({ type: 'music_video_playback', payload: snap })); });
+  }
+  function listFor(entryId) {
+    return ['play_next', 'from_source', 'then'].filter(function(key) {
+      return (snap[key] || []).some(function(e) { return e.entry_id === entryId; });
+    })[0];
+  }
+  var ACTION = {
+    'move-queue-entry': function(b) {
+      [listFor(b.entry_id)].filter(Boolean).forEach(function(k) {
+        var i = snap[k].findIndex(function(e) { return e.entry_id === b.entry_id; });
+        var j = i + (b.direction === 'up' ? -1 : 1);
+        [j].filter(function(x) { return x >= 0 && x < snap[k].length; }).forEach(function(x) {
+          var t = snap[k][i]; snap[k][i] = snap[k][x]; snap[k][x] = t;
+        });
+      });
+    },
+    'remove-queue-entry': function(b) {
+      [listFor(b.entry_id)].filter(Boolean).forEach(function(k) {
+        snap[k] = snap[k].filter(function(e) { return e.entry_id !== b.entry_id; });
+      });
+    },
+    'play-video': function(b) {
+      var all = (snap.play_next || []).concat(snap.from_source || []).concat(snap.then || []);
+      [all.filter(function(e) { return e.video_id === b.video_id; })[0]].filter(Boolean).forEach(function(e) { snap.now_playing = e; });
+    },
+    'toggle-shuffle': function() { snap.shuffle = !snap.shuffle; },
+    'toggle-repeat': function() { snap.repeat = !snap.repeat; }
+  };
+  await page.routeWebSocket(/:8766/, function(ws) {
+    live = ws;
+    push();
+    ws.onMessage(function(raw) {
+      var m = JSON.parse(raw);
+      var REPLY = {
+        register_device: function() {},
+        activate_person: function() {
+          [m.payload.person_id].filter(Boolean).forEach(function(pid) {
+            ws.send(JSON.stringify({ type: 'person_active', payload: { person_id: pid, device_id: m.payload.device_id } }));
+          });
+        },
+        list_devices: function() {
+          ws.send(JSON.stringify({ type: 'devices', payload: { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] } }));
+        },
+        register_companion: function() {},
+        snapshot_request: function() {
+          ws.send(JSON.stringify({ type: 'app_state', payload: { person: 'kids', profile: 'kids', screen: 'player' } }));
+          push();
+        }
+      };
+      [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
+    });
+  });
+  await page.route('**/api/music-video-playback/*', function(route) {
+    var action = decodeURIComponent(route.request().url().split('/api/music-video-playback/')[1].split('?')[0]);
+    var body = JSON.parse(route.request().postData() || '{}');
+    posts.push({ action: action, body: body });
+    [ACTION[action]].filter(Boolean).forEach(function(fn) { fn(body); });
+    route.fulfill({ status: 204, body: '' });
+    push();
+  });
+  return { posts: posts, snapshot: function() { return snap; } };
+}
+
 module.exports = {
   VIDEOS, SERIES, ALBUMS, TRACKS, EPISODES, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, MUSIC_VIDEO_CARDS, BROWSE, CONFIG, nextOf,
-  installApi, installPlaybackBackend, installVideoPlaybackBackend,
+  installApi, installPlaybackBackend, installVideoPlaybackBackend, installMusicVideoQueueBackend,
   // TASK-326: pure response builders + the CW row builder, so the stub<->contract
   // shape test can exercise the exact objects the routes above emit.
   browseResponse, videoResponse, albumResponse, playlistResponse, continueWatchingResponse, midWatchRows

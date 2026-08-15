@@ -90,6 +90,13 @@ export function connectApp(serverOrigin, onIntent, opts) {
       video_playback: function() {
         [o.onVideoPlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
       },
+      // FEAT-418 (TASK-419/420): the server-authoritative MUSIC-VIDEO `playback`
+      // snapshot, on its OWN channel (kept separate from music's and video's own
+      // so a client never confuses one for another). The music-video Queue View
+      // overlay renders + repaints from it; replayed on reconnect like the others.
+      music_video_playback: function() {
+        [o.onMusicVideoPlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
+      },
       deactivated: function() {
         [o.onDeactivated].filter(Boolean).concat([defaultDeactivated])[0](msg.payload);
       },
