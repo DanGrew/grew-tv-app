@@ -20,6 +20,7 @@ var JUMP_COLS    = 4;
 var JUMP_DEFAULT = 4;            // +10s, the most common forward skip
 var QUICK_SKIP   = 10;          // d-pad left/right one-press skip
 var BACKEND_SAVE_MS = 5000;
+var STALL_RECOVERY_MS = 6000;   // BUG-423: waiting -> canplay/playing longer than this reloads
 
 // BUG-016: d-pad up/down follows the new visual order — transport (prev/play/next)
 // then the pill row beneath the progress bar (queue, jump, lyrics, reset).
@@ -62,6 +63,7 @@ export function setup(config) {
   // timeupdate ticks past the boundary advances exactly once; re-armed per track in
   // playTrack.
   var currentEndAt    = null;
+  var stallTimer      = null;   // BUG-423: armed on `waiting`, cleared on `canplay`/`playing`
 
   var AUDIO_TOGGLE = {
     'true':  function() { audio.play().catch(function() {}); },
@@ -406,8 +408,9 @@ export function setup(config) {
     emitState();
     emit('pause');
   });
-  audio.addEventListener('waiting', function() { emit('buffer_start'); });
-  audio.addEventListener('canplay', function() { emit('buffer_end'); });
+  audio.addEventListener('waiting', function() { emit('buffer_start'); armStallTimer(); });
+  audio.addEventListener('canplay', function() { emit('buffer_end'); clearStallTimer(); });
+  audio.addEventListener('playing', clearStallTimer);
   audio.addEventListener('seeked', function() { emitState(); coalesceSeek(); });
 
   // BUG-061: Chromium binds a playing element's audio output to the CoreAudio
@@ -416,6 +419,21 @@ export function setup(config) {
   // the live element. devicechange fires on that default-output flip — tearing
   // the element down and remounting (same src, same position) re-grabs whatever
   // device is current now. A no-op while paused/idle — nothing to rebind.
+  // BUG-423: `_stream()` (media-manager) enforces no read timeout on the track's
+  // streaming request, so a stalled connection wedges forever — no error, no
+  // close, nothing for the browser to recover from on its own. `waiting` arms a
+  // timer; a `canplay`/`playing` well inside the threshold (normal buffering)
+  // clears it. Outlasting the threshold means the connection is wedged, not
+  // buffering, so drive the same reload-in-place path BUG-061 uses.
+  function armStallTimer() {
+    clearStallTimer();
+    stallTimer = setTimeout(remountOnDeviceChange, STALL_RECOVERY_MS);
+  }
+  function clearStallTimer() {
+    clearTimeout(stallTimer);
+    stallTimer = null;
+  }
+
   function remountOnDeviceChange() {
     var resumeAt   = audio.currentTime;
     var wasPlaying = !audio.paused;
