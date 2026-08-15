@@ -9,7 +9,7 @@
 const { runFlow, bootTv, openCompanionBrowse } = require('./_harness.cjs');
 
 const NAME = 'Verify Flow';
-const rail = (p, title) => p.locator('#rails-row .chip', { hasText: title }).first();
+const rail = (p, title) => p.locator(`#pager-dots .pager-dot[aria-label="${title}"]`);
 const crumb = (p, title) => p.locator('#breadcrumb .crumb-link', { hasText: title }).first();
 
 runFlow({

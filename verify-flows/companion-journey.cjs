@@ -9,7 +9,7 @@
 // shifted-but-present item still pairs; only a DELETED title breaks, by design).
 const { runFlow, bootTv, openCompanionBrowse } = require('./_harness.cjs');
 
-const chip = (p, row, title) => p.locator(row + ' .chip', { hasText: title }).first();
+const dot = (p, title) => p.locator(`#pager-dots .pager-dot[aria-label="${title}"]`);
 const dock = (p, title) => p.locator('#section-dock .dock-tab', { hasText: title }).first();
 const crumb = (p, title) => p.locator('#breadcrumb .crumb-link', { hasText: title }).first();
 
@@ -18,14 +18,14 @@ runFlow({
   setup: async (browser, base) => { await bootTv(browser, base); return openCompanionBrowse(browser, base); },
   steps: [
     { name: '01-browse', fn: p => dock(p, 'TV Series').waitFor() },
-    { name: '02-tv-series', fn: async p => { await dock(p, 'TV Series').click(); await chip(p, '#rails-row', 'Comedy').waitFor(); } },
-    { name: '03-comedy-grid', fn: async p => { await chip(p, '#rails-row', 'Comedy').click(); await p.locator('#txtgrid .ph-txt', { hasText: 'Black Books' }).waitFor(); } },
+    { name: '02-tv-series', fn: async p => { await dock(p, 'TV Series').click(); await dot(p, 'Comedy').waitFor(); } },
+    { name: '03-comedy-grid', fn: async p => { await dot(p, 'Comedy').click(); await p.locator('#txtgrid .ph-txt', { hasText: 'Black Books' }).waitFor(); } },
     { name: '04-detail', fn: async p => { await p.locator('#txtgrid .ph-txt', { hasText: 'Black Books' }).first().click(); await p.waitForURL(/detail\.html/, { timeout: 15000 }); await p.locator('#ctx-title', { hasText: 'Black Books' }).waitFor(); } },
     { name: '05-video', fn: async p => { await p.locator('button').filter({ hasText: /^\s*1\.\s/ }).first().click(); await p.waitForURL(/video\.html/, { timeout: 15000 }); await p.locator('#c-toggle').waitFor(); } },
     { name: '06-paused', fn: async p => { await p.locator('#c-toggle').click(); await p.locator('#c-toggle', { hasText: '▶' }).waitFor(); } },
     { name: '07-playing', fn: async p => { await p.locator('#c-toggle').click(); await p.locator('#c-toggle', { hasText: '⏸' }).waitFor(); } },
     { name: '08-crumb-detail', fn: async p => { await crumb(p, 'Black Books').click(); await p.waitForURL(/detail\.html/, { timeout: 15000 }); await p.locator('#ctx-title', { hasText: 'Black Books' }).waitFor(); } },
     { name: '09-crumb-grid', fn: async p => { await crumb(p, 'Comedy').click(); await p.waitForURL(/browse\.html/, { timeout: 15000 }); await p.locator('#txtgrid .ph-txt', { hasText: 'Black Books' }).waitFor(); } },
-    { name: '10-films', fn: async p => { await dock(p, 'Films').click(); await p.locator('#rails-row .chip').first().waitFor(); } },
+    { name: '10-films', fn: async p => { await dock(p, 'Films').click(); await p.locator('#pager-dots .pager-dot').first().waitFor(); } },
   ],
 });

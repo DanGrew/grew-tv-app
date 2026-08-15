@@ -19,8 +19,9 @@ runFlow({
   steps: [
     { name: '01-romcom', fn: async p => {
       await p.locator('#section-dock .dock-tab', { hasText: 'Films' }).first().click();
-      // Companion Films is genre-railed — the grid is empty until a genre chip is picked.
-      await p.locator('#rails-row .chip', { hasText: 'Romcom' }).first().click();
+      // Companion Films is genre-railed — TASK-411 auto-lands on the first genre's
+      // grid, so pick the Romcom rail's pager dot to reach this film.
+      await p.locator('#pager-dots .pager-dot[aria-label="Romcom"]').click();
       await p.locator('#txtgrid .ph-txt', { hasText: FILM }).first().waitFor();
     } },
     { name: '02-playing', fn: async p => {

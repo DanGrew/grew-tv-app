@@ -12,7 +12,7 @@
 // is non-trivial; navigates by title.
 const { runFlow, bootTv, openCompanionBrowse } = require('./_harness.cjs');
 
-const chip = (p, title) => p.locator('#rails-row .chip', { hasText: title }).first();
+const chip = (p, title) => p.locator(`#pager-dots .pager-dot[aria-label="${title}"]`);
 
 runFlow({
   id: 'companion-artist',

@@ -8,7 +8,7 @@
 // data both builds, so position is stable; only a deleted catalog breaks it).
 const { runFlow, bootTv, openCompanionBrowse } = require('./_harness.cjs');
 
-const chip = (p, title) => p.locator('#rails-row .chip', { hasText: title }).first();
+const chip = (p, title) => p.locator(`#pager-dots .pager-dot[aria-label="${title}"]`);
 const crumb = (p, title) => p.locator('#breadcrumb .crumb-link', { hasText: title }).first();
 
 runFlow({
