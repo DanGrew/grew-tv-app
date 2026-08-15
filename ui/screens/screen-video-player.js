@@ -15,6 +15,7 @@ var JUMP_DEFAULT = 5;            // +10s, the most common forward skip
 var QUICK_SKIP   = 10;           // TV d-pad left/right one-press skip
 var UPNEXT_SECS  = 5;            // autoplay "Up next" countdown
 var BACKEND_SAVE_MS = 5000;
+var STALL_RECOVERY_MS = 6000;   // BUG-429: waiting -> canplay/playing longer than this reloads
 
 // Transport focus order; CC/mv-shuffle/mv-repeat are skipped while hidden (no
 // .vtt for this video / not a multi-item music-video playthrough, TASK-407).
@@ -48,6 +49,7 @@ export function setup(config) {
   var jumpPopup         = null;
   var upnextTimer       = null;
   var upnextRemaining   = 0;
+  var stallTimer        = null;   // BUG-429: armed on `waiting`, cleared on `canplay`/`playing`
   var captionsOn        = false;
   var pendingResume     = false;
   var _currentDisplay   = {};
@@ -538,8 +540,9 @@ export function setup(config) {
     emitState();
     emit('pause');
   });
-  video.addEventListener('waiting', function() { emit('buffer_start'); });
-  video.addEventListener('canplay', function() { emit('buffer_end'); });
+  video.addEventListener('waiting', function() { emit('buffer_start'); armStallTimer(); });
+  video.addEventListener('canplay', function() { emit('buffer_end'); clearStallTimer(); });
+  video.addEventListener('playing', clearStallTimer);
   video.addEventListener('seeked', function() {
     emitState();
     coalesceSeek();
@@ -552,6 +555,21 @@ export function setup(config) {
   // the live element. devicechange fires on that default-output flip — tearing
   // the element down and remounting (same src, same position) re-grabs whatever
   // device is current now. A no-op while paused/idle — nothing to rebind.
+  // BUG-429: `_stream()` (media-manager) enforces no read timeout on the video's
+  // streaming request, so a stalled connection wedges forever — no error, no
+  // close, nothing for the browser to recover from on its own. `waiting` arms a
+  // timer; a `canplay`/`playing` well inside the threshold (normal buffering)
+  // clears it. Outlasting the threshold means the connection is wedged, not
+  // buffering, so drive the same reload-in-place path BUG-061 uses.
+  function armStallTimer() {
+    clearStallTimer();
+    stallTimer = setTimeout(remountOnDeviceChange, STALL_RECOVERY_MS);
+  }
+  function clearStallTimer() {
+    clearTimeout(stallTimer);
+    stallTimer = null;
+  }
+
   function remountOnDeviceChange() {
     var resumeAt   = video.currentTime;
     var wasPlaying = !video.paused;
