@@ -190,3 +190,53 @@ test('devicechange while playing remounts the video element and resumes at the s
   expect(await page.evaluate(() => window.__plays)).toBeGreaterThan(0);
   expect(await page.evaluate(() => window.__pos)).toBe(77);
 });
+
+// BUG-429 — video/show twin of BUG-423: the same `_stream()` no-timeout stall
+// wedges screen-video-player.js just like the audio player. Mirrors the
+// BUG-423 stall tests above, on the video element/route instead.
+test('a stall outlasting the threshold reloads the video element at the same position (BUG-429)', async ({ page }) => {
+  await installVideoPlaybackBackend(page);
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#screen-video')).toBeVisible();
+
+  await page.clock.install();
+  await page.locator('#video').evaluate(v => {
+    window.__loads = 0;
+    window.__plays = 0;
+    Object.defineProperty(v, 'readyState', { configurable: true, get: () => 1 });
+    Object.defineProperty(v, 'currentTime', { configurable: true, get: () => (window.__pos === undefined ? 77 : window.__pos), set: val => { window.__pos = val; } });
+    Object.defineProperty(v, 'paused', { configurable: true, get: () => false });
+    v.load = () => { window.__loads += 1; };
+    v.play = () => { window.__plays += 1; return Promise.resolve(); };
+    v.dispatchEvent(new Event('waiting'));
+  });
+  await page.clock.fastForward(6001);
+
+  expect(await page.evaluate(() => window.__loads)).toBe(1);
+  expect(await page.evaluate(() => window.__plays)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.__pos)).toBe(77);
+});
+
+test('a stall clearing before the threshold does not reload the video element (BUG-429)', async ({ page }) => {
+  await installVideoPlaybackBackend(page);
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#screen-video')).toBeVisible();
+
+  await page.clock.install();
+  await page.locator('#video').evaluate(v => {
+    window.__loads = 0;
+    window.__plays = 0;
+    Object.defineProperty(v, 'readyState', { configurable: true, get: () => 1 });
+    Object.defineProperty(v, 'currentTime', { configurable: true, get: () => 77, set: () => {} });
+    Object.defineProperty(v, 'paused', { configurable: true, get: () => false });
+    v.load = () => { window.__loads += 1; };
+    v.play = () => { window.__plays += 1; return Promise.resolve(); };
+    v.dispatchEvent(new Event('waiting'));
+  });
+  await page.clock.fastForward(3000);
+  await page.locator('#video').evaluate(v => v.dispatchEvent(new Event('canplay')));
+  await page.clock.fastForward(6001);
+
+  expect(await page.evaluate(() => window.__loads)).toBe(0);
+  expect(await page.evaluate(() => window.__plays)).toBe(0);
+});
