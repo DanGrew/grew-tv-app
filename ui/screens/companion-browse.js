@@ -35,11 +35,11 @@ import { mountStatusMenu } from './companion-status-menu.js';
 // never drift. L4 (item detail/transport) is the existing companion screen,
 // reached when the app echoes the item context after a tile `select`.
 
-// Which rows + Back show at each level. Sections is the root (no Back).
+// Which rows show at each level. Sections is the root.
 var LEVEL_VIEW = {
-  sections: { rails: 'none', grid: 'none', back: 'none' },
-  rails:    { rails: '',     grid: 'none', back: '' },
-  grid:     { rails: '',     grid: '',     back: '' }
+  sections: { rails: 'none', grid: 'none' },
+  rails:    { rails: '',     grid: 'none' },
+  grid:     { rails: '',     grid: '' }
 };
 
 // A picked section opens its rails; no section is the root sections level.
@@ -64,8 +64,7 @@ export function initPage() {
     pagerCreate: document.getElementById('pager-create'),
     gridWrap: document.getElementById('grid-wrap'),
     gridCount: document.getElementById('grid-count'),
-    txtgrid: document.getElementById('txtgrid'),
-    back: document.getElementById('btn-back')
+    txtgrid: document.getElementById('txtgrid')
   };
   var state = {
     profile: null, person: null,
@@ -305,7 +304,6 @@ export function initPage() {
     var v = LEVEL_VIEW[state.level];
     els.railsWrap.style.display = v.rails;
     els.gridWrap.style.display = v.grid;
-    els.back.style.display = v.back;
   }
 
   // FEAT-032 (TASK-218): persist the drill position so returning to browse — Back,
@@ -476,17 +474,6 @@ export function initPage() {
   function openItem(card) {
     ({ true: function() { openItemLocal(card); }, false: function() { api.sendIntent('select', { id: card.id }); } })[mode.isDesynced()]();
   }
-
-  // Back collapses exactly one level: grid -> its section's rails, rails -> the
-  // root sections. Each step drives the TV through the same navigate() funnel.
-  function back() {
-    var BACK = {
-      grid:  function() { navigate('browse.html', { tab: state.section }); },
-      rails: function() { navigate('browse.html', {}); }
-    };
-    [BACK[state.level]].filter(Boolean).forEach(function(fn) { fn(); });
-  }
-  els.back.addEventListener('click', back);
 
   // TASK-411 — ‹ › step one rail at a time, same funnel a dot/swipe lands
   // through; a disabled arrow (arrowDisabled, applied in renderRails) never
