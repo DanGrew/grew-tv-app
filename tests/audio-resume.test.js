@@ -107,6 +107,66 @@ test('devicechange while paused does not auto-resume playback (BUG-061)', async 
   expect(await page.evaluate(() => window.__plays)).toBe(0);
 });
 
+// BUG-423 — a stalled stream (bytes stop arriving mid-`Content Download`, no
+// error, no close) wedges the player forever with nothing to notice or recover
+// on its own. `waiting` now arms a stall timer that drives the same
+// reload-in-place path as BUG-061 once the stall outlasts the threshold; a
+// `canplay`/`playing` well inside the threshold (normal buffering) clears it
+// with no reload. Fakes the element the same way the BUG-061 tests above do,
+// and uses Playwright's clock so the threshold doesn't cost real test time.
+test('a stall outlasting the threshold reloads the audio element at the same position (BUG-423)', async ({ page }) => {
+  await pickPerson(page, 'kids');
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="ootb"]').click();
+  await page.locator('.detail-row[data-id="ootb-01"]').click();
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
+
+  await page.clock.install();
+  await page.locator('#audio').evaluate(a => {
+    window.__loads = 0;
+    window.__plays = 0;
+    Object.defineProperty(a, 'readyState', { configurable: true, get: () => 1 });
+    Object.defineProperty(a, 'currentTime', { configurable: true, get: () => (window.__pos === undefined ? 42 : window.__pos), set: v => { window.__pos = v; } });
+    Object.defineProperty(a, 'paused', { configurable: true, get: () => false });
+    a.load = () => { window.__loads += 1; };
+    a.play = () => { window.__plays += 1; return Promise.resolve(); };
+    a.dispatchEvent(new Event('waiting'));
+  });
+  await page.clock.fastForward(6001);
+
+  expect(await page.evaluate(() => window.__loads)).toBe(1);
+  expect(await page.evaluate(() => window.__plays)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.__pos)).toBe(42);
+});
+
+test('a stall clearing before the threshold does not reload (BUG-423)', async ({ page }) => {
+  await pickPerson(page, 'kids');
+  await expect(page.locator('#screen-browse')).toBeVisible();
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="ootb"]').click();
+  await page.locator('.detail-row[data-id="ootb-01"]').click();
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
+
+  await page.clock.install();
+  await page.locator('#audio').evaluate(a => {
+    window.__loads = 0;
+    window.__plays = 0;
+    Object.defineProperty(a, 'readyState', { configurable: true, get: () => 1 });
+    Object.defineProperty(a, 'currentTime', { configurable: true, get: () => 42, set: () => {} });
+    Object.defineProperty(a, 'paused', { configurable: true, get: () => false });
+    a.load = () => { window.__loads += 1; };
+    a.play = () => { window.__plays += 1; return Promise.resolve(); };
+    a.dispatchEvent(new Event('waiting'));
+  });
+  await page.clock.fastForward(3000);
+  await page.locator('#audio').evaluate(a => a.dispatchEvent(new Event('canplay')));
+  await page.clock.fastForward(6001);
+
+  expect(await page.evaluate(() => window.__loads)).toBe(0);
+  expect(await page.evaluate(() => window.__plays)).toBe(0);
+});
+
 // Video twin (screen-video-player.js shares the same element-lifecycle fix —
 // the same Bluetooth speaker sits in front of both screens).
 test('devicechange while playing remounts the video element and resumes at the same position (video twin, BUG-061)', async ({ page }) => {
