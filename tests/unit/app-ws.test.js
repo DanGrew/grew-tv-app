@@ -182,7 +182,7 @@ describe('connectApp', () => {
 
   it('optional verdict/playback handlers with no callback are no-ops', async () => {
     var { ws } = await boot('http://host:8766', () => {});   // no opts callbacks
-    ['person_active', 'person_busy', 'playback', 'video_playback'].forEach(function(type) {
+    ['person_active', 'person_busy', 'playback', 'video_playback', 'music_video_playback'].forEach(function(type) {
       expect(() => ws.onmessage({ data: JSON.stringify({ type: type, payload: {} }) })).not.toThrow();
     });
   });
@@ -289,6 +289,13 @@ describe('connectApp', () => {
     var { ws } = await boot('http://host:8766', () => {}, { onVideoPlayback: (p) => { got = p; } });
     ws.onmessage({ data: JSON.stringify({ type: 'video_playback', payload: { now_playing: { item_id: 'bluey-s1e1' } } }) });
     expect(got.now_playing.item_id).toBe('bluey-s1e1');
+  });
+
+  it('routes a music-video playback snapshot to opts.onMusicVideoPlayback', async () => {
+    var got = null;
+    var { ws } = await boot('http://host:8766', () => {}, { onMusicVideoPlayback: (p) => { got = p; } });
+    ws.onmessage({ data: JSON.stringify({ type: 'music_video_playback', payload: { now_playing: { video_id: 'mv-01' } } }) });
+    expect(got.now_playing.video_id).toBe('mv-01');
   });
 
   it('deactivated with no onDeactivated override falls back to the profile picker (default)', async () => {

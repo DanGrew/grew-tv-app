@@ -218,6 +218,13 @@ describe('connect', () => {
     expect(got.now_playing.item_id).toBe('bluey-s1e1');
   });
 
+  it('routes a music-video playback snapshot to opts.onMusicVideoPlayback', async () => {
+    var got = null;
+    var { ws } = await boot('http://host:8766', () => {}, () => {}, () => {}, () => {}, { onMusicVideoPlayback: (p) => { got = p; } });
+    ws.onmessage({ data: JSON.stringify({ type: 'music_video_playback', payload: { now_playing: { video_id: 'mv-01' } } }) });
+    expect(got.now_playing.video_id).toBe('mv-01');
+  });
+
   it('calls onStatus connected on open', async () => {
     var statuses = [];
     var { ws } = await boot('http://host:8766', () => {}, function(s) { statuses.push(s); });
@@ -302,7 +309,7 @@ describe('connect', () => {
 
   it('optional playback/verdict handlers with no callback are no-ops', async () => {
     var { ws } = await boot('http://host:8766', () => {}, () => {});   // no opts callbacks
-    ['playback', 'video_playback', 'person_active', 'person_busy'].forEach(function(type) {
+    ['playback', 'video_playback', 'music_video_playback', 'person_active', 'person_busy'].forEach(function(type) {
       expect(() => ws.onmessage({ data: JSON.stringify({ type: type, payload: {} }) })).not.toThrow();
     });
   });
