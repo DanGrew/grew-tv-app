@@ -4,6 +4,7 @@ import { companionVideoQueueHtml } from '../../core/video-queue-view.js';
 import { screenPage } from '../../core/companion-utils.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
+import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 import { mountStatusMenu } from './companion-status-menu.js';
 
@@ -25,9 +26,12 @@ export function initPage() {
   };
   var state = { person: null };
   var api = {};
+  var updateBar = null;
   var activeTab = null;               // TASK-238: chosen Queue/Next/Coming-Up tab
   var mode = createCompanionMode();
   function noop() {}
+  function getApi() { return api; }
+  function onDevices(devices) { updateBar(devices); }
   // FEAT-038 (TASK-230): the switch only changes mode. BROWSE greys the queue
   // actions in place (body.browsing) so nothing disturbs playback; reach the
   // library via Back -> player -> breadcrumb. CONTROL reloads (reconnect).
@@ -100,5 +104,6 @@ export function initPage() {
   mountSyncBar(mode, onModeChange);
   mountStatusMenu();
   applyMode();
-  api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, noop, { onVideoPlayback: render, mode: mode });
+  api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { onVideoPlayback: render, mode: mode });
+  updateBar = mountScreenBar(getApi, noop);
 }

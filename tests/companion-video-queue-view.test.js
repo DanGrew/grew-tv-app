@@ -104,3 +104,32 @@ test('Switch profile sends the navigate intent to the picker (BUG-007)', async (
   await page.locator('#switch-profile').click();
   await expect.poll(() => intents.filter(i => i.intent === 'navigate' && i.params.page === 'profile.html').length).toBeGreaterThan(0);
 });
+
+// TASK-417 — the Screen row (mountScreenBar), the one status-menu piece TASK-415
+// never reached on this page. Two devices so the bar surfaces its "Pick a
+// screen" picker (a lone device auto-targets silently, per companion-screen-bar
+// TASK-179 coverage) — picking one re-targets exactly as it does on browse.html.
+test('the Screen row lists both screens and picking one re-targets (TASK-417)', async ({ page }) => {
+  const received = [];
+  await installApi(page);
+  await page.routeWebSocket(/:8766/, ws => {
+    ws.onMessage(raw => {
+      const m = JSON.parse(raw);
+      received.push(m);
+      if (m.type === 'list_devices') {
+        ws.send(JSON.stringify({ type: 'devices', payload: { devices: [
+          { device_id: 'tv-a', label: 'Living Room', active_person: null },
+          { device_id: 'tv-b', label: 'Kitchen', active_person: null }
+        ] } }));
+      }
+    });
+  });
+  await page.goto('/companion/video-queue.html');
+  await page.locator('#btn-status').click();
+  await expect(page.locator('#screen-bar .screen-btn')).toHaveCount(2);
+
+  await page.locator('#screen-bar .screen-btn[data-id="tv-a"]').click();
+  await expect.poll(() => received.filter(m => m.type === 'register_companion').length).toBeGreaterThan(0);
+  const reg = received.find(m => m.type === 'register_companion');
+  expect(reg.payload.device_id).toBe('tv-a');
+});
