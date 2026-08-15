@@ -492,7 +492,10 @@ export function initPage() {
   // alone for the page's own scroll (touch-action: pan-y backs this up at the
   // CSS layer), a horizontal one pages, with resistance at either end
   // (pageOffset) and a released drag past threshold landing via the SAME
-  // selectRail() path a dot/arrow tap uses (swipeTarget).
+  // selectRail() path a dot/arrow tap uses (swipeTarget). TASK-425 — the
+  // listener sits on #grid-wrap (CSS flex-fills it to the dock), not #txtgrid,
+  // so a single-row rail's empty space below the tiles still starts a drag;
+  // the painted/transformed element stays #txtgrid.
   var drag = null;
   function paintDrag(dx) {
     els.txtgrid.style.transform = 'translateX(' + pageOffset(dx, railIndex(), railList().length) + 'px)';
@@ -547,7 +550,7 @@ export function initPage() {
     window.addEventListener('pointerup', onGridPointerUp);
     window.addEventListener('pointercancel', onGridPointerCancel);
   }
-  els.txtgrid.addEventListener('pointerdown', onGridPointerDown);
+  els.gridWrap.addEventListener('pointerdown', onGridPointerDown);
 
   // Render ONCE after both browse + continue-watching settle (the FEAT-020
   // double-render request storm is moot here — text-only — but a single render
