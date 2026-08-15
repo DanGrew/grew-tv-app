@@ -5,10 +5,11 @@ const { installApi, BROWSE, MUSIC_CARDS, MUSIC_VIDEO_CARDS } = require('./fixtur
 // FEAT-020/TASK-139 tab+rails layout). The companion walks four levels —
 // Sections -> Rails -> Grid -> Item — one at a time, driving the TV: each tap
 // emits the existing FEAT-017 `navigate`/`select` intent (no new protocol) and
-// optimistically renders locally. Chips are the breadcrumb (sideways jump = tap a
-// different chip; Back collapses one level). The L3 grid is text-only — zero
-// posters. The app side is mocked over the WS; the catalog is backend state from
-// /api/browse (installApi fixtures).
+// optimistically renders locally. The pinned section dock (any section, one
+// tap) and the always-visible pager (any rail, one tap) reach every
+// section/rail directly from the grid (TASK-426 removed Back as redundant).
+// The L3 grid is text-only — zero posters. The app side is mocked over the
+// WS; the catalog is backend state from /api/browse (installApi fixtures).
 
 function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
@@ -46,11 +47,19 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('#section-dock .dock-tab-label')).toHaveText(['TV Series', 'Films', 'Home Movies']);
 });
 
-test('L1 shows section chips from the server sections — no rails/grid/Back yet', async ({ page }) => {
+test('L1 shows section chips from the server sections — no rails/grid yet', async ({ page }) => {
   await expect(page.locator('#rails-wrap')).toBeHidden();
   await expect(page.locator('#grid-wrap')).toBeHidden();
-  await expect(page.locator('#btn-back')).toBeHidden();
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Home');
+});
+
+test('TASK-426: #btn-back never renders on browse.html, at any level', async ({ page }) => {
+  await expect(page.locator('#btn-back')).toHaveCount(0);
+  await page.locator('.dock-tab[data-section="films"]').click();
+  await expect(page.locator('#grid-wrap')).toBeVisible();
+  await expect(page.locator('#btn-back')).toHaveCount(0);
+  await page.locator('#pager-next').click();
+  await expect(page.locator('#btn-back')).toHaveCount(0);
 });
 
 test('L1→L2/L3: tapping a section jumps straight to its first rail\'s grid (TASK-411) + emits a navigate intent', async ({ page }) => {
@@ -62,7 +71,6 @@ test('L1→L2/L3: tapping a section jumps straight to its first rail\'s grid (TA
   await expect(page.locator('#txtgrid .ph-txt[data-id="bluey"] .nm')).toHaveText('Bluey');
   // Text-only: the L3 grid renders zero images.
   await expect(page.locator('#txtgrid img')).toHaveCount(0);
-  await expect(page.locator('#btn-back')).toBeVisible();
   expect(intents).toContainEqual(expect.objectContaining({ intent: 'navigate', params: { page: 'rail-grid.html', params: { section: 'series', rail: 'genre:animation' } } }));
 });
 
@@ -117,19 +125,6 @@ test('‹ › arrows step one rail at a time and disable at either end', async (
   await expect(page.locator('#pager-name')).toHaveText('Animation');
 });
 
-test('Back collapses exactly one level: grid → rails (pager, no grid) → sections', async ({ page }) => {
-  await page.locator('.dock-tab[data-section="series"]').click();
-  await expect(page.locator('#grid-wrap')).toBeVisible();
-  await page.locator('#btn-back').click();
-  await expect(page.locator('#grid-wrap')).toBeHidden();
-  await expect(page.locator('#rails-wrap')).toBeVisible();
-  await expect(page.locator('#btn-back')).toBeVisible();
-  await page.locator('#btn-back').click();
-  await expect(page.locator('#rails-wrap')).toBeHidden();
-  await expect(page.locator('#btn-back')).toBeHidden();
-  await expect(page.locator('#section-dock .dock-tab-label')).toHaveText(['TV Series', 'Films', 'Home Movies']);
-});
-
 test('reuses the FEAT-021 breadcrumb — trail builds Home › Section › Rail as you drill', async ({ page }) => {
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Home');
   await page.locator('.dock-tab[data-section="films"]').click();
@@ -181,7 +176,7 @@ test.describe('create-playlist affordance', () => {
     await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music']);
   });
 
-  test('the create ＋ button is absent until the Music section is open, then lives beside Back', async ({ page }) => {
+  test('the create ＋ button is absent until the Music section is open, then lives in the bottom bar', async ({ page }) => {
     await expect(page.locator('[data-create-playlist]')).toBeHidden();
     await page.locator('.dock-tab[data-section="music"]').click();
     await expect(page.locator('#pager-create')).toBeVisible();
@@ -207,7 +202,7 @@ test.describe('create-playlist affordance', () => {
     await expect(page.locator('#pager-create')).toBeVisible();
   });
 
-  // TASK-424 — the wobble fix: ＋ lives in #bottom-bar next to Back, nowhere near
+  // TASK-424 — the wobble fix: ＋ lives in #bottom-bar, nowhere near
   // .pager-head, so #pager-prev/#pager-next must land at the exact same screen
   // position whether ＋ is showing (Playlists) or hidden (Artists) — not just
   // "roughly close".
@@ -242,7 +237,7 @@ test.describe('create-playlist affordance on Music Videos (TASK-378)', () => {
     await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music Videos']);
   });
 
-  test('the create ＋ button lives beside Back on Music Videos too', async ({ page }) => {
+  test('the create ＋ button lives in the bottom bar on Music Videos too', async ({ page }) => {
     await page.locator('.dock-tab[data-section="music-videos"]').click();
     await expect(page.locator('#pager-create')).toBeVisible();
   });
@@ -324,15 +319,6 @@ test('FEAT-032: a recorded grid trail restores the grid level on load, not the s
   // companion): a tile tap emits `select`, which the TV's rail-grid page routes —
   // if the TV isn't on that rail-grid the tap is dropped. Proves they re-sync.
   await expect.poll(() => intents.filter((i) => i.intent === 'navigate' && i.params.page === 'rail-grid.html' && i.params.params.rail === 'genre:animation').length).toBeGreaterThan(0);
-});
-
-test('FEAT-032: collapsing back to the sections root clears the trail (next load starts at top)', async ({ page }) => {
-  await page.locator('.dock-tab[data-section="series"]').click();
-  await page.locator('#btn-back').click();
-  await page.locator('#btn-back').click();
-  await expect(page.locator('#section-dock .dock-tab-label')).toHaveText(['TV Series', 'Films', 'Home Movies']);
-  const trail = await page.evaluate(() => sessionStorage.getItem('grew-tv:nav-trail'));
-  expect(trail).toBeNull();
 });
 
 test('FEAT-032: a deeper artist entry on top of the browse entry does NOT reset browse (regression)', async ({ page }) => {
