@@ -12,30 +12,42 @@ const { installApi, BROWSE, PLAYLIST_CARDS } = require('./fixtures/api.js');
 // prompt on a later visit" story is provable across a real page reload, even
 // though the in-memory file/handle state itself resets each script load.
 function installFakeDownloadsEnv() {
+  // BUG-416 — window.__dlFiles is keyed by the full relative path (e.g.
+  // "grew-tv/Road Trip/01 - Artist - Title.m4a") so a real getDirectoryHandle
+  // nesting shows up as distinct entries per playlist subfolder, the same as
+  // the on-device folder-per-playlist layout this fake stands in for.
   window.__dlFiles = {};
-  function fileHandle(fname) {
+  function fileHandle(path) {
     return {
       createWritable: function() {
         return Promise.resolve({
-          write: function(d) { window.__dlFiles[fname] = d; return Promise.resolve(); },
+          write: function(d) { window.__dlFiles[path] = d; return Promise.resolve(); },
           close: function() { return Promise.resolve(); }
         });
       }
     };
   }
-  function makeHandle(name) {
+  function makeDirHandle(path) {
     return {
-      name: name,
       getFileHandle: function(fname, opts) {
+        var key = path + fname;
         return new Promise(function(resolve, reject) {
-          if (Object.prototype.hasOwnProperty.call(window.__dlFiles, fname)) { resolve(fileHandle(fname)); return; }
-          if (opts && opts.create) { window.__dlFiles[fname] = undefined; resolve(fileHandle(fname)); return; }
+          if (Object.prototype.hasOwnProperty.call(window.__dlFiles, key)) { resolve(fileHandle(key)); return; }
+          if (opts && opts.create) { window.__dlFiles[key] = undefined; resolve(fileHandle(key)); return; }
           var e = new Error('not found'); e.name = 'NotFoundError'; reject(e);
         });
       },
-      queryPermission: function() { return Promise.resolve('granted'); },
-      requestPermission: function() { return Promise.resolve('granted'); }
+      getDirectoryHandle: function(dname) {
+        return Promise.resolve(makeDirHandle(path + dname + '/'));
+      }
     };
+  }
+  function makeHandle(name) {
+    var h = makeDirHandle('');
+    h.name = name;
+    h.queryPermission = function() { return Promise.resolve('granted'); };
+    h.requestPermission = function() { return Promise.resolve('granted'); };
+    return h;
   }
   window.showDirectoryPicker = function() { return Promise.resolve(makeHandle('GrewTV Music')); };
 
@@ -170,9 +182,9 @@ test.describe('with the File System Access API', () => {
     await page.locator('#btn-sync').click();
     await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Synced');
     const files = await page.evaluate(() => Object.keys(window.__dlFiles));
-    expect(files).toContain('ELO - Sweet Talkin Woman.m4a');
-    expect(files).toContain('ELO - Turn to Stone.m4a');
-    expect(files).toContain('Road Trip.m3u');
+    expect(files).toContain('grew-tv/Road Trip/01 - ELO - Sweet Talkin Woman.m4a');
+    expect(files).toContain('grew-tv/Road Trip/02 - ELO - Turn to Stone.m4a');
+    expect(files).toContain('grew-tv/Road Trip/Road Trip.m3u');
   });
 
   test('an unchecked playlist stays Not synced after syncing a different one', async ({ page }) => {
@@ -193,10 +205,13 @@ test.describe('with the File System Access API', () => {
     await expect(page.locator('#btn-sync')).toHaveText('Sync selected (1)');
   });
 
-  test('a track already in the folder from an earlier sync is not re-fetched when a second playlist shares it', async ({ page }) => {
-    // Two playlists sharing one track (ootb-03) — Road Trip already carries it,
-    // so syncing Empty Mix's stand-in here (rewired to share the track) proves
-    // dedup-by-filename-presence across playlists (task spec story 5).
+  // BUG-416 (Musicolet folder-per-playlist) — each playlist now lives in its
+  // own grew-tv/<title> subfolder so a folder-browsing player can play it as
+  // a standalone set, so a track shared by two playlists downloads into each
+  // one independently rather than the old shared-flat-folder cross-playlist
+  // dedup (TASK-403 story 5, superseded here — no symlinks are possible
+  // through the File System Access API).
+  test('a track shared by two playlists downloads its own copy into each playlist\'s own folder', async ({ page }) => {
     await page.route('**/api/playlist/pl-empty', route => route.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ id: 'pl-empty', title: 'Empty Mix', items: [{ season: null, episode: null, video: { id: 'ootb-03', title: 'Sweet Talkin Woman', profile: 'kids', duration: 228, poster: 'ootb.jpg', mediaType: 'audio', ext: 'm4a', artist: 'ELO', available: true } }] })
@@ -216,10 +231,11 @@ test.describe('with the File System Access API', () => {
     await page.locator('.pl-row', { hasText: 'Empty Mix' }).locator('.pl-check').check();
     await page.locator('#btn-sync').click();
     await expect(page.locator('.pl-row', { hasText: 'Empty Mix' }).locator('.pl-status')).toHaveText('0 tracks — Synced');
-    expect(audioFetchCount).toBe(1);
+    expect(audioFetchCount).toBe(2);
     const files = await page.evaluate(() => Object.keys(window.__dlFiles));
-    expect(files).toContain('Empty Mix.m3u');
-    expect(files.filter(f => f === 'ELO - Sweet Talkin Woman.m4a')).toHaveLength(1);
+    expect(files).toContain('grew-tv/Empty Mix/Empty Mix.m3u');
+    expect(files).toContain('grew-tv/Road Trip/01 - ELO - Sweet Talkin Woman.m4a');
+    expect(files).toContain('grew-tv/Empty Mix/01 - ELO - Sweet Talkin Woman.m4a');
   });
 
   // BUG-064 — one bad track no longer kills the whole sync.
@@ -231,10 +247,10 @@ test.describe('with the File System Access API', () => {
     await page.locator('#btn-sync').click();
     await expect(page.locator('#dl-status')).toHaveText('1 track failed — Turn to Stone (HTTP 404)');
     const files = await page.evaluate(() => Object.keys(window.__dlFiles));
-    expect(files).toContain('ELO - Sweet Talkin Woman.m4a');
-    expect(files).not.toContain('ELO - Turn to Stone.m4a');
-    expect(files).toContain('Road Trip.m3u');
-    const m3u = await page.evaluate(() => new TextDecoder().decode(window.__dlFiles['Road Trip.m3u']));
+    expect(files).toContain('grew-tv/Road Trip/01 - ELO - Sweet Talkin Woman.m4a');
+    expect(files).not.toContain('grew-tv/Road Trip/02 - ELO - Turn to Stone.m4a');
+    expect(files).toContain('grew-tv/Road Trip/Road Trip.m3u');
+    const m3u = await page.evaluate(() => new TextDecoder().decode(window.__dlFiles['grew-tv/Road Trip/Road Trip.m3u']));
     expect(m3u).not.toContain('Turn to Stone');
   });
 
@@ -255,9 +271,9 @@ test.describe('with the File System Access API', () => {
     await page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-check').check();
     await page.locator('#btn-sync').click();
     await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Synced');
-    const firstBytes = await page.evaluate(() => Array.from(window.__dlFiles['Road Trip.m3u'].slice(0, 3)));
+    const firstBytes = await page.evaluate(() => Array.from(window.__dlFiles['grew-tv/Road Trip/Road Trip.m3u'].slice(0, 3)));
     expect(firstBytes).not.toEqual([0xef, 0xbb, 0xbf]);
-    const text = await page.evaluate(() => new TextDecoder().decode(window.__dlFiles['Road Trip.m3u']));
+    const text = await page.evaluate(() => new TextDecoder().decode(window.__dlFiles['grew-tv/Road Trip/Road Trip.m3u']));
     expect(text.startsWith('#EXTM3U\n')).toBe(true);
   });
 });
