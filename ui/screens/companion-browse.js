@@ -1,5 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadContinueWatching, videoPlaybackAction, loadVideoPlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, videoPlaybackAction, musicVideoPlaybackAction, loadVideoPlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { queueCount } from '../../core/video-player-router.js';
 import { playNextCount } from '../../core/queue-view.js';
@@ -159,6 +159,15 @@ export function initPage() {
       .catch(noop);
   }
 
+  // TASK-421 — the music-video twin of queueVideo: POSTs to the SEPARATE
+  // music-video engine (FEAT-418), never the film queue or the audio engine's
+  // own Play Next list (story 3). No pill to refresh (this section has none).
+  function queueMusicVideo(id) {
+    musicVideoPlaybackAction(server, 'queue-video', state.person, { video_id: id })
+      .then(function() { showQueueStatus('Queued to Play Next'); })
+      .catch(noop);
+  }
+
   // FEAT-040 (Play Queue): when the video override queue is non-empty, offer a quick
   // compact "🎬 (N)" button (TASK-258 — media icon + bracketed count, no word) —
   // tapping it drives the TV player to start the queue head (?playQueue), so you
@@ -225,16 +234,18 @@ export function initPage() {
     return el;
   }
 
-  // A film tile gains a sibling ＋ Queue control (TASK-250 fills the gap: a
-  // standalone film has no detail-row list, so this is its only queue affordance).
-  // The control stays live in Browse (per-person POST), unlike the play tile.
+  // A film/music-video tile gains a sibling ＋ Queue control (TASK-250 fills the
+  // gap: a standalone film has no detail-row list, so this is its only queue
+  // affordance; TASK-421 extends it to music videos — same gap, own rail). The
+  // control stays live in Browse (per-person POST), unlike the play tile.
+  var QUEUE_FN = { video: queueVideo, 'music-video': queueMusicVideo };
   function filmQueueBtn(card) {
     var b = document.createElement('button');
     b.className = 'ph-cell-queue';
     b.setAttribute('data-queue', card.id);
     b.setAttribute('aria-label', 'Queue');
     b.textContent = '＋';
-    b.addEventListener('click', function() { queueVideo(card.id); });
+    b.addEventListener('click', function() { QUEUE_FN[cardRoute(card)](card.id); });
     return b;
   }
   function filmCell(card) {
@@ -245,11 +256,12 @@ export function initPage() {
     return cell;
   }
 
-  // Only a standalone film/video gets the ＋ Queue cell; series/album/artist/
-  // playlist tiles route to their own pages (and series already queue per-episode
-  // from the detail screen). cardRoute(card)==='video' marks a film.
+  // Only a standalone film/video or music video gets the ＋ Queue cell; series/
+  // album/artist/playlist tiles route to their own pages (and series already
+  // queue per-episode from the detail screen). cardRoute(card) marks which.
+  var QUEUEABLE_ROUTE = { video: true, 'music-video': true };
   var CELL = { 'true': filmCell, 'false': nameTile };
-  function txtTile(card) { return CELL[String(cardRoute(card) === 'video')](card); }
+  function txtTile(card) { return CELL[String(!!QUEUEABLE_ROUTE[cardRoute(card)])](card); }
 
   function renderSections() {
     els.sectionDock.innerHTML = '';

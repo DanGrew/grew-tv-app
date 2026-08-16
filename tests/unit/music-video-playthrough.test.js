@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { currentItem, hasNext, hasPrev, upNextItem, isMulti, entryMode, musicVideosByArtist, compareByTitle, startIndex, playlistTrackTarget, initSeq, fairShuffle, toggleShuffle, toggleRepeat, canAdvance, nextSeq, mvTransportVisibility } from '../../core/music-video-playthrough.js';
+import { currentItem, hasNext, hasPrev, upNextItem, isMulti, entryMode, musicVideosByArtist, compareByTitle, startIndex, playlistTrackTarget, playlistQueueKey, initSeq, fairShuffle, toggleShuffle, toggleRepeat, canAdvance, nextSeq, mvTransportVisibility } from '../../core/music-video-playthrough.js';
 
 function seq(items, index) { return { items: items, index: index }; }
 function mv(id, title) { return { id: id, title: title }; }
@@ -184,6 +184,18 @@ describe('playlistTrackTarget', () => {
   it('passes a track item straight through to the given audio target unchanged', () => {
     var item = { video: { id: 'trk-1', itemType: 'track' } };
     expect(playlistTrackTarget(item, 'pl-1', audioTarget)).toBe(audioTarget);
+  });
+});
+
+describe('playlistQueueKey (TASK-421)', () => {
+  it('is "music-video" for a music-video item — routes Play Next to its OWN engine', () => {
+    expect(playlistQueueKey('music-video')).toBe('music-video');
+  });
+  it('is "track" for a plain audio track (itemType absent) — routes to the audio engine', () => {
+    expect(playlistQueueKey(undefined)).toBe('track');
+  });
+  it('is "track" for an explicitly empty itemType, same as absent', () => {
+    expect(playlistQueueKey('')).toBe('track');
   });
 });
 

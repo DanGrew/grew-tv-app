@@ -478,3 +478,52 @@ test.describe('video Play Queue button label (TASK-258)', () => {
     await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (3)');
   });
 });
+
+// TASK-421 — the Music Videos twin of the companion film ＋ Queue control
+// (tests/companion-film-queue.test.js): a music-video grid tile (an artist's
+// rail, e.g. mv-01 on the QOTSA rail) gains the same ＋ Queue cell, wired to
+// the SEPARATE music-video engine (FEAT-418) — never the film queue this same
+// cell posts to for a plain video tile (story 3: the two engines stay apart).
+test.describe('music-video ＋ Queue control (TASK-421)', () => {
+  function mvMockApp(page) {
+    return page.routeWebSocket(/:8766/, (ws) => {
+      ws.onMessage(function(raw) {
+        const m = JSON.parse(raw);
+        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+        if (m.type === 'snapshot_request') { ws.send(msg('context', { version: 2, context_id: 'browse' })); ws.send(msg('app_state', { screen: 'home', profile: 'kids', person: 'kids' })); }
+      });
+    });
+  }
+  test.beforeEach(async ({ page }) => {
+    await installApi(page);
+    await mvMockApp(page);
+    await page.route('**/api/browse**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    }));
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
+    await page.locator('#pager-next').click();               // mv-playlists -> Muse (A-Z before QOTSA)
+    await page.locator('#pager-next').click();               // Muse -> the QOTSA artist rail
+    await expect(page.locator('#pager-name')).toHaveText('QOTSA');
+    await expect(page.locator('#txtgrid .ph-txt[data-id="mv-01"]')).toBeVisible();
+  });
+
+  test('a music-video grid tile carries a ＋ Queue control', async ({ page }) => {
+    await expect(page.locator('.ph-txt-cell .ph-cell-queue[data-queue="mv-01"]')).toHaveText('＋');
+  });
+
+  test('＋ Queue POSTs to the music-video engine, not the film queue, and confirms with a toast', async ({ page }) => {
+    let filmQueued = false;
+    await page.route('**/api/video-playback/queue-video**', route => { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
+    await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+    const queued = page.waitForRequest(req =>
+      req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+    await page.locator('.ph-cell-queue[data-queue="mv-01"]').click();
+    const req = await queued;
+    expect(req.url()).toContain('person=kids');
+    expect(JSON.parse(req.postData())).toEqual({ video_id: 'mv-01' });
+    await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
+    expect(filmQueued).toBe(false);
+  });
+});

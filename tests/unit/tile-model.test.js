@@ -142,12 +142,12 @@ describe('tileModel — defaults', () => {
   });
 });
 
-describe('tileModel — queueable (FEAT-040/TASK-374/377)', () => {
+describe('tileModel — queueable (FEAT-040/TASK-374/377/421)', () => {
   it('a plain video card is queueable', () => {
     expect(tileModel({ kind: 'video', id: 'v' }, {}).queueable).toBe(true);
   });
-  it('a music-video card is NOT queueable — that engine is never its player', () => {
-    expect(tileModel({ kind: 'video', id: 'mv', itemType: 'music-video' }, {}).queueable).toBe(false);
+  it('a music-video card is ALSO queueable — TASK-421 gave it its own engine', () => {
+    expect(tileModel({ kind: 'video', id: 'mv', itemType: 'music-video' }, {}).queueable).toBe(true);
   });
   it('a non-video kind is never queueable regardless of itemType', () => {
     expect(tileModel({ kind: 'series', id: 's' }, {}).queueable).toBe(false);

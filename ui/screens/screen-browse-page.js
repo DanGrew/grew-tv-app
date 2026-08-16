@@ -2,7 +2,7 @@ import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, videoPlaybackAction, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, videoPlaybackAction, musicVideoPlaybackAction, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
@@ -58,10 +58,19 @@ export function initBrowsePage() {
     clearTimeout(statusTimer);
     statusTimer = setTimeout(hideStatus, 2500);
   }
-  // Film ＋Queue producer: POST queue-video per person; confirm + refresh the pill.
+  // ＋Queue producer (TASK-421 added the music-video branch): POST queue-video
+  // per person to whichever engine the card's own route names — the video
+  // engine for a film, the SEPARATE music-video engine (FEAT-418) for a music
+  // video, never the audio engine's own Play Next (story 3). Only the film
+  // queue has a header pill to refresh.
+  var QUEUE_ACTION = {
+    video: function(id) { return videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); },
+    'music-video': function(id) { return musicVideoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); }
+  };
+  var QUEUE_REFRESH = { video: refreshQueue, 'music-video': function() {} };
   function onQueue(card) {
-    videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: card.id })
-      .then(function() { showStatus('Queued to Play Next'); refreshQueue(); })
+    QUEUE_ACTION[cardRoute(card)](card.id)
+      .then(function() { showStatus('Queued to Play Next'); QUEUE_REFRESH[cardRoute(card)](); })
       .catch(function() {});
   }
 

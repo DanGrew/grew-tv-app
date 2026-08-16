@@ -1,5 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, mediaUrl } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, musicVideoPlaybackAction, mediaUrl } from '../../core/app-api.js';
 import { fetchHttpsOrigin } from '../../core/server-config.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
@@ -7,6 +7,7 @@ import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { rowActions, popoverTop } from '../../core/playlist-row-menu.js';
+import { playlistQueueKey } from '../../core/music-video-playthrough.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
@@ -162,9 +163,15 @@ export function initPage() {
   }
   // FEAT-040/TASK-248 — queue a track to PLAY NEXT (queue-track, per person; durable
   // override queue TASK-246). Per-person POST ⇒ live in BOTH modes. The sheet's top
-  // "☰ Play Next" action — closes the sheet first, then POSTs.
+  // "☰ Play Next" action — closes the sheet first, then POSTs. TASK-421: a
+  // music-video row (card.itemType, threaded through trackCards) POSTs to its OWN
+  // engine (FEAT-418) instead — never the audio engine's own list (story 3).
+  var QUEUE_TRACK_ACTION = {
+    'music-video': function(id) { return musicVideoPlaybackAction(server, 'queue-video', state.person, { video_id: id }); },
+    track: function(id) { return playbackAction(server, 'queue-track', state.person, { track_id: id }); }
+  };
   function queueTrack(card) {
-    playbackAction(server, 'queue-track', state.person, { track_id: card.id })
+    QUEUE_TRACK_ACTION[playlistQueueKey(card.itemType)](card.id)
       .then(function() { showStatus('Queued to Play Next'); })
       .catch(function() { showStatus('Could not queue track.'); });
   }
@@ -335,7 +342,7 @@ export function initPage() {
   // a playlist carries no season/episode, so the bare track title is the label.
   function trackCards() {
     return state.tracks.map(function(item) {
-      return { id: item.video.id, title: item.video.title, durationSec: item.video.duration, poster: item.video.poster };
+      return { id: item.video.id, title: item.video.title, durationSec: item.video.duration, poster: item.video.poster, itemType: item.video.itemType };
     });
   }
 
