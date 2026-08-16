@@ -410,13 +410,22 @@ describe('BUG-416: the .m3u write is part of the completion contract', () => {
   });
 
   it('fileExists no longer swallows a non-NotFoundError — it surfaces as a per-track failure instead of a silent (re)write', async () => {
+    // The existence check (no `create`) throws a non-NotFoundError; the write
+    // call (opts.create) is left to the real fake and would succeed — so a
+    // swallow-and-proceed bug would write the file and count the track ok,
+    // while the fix must fail the track before ever attempting the write.
     fakeFetch({ 'http://s/media/ootb-03.m4a': 'A1' });
     var dir = fakeDirHandle({});
-    dir.getFileHandle = async function(name) {
-      if (name === 'ELO - Sweet Talkin Woman.m4a') { var e = new Error('permission hiccup'); e.name = 'NotAllowedError'; throw e; }
-      var err = new Error('not found'); err.name = 'NotFoundError'; throw err;
+    var realGetFileHandle = dir.getFileHandle;
+    dir.getFileHandle = async function(name, opts) {
+      if (name === 'ELO - Sweet Talkin Woman.m4a' && !(opts && opts.create)) {
+        var e = new Error('permission hiccup'); e.name = 'NotAllowedError'; throw e;
+      }
+      return realGetFileHandle(name, opts);
     };
     var summary = await syncPlaylist(dir, 'http://s', { title: 'Road Trip', items: [{ video: TRACK_NO_LYRICS }] });
     expect(summary.failed).toEqual([{ id: 'ootb-03', title: 'Sweet Talkin Woman', reason: 'permission hiccup' }]);
+    expect(summary.written).toBe(0);
+    expect(dir.files['ELO - Sweet Talkin Woman.m4a']).toBeUndefined();
   });
 });
