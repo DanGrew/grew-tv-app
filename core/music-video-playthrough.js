@@ -197,3 +197,13 @@ export function playlistTrackTarget(item, playlistId, audioTarget) {
   }
   return audioTarget;
 }
+
+// TASK-421 (story 3) — the twin dispatch key for a playlist row's "☰ Play Next":
+// a music-video row POSTs to its OWN engine (FEAT-418), never the audio
+// engine's queue-track, so the two Play Next lists stay apart. Same itemType
+// signal playlistTrackTarget already reads, kept in core (both the TV
+// playlist-detail page and its companion mirror call this — ui/** stays
+// cyclomatic-1/pure-DOM-only).
+export function playlistQueueKey(itemType) {
+  return [itemType].filter(Boolean).concat(['track'])[0];
+}

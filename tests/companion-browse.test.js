@@ -470,3 +470,115 @@ test.describe('video Play Queue button label (TASK-258)', () => {
     await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (3)');
   });
 });
+
+// TASK-421 — the Music Videos twin of the companion film ＋ Queue control
+// (tests/companion-film-queue.test.js): a music-video grid tile (an artist's
+// rail, e.g. mv-01 on the QOTSA rail) gains the same ＋ Queue cell, wired to
+// the SEPARATE music-video engine (FEAT-418) — never the film queue this same
+// cell posts to for a plain video tile (story 3: the two engines stay apart).
+test.describe('music-video ＋ Queue control (TASK-421)', () => {
+  function mvMockApp(page) {
+    return page.routeWebSocket(/:8766/, (ws) => {
+      ws.onMessage(function(raw) {
+        const m = JSON.parse(raw);
+        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+        if (m.type === 'snapshot_request') { ws.send(msg('context', { version: 2, context_id: 'browse' })); ws.send(msg('app_state', { screen: 'home', profile: 'kids', person: 'kids' })); }
+      });
+    });
+  }
+  test.beforeEach(async ({ page }) => {
+    await installApi(page);
+    await mvMockApp(page);
+    await page.route('**/api/browse**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    }));
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
+    await page.locator('#pager-next').click();               // mv-playlists -> Muse (A-Z before QOTSA)
+    await page.locator('#pager-next').click();               // Muse -> the QOTSA artist rail
+    await expect(page.locator('#pager-name')).toHaveText('QOTSA');
+    await expect(page.locator('#txtgrid .ph-txt[data-id="mv-01"]')).toBeVisible();
+  });
+
+  test('a music-video grid tile carries a ＋ Queue control', async ({ page }) => {
+    await expect(page.locator('.ph-txt-cell .ph-cell-queue[data-queue="mv-01"]')).toHaveText('＋');
+  });
+
+  test('＋ Queue POSTs to the music-video engine, not the film queue, and confirms with a toast', async ({ page }) => {
+    let filmQueued = false;
+    await page.route('**/api/video-playback/queue-video**', route => { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
+    await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+    const queued = page.waitForRequest(req =>
+      req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+    await page.locator('.ph-cell-queue[data-queue="mv-01"]').click();
+    const req = await queued;
+    expect(req.url()).toContain('person=kids');
+    expect(JSON.parse(req.postData())).toEqual({ video_id: 'mv-01' });
+    await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
+    expect(filmQueued).toBe(false);
+  });
+
+  // BUG (found in real-device testing after TASK-421 shipped): a real touch tap
+  // is almost never pixel-stationary — a few px of incidental jitter between
+  // touchstart/touchend is normal. The #txtgrid swipe-pager (TASK-411) armed its
+  // click-swallow guard (settleDrag -> guardClick) off `d.active`, which only
+  // needs ACTIVATE_THRESHOLD (8px) — far short of the 40px SWIPE_THRESHOLD a
+  // drag needs to actually change rail. So an 8-39px jitter never paged
+  // anywhere, yet still ate that same tap's own click, making the ＋ Queue
+  // badge (and any tile) need a 2nd, steadier press most of the time.
+  test('a jittery-but-stationary tap (8-39px, never enough to page) still queues on the FIRST press', async ({ page }) => {
+    await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+    const queued = page.waitForRequest(req =>
+      req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+    const box = await page.locator('.ph-cell-queue[data-queue="mv-01"]').boundingBox();
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 9, y + 2, { steps: 5 }); // 9px horizontal jitter, below the 40px page threshold
+    await page.mouse.up();
+    const req = await queued;
+    expect(req.url()).toContain('person=kids');
+    // The rail must NOT have paged away (9px never reaches SWIPE_THRESHOLD).
+    await expect(page.locator('#pager-name')).toHaveText('QOTSA');
+  });
+
+  // BUG (found in real-device testing AFTER the jitter fix above shipped): a
+  // real TOUCH drag that actually pages never fires a trailing `click` at all
+  // — browsers suppress the synthesized click once a touch gesture reads as a
+  // drag/scroll; only a MOUSE always fires one on release, regardless of
+  // movement (confirmed live: a real CDP-dispatched touch swipe against the
+  // dev server produced zero `click` events on #txtgrid). guardClick() arms a
+  // { once: true } listener hoping to swallow THAT click, but on a real touch
+  // drag no such click ever arrives to consume it — so it stays armed and
+  // silently eats the caller's NEXT, entirely unrelated tap instead (e.g. a
+  // ＋ Queue press right after paging to the rail that press landed on),
+  // needing a 2nd press to register. Reproduced here with raw PointerEvents
+  // (deterministic, no dependency on a given browser's own touch/click
+  // suppression heuristics) — drag past SWIPE_THRESHOLD with NO trailing
+  // click, exactly what a real touch drag leaves behind, then a normal
+  // (mouse) click on the landed rail's ＋ Queue badge, which must not be eaten.
+  test('a drag that pages but leaves no trailing click must not eat the caller\'s NEXT tap', async ({ page }) => {
+    await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+
+    await page.evaluate(() => {
+      var el = document.getElementById('txtgrid');
+      function fire(type, x) {
+        el.dispatchEvent(new PointerEvent(type, { pointerId: 1, clientX: x, clientY: 0, bubbles: true, cancelable: true }));
+      }
+      fire('pointerdown', 100);
+      fire('pointermove', 130); // past ACTIVATE_THRESHOLD, activates the drag
+      fire('pointermove', 190); // past SWIPE_THRESHOLD (+90px, rightward = prev)
+      fire('pointerup', 190);
+      // Deliberately no 'click' dispatched — this is what a real touch drag leaves behind.
+    });
+    await expect(page.locator('#pager-name')).toHaveText('Muse'); // the drag paged, exactly as intended (QOTSA -> prev)
+
+    const queued = page.waitForRequest(req =>
+      req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+    await page.locator('.ph-cell-queue[data-queue="mv-03"]').click(); // a normal, later tap on the landed rail
+    const req = await queued; // must queue on this FIRST tap, not need a 2nd
+    expect(req.url()).toContain('person=kids');
+  });
+});

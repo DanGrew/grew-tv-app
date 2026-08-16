@@ -2,7 +2,7 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { gridArrow, renderGrid, focusFirstGridTile } from './screen-rail-grid.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, videoPlaybackAction } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, videoPlaybackAction, musicVideoPlaybackAction } from '../../core/app-api.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 import { buildTabs, buildTabRails, cardRoute } from '../../core/home-rails.js';
@@ -47,8 +47,9 @@ export function initRailGridPage() {
     [SELECT[cardRoute(card)]].filter(Boolean).forEach(function(fn) { fn(card); });
   }
 
-  // FEAT-040: film tile ＋Queue (mirrors the browse page) — POST queue-video per
-  // person + a transient toast. Films only (createTile gates on video kind).
+  // FEAT-040/TASK-421: tile ＋Queue (mirrors the browse page) — POST queue-video
+  // per person to the card's own engine (video for a film, the SEPARATE
+  // music-video engine for a music video, FEAT-418) + a transient toast.
   var statusTimer = null;
   function hideStatus() { document.getElementById('queue-status').style.display = 'none'; }
   function showStatus(text) {
@@ -58,8 +59,12 @@ export function initRailGridPage() {
     clearTimeout(statusTimer);
     statusTimer = setTimeout(hideStatus, 2500);
   }
+  var QUEUE_ACTION = {
+    video: function(id) { return videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); },
+    'music-video': function(id) { return musicVideoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); }
+  };
   function onQueue(card) {
-    videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: card.id })
+    QUEUE_ACTION[cardRoute(card)](card.id)
       .then(function() { showStatus('Queued to Play Next'); })
       .catch(function() {});
   }

@@ -2,14 +2,14 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, mediaUrl } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, musicVideoPlaybackAction, mediaUrl } from '../../core/app-api.js';
 import { coverMosaicHtml } from '../../core/cover-mosaic.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { gridIndex } from '../../core/playlist-name.js';
-import { playlistTrackTarget } from '../../core/music-video-playthrough.js';
+import { playlistTrackTarget, playlistQueueKey } from '../../core/music-video-playthrough.js';
 
 // FEAT-036 (TASK-204) playlist detail. A user playlist resolves into the same
 // detail shape as an album (/api/playlist), so this reuses the FEAT-017
@@ -224,9 +224,14 @@ export function initPlaylistDetailPage() {
   }
   // FEAT-040/TASK-248 — queue a track to PLAY NEXT (queue-track, per person; durable
   // override queue TASK-246). The sheet's top "☰ Play Next" action — closes the sheet
-  // first, then POSTs.
+  // first, then POSTs. TASK-421: a music-video row (item.video.itemType) POSTs to
+  // its OWN engine (FEAT-418) instead — never the audio engine's own list (story 3).
+  var QUEUE_TRACK_ACTION = {
+    'music-video': function(id) { return musicVideoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); },
+    track: function(id) { return playbackAction(SERVER, 'queue-track', getPerson(), { track_id: id }); }
+  };
   function queueTrack(item) {
-    playbackAction(SERVER, 'queue-track', getPerson(), { track_id: item.video.id })
+    QUEUE_TRACK_ACTION[playlistQueueKey(item.video.itemType)](item.video.id)
       .then(function() { showStatus('Queued to Play Next'); })
       .catch(function() { showStatus('Could not queue track.'); });
   }

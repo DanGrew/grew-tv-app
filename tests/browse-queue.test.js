@@ -108,22 +108,33 @@ test('the two queue buttons show independently — video queued, music empty', a
   await expect(page.locator('#btn-play-queue-music')).toBeHidden();
 });
 
-// TASK-374/377: a music video is never queued to the film Play Next engine
-// (the owner ruled that engine out as its player entirely) — its tile must
-// carry no ＋ badge, unlike a plain film/video tile.
-test('a music-video tile carries no ＋ Queue badge', async ({ page }) => {
+// TASK-421: a music video gets its own ＋ Queue badge, wired to the SEPARATE
+// music-video engine (FEAT-418) — never the film queue this same badge posts
+// to for a plain video tile (story 3: the two engines stay apart).
+test('a music-video tile carries a ＋ Queue badge that POSTs to its own engine', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
+  var filmQueued = false;
+  await page.route('**/api/video-playback/queue-video*', function(route) { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
   await page.route('**/api/browse**', function(route) {
     return route.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
     });
   });
+  await page.route('**/api/music-video-playback/queue-video*', function(route) { return route.fulfill({ status: 204, body: '' }); });
   await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
   await page.locator('.sidebar-tab[data-tab="music-videos"]').click();
   await expect(page.locator('.film-tile[data-id="mv-01"]')).toBeVisible();
-  await expect(page.locator('.film-tile[data-id="mv-01"] .tile-queue')).toHaveCount(0);
+  await expect(page.locator('.film-tile[data-id="mv-01"] .tile-queue')).toHaveText('＋');
+  const queued = page.waitForRequest(req =>
+    req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+  await page.locator('.film-tile[data-id="mv-01"] .tile-queue').click();
+  const req = await queued;
+  expect(req.url()).toContain('person=kids');
+  expect(JSON.parse(req.postData())).toEqual({ video_id: 'mv-01' });
+  await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
+  expect(filmQueued).toBe(false);
 });
 
 test('rail-grid film tiles also carry the ＋ badge and queue', async ({ page }) => {
@@ -136,4 +147,29 @@ test('rail-grid film tiles also carry the ＋ badge and queue', async ({ page })
   await page.locator('.film-tile[data-id="finding-nemo-main"] .tile-queue').click();
   expect(JSON.parse((await queued).postData())).toEqual({ video_id: 'finding-nemo-main' });
   await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
+});
+
+// TASK-421 — an artist's music-video rail-grid ("See all" on the QOTSA rail)
+// carries the same ＋ badge, POSTing to the SEPARATE music-video engine
+// (FEAT-418), never the film queue (story 3).
+test('rail-grid music-video tiles carry the ＋ badge and queue to their OWN engine', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  let filmQueued = false;
+  await page.route('**/api/video-playback/queue-video*', function(route) { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
+  await page.route('**/api/browse**', function(route) {
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    });
+  });
+  await page.route('**/api/music-video-playback/queue-video*', function(route) { return route.fulfill({ status: 204, body: '' }); });
+  await page.goto('/app/homeview/rail-grid.html?section=music-videos&rail=mv-artist:QOTSA&profile=kids&person=kids');
+  await expect(page.locator('.film-tile[data-id="mv-01"] .tile-queue')).toBeVisible();
+  const queued = page.waitForRequest(req =>
+    req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+  await page.locator('.film-tile[data-id="mv-01"] .tile-queue').click();
+  expect(JSON.parse((await queued).postData())).toEqual({ video_id: 'mv-01' });
+  await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
+  expect(filmQueued).toBe(false);
 });

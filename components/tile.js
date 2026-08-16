@@ -99,11 +99,11 @@ export function createTile(server, card, opts) {
     tile.appendChild(bar);
   });
 
-  // FEAT-040: a standalone film/video tile gets a ＋ Queue action badge (top-right)
-  // when the page supplies `onQueue` — tap to add the film to the video Play-Next
-  // queue. stopPropagation so it never triggers the tile's play (onSelect).
-  // Films have no Lyrics badge, so the right corner is free. m.queueable (core)
-  // excludes a music video — TASK-374/377, that engine is never its player.
+  // FEAT-040/TASK-421: a standalone film/video (or music-video) tile gets a ＋
+  // Queue action badge (top-right) when the page supplies `onQueue` — tap to
+  // queue the item to ITS OWN engine's Play Next (the page's onQueue decides
+  // which). stopPropagation so it never triggers the tile's play (onSelect).
+  // Films/music videos have no Lyrics badge, so the right corner is free.
   function appendQueueBadge(fn) {
     var q = document.createElement('button');
     q.className = 'tile-queue';
