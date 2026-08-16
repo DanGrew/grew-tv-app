@@ -71,14 +71,13 @@ test('Story 3: tapping the header icon again is the only thing that closes it', 
 });
 
 // Search + the menu icon sit at the very top — directly below the connection
-// status line, above the queue quick-play buttons and the breadcrumb — and the
-// open menu renders entirely below the icon row, never overlapping it.
+// status line, above the queue quick-play buttons — and the open menu renders
+// entirely below the icon row, never overlapping it.
 test('Search and the menu icon sit above everything else, below the connection status; the open menu never overlaps them', async ({ page }) => {
   const order = await page.evaluate(() =>
     Array.from(document.body.children).map((el) => el.id));
   expect(order.indexOf('conn-status')).toBeLessThan(order.indexOf('topbar-actions'));
   expect(order.indexOf('topbar-actions')).toBeLessThan(order.indexOf('queue-actions'));
-  expect(order.indexOf('topbar-actions')).toBeLessThan(order.indexOf('breadcrumb'));
 
   await page.locator('#btn-status').click();
   const iconBox = await page.locator('#btn-status').boundingBox();

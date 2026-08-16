@@ -7,14 +7,12 @@ import { screenPage, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, railsForSection } from '../../core/home-rails.js';
 import { firstRailId, pageOffset, swipeTarget, stepIndex, arrowDisabled, shouldActivateDrag } from '../../core/rail-pager.js';
-import { buildCrumbs } from '../../core/breadcrumb.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute } from '../../core/home-rails.js';
 import { externalDestinations, launchExternalParams, destinationUrls } from '../../core/external-destinations.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { desyncOpenPage, tileOffDesynced } from '../../core/companion-button-modes.js';
-import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 import { mountStatusMenu } from './companion-status-menu.js';
@@ -288,19 +286,6 @@ export function initPage() {
 
   function railTitle() { return [activeRail().title].filter(Boolean).concat([''])[0]; }
 
-  // The FEAT-021 trail, per level: Home (sections) -> Home > Section (rails) ->
-  // Home > Section > Rail (grid). Reuses core/breadcrumb.js so it styles + wires
-  // for free (a crumb tap routes back through navigate()).
-  function crumbModel() {
-    var ctx = { sectionId: state.section, sectionTitle: sectionTitle(), railTitle: railTitle() };
-    var BY_LEVEL = {
-      sections: function() { return buildCrumbs('browse'); },
-      rails:    function() { return buildCrumbs('detail', { seriesTitle: sectionTitle() }); },
-      grid:     function() { return buildCrumbs('rail-grid', ctx); }
-    };
-    return BY_LEVEL[state.level]();
-  }
-
   function applyLevel() {
     var v = LEVEL_VIEW[state.level];
     els.railsWrap.style.display = v.rails;
@@ -415,7 +400,6 @@ export function initPage() {
     renderRails();
     renderGrid();
     recordTrail();
-    mountCompanionBreadcrumb('breadcrumb', crumbModel(), navigate);
   }
 
   // The single funnel for every drill move: emit the FEAT-017 `navigate` intent
