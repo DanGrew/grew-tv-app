@@ -150,8 +150,14 @@ export function setup(config) {
     VIDEO_TOGGLE[video.paused]();
   }
 
+  // BUG-439: video.duration is NaN until metadata loads (or forever, if playback
+  // never actually started) — clampTime's Math.min(NaN, x) propagates the NaN
+  // straight into currentTime, which HTMLMediaElement throws on. Skip the seek,
+  // not the whole handler, so the press still registers (showControls).
   var executeSkip = function(delta) {
-    video.currentTime = clampTime(video.currentTime, delta, video.duration);
+    [video.duration].filter(isFinite).forEach(function() {
+      video.currentTime = clampTime(video.currentTime, delta, video.duration);
+    });
     showControls();
   };
 
