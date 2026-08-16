@@ -23,6 +23,7 @@ import { mountStatusMenu } from './companion-status-menu.js';
 // TASK-321: an ALBUM has no Play-next — you tap a track to start it (mirrors the
 // TV album page, which dropped its header Play/Shuffle).
 export function initPage() {
+  mountStatusMenu(['mode', 'screen', 'profile']);
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
@@ -372,7 +373,6 @@ export function initPage() {
   document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });
 
   mountSyncBar(mode, onToggle);
-  mountStatusMenu();
   applySwitchProfile();
   // Desynced entry: browse linked here with ?id=…, so load that collection
   // ourselves rather than waiting for the TV's context echo (which won't come).

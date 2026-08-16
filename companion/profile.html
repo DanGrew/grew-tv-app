@@ -58,10 +58,6 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .screen-btn, .screen-current { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-start; }
 .screen-btn-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; position: relative; }
-#btn-status { flex: 0 0 auto; font-size: 18px; line-height: 1; padding: 8px 13px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
-#btn-status:active, #btn-status:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-#status-menu { display: none; flex-direction: column; gap: 14px; position: absolute; top: calc(100% + 8px); right: 0; z-index: 15; width: max-content; max-width: min(320px, calc(100vw - 24px)); padding: 16px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
-#status-menu.open { display: flex; }
 .takeover-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 10; padding: 24px; }
 .takeover-overlay.active { display: flex; }
 .takeover-box { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 18px; padding: 24px; border: 2px solid var(--border); border-radius: var(--radius); background: #16213e; text-align: center; }
@@ -76,10 +72,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 <body>
 <div id="conn-status">connecting\u2026</div>
 <div id="topbar-actions">
-  <button id="btn-status" type="button" aria-label="Menu">&#9776;</button>
-  <div id="status-menu">
-    <div id="screen-bar"></div>
-  </div>
+  <div id="status-menu-mount"></div>
 </div>
 <div id="ctx-label"></div>
 <div id="ctx-title"></div>
