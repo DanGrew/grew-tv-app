@@ -131,18 +131,35 @@ describe('syncPlaylist', () => {
     });
     var dir = fakeDirHandle({});
     var summary = await syncPlaylist(dir, 'http://s', PLAYLIST);
-    expect(summary).toEqual({ total: 2, written: 2, alreadyPresent: 0, failed: [] });
-    expect(dir.files['Road Trip.m3u']).toBe(
+    expect(summary).toEqual({ total: 2, written: 2, alreadyPresent: 0, failed: [], playlistFileError: null });
+    expect(new TextDecoder().decode(dir.files['Road Trip.m3u'])).toBe(
       '#EXTM3U\n#EXTINF:228,ELO - Sweet Talkin Woman\nELO - Sweet Talkin Woman.m4a\n' +
       '#EXTINF:245,ELO - Mr. Blue Sky\nELO - Mr. Blue Sky.m4a\n'
     );
+  });
+
+  // BUG-416 — writable.write() gets raw bytes (TextEncoder never emits a
+  // BOM), not a JS string some File System Access implementations would
+  // prepend a BOM to, breaking Musicolet's `#EXTM3U` magic-string check.
+  it('writes the .m3u as BOM-free bytes, not a string', async () => {
+    fakeFetch({
+      'http://s/media/ootb-03.m4a': 'A1',
+      'http://s/media/ootb-02.m4a': 'A2',
+      'http://s/media/ootb-02.lrc': 'L2'
+    });
+    var dir = fakeDirHandle({});
+    await syncPlaylist(dir, 'http://s', PLAYLIST);
+    var bytes = dir.files['Road Trip.m3u'];
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(Array.from(bytes.slice(0, 3))).not.toEqual([0xef, 0xbb, 0xbf]);
+    expect(new TextDecoder().decode(bytes).startsWith('#EXTM3U\n')).toBe(true);
   });
 
   it('counts a track already present in the folder as alreadyPresent, not written', async () => {
     fakeFetch({ 'http://s/media/ootb-02.m4a': 'A2', 'http://s/media/ootb-02.lrc': 'L2' });
     var dir = fakeDirHandle({ 'ELO - Sweet Talkin Woman.m4a': 'EXISTING' });
     var summary = await syncPlaylist(dir, 'http://s', PLAYLIST);
-    expect(summary).toEqual({ total: 2, written: 1, alreadyPresent: 1, failed: [] });
+    expect(summary).toEqual({ total: 2, written: 1, alreadyPresent: 1, failed: [], playlistFileError: null });
   });
 
   it('reports progress via onTrack(i, total) after each track', async () => {
@@ -160,14 +177,14 @@ describe('syncPlaylist', () => {
   it('tolerates a playlist with no items', async () => {
     var dir = fakeDirHandle({});
     var summary = await syncPlaylist(dir, 'http://s', { title: 'Empty Mix', items: [] });
-    expect(summary).toEqual({ total: 0, written: 0, alreadyPresent: 0, failed: [] });
-    expect(dir.files['Empty Mix.m3u']).toBe('#EXTM3U\n');
+    expect(summary).toEqual({ total: 0, written: 0, alreadyPresent: 0, failed: [], playlistFileError: null });
+    expect(new TextDecoder().decode(dir.files['Empty Mix.m3u'])).toBe('#EXTM3U\n');
   });
 
   it('tolerates a playlist with items missing altogether', async () => {
     var dir = fakeDirHandle({});
     var summary = await syncPlaylist(dir, 'http://s', { title: 'No Items Field' });
-    expect(summary).toEqual({ total: 0, written: 0, alreadyPresent: 0, failed: [] });
+    expect(summary).toEqual({ total: 0, written: 0, alreadyPresent: 0, failed: [], playlistFileError: null });
   });
 
   // BUG-064 — a single track's failure no longer aborts the batch.
@@ -226,7 +243,7 @@ describe('syncPlaylist', () => {
       fakeFetch({ 'http://s/media/ootb-02.m4a': 'A2', 'http://s/media/ootb-02.lrc': 'L2' });
       var dir = fakeDirHandle({});
       await syncPlaylist(dir, 'http://s', PLAYLIST);
-      expect(dir.files['Road Trip.m3u']).toBe(
+      expect(new TextDecoder().decode(dir.files['Road Trip.m3u'])).toBe(
         '#EXTM3U\n#EXTINF:245,ELO - Mr. Blue Sky\nELO - Mr. Blue Sky.m4a\n'
       );
     });
@@ -253,8 +270,8 @@ describe('syncPlaylists', () => {
     var dir = fakeDirHandle({});
     var results = await syncPlaylists(dir, 'http://s', ['pl-a', 'pl-b']);
     expect(results).toEqual({
-      'pl-a': { total: 1, written: 1, alreadyPresent: 0, failed: [] },
-      'pl-b': { total: 1, written: 1, alreadyPresent: 0, failed: [] }
+      'pl-a': { total: 1, written: 1, alreadyPresent: 0, failed: [], playlistFileError: null },
+      'pl-b': { total: 1, written: 1, alreadyPresent: 0, failed: [], playlistFileError: null }
     });
     expect(dir.files['A.m3u']).toBeDefined();
     expect(dir.files['B.m3u']).toBeDefined();
@@ -295,7 +312,7 @@ describe('syncCheckedPlaylists', () => {
     });
     var dir = fakeDirHandle({});
     var results = await syncCheckedPlaylists(dir, 'http://s', ['pl-a']);
-    expect(results).toEqual({ 'pl-a': { total: 1, written: 1, alreadyPresent: 0, failed: [] } });
+    expect(results).toEqual({ 'pl-a': { total: 1, written: 1, alreadyPresent: 0, failed: [], playlistFileError: null } });
     expect(syncedPlaylistIds()).toEqual(['pl-a']);
   });
 
@@ -326,5 +343,80 @@ describe('syncCheckedPlaylists', () => {
     var dir = fakeDirHandle({});
     await syncCheckedPlaylists(dir, 'http://s', ['pl-a', 'pl-b']);
     expect(syncedPlaylistIds()).toEqual(['pl-b']);
+  });
+});
+
+// BUG-416 — the false-complete bug: every track can land and the page still
+// must not read "all downloaded" unless the .m3u actually landed too.
+describe('BUG-416: the .m3u write is part of the completion contract', () => {
+  var PLAYLIST = {
+    title: 'Road Trip',
+    items: [{ video: TRACK_NO_LYRICS }, { video: TRACK_WITH_LYRICS }]
+  };
+
+  it('syncPlaylist reports a playlistFileError when the .m3u write fails, even though every track landed', async () => {
+    fakeFetch({
+      'http://s/media/ootb-03.m4a': 'A1',
+      'http://s/media/ootb-02.m4a': 'A2',
+      'http://s/media/ootb-02.lrc': 'L2'
+    });
+    var dir = fakeDirHandle({});
+    var realGetFileHandle = dir.getFileHandle;
+    dir.getFileHandle = async function(name, opts) {
+      if (name === 'Road Trip.m3u' && opts && opts.create) throw new Error('disk full');
+      return realGetFileHandle(name, opts);
+    };
+    var summary = await syncPlaylist(dir, 'http://s', PLAYLIST);
+    expect(summary.total).toBe(2);
+    expect(summary.failed).toEqual([]);
+    expect(summary.playlistFileError).toBe('playlist file "Road Trip.m3u" failed to write: disk full');
+  });
+
+  it('syncCheckedPlaylists does not mark a playlist synced when its .m3u failed to write', async () => {
+    fakeFetch({
+      'http://s/api/playlist/pl-a': { title: 'Road Trip', items: [{ video: TRACK_NO_LYRICS }] },
+      'http://s/media/ootb-03.m4a': 'A1'
+    });
+    var dir = fakeDirHandle({});
+    var realGetFileHandle = dir.getFileHandle;
+    dir.getFileHandle = async function(name, opts) {
+      if (name === 'Road Trip.m3u' && opts && opts.create) throw new Error('disk full');
+      return realGetFileHandle(name, opts);
+    };
+    var results = await syncCheckedPlaylists(dir, 'http://s', ['pl-a']);
+    expect(results['pl-a'].failed).toEqual([]);
+    expect(results['pl-a'].playlistFileError).toBeTruthy();
+    expect(syncedPlaylistIds()).toEqual([]);
+  });
+
+  it('one playlist\'s .m3u write failure does not abort the rest of a multi-playlist batch', async () => {
+    fakeFetch({
+      'http://s/api/playlist/pl-a': { title: 'A', items: [{ video: TRACK_NO_LYRICS }] },
+      'http://s/api/playlist/pl-b': { title: 'B', items: [{ video: TRACK_WITH_LYRICS }] },
+      'http://s/media/ootb-03.m4a': 'A1',
+      'http://s/media/ootb-02.m4a': 'A2',
+      'http://s/media/ootb-02.lrc': 'L2'
+    });
+    var dir = fakeDirHandle({});
+    var realGetFileHandle = dir.getFileHandle;
+    dir.getFileHandle = async function(name, opts) {
+      if (name === 'A.m3u' && opts && opts.create) throw new Error('disk full');
+      return realGetFileHandle(name, opts);
+    };
+    var results = await syncPlaylists(dir, 'http://s', ['pl-a', 'pl-b']);
+    expect(results['pl-a'].playlistFileError).toBeTruthy();
+    expect(results['pl-b'].playlistFileError).toBeNull();
+    expect(new TextDecoder().decode(dir.files['B.m3u']).startsWith('#EXTM3U\n')).toBe(true);
+  });
+
+  it('fileExists no longer swallows a non-NotFoundError — it surfaces as a per-track failure instead of a silent (re)write', async () => {
+    fakeFetch({ 'http://s/media/ootb-03.m4a': 'A1' });
+    var dir = fakeDirHandle({});
+    dir.getFileHandle = async function(name) {
+      if (name === 'ELO - Sweet Talkin Woman.m4a') { var e = new Error('permission hiccup'); e.name = 'NotAllowedError'; throw e; }
+      var err = new Error('not found'); err.name = 'NotFoundError'; throw err;
+    };
+    var summary = await syncPlaylist(dir, 'http://s', { title: 'Road Trip', items: [{ video: TRACK_NO_LYRICS }] });
+    expect(summary.failed).toEqual([{ id: 'ootb-03', title: 'Sweet Talkin Woman', reason: 'permission hiccup' }]);
   });
 });
