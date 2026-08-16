@@ -535,8 +535,23 @@ export function initPage() {
   // real touch tap is almost never pixel-stationary, so this silently
   // dropped most taps on a tile or its ＋ Queue badge (needing a 2nd,
   // steadier press).
+  //
+  // A REAL touch swipe never fires that click at all — only a mouse fires a
+  // trailing click on release regardless of how far it moved; a touch UA
+  // suppresses it once the gesture reads as a drag/scroll. So the { once:
+  // true } guard above stayed armed forever waiting for a click that was
+  // never coming, and silently ate the caller's NEXT, unrelated tap instead
+  // (found in real-device testing: swipe to a rail, then the first tap on its
+  // ＋ Queue badge did nothing — the 2nd tap is what actually consumed the
+  // stale guard). A same-gesture mouse click always dispatches synchronously
+  // within the current task, before any macrotask runs — so disarming on a
+  // 0ms timeout still catches that click, while guaranteeing the guard can
+  // never survive to catch a later, separate gesture.
   function swallowClick(e) { e.preventDefault(); e.stopPropagation(); }
-  function guardClick() { els.txtgrid.addEventListener('click', swallowClick, { capture: true, once: true }); }
+  function guardClick() {
+    els.txtgrid.addEventListener('click', swallowClick, { capture: true, once: true });
+    setTimeout(function() { els.txtgrid.removeEventListener('click', swallowClick, { capture: true }); }, 0);
+  }
   function guardClickIfPaged(dx) {
     ({ true: guardClick, false: noop })[didPageRail(dx, railIndex(), railList().length)]();
   }

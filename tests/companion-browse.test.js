@@ -551,4 +551,42 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
     // The rail must NOT have paged away (9px never reaches SWIPE_THRESHOLD).
     await expect(page.locator('#pager-name')).toHaveText('QOTSA');
   });
+
+  // BUG (found in real-device testing AFTER the jitter fix above shipped): a
+  // real TOUCH drag that actually pages never fires a trailing `click` at all
+  // — browsers suppress the synthesized click once a touch gesture reads as a
+  // drag/scroll; only a MOUSE always fires one on release, regardless of
+  // movement (confirmed live: a real CDP-dispatched touch swipe against the
+  // dev server produced zero `click` events on #txtgrid). guardClick() arms a
+  // { once: true } listener hoping to swallow THAT click, but on a real touch
+  // drag no such click ever arrives to consume it — so it stays armed and
+  // silently eats the caller's NEXT, entirely unrelated tap instead (e.g. a
+  // ＋ Queue press right after paging to the rail that press landed on),
+  // needing a 2nd press to register. Reproduced here with raw PointerEvents
+  // (deterministic, no dependency on a given browser's own touch/click
+  // suppression heuristics) — drag past SWIPE_THRESHOLD with NO trailing
+  // click, exactly what a real touch drag leaves behind, then a normal
+  // (mouse) click on the landed rail's ＋ Queue badge, which must not be eaten.
+  test('a drag that pages but leaves no trailing click must not eat the caller\'s NEXT tap', async ({ page }) => {
+    await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+
+    await page.evaluate(() => {
+      var el = document.getElementById('txtgrid');
+      function fire(type, x) {
+        el.dispatchEvent(new PointerEvent(type, { pointerId: 1, clientX: x, clientY: 0, bubbles: true, cancelable: true }));
+      }
+      fire('pointerdown', 100);
+      fire('pointermove', 130); // past ACTIVATE_THRESHOLD, activates the drag
+      fire('pointermove', 190); // past SWIPE_THRESHOLD (+90px, rightward = prev)
+      fire('pointerup', 190);
+      // Deliberately no 'click' dispatched — this is what a real touch drag leaves behind.
+    });
+    await expect(page.locator('#pager-name')).toHaveText('Muse'); // the drag paged, exactly as intended (QOTSA -> prev)
+
+    const queued = page.waitForRequest(req =>
+      req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+    await page.locator('.ph-cell-queue[data-queue="mv-03"]').click(); // a normal, later tap on the landed rail
+    const req = await queued; // must queue on this FIRST tap, not need a 2nd
+    expect(req.url()).toContain('person=kids');
+  });
 });
