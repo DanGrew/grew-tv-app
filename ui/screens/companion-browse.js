@@ -6,7 +6,7 @@ import { playNextCount } from '../../core/queue-view.js';
 import { screenPage, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, railsForSection } from '../../core/home-rails.js';
-import { firstRailId, pageOffset, swipeTarget, stepIndex, arrowDisabled, shouldActivateDrag } from '../../core/rail-pager.js';
+import { firstRailId, pageOffset, settleIndex, stepIndex, arrowDisabled, shouldActivateDrag } from '../../core/rail-pager.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute } from '../../core/home-rails.js';
@@ -63,6 +63,7 @@ export function initPage() {
     pagerCreate: document.getElementById('pager-create'),
     gridWrap: document.getElementById('grid-wrap'),
     gridCount: document.getElementById('grid-count'),
+    txtgridViewport: document.getElementById('txtgrid-viewport'),
     txtgrid: document.getElementById('txtgrid')
   };
   var state = {
@@ -272,11 +273,14 @@ export function initPage() {
     els.pagerCreate.style.display = CREATE_DISPLAY[Boolean(CREATE_RAILS[createRailKey()])];
   }
 
+  function paintTiles(el, items) {
+    items.forEach(function(c) { el.appendChild(txtTile(c)); });
+  }
   function renderGrid() {
     els.txtgrid.innerHTML = '';
     var items = activeRail().items;
     els.gridCount.textContent = items.length + ' items';
-    items.forEach(function(c) { els.txtgrid.appendChild(txtTile(c)); });
+    paintTiles(els.txtgrid, items);
   }
 
   function sectionTitle() {
@@ -498,19 +502,55 @@ export function initPage() {
     [drag].filter(Boolean).filter(function(d) { return d.id === e.pointerId; })
       .forEach(function(d) { trackDrag(e, d, e.clientX - d.x, e.clientY - d.y); });
   }
-  function landSwipe(dx) {
-    var list = railList();
-    var target = list[swipeTarget(dx, railIndex(), list.length)];
-    [target].filter(Boolean).filter(function(r) { return r.id !== state.rail; }).forEach(function(r) { selectRail(r.id); });
+  function easeBackDrag() {
+    els.txtgrid.style.transition = 'transform var(--dur) var(--ease)';
+    els.txtgrid.style.transform = '';
+  }
+  // The new rail's tiles, painted into an absolutely-positioned layer parked
+  // just off the visible edge (sidePct: 1 = right, -1 = left) so it can slide
+  // in alongside the outgoing #txtgrid rather than swap after a snap-back.
+  function buildIncomingEl(rail, sidePct) {
+    var el = document.createElement('div');
+    el.className = 'txtgrid-slide';
+    el.style.transform = 'translateX(' + (sidePct * 100) + '%)';
+    paintTiles(el, rail.items);
+    return el;
+  }
+  function finishSlide(incoming, railId) {
+    incoming.remove();
+    els.txtgrid.style.transition = 'none';
+    els.txtgrid.style.transform = '';
+    selectRail(railId);
+  }
+  function runSlide(incoming, dir, railId) {
+    incoming.addEventListener('transitionend', function() { finishSlide(incoming, railId); }, { once: true });
+    els.txtgrid.style.transition = 'transform var(--dur) var(--ease)';
+    els.txtgrid.style.transform = 'translateX(' + (dir * 100) + '%)';
+    incoming.style.transition = 'transform var(--dur) var(--ease)';
+    incoming.style.transform = 'translateX(0)';
+  }
+  // TASK-433 — a released drag past threshold reads as one continuous slide:
+  // the outgoing #txtgrid keeps moving off in the drag direction while the
+  // target rail's tiles (painted fresh from local data, no LAN round-trip)
+  // come in from the opposite edge, both animating together. The two-step
+  // (append off-screen, force reflow, THEN set the transitioning end state)
+  // is what makes the incoming layer's own move visible rather than instant.
+  function slideToRail(target, dx) {
+    var dir = Math.sign(dx);
+    var incoming = buildIncomingEl(target, -dir);
+    els.txtgridViewport.appendChild(incoming);
+    void incoming.offsetWidth;
+    runSlide(incoming, dir, target.id);
   }
   // A drag that actually paged swallows the synthesized click its release
   // would otherwise fire on whatever tile ends up under the pointer.
   function swallowClick(e) { e.preventDefault(); e.stopPropagation(); }
   function guardClick() { els.txtgrid.addEventListener('click', swallowClick, { capture: true, once: true }); }
   function settleDrag(d) {
-    els.txtgrid.style.transition = 'transform var(--dur) var(--ease)';
-    els.txtgrid.style.transform = '';
-    ({ true: landSwipe, false: noop })[d.active](d.dx);
+    var list = railList();
+    var landRail = list[settleIndex(d.active, d.dx, railIndex(), list.length)];
+    var target = [landRail].filter(Boolean).filter(function(r) { return r.id !== state.rail; })[0];
+    ({ true: function() { slideToRail(target, d.dx); }, false: easeBackDrag })[Boolean(target)]();
     ({ true: guardClick, false: noop })[d.active]();
   }
   function endGesture() {

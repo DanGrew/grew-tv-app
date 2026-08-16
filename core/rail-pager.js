@@ -47,6 +47,15 @@ export function swipeTarget(dx, index, count) {
   return Math.max(index - 1, 0);
 }
 
+// TASK-433 — the index a settled drag should land on: swipeTarget's own
+// threshold/clamp only if the gesture actually activated as horizontal,
+// else the same index (an inactive drag can carry a large dx while a
+// vertical scroll dominates it, which must never read as a swipe).
+export function settleIndex(active, dx, index, count) {
+  if (!active) return index;
+  return swipeTarget(dx, index, count);
+}
+
 // One arrow-step (‹ ›), clamped the same way a completed swipe is.
 export function stepIndex(index, count, dir) {
   if (dir === 'prev') return Math.max(index - 1, 0);
