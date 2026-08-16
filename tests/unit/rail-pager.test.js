@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { firstRailId, isHorizontalDrag, shouldActivateDrag, pageOffset, swipeTarget, stepIndex, arrowDisabled } from '../../core/rail-pager.js';
+import { firstRailId, isHorizontalDrag, shouldActivateDrag, pageOffset, swipeTarget, settleIndex, stepIndex, arrowDisabled } from '../../core/rail-pager.js';
 
 describe('firstRailId', () => {
   it('the first rail\'s id', () => {
@@ -93,6 +93,23 @@ describe('swipeTarget', () => {
   it('right at the swipe threshold counts as a completed swipe', () => {
     expect(swipeTarget(40, 1, 3)).toBe(0);
     expect(swipeTarget(-40, 1, 3)).toBe(2);
+  });
+});
+
+describe('settleIndex', () => {
+  it('an inactive drag stays on the same index, even past the swipe threshold', () => {
+    expect(settleIndex(false, 50, 1, 3)).toBe(1);
+  });
+  it('an active drag over threshold lands on swipeTarget\'s index', () => {
+    expect(settleIndex(true, -50, 1, 3)).toBe(2);
+    expect(settleIndex(true, 50, 1, 3)).toBe(0);
+  });
+  it('an active drag under threshold stays on the same index', () => {
+    expect(settleIndex(true, 10, 1, 3)).toBe(1);
+  });
+  it('an active drag past either end clamps to the same index', () => {
+    expect(settleIndex(true, -50, 2, 3)).toBe(2);
+    expect(settleIndex(true, 50, 0, 3)).toBe(0);
   });
 });
 

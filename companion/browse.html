@@ -35,7 +35,9 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
 #rails-wrap, #grid-wrap { display: flex; flex-direction: column; gap: 8px; }
 #grid-wrap { overflow-x: hidden; flex: 1; touch-action: pan-y; }
 #grid-count { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-#txtgrid { display: grid; grid-template-columns: 1fr; gap: 7px; touch-action: pan-y; }
+#txtgrid-viewport { position: relative; }
+#txtgrid, .txtgrid-slide { display: grid; grid-template-columns: 1fr; gap: 7px; touch-action: pan-y; }
+.txtgrid-slide { position: absolute; top: 0; left: 0; width: 100%; }
 .pager-head { display: flex; align-items: center; gap: 8px; }
 #bottom-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .pager-info { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; }
@@ -140,7 +142,9 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
   </div>
   <div id="grid-wrap">
     <div id="grid-count"></div>
-    <div id="txtgrid"></div>
+    <div id="txtgrid-viewport">
+      <div id="txtgrid"></div>
+    </div>
   </div>
   <div id="bottom-bar">
     <button id="pager-create" class="chip chip-create" type="button" data-create-playlist aria-label="New playlist" style="display:none">&#65291;</button>
