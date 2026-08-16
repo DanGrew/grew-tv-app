@@ -422,6 +422,28 @@ describe('syncCheckedPlaylists', () => {
     await syncCheckedPlaylists(dir, 'http://s', ['pl-a', 'pl-b']);
     expect(syncedPlaylistIds()).toEqual(['pl-b']);
   });
+
+  // BUG-416 — the synced flag was a one-way ratchet: markSynced only ever
+  // added an id, with no matching unmark, so a playlist that synced cleanly
+  // once kept reading "Synced" forever, even after a later resync (new
+  // tracks added to the playlist, one now missing) genuinely failed. The
+  // status must reflect the latest run's outcome, not "synced at some point".
+  it('unmarks a previously-synced playlist when a resync has a failed track', async () => {
+    fakeFetch({
+      'http://s/api/playlist/pl-a': { title: 'A', items: [{ video: TRACK_NO_LYRICS }] },
+      'http://s/media/ootb-03.m4a': 'A1'
+    });
+    var dir = fakeDirHandle({});
+    await syncCheckedPlaylists(dir, 'http://s', ['pl-a']);
+    expect(syncedPlaylistIds()).toEqual(['pl-a']);
+
+    fakeFetch({
+      'http://s/api/playlist/pl-a': { title: 'A', items: [{ video: TRACK_NO_LYRICS }, { video: TRACK_WITH_LYRICS }] }
+    });
+    var results = await syncCheckedPlaylists(dir, 'http://s', ['pl-a']);
+    expect(results['pl-a'].failed.length).toBeGreaterThan(0);
+    expect(syncedPlaylistIds()).toEqual([]);
+  });
 });
 
 // BUG-416 — the false-complete bug: every track can land and the page still
@@ -431,6 +453,16 @@ describe('BUG-416: the .m3u write is part of the completion contract', () => {
     title: 'Road Trip',
     items: [{ video: TRACK_NO_LYRICS }, { video: TRACK_WITH_LYRICS }]
   };
+
+  var store;
+  beforeEach(() => {
+    store = {};
+    vi.stubGlobal('localStorage', {
+      getItem: (k) => store[k] ?? null,
+      setItem: (k, v) => { store[k] = v; }
+    });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
 
   it('syncPlaylist reports a playlistFileError when the .m3u write fails, even though every track landed', async () => {
     fakeFetch({

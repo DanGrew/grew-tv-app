@@ -8,7 +8,7 @@
 // real File System Access API is not available outside a browser.
 import { mediaUrl, loadLyrics, loadPlaylist } from './app-api.js';
 import { trackFilename, lyricsFilename, playlistM3uFilename, playlistFolderName } from './downloads-filename.js';
-import { markSynced } from './downloads-synced.js';
+import { markSynced, unmarkSynced } from './downloads-synced.js';
 
 // BUG-416 (Musicolet folder-per-playlist) — Musicolet (and other Android
 // players) resolve an .m3u's tracks by matching pathnames against its own
@@ -197,14 +197,22 @@ export async function syncPlaylists(dirHandle, serverUrl, playlistIds, onProgres
 }
 
 // The ui layer's whole Sync-tap job in one call: sync every checked
-// playlist, then mark each as synced (core/downloads-synced.js) so the
-// status line flips without the caller doing its own bookkeeping. BUG-064 —
-// a playlist with any failed track is NOT marked synced (its status line
-// would otherwise read "Synced" over an incomplete folder). BUG-416 — nor is
-// one whose .m3u failed to write, even when every track landed: "Synced"
-// means count-matches-queued AND the playlist file is present.
+// playlist, then mark or unmark each as synced (core/downloads-synced.js) so
+// the status line flips without the caller doing its own bookkeeping.
+// BUG-064 — a playlist with any failed track is NOT marked synced (its
+// status line would otherwise read "Synced" over an incomplete folder).
+// BUG-416 — nor is one whose .m3u failed to write, even when every track
+// landed: "Synced" means count-matches-queued AND the playlist file is
+// present. BUG-416 — and a playlist that synced cleanly on an earlier run
+// but fails THIS run is explicitly unmarked: the flag must track the latest
+// run's outcome, not "synced at some point" (markSynced alone was a
+// one-way ratchet that never cleared, so a resync failure kept reading
+// "Synced" over a folder that was genuinely missing tracks).
 export async function syncCheckedPlaylists(dirHandle, serverUrl, playlistIds, onProgress) {
   var results = await syncPlaylists(dirHandle, serverUrl, playlistIds, onProgress);
-  playlistIds.filter(function(id) { return results[id].failed.length === 0 && !results[id].playlistFileError; }).forEach(markSynced);
+  playlistIds.forEach(function(id) {
+    var ok = results[id].failed.length === 0 && !results[id].playlistFileError;
+    (ok ? markSynced : unmarkSynced)(id);
+  });
   return results;
 }

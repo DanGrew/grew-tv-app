@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { syncedPlaylistIds, isSynced, markSynced } from '../../core/downloads-synced.js';
+import { syncedPlaylistIds, isSynced, markSynced, unmarkSynced } from '../../core/downloads-synced.js';
 
 var KEY = 'grew-tv.downloads.synced';
 
@@ -55,5 +55,27 @@ describe('markSynced', () => {
     markSynced('pl-a');
     markSynced('pl-b');
     expect(syncedPlaylistIds().sort()).toEqual(['pl-a', 'pl-b']);
+  });
+});
+
+// BUG-416 — markSynced alone was a one-way ratchet with no way to clear a
+// stale flag, which is exactly how a failed resync could keep reading
+// "Synced" over a folder genuinely missing tracks.
+describe('unmarkSynced', () => {
+  it('removes a previously marked id', () => {
+    markSynced('pl-a');
+    unmarkSynced('pl-a');
+    expect(isSynced('pl-a')).toBe(false);
+    expect(syncedPlaylistIds()).toEqual([]);
+  });
+  it('is a no-op for an id that was never marked', () => {
+    unmarkSynced('pl-a');
+    expect(syncedPlaylistIds()).toEqual([]);
+  });
+  it('leaves other marked ids untouched', () => {
+    markSynced('pl-a');
+    markSynced('pl-b');
+    unmarkSynced('pl-a');
+    expect(syncedPlaylistIds()).toEqual(['pl-b']);
   });
 });
