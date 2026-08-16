@@ -6,7 +6,7 @@ import { playNextCount } from '../../core/queue-view.js';
 import { screenPage, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, railsForSection } from '../../core/home-rails.js';
-import { firstRailId, pageOffset, swipeTarget, stepIndex, arrowDisabled, shouldActivateDrag } from '../../core/rail-pager.js';
+import { firstRailId, pageOffset, swipeTarget, stepIndex, arrowDisabled, shouldActivateDrag, didPageRail } from '../../core/rail-pager.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
@@ -528,14 +528,23 @@ export function initPage() {
     [target].filter(Boolean).filter(function(r) { return r.id !== state.rail; }).forEach(function(r) { selectRail(r.id); });
   }
   // A drag that actually paged swallows the synthesized click its release
-  // would otherwise fire on whatever tile ends up under the pointer.
+  // would otherwise fire on whatever tile ends up under the pointer. Gating
+  // this on d.active alone (the ACTIVATE_THRESHOLD noise floor, 8px) rather
+  // than on an ACTUAL page change (didPageRail, SWIPE_THRESHOLD 40px) ate the
+  // tap's own click on ordinary finger jitter that never paged anywhere — a
+  // real touch tap is almost never pixel-stationary, so this silently
+  // dropped most taps on a tile or its ＋ Queue badge (needing a 2nd,
+  // steadier press).
   function swallowClick(e) { e.preventDefault(); e.stopPropagation(); }
   function guardClick() { els.txtgrid.addEventListener('click', swallowClick, { capture: true, once: true }); }
+  function guardClickIfPaged(dx) {
+    ({ true: guardClick, false: noop })[didPageRail(dx, railIndex(), railList().length)]();
+  }
   function settleDrag(d) {
     els.txtgrid.style.transition = 'transform var(--dur) var(--ease)';
     els.txtgrid.style.transform = '';
     ({ true: landSwipe, false: noop })[d.active](d.dx);
-    ({ true: guardClick, false: noop })[d.active]();
+    ({ true: guardClickIfPaged, false: noop })[d.active](d.dx);
   }
   function endGesture() {
     window.removeEventListener('pointermove', onGridPointerMove);

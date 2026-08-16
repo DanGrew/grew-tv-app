@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { firstRailId, isHorizontalDrag, shouldActivateDrag, pageOffset, swipeTarget, stepIndex, arrowDisabled } from '../../core/rail-pager.js';
+import { firstRailId, isHorizontalDrag, shouldActivateDrag, pageOffset, swipeTarget, stepIndex, arrowDisabled, didPageRail } from '../../core/rail-pager.js';
 
 describe('firstRailId', () => {
   it('the first rail\'s id', () => {
@@ -93,6 +93,18 @@ describe('swipeTarget', () => {
   it('right at the swipe threshold counts as a completed swipe', () => {
     expect(swipeTarget(40, 1, 3)).toBe(0);
     expect(swipeTarget(-40, 1, 3)).toBe(2);
+  });
+});
+
+describe('didPageRail (TASK-421)', () => {
+  it('false under the swipe threshold — ordinary tap jitter never pages', () => {
+    expect(didPageRail(9, 1, 3)).toBe(false);
+  });
+  it('true once a swipe crosses the threshold and actually lands elsewhere', () => {
+    expect(didPageRail(-50, 1, 3)).toBe(true);
+  });
+  it('false when a swipe crosses the threshold but clamps back to the same rail (already at the end)', () => {
+    expect(didPageRail(-50, 2, 3)).toBe(false);
   });
 });
 

@@ -526,4 +526,29 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
     await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
     expect(filmQueued).toBe(false);
   });
+
+  // BUG (found in real-device testing after TASK-421 shipped): a real touch tap
+  // is almost never pixel-stationary — a few px of incidental jitter between
+  // touchstart/touchend is normal. The #txtgrid swipe-pager (TASK-411) armed its
+  // click-swallow guard (settleDrag -> guardClick) off `d.active`, which only
+  // needs ACTIVATE_THRESHOLD (8px) — far short of the 40px SWIPE_THRESHOLD a
+  // drag needs to actually change rail. So an 8-39px jitter never paged
+  // anywhere, yet still ate that same tap's own click, making the ＋ Queue
+  // badge (and any tile) need a 2nd, steadier press most of the time.
+  test('a jittery-but-stationary tap (8-39px, never enough to page) still queues on the FIRST press', async ({ page }) => {
+    await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+    const queued = page.waitForRequest(req =>
+      req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+    const box = await page.locator('.ph-cell-queue[data-queue="mv-01"]').boundingBox();
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 9, y + 2, { steps: 5 }); // 9px horizontal jitter, below the 40px page threshold
+    await page.mouse.up();
+    const req = await queued;
+    expect(req.url()).toContain('person=kids');
+    // The rail must NOT have paged away (9px never reaches SWIPE_THRESHOLD).
+    await expect(page.locator('#pager-name')).toHaveText('QOTSA');
+  });
 });

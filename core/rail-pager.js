@@ -47,6 +47,17 @@ export function swipeTarget(dx, index, count) {
   return Math.max(index - 1, 0);
 }
 
+// Whether a released drag actually crossed into a different rail index — the
+// real "this paged" signal a caller should gate a click-swallow guard on.
+// shouldActivateDrag's ACTIVATE_THRESHOLD is a much lower noise floor (just
+// enough to decide horizontal-vs-vertical intent); gating a click guard on
+// THAT alone ate the release click of ordinary tap jitter that crossed 8px
+// but never reached the 40px SWIPE_THRESHOLD needed to actually page
+// (TASK-421 bug — a real touch tap is almost never pixel-stationary).
+export function didPageRail(dx, index, count) {
+  return swipeTarget(dx, index, count) !== index;
+}
+
 // One arrow-step (‹ ›), clamped the same way a completed swipe is.
 export function stepIndex(index, count, dir) {
   if (dir === 'prev') return Math.max(index - 1, 0);
