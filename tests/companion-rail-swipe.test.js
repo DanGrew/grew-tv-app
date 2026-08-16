@@ -73,6 +73,21 @@ test('a leftward drag past the swipe threshold pages to the next rail, over the 
   expect(intents).toContainEqual(expect.objectContaining({ intent: 'navigate', params: { page: 'rail-grid.html', params: { section: 'films', rail: 'genre:comedy' } } }));
 });
 
+// TASK-433 — the fix is that BOTH rails are on screen together, not a
+// content swap that only happens after a snap-back. Right after release
+// (before the slide's transition has finished) the outgoing #txtgrid must
+// still hold the OLD rail (Finding Nemo is Animation-only, absent from
+// Comedy) while a second .txtgrid-slide layer already carries the NEW
+// rail's content — this fails against the old landSwipe(), which had no
+// second layer and replaced #txtgrid's content in the same tick as release.
+test('a leftward drag past threshold keeps the old rail live while the new rail paints in on a second layer', async ({ page }) => {
+  await dragGrid(page, -80, 0);
+  await expect(page.locator('#txtgrid .ph-txt', { hasText: 'Finding Nemo' })).toHaveCount(1);
+  await expect(page.locator('.txtgrid-slide .ph-txt')).toHaveText(['Toy Story']);
+  await expect(page.locator('#pager-name')).toHaveText('Comedy');
+  await expect(page.locator('.txtgrid-slide')).toHaveCount(0);
+});
+
 test('a rightward drag past the swipe threshold pages back to the previous rail', async ({ page }) => {
   await dragGrid(page, -80, 0);
   await expect(page.locator('#pager-name')).toHaveText('Comedy');
