@@ -50,6 +50,7 @@ var SECTION_LEVEL = { true: 'rails', false: 'sections' };
 var DRILL_CTX = { browse: true, 'rail-grid': true };
 
 export function initPage() {
+  mountStatusMenu(['mode', 'screen', 'profile', 'atlas']);
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
@@ -692,7 +693,6 @@ export function initPage() {
   restoreTrail();
   renderDoor();
   mountSyncBar(mode, onToggle);
-  mountStatusMenu();
   api = connect(server, onContext, function(s) { els.connStatus.textContent = s; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, setBound);
 }

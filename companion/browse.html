@@ -64,8 +64,6 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
 .dock-tab-label { font-size: 11px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .dock-tab.active { color: var(--focus); border-top-color: var(--focus); }
 .dock-tab:active, .dock-tab:focus { outline: none; color: var(--focus); }
-#switch-profile { width: 100%; text-align: left; font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
-#switch-profile:active, #switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .chip-create { font-weight: 700; padding-left: 17px; padding-right: 17px; }
 #door { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
 #door:empty { display: none; }
@@ -104,10 +102,8 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
 .seg-opt:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
 .desync-off { opacity: 0.35; pointer-events: none; }
 #topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; position: relative; }
-#btn-search, #btn-status { flex: 0 0 auto; font-size: 18px; line-height: 1; padding: 8px 13px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
-#btn-search:active, #btn-search:focus, #btn-status:active, #btn-status:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-#status-menu { display: none; flex-direction: column; gap: 14px; position: absolute; top: calc(100% + 8px); right: 0; z-index: 15; width: max-content; max-width: min(320px, calc(100vw - 24px)); padding: 16px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
-#status-menu.open { display: flex; }
+#btn-search { flex: 0 0 auto; font-size: 18px; line-height: 1; padding: 8px 13px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#btn-search:active, #btn-search:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #search-panel { display: none; position: fixed; inset: 0; z-index: 20; flex-direction: column; gap: 12px; padding: 14px 12px; background: linear-gradient(135deg, #14142a 0%, #12203a 45%, #0c2a4e 100%); }
 #search-panel.open { display: flex; }
 #search-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; }
@@ -133,13 +129,7 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
 <div id="conn-status">connecting…</div>
 <div id="topbar-actions">
   <button id="btn-search" type="button" aria-label="Search">🔍</button>
-  <button id="btn-status" type="button" aria-label="Menu">☰</button>
-  <div id="status-menu">
-    <div id="sync-bar"></div>
-    <div id="screen-bar"></div>
-    <button id="switch-profile" type="button">👤 Switch profile</button>
-    <div id="door"></div>
-  </div>
+  <div id="status-menu-mount"></div>
 </div>
 <div id="queue-actions">
 <button id="btn-play-queue" type="button" style="display:none">&#127909; (0)</button>
