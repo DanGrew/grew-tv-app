@@ -32,6 +32,7 @@ var JUMP = [
 var PLAY_ICON = { 'true': '⏸', 'false': '▶' };
 
 export function initPage() {
+  mountStatusMenu(['mode', 'screen', 'profile']);
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
@@ -372,7 +373,6 @@ export function initPage() {
   setInterval(renderBar, 250);
 
   mountSyncBar(mode, onModeChange);
-  mountStatusMenu();
   applyMode();
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode, onVideoPlayback: onVideoPlayback });
   updateBar = mountScreenBar(getApi, noop);

@@ -6,15 +6,13 @@ import { playNextCount } from '../../core/queue-view.js';
 import { screenPage, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, railsForSection } from '../../core/home-rails.js';
-import { firstRailId, pageOffset, swipeTarget, stepIndex, arrowDisabled, shouldActivateDrag, didPageRail } from '../../core/rail-pager.js';
-import { buildCrumbs } from '../../core/breadcrumb.js';
+import { firstRailId, pageOffset, settleIndex, stepIndex, arrowDisabled, shouldActivateDrag } from '../../core/rail-pager.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute } from '../../core/home-rails.js';
 import { externalDestinations, launchExternalParams, destinationUrls } from '../../core/external-destinations.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { desyncOpenPage, tileOffDesynced } from '../../core/companion-button-modes.js';
-import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 import { mountStatusMenu } from './companion-status-menu.js';
@@ -50,6 +48,7 @@ var SECTION_LEVEL = { true: 'rails', false: 'sections' };
 var DRILL_CTX = { browse: true, 'rail-grid': true };
 
 export function initPage() {
+  mountStatusMenu(['mode', 'screen', 'profile', 'atlas']);
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
@@ -64,6 +63,7 @@ export function initPage() {
     pagerCreate: document.getElementById('pager-create'),
     gridWrap: document.getElementById('grid-wrap'),
     gridCount: document.getElementById('grid-count'),
+    txtgridViewport: document.getElementById('txtgrid-viewport'),
     txtgrid: document.getElementById('txtgrid')
   };
   var state = {
@@ -285,11 +285,14 @@ export function initPage() {
     els.pagerCreate.style.display = CREATE_DISPLAY[Boolean(CREATE_RAILS[createRailKey()])];
   }
 
+  function paintTiles(el, items) {
+    items.forEach(function(c) { el.appendChild(txtTile(c)); });
+  }
   function renderGrid() {
     els.txtgrid.innerHTML = '';
     var items = activeRail().items;
     els.gridCount.textContent = items.length + ' items';
-    items.forEach(function(c) { els.txtgrid.appendChild(txtTile(c)); });
+    paintTiles(els.txtgrid, items);
   }
 
   function sectionTitle() {
@@ -298,19 +301,6 @@ export function initPage() {
   }
 
   function railTitle() { return [activeRail().title].filter(Boolean).concat([''])[0]; }
-
-  // The FEAT-021 trail, per level: Home (sections) -> Home > Section (rails) ->
-  // Home > Section > Rail (grid). Reuses core/breadcrumb.js so it styles + wires
-  // for free (a crumb tap routes back through navigate()).
-  function crumbModel() {
-    var ctx = { sectionId: state.section, sectionTitle: sectionTitle(), railTitle: railTitle() };
-    var BY_LEVEL = {
-      sections: function() { return buildCrumbs('browse'); },
-      rails:    function() { return buildCrumbs('detail', { seriesTitle: sectionTitle() }); },
-      grid:     function() { return buildCrumbs('rail-grid', ctx); }
-    };
-    return BY_LEVEL[state.level]();
-  }
 
   function applyLevel() {
     var v = LEVEL_VIEW[state.level];
@@ -426,7 +416,6 @@ export function initPage() {
     renderRails();
     renderGrid();
     recordTrail();
-    mountCompanionBreadcrumb('breadcrumb', crumbModel(), navigate);
   }
 
   // The single funnel for every drill move: emit the FEAT-017 `navigate` intent
@@ -504,7 +493,10 @@ export function initPage() {
   // alone for the page's own scroll (touch-action: pan-y backs this up at the
   // CSS layer), a horizontal one pages, with resistance at either end
   // (pageOffset) and a released drag past threshold landing via the SAME
-  // selectRail() path a dot/arrow tap uses (swipeTarget).
+  // selectRail() path a dot/arrow tap uses (swipeTarget). TASK-425 — the
+  // listener sits on #grid-wrap (CSS flex-fills it to the dock), not #txtgrid,
+  // so a single-row rail's empty space below the tiles still starts a drag;
+  // the painted/transformed element stays #txtgrid.
   var drag = null;
   function paintDrag(dx) {
     els.txtgrid.style.transform = 'translateX(' + pageOffset(dx, railIndex(), railList().length) + 'px)';
@@ -522,44 +514,77 @@ export function initPage() {
     [drag].filter(Boolean).filter(function(d) { return d.id === e.pointerId; })
       .forEach(function(d) { trackDrag(e, d, e.clientX - d.x, e.clientY - d.y); });
   }
-  function landSwipe(dx) {
-    var list = railList();
-    var target = list[swipeTarget(dx, railIndex(), list.length)];
-    [target].filter(Boolean).filter(function(r) { return r.id !== state.rail; }).forEach(function(r) { selectRail(r.id); });
+  function easeBackDrag() {
+    els.txtgrid.style.transition = 'transform var(--dur) var(--ease)';
+    els.txtgrid.style.transform = '';
   }
-  // A drag that actually paged swallows the synthesized click its release
-  // would otherwise fire on whatever tile ends up under the pointer. Gating
-  // this on d.active alone (the ACTIVATE_THRESHOLD noise floor, 8px) rather
-  // than on an ACTUAL page change (didPageRail, SWIPE_THRESHOLD 40px) ate the
-  // tap's own click on ordinary finger jitter that never paged anywhere — a
-  // real touch tap is almost never pixel-stationary, so this silently
-  // dropped most taps on a tile or its ＋ Queue badge (needing a 2nd,
-  // steadier press).
+  // The new rail's tiles, painted into an absolutely-positioned layer parked
+  // just off the visible edge (sidePct: 1 = right, -1 = left) so it can slide
+  // in alongside the outgoing #txtgrid rather than swap after a snap-back.
+  function buildIncomingEl(rail, sidePct) {
+    var el = document.createElement('div');
+    el.className = 'txtgrid-slide';
+    el.style.transform = 'translateX(' + (sidePct * 100) + '%)';
+    paintTiles(el, rail.items);
+    return el;
+  }
+  function finishSlide(incoming, railId) {
+    incoming.remove();
+    els.txtgrid.style.transition = 'none';
+    els.txtgrid.style.transform = '';
+    selectRail(railId);
+  }
+  function runSlide(incoming, dir, railId) {
+    incoming.addEventListener('transitionend', function() { finishSlide(incoming, railId); }, { once: true });
+    els.txtgrid.style.transition = 'transform var(--dur) var(--ease)';
+    els.txtgrid.style.transform = 'translateX(' + (dir * 100) + '%)';
+    incoming.style.transition = 'transform var(--dur) var(--ease)';
+    incoming.style.transform = 'translateX(0)';
+  }
+  // TASK-433 — a released drag past threshold reads as one continuous slide:
+  // the outgoing #txtgrid keeps moving off in the drag direction while the
+  // target rail's tiles (painted fresh from local data, no LAN round-trip)
+  // come in from the opposite edge, both animating together. The two-step
+  // (append off-screen, force reflow, THEN set the transitioning end state)
+  // is what makes the incoming layer's own move visible rather than instant.
+  function slideToRail(target, dx) {
+    var dir = Math.sign(dx);
+    var incoming = buildIncomingEl(target, -dir);
+    els.txtgridViewport.appendChild(incoming);
+    void incoming.offsetWidth;
+    runSlide(incoming, dir, target.id);
+  }
+  // A drag that actually paged (Boolean(target), a REAL rail change) swallows
+  // the synthesized click its release would otherwise fire on whatever tile
+  // ends up under the pointer. Gating this on d.active alone (the
+  // ACTIVATE_THRESHOLD noise floor, 8px) rather than on an actual page change
+  // ate the tap's own click on ordinary finger jitter that never paged
+  // anywhere — a real touch tap is almost never pixel-stationary, so this
+  // silently dropped most taps on a tile or its ＋ Queue badge (needing a
+  // 2nd, steadier press).
   //
-  // A REAL touch swipe never fires that click at all — only a mouse fires a
+  // A REAL touch drag never fires that click at all — only a mouse fires a
   // trailing click on release regardless of how far it moved; a touch UA
-  // suppresses it once the gesture reads as a drag/scroll. So the { once:
-  // true } guard above stayed armed forever waiting for a click that was
-  // never coming, and silently ate the caller's NEXT, unrelated tap instead
-  // (found in real-device testing: swipe to a rail, then the first tap on its
-  // ＋ Queue badge did nothing — the 2nd tap is what actually consumed the
-  // stale guard). A same-gesture mouse click always dispatches synchronously
-  // within the current task, before any macrotask runs — so disarming on a
-  // 0ms timeout still catches that click, while guaranteeing the guard can
-  // never survive to catch a later, separate gesture.
+  // suppresses it once the gesture reads as a drag/scroll. So a guard armed
+  // with only { once: true } stays armed forever waiting for a click that
+  // was never coming, and silently eats the caller's NEXT, unrelated tap
+  // instead (found in real-device testing: swipe to a rail, then the first
+  // tap on its ＋ Queue badge did nothing — the 2nd tap is what actually
+  // consumed the stale guard). A same-gesture mouse click always dispatches
+  // synchronously within the current task, before any macrotask runs — so
+  // disarming on a 0ms timeout still catches that click, while guaranteeing
+  // the guard can never survive to catch a later, separate gesture.
   function swallowClick(e) { e.preventDefault(); e.stopPropagation(); }
   function guardClick() {
     els.txtgrid.addEventListener('click', swallowClick, { capture: true, once: true });
     setTimeout(function() { els.txtgrid.removeEventListener('click', swallowClick, { capture: true }); }, 0);
   }
-  function guardClickIfPaged(dx) {
-    ({ true: guardClick, false: noop })[didPageRail(dx, railIndex(), railList().length)]();
-  }
   function settleDrag(d) {
-    els.txtgrid.style.transition = 'transform var(--dur) var(--ease)';
-    els.txtgrid.style.transform = '';
-    ({ true: landSwipe, false: noop })[d.active](d.dx);
-    ({ true: guardClickIfPaged, false: noop })[d.active](d.dx);
+    var list = railList();
+    var landRail = list[settleIndex(d.active, d.dx, railIndex(), list.length)];
+    var target = [landRail].filter(Boolean).filter(function(r) { return r.id !== state.rail; })[0];
+    ({ true: function() { slideToRail(target, d.dx); }, false: easeBackDrag })[Boolean(target)]();
+    ({ true: guardClick, false: noop })[Boolean(target)]();
   }
   function endGesture() {
     window.removeEventListener('pointermove', onGridPointerMove);
@@ -583,7 +608,7 @@ export function initPage() {
     window.addEventListener('pointerup', onGridPointerUp);
     window.addEventListener('pointercancel', onGridPointerCancel);
   }
-  els.txtgrid.addEventListener('pointerdown', onGridPointerDown);
+  els.gridWrap.addEventListener('pointerdown', onGridPointerDown);
 
   // Render ONCE after both browse + continue-watching settle (the FEAT-020
   // double-render request storm is moot here — text-only — but a single render
@@ -725,7 +750,6 @@ export function initPage() {
   restoreTrail();
   renderDoor();
   mountSyncBar(mode, onToggle);
-  mountStatusMenu();
   api = connect(server, onContext, function(s) { els.connStatus.textContent = s; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, setBound);
 }

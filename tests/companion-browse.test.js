@@ -50,7 +50,6 @@ test.beforeEach(async ({ page }) => {
 test('L1 shows section chips from the server sections — no rails/grid yet', async ({ page }) => {
   await expect(page.locator('#rails-wrap')).toBeHidden();
   await expect(page.locator('#grid-wrap')).toBeHidden();
-  await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Home');
 });
 
 test('TASK-426: #btn-back never renders on browse.html, at any level', async ({ page }) => {
@@ -123,13 +122,6 @@ test('‹ › arrows step one rail at a time and disable at either end', async (
   await expect(page.locator('#pager-next')).toBeDisabled();
   await page.locator('#pager-prev').click();
   await expect(page.locator('#pager-name')).toHaveText('Animation');
-});
-
-test('reuses the FEAT-021 breadcrumb — trail builds Home › Section › Rail as you drill', async ({ page }) => {
-  await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Home');
-  await page.locator('.dock-tab[data-section="films"]').click();
-  await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home', 'Films']);
-  await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Animation');
 });
 
 test('Switch profile drives the picker — navigate intent echoes a profile context, companion follows (BUG-007)', async ({ page }) => {

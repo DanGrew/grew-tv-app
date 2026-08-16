@@ -21,6 +21,7 @@ var KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'ok'];
 var KEY_LABEL = { back: '⌫', ok: '✓' };
 
 export function initPage() {
+  mountStatusMenu(['screen']);
   // FEAT-038 (DSYNC-2c): picking a profile is a fresh session start. Reset the
   // persisted Browse flag to Control AND clear the local drill trail — otherwise
   // a leftover spot (e.g. a Music/Playlists drill from Browse) gets restored when
@@ -238,7 +239,6 @@ export function initPage() {
 
   els.takeoverConfirm.addEventListener('click', confirmTakeover);
   els.takeoverCancel.addEventListener('click', cancelTakeover);
-  mountStatusMenu();
 
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, noop, onDevices,
     { onPersonActive: onPersonActive, onPersonBusy: onPersonBusy });

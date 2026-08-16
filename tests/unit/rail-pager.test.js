@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { firstRailId, isHorizontalDrag, shouldActivateDrag, pageOffset, swipeTarget, stepIndex, arrowDisabled, didPageRail } from '../../core/rail-pager.js';
+import { firstRailId, isHorizontalDrag, shouldActivateDrag, pageOffset, swipeTarget, settleIndex, stepIndex, arrowDisabled } from '../../core/rail-pager.js';
 
 describe('firstRailId', () => {
   it('the first rail\'s id', () => {
@@ -96,15 +96,20 @@ describe('swipeTarget', () => {
   });
 });
 
-describe('didPageRail (TASK-421)', () => {
-  it('false under the swipe threshold — ordinary tap jitter never pages', () => {
-    expect(didPageRail(9, 1, 3)).toBe(false);
+describe('settleIndex', () => {
+  it('an inactive drag stays on the same index, even past the swipe threshold', () => {
+    expect(settleIndex(false, 50, 1, 3)).toBe(1);
   });
-  it('true once a swipe crosses the threshold and actually lands elsewhere', () => {
-    expect(didPageRail(-50, 1, 3)).toBe(true);
+  it('an active drag over threshold lands on swipeTarget\'s index', () => {
+    expect(settleIndex(true, -50, 1, 3)).toBe(2);
+    expect(settleIndex(true, 50, 1, 3)).toBe(0);
   });
-  it('false when a swipe crosses the threshold but clamps back to the same rail (already at the end)', () => {
-    expect(didPageRail(-50, 2, 3)).toBe(false);
+  it('an active drag under threshold stays on the same index', () => {
+    expect(settleIndex(true, 10, 1, 3)).toBe(1);
+  });
+  it('an active drag past either end clamps to the same index', () => {
+    expect(settleIndex(true, -50, 2, 3)).toBe(2);
+    expect(settleIndex(true, 50, 0, 3)).toBe(0);
   });
 });
 

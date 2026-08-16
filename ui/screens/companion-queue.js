@@ -18,6 +18,7 @@ import { mountStatusMenu } from './companion-status-menu.js';
 // repeat are server actions. Play/pause is the one device-local control — it
 // toggles the TV's <audio> via the existing `toggle` WS intent, not a snapshot.
 export function initPage() {
+  mountStatusMenu(['mode', 'screen', 'profile']);
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
@@ -93,7 +94,6 @@ export function initPage() {
   document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });
   render(null);
   mountSyncBar(mode, onModeChange);
-  mountStatusMenu();
   applyMode();
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { onPlayback: render, mode: mode });
   updateBar = mountScreenBar(getApi, noop);

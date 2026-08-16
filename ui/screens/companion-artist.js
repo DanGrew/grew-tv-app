@@ -24,6 +24,7 @@ import { mountStatusMenu } from './companion-status-menu.js';
 // profile arrive over WS. Desync (Browse): the song rows grey out (they drive the
 // TV — the companion plays nothing itself), matching companion-detail's album tracks.
 export function initPage() {
+  mountStatusMenu(['mode', 'screen', 'profile']);
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
@@ -170,7 +171,6 @@ export function initPage() {
 
   document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });
   mountSyncBar(mode, onModeChange);
-  mountStatusMenu();
   applyMode();
   // Browse-mode entry: browse linked here with ?id=<artist>, so seed the artist
   // ourselves (captureArtist loads its songs once the profile arrives). The

@@ -41,17 +41,6 @@ function mockApp(page, initial) {
   });
 }
 
-test('browse shows a single non-clickable Home crumb', async ({ page }) => {
-  await installApi(page);
-  await mockApp(page, { context: { context_id: 'browse' }, appState: { screen: 'home', profile: 'kids' } });
-  await page.goto('/companion/browse.html');
-  await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Home');
-  await expect(page.locator('#breadcrumb .crumb-link')).toHaveCount(0);
-  // Guards the drill-down catalog render path (FEAT-028 / TASK-168: L1 is a row
-  // of server-driven section chips, not a content-type tab strip).
-  await expect(page.locator('#section-dock .dock-tab-label')).toHaveText(['TV Series', 'Films', 'Home Movies']);
-});
-
 test('detail shows Home (clickable) then the series as current', async ({ page }) => {
   await installApi(page);
   await mockApp(page, { context: { context_id: 'detail', series_id: 'bluey' }, appState: { screen: 'detail', itemId: 'bluey', profile: 'kids' } });

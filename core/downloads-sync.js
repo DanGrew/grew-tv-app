@@ -10,14 +10,19 @@ import { mediaUrl, loadLyrics, loadPlaylist } from './app-api.js';
 import { trackFilename, lyricsFilename, playlistM3uFilename } from './downloads-filename.js';
 import { markSynced } from './downloads-synced.js';
 
+// BUG-416 — only a real "not there" (NotFoundError) reads as absent; any
+// other File System Access error (permission/quota/transient I/O) rethrows
+// so it lands in the caller's per-track failure handling instead of being
+// silently treated as "safe to (re)write", which could paper over a real
+// failure.
 async function fileExists(dirHandle, name) {
   try {
     await dirHandle.getFileHandle(name);
     return true;
   }
-  // Stryker disable next-line BlockStatement: only ever read via `!fileExists(...)` — undefined negates the same as false, no observable difference.
   catch (e) {
-    return false;
+    if (e && e.name === 'NotFoundError') return false;
+    throw e;
   }
 }
 
@@ -77,6 +82,30 @@ export function m3uText(tracks) {
   return lines.join('\n') + '\n';
 }
 
+// BUG-416 — some File System Access implementations prepend a UTF-8 BOM
+// when a plain JS string is handed to writable.write(), which breaks a
+// player's `#EXTM3U` magic-string check. TextEncoder.encode() never emits a
+// BOM, so writing the raw bytes ourselves removes the ambiguity rather than
+// trusting the browser's own string-to-UTF8 write path.
+function m3uBytes(tracks) {
+  return new TextEncoder().encode(m3uText(tracks));
+}
+
+// BUG-416 — the .m3u write is part of the completion contract, not a
+// fire-and-forget side effect: a failure here must stop the playlist from
+// reading "Synced" just as a failed track does. Returns a message on
+// failure, null on success, rather than throwing — one bad playlist's file
+// write must not abort the rest of a multi-playlist batch (syncPlaylists).
+async function writePlaylistFile(dirHandle, playlistTitle, tracks) {
+  var name = playlistM3uFilename(playlistTitle);
+  try {
+    await writeFile(dirHandle, name, m3uBytes(tracks));
+    return null;
+  } catch (e) {
+    return 'playlist file "' + name + '" failed to write: ' + trackErrorReason(e);
+  }
+}
+
 // Sync one playlist's tracks into the folder, then (re)write its .m3u in
 // full. `onTrack(i, total)` (optional) reports progress as each track
 // finishes. BUG-064 — a single track's failure (fetch, FS write, lyrics
@@ -102,8 +131,8 @@ export async function syncPlaylist(dirHandle, serverUrl, playlist, onTrack) {
     }
     report(i + 1, tracks.length);
   }
-  await writeFile(dirHandle, playlistM3uFilename(playlist.title), m3uText(ok));
-  return { total: tracks.length, written: written, alreadyPresent: ok.length - written, failed: failed };
+  var playlistFileError = await writePlaylistFile(dirHandle, playlist.title, ok);
+  return { total: tracks.length, written: written, alreadyPresent: ok.length - written, failed: failed, playlistFileError: playlistFileError };
 }
 
 // Sync a batch of checked playlists, by id, in order — the ui layer's Sync
@@ -127,9 +156,11 @@ export async function syncPlaylists(dirHandle, serverUrl, playlistIds, onProgres
 // playlist, then mark each as synced (core/downloads-synced.js) so the
 // status line flips without the caller doing its own bookkeeping. BUG-064 —
 // a playlist with any failed track is NOT marked synced (its status line
-// would otherwise read "Synced" over an incomplete folder).
+// would otherwise read "Synced" over an incomplete folder). BUG-416 — nor is
+// one whose .m3u failed to write, even when every track landed: "Synced"
+// means count-matches-queued AND the playlist file is present.
 export async function syncCheckedPlaylists(dirHandle, serverUrl, playlistIds, onProgress) {
   var results = await syncPlaylists(dirHandle, serverUrl, playlistIds, onProgress);
-  playlistIds.filter(function(id) { return results[id].failed.length === 0; }).forEach(markSynced);
+  playlistIds.filter(function(id) { return results[id].failed.length === 0 && !results[id].playlistFileError; }).forEach(markSynced);
   return results;
 }

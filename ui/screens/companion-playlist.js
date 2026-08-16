@@ -28,6 +28,7 @@ import { mountStatusMenu } from './companion-status-menu.js';
 // Play/Shuffle). An EMPTY playlist still lists + opens. The TV teleports and
 // echoes context — same per-person relay the browse / detail / artist companions ride.
 export function initPage() {
+  mountStatusMenu(['mode', 'screen', 'profile']);
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
@@ -427,7 +428,6 @@ export function initPage() {
 
   document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });
   mountSyncBar(mode, onModeChange);
-  mountStatusMenu();
   applyMode();
   // Browse-mode entry: browse linked here with ?id=…, so load that playlist
   // ourselves (loadPlaylist / /api/playlist) instead of waiting for the TV echo.

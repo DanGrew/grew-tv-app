@@ -38,11 +38,20 @@ export function playlistStatusText(playlistId, progress, clipCount) {
 // can leave the line untouched on a clean sync.
 function trackFailureText(f) { return f.title + ' (' + f.reason + ')'; }
 
-export function syncFailureText(results) {
-  var failed = Object.keys(results).reduce(function(acc, id) {
-    return acc.concat(results[id].failed);
-  }, []);
-  if (failed.length === 0) return null;
+function trackFailureText_(failed) {
   var noun = failed.length === 1 ? 'track' : 'tracks';
   return failed.length + ' ' + noun + ' failed — ' + failed.map(trackFailureText).join(', ');
+}
+
+// BUG-416 — a playlist can land every track and still not be "complete" if
+// its .m3u failed to write; name that shortfall too, distinct from a
+// per-track failure, rather than reading a clean track count as "nothing
+// went wrong".
+export function syncFailureText(results) {
+  var ids = Object.keys(results);
+  var failed = ids.reduce(function(acc, id) { return acc.concat(results[id].failed); }, []);
+  var fileErrors = ids.map(function(id) { return results[id].playlistFileError; }).filter(Boolean);
+  var trackPart = [failed.length > 0].filter(Boolean).map(function() { return trackFailureText_(failed); });
+  var parts = trackPart.concat(fileErrors);
+  return parts.length === 0 ? null : parts.join(' — ');
 }
