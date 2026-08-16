@@ -4,7 +4,7 @@ import { setup as setupPlayer } from './screen-video-player.js';
 import { setupVideoQueue } from './screen-video-queue.js';
 import { setupMusicVideoQueue } from './screen-music-video-queue.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadSeries, loadProgress, loadVideo, loadPlaylist, loadBrowse, videoPlaybackAction, musicVideoPlaybackAction, addToPlaylist } from '../../core/app-api.js';
+import { loadSeries, loadProgress, loadVideo, loadPlaylist, loadBrowse, loadVideoPlayback, videoPlaybackAction, musicVideoPlaybackAction, addToPlaylist } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
 import { currentItem, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist, startIndex, initSeq, toggleShuffle, toggleRepeat, canAdvance, nextSeq } from '../../core/music-video-playthrough.js';
@@ -49,6 +49,10 @@ var RESUME_BY_RESTART = {
 function resumeStart(restart, prog) { return RESUME_BY_RESTART[!!restart + ''](prog); }
 function zeroProgress() { return { position_secs: 0, duration_secs: null }; }
 var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+// BUG-439: an engine-fired action (play-video/-source/-queue) waits this long for
+// its first video_playback snapshot before giving up and surfacing error.html,
+// instead of leaving the player sitting inert with no feedback.
+var ENGINE_TIMEOUT_MS = 8000;
 
 export function initVideoPage() {
   var videoId  = getParam('video');
@@ -73,6 +77,7 @@ export function initVideoPage() {
   var currentTitle = '';   // current item's title (for the breadcrumb leaf)
   var seriesTitle = null;  // cached series title for the middle crumb
   var seq = initSeq([], 0);  // music-video mode only (core/music-video-playthrough)
+  var enginePending = null;  // ENGINE_TIMEOUT_MS watchdog, armed per engine action, cleared on first swap
 
   function sendAction(action, body) { videoPlaybackAction(SERVER, action, person, body).catch(function() {}); }
   // FEAT-418 (TASK-419/420): the music-video Queue View's own action sender —
@@ -103,7 +108,36 @@ export function initVideoPage() {
     [upNextLine(snapshot)].filter(Boolean).forEach(function(l) { player.setUpNext(l.prefix, l.label); });
   }
 
+  // BUG-439: the watchdog for a fired engine action — armed right before the
+  // sendAction that can silently no-op server-side, cleared the moment a real
+  // snapshot swap proves the action landed. Timing out means the action was
+  // dropped (or the WS never bound), so surface the existing "can't reach"
+  // page rather than leaving a black screen with no feedback (Story 2).
+  function armEngineTimeout() {
+    clearTimeout(enginePending);
+    enginePending = setTimeout(function() { navTo('error.html'); }, ENGINE_TIMEOUT_MS);
+  }
+  function clearEngineTimeout() {
+    clearTimeout(enginePending);
+    enginePending = null;
+  }
+
+  // BUG-439: the play-video/-source/-queue POST can land before the WS
+  // activate_person handshake finishes binding this device server-side, so its
+  // snapshot broadcast is silently dropped (the server already applied the
+  // action — only the push was lost). Once activate_person is confirmed, pull
+  // the current snapshot directly (the same GET FEAT-040's Play Queue already
+  // reads) and apply it — a no-op if the push already landed (isSwap sees the
+  // same item_id), the fix if it didn't. Music-video mode never touches this
+  // engine, so it sits out.
+  var RESYNC_ON_ACTIVATE = {
+    'true':  function() {},
+    'false': function() { loadVideoPlayback(SERVER, person).then(applySnapshot).catch(function() {}); }
+  };
+  function resyncOnActivate() { RESYNC_ON_ACTIVATE[isMusicVideo + ''](); }
+
   function swapVideo(np) {
+    clearEngineTimeout();
     loadedId = np.item_id;
     currentTitle = np.title;
     var restartThis = [restart].filter(Boolean).filter(function() { return np.item_id === videoId; })[0];
@@ -342,7 +376,11 @@ export function initVideoPage() {
   // Queue View overlay — it never drives now-playing/prev/next (that stays the
   // client-owned seq above), unlike applySnapshot's full video-engine handling.
   function applyMvQueueSnapshot(snap) { queue.applySnapshot(snap); }
-  wsApp = connectApp(window.location.origin, appIntent, { onVideoPlayback: applySnapshot, onMusicVideoPlayback: applyMvQueueSnapshot });
+  wsApp = connectApp(window.location.origin, appIntent, {
+    onVideoPlayback: applySnapshot,
+    onMusicVideoPlayback: applyMvQueueSnapshot,
+    onPersonActive: resyncOnActivate
+  });
 
   document.addEventListener('keydown', dispatchKey);
 
@@ -352,6 +390,7 @@ export function initVideoPage() {
   function startSeries() {
     mountCrumbs();
     ensureSeriesTitle();
+    armEngineTimeout();
     initCaptions(SERVER)
       .then(function() { sendAction('play-source', { source_type: 'series', source_id: seriesId, item_id: videoId }); })
       .catch(function() {});
@@ -364,6 +403,7 @@ export function initVideoPage() {
   // it + resumes from watch_progress. The durable queue plays after it.
   function startSingle() {
     mountCrumbs();
+    armEngineTimeout();
     initCaptions(SERVER)
       .then(function() { sendAction('play-video', { video_id: videoId }); })
       .catch(function() {});
@@ -374,6 +414,7 @@ export function initVideoPage() {
   // video first.
   function startQueue() {
     mountCrumbs();
+    armEngineTimeout();
     initCaptions(SERVER)
       .then(function() { sendAction('play-queue', {}); })
       .catch(function() {});
