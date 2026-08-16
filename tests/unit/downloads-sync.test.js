@@ -3,12 +3,15 @@ import { ensureTrackFiles, m3uText, syncPlaylist, syncPlaylists, syncCheckedPlay
 import { syncedPlaylistIds } from '../../core/downloads-synced.js';
 
 // A minimal fake of the File System Access directory-handle contract this
-// module actually calls: getFileHandle(name[, {create}]) rejects
-// NotFoundError when absent and create is falsy (real browser behaviour),
-// otherwise resolves a handle whose createWritable().write/close records
-// into `files` (name -> the exact value passed to write()).
+// module actually calls: getFileHandle(name[, {create}])/getDirectoryHandle
+// reject NotFoundError when absent and create is falsy (real browser
+// behaviour), otherwise resolve a handle. A directory handle is itself
+// another fakeDirHandle, so BUG-416's `grew-tv/<playlist>/` nesting is just
+// two getDirectoryHandle hops. createWritable().write/close records into the
+// owning handle's own `files` (name -> the exact value passed to write()).
 function fakeDirHandle(existing) {
   var files = Object.assign({}, existing || {});
+  var dirs = {};
   function fileHandle(name) {
     return {
       createWritable: async function() {
@@ -21,12 +24,40 @@ function fakeDirHandle(existing) {
   }
   return {
     files: files,
+    dirs: dirs,
     getFileHandle: async function(name, opts) {
       if (Object.prototype.hasOwnProperty.call(files, name)) return fileHandle(name);
       if (opts && opts.create) { files[name] = undefined; return fileHandle(name); }
       var e = new Error('not found'); e.name = 'NotFoundError'; throw e;
+    },
+    getDirectoryHandle: async function(name, opts) {
+      if (Object.prototype.hasOwnProperty.call(dirs, name)) return dirs[name];
+      if (opts && opts.create) { dirs[name] = fakeDirHandle({}); return dirs[name]; }
+      var e = new Error('not found'); e.name = 'NotFoundError'; throw e;
     }
   };
+}
+
+// A playlist's actual working folder, once syncPlaylist has created it:
+// <root>/grew-tv/<playlist title>/.
+function plDir(rootDir, playlistTitle) {
+  return rootDir.dirs['grew-tv'].dirs[playlistTitle];
+}
+function plFiles(rootDir, playlistTitle) {
+  return plDir(rootDir, playlistTitle).files;
+}
+
+// Pre-seeds <root>/grew-tv/<playlistTitle>/ with `files` already present, and
+// hands back both the root (to pass into syncPlaylist) and the playlist's
+// own dir handle (to inspect or monkey-patch getFileHandle on directly —
+// syncPlaylist resolves and operates on that nested handle, not the root).
+function seedPlaylistDir(playlistTitle, files) {
+  var root = fakeDirHandle({});
+  var grewTv = fakeDirHandle({});
+  var pl = fakeDirHandle(files || {});
+  grewTv.dirs[playlistTitle] = pl;
+  root.dirs['grew-tv'] = grewTv;
+  return { root: root, playlistDir: pl };
 }
 
 function fakeFetch(byUrl) {
@@ -49,23 +80,23 @@ describe('ensureTrackFiles', () => {
   it('rejects when the audio fetch is not ok', async () => {
     fakeFetch({});
     var dir = fakeDirHandle({});
-    await expect(ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS)).rejects.toBe(404);
+    await expect(ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1)).rejects.toBe(404);
   });
 
   it('fetches and writes the audio file when absent', async () => {
     fakeFetch({ 'http://s/media/ootb-03.m4a': 'AUDIO-BYTES' });
     var dir = fakeDirHandle({});
-    var wasWritten = await ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS);
+    var wasWritten = await ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1);
     expect(wasWritten).toBe(true);
-    expect(dir.files['ELO - Sweet Talkin Woman.m4a']).toBe('AUDIO-BYTES');
+    expect(dir.files['01 - ELO - Sweet Talkin Woman.m4a']).toBe('AUDIO-BYTES');
   });
 
   it('skips the fetch+write when the audio file already exists', async () => {
     global.fetch = async function() { throw new Error('should not fetch'); };
-    var dir = fakeDirHandle({ 'ELO - Sweet Talkin Woman.m4a': 'EXISTING' });
-    var wasWritten = await ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS);
+    var dir = fakeDirHandle({ '01 - ELO - Sweet Talkin Woman.m4a': 'EXISTING' });
+    var wasWritten = await ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1);
     expect(wasWritten).toBe(false);
-    expect(dir.files['ELO - Sweet Talkin Woman.m4a']).toBe('EXISTING');
+    expect(dir.files['01 - ELO - Sweet Talkin Woman.m4a']).toBe('EXISTING');
   });
 
   it('also fetches+writes the .lrc when the track has lyrics and it is absent', async () => {
@@ -74,22 +105,111 @@ describe('ensureTrackFiles', () => {
       'http://s/media/ootb-02.lrc': '[00:01.00]line one'
     });
     var dir = fakeDirHandle({});
-    await ensureTrackFiles(dir, 'http://s', TRACK_WITH_LYRICS);
-    expect(dir.files['ELO - Mr. Blue Sky.lrc']).toBe('[00:01.00]line one');
+    await ensureTrackFiles(dir, 'http://s', TRACK_WITH_LYRICS, 1, 1);
+    expect(dir.files['01 - ELO - Mr. Blue Sky.lrc']).toBe('[00:01.00]line one');
   });
 
   it('skips the .lrc fetch+write when it already exists', async () => {
     fakeFetch({ 'http://s/media/ootb-02.m4a': 'AUDIO-BYTES' });
-    var dir = fakeDirHandle({ 'ELO - Mr. Blue Sky.lrc': 'EXISTING-LRC' });
-    await ensureTrackFiles(dir, 'http://s', TRACK_WITH_LYRICS);
-    expect(dir.files['ELO - Mr. Blue Sky.lrc']).toBe('EXISTING-LRC');
+    var dir = fakeDirHandle({ '01 - ELO - Mr. Blue Sky.lrc': 'EXISTING-LRC' });
+    await ensureTrackFiles(dir, 'http://s', TRACK_WITH_LYRICS, 1, 1);
+    expect(dir.files['01 - ELO - Mr. Blue Sky.lrc']).toBe('EXISTING-LRC');
   });
 
   it('never touches a .lrc file when the track has no lyrics', async () => {
     fakeFetch({ 'http://s/media/ootb-03.m4a': 'AUDIO-BYTES' });
     var dir = fakeDirHandle({});
-    await ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS);
-    expect(dir.files['ELO - Sweet Talkin Woman.lrc']).toBeUndefined();
+    await ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1);
+    expect(dir.files['01 - ELO - Sweet Talkin Woman.lrc']).toBeUndefined();
+  });
+
+  // BUG-416 — reported on a mobile device: the same tracks in a longer
+  // playlist consistently threw a raw "Failed to fetch" (a rejected fetch()
+  // promise, not an HTTP status) while streaming those same tracks worked
+  // fine — a transient network condition, not a missing file. A rejected
+  // fetch() is retried a few times in place before counting as a real
+  // per-track failure.
+  describe('transient fetch failures are retried, not treated as permanent', () => {
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    it('retries a transient audio fetch failure and succeeds', async () => {
+      var calls = 0;
+      global.fetch = async function() {
+        calls++;
+        if (calls === 1) throw new TypeError('Failed to fetch');
+        return { ok: true, status: 200, blob: async function() { return 'AUDIO'; } };
+      };
+      var dir = fakeDirHandle({});
+      var promise = ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1);
+      await vi.advanceTimersByTimeAsync(250);
+      var wasWritten = await promise;
+      expect(wasWritten).toBe(true);
+      expect(calls).toBe(2);
+      expect(dir.files['01 - ELO - Sweet Talkin Woman.m4a']).toBe('AUDIO');
+    });
+
+    it('does not retry a resolved-but-not-ok response (a real HTTP 404 is definitive, not transient)', async () => {
+      var calls = 0;
+      global.fetch = async function() {
+        calls++;
+        return { ok: false, status: 404 };
+      };
+      var dir = fakeDirHandle({});
+      await expect(ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1)).rejects.toBe(404);
+      expect(calls).toBe(1);
+    });
+
+    it('waits the retry delay before the next attempt, not less', async () => {
+      var calls = 0;
+      global.fetch = async function() {
+        calls++;
+        if (calls === 1) throw new TypeError('Failed to fetch');
+        return { ok: true, status: 200, blob: async function() { return 'AUDIO'; } };
+      };
+      var dir = fakeDirHandle({});
+      var promise = ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1);
+      await vi.advanceTimersByTimeAsync(249);
+      expect(calls).toBe(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await promise;
+      expect(calls).toBe(2);
+    });
+
+    it('gives up after exactly 3 attempts and reports the original failure reason', async () => {
+      var calls = 0;
+      global.fetch = async function() {
+        calls++;
+        throw new TypeError('Failed to fetch');
+      };
+      var dir = fakeDirHandle({});
+      var promise = ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1).catch(function(e) { return e; });
+      // Exactly 2 waits between 3 attempts (none after the last, failed,
+      // attempt) — advancing by only that much must already leave the
+      // promise settled, not still pending on a further wait.
+      await vi.advanceTimersByTimeAsync(2 * 250);
+      expect(calls).toBe(3);
+      var err = await promise;
+      expect(err.message).toBe('Failed to fetch');
+    });
+
+    it('retries a transient lyrics fetch failure and succeeds', async () => {
+      var lyricsCalls = 0;
+      global.fetch = async function(url) {
+        if (String(url).indexOf('.lrc') !== -1) {
+          lyricsCalls++;
+          if (lyricsCalls === 1) throw new TypeError('Failed to fetch');
+          return { ok: true, status: 200, text: async function() { return 'LYRICS'; } };
+        }
+        return { ok: true, status: 200, blob: async function() { return 'AUDIO'; } };
+      };
+      var dir = fakeDirHandle({});
+      var promise = ensureTrackFiles(dir, 'http://s', TRACK_WITH_LYRICS, 1, 1);
+      await vi.advanceTimersByTimeAsync(250);
+      await promise;
+      expect(lyricsCalls).toBe(2);
+      expect(dir.files['01 - ELO - Mr. Blue Sky.lrc']).toBe('LYRICS');
+    });
   });
 });
 
@@ -99,9 +219,9 @@ describe('m3uText', () => {
     expect(text).toBe(
       '#EXTM3U\n' +
       '#EXTINF:228,ELO - Sweet Talkin Woman\n' +
-      'ELO - Sweet Talkin Woman.m4a\n' +
+      '01 - ELO - Sweet Talkin Woman.m4a\n' +
       '#EXTINF:245,ELO - Mr. Blue Sky\n' +
-      'ELO - Mr. Blue Sky.m4a\n'
+      '02 - ELO - Mr. Blue Sky.m4a\n'
     );
   });
   it('falls back to -1 duration when absent', () => {
@@ -114,6 +234,20 @@ describe('m3uText', () => {
   });
   it('is just the header for an empty track list', () => {
     expect(m3uText([])).toBe('#EXTM3U\n');
+  });
+  // BUG-416 — a failed track is a null in its own slot (not removed from the
+  // array), so a later track's index/padding still matches the total and so
+  // the filename ensureTrackFiles actually wrote — a renumbered subset would
+  // reference a file that doesn't exist on disk.
+  it('skips a null slot but keeps a later track\'s position/padding relative to the full total, not a renumbered subset', () => {
+    var text = m3uText([TRACK_NO_LYRICS, null, TRACK_WITH_LYRICS]);
+    expect(text).toBe(
+      '#EXTM3U\n' +
+      '#EXTINF:228,ELO - Sweet Talkin Woman\n' +
+      '01 - ELO - Sweet Talkin Woman.m4a\n' +
+      '#EXTINF:245,ELO - Mr. Blue Sky\n' +
+      '03 - ELO - Mr. Blue Sky.m4a\n'
+    );
   });
 });
 
@@ -132,9 +266,9 @@ describe('syncPlaylist', () => {
     var dir = fakeDirHandle({});
     var summary = await syncPlaylist(dir, 'http://s', PLAYLIST);
     expect(summary).toEqual({ total: 2, written: 2, alreadyPresent: 0, failed: [], playlistFileError: null });
-    expect(new TextDecoder().decode(dir.files['Road Trip.m3u'])).toBe(
-      '#EXTM3U\n#EXTINF:228,ELO - Sweet Talkin Woman\nELO - Sweet Talkin Woman.m4a\n' +
-      '#EXTINF:245,ELO - Mr. Blue Sky\nELO - Mr. Blue Sky.m4a\n'
+    expect(new TextDecoder().decode(plFiles(dir, 'Road Trip')['Road Trip.m3u'])).toBe(
+      '#EXTM3U\n#EXTINF:228,ELO - Sweet Talkin Woman\n01 - ELO - Sweet Talkin Woman.m4a\n' +
+      '#EXTINF:245,ELO - Mr. Blue Sky\n02 - ELO - Mr. Blue Sky.m4a\n'
     );
   });
 
@@ -149,7 +283,7 @@ describe('syncPlaylist', () => {
     });
     var dir = fakeDirHandle({});
     await syncPlaylist(dir, 'http://s', PLAYLIST);
-    var bytes = dir.files['Road Trip.m3u'];
+    var bytes = plFiles(dir, 'Road Trip')['Road Trip.m3u'];
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect(Array.from(bytes.slice(0, 3))).not.toEqual([0xef, 0xbb, 0xbf]);
     expect(new TextDecoder().decode(bytes).startsWith('#EXTM3U\n')).toBe(true);
@@ -157,8 +291,8 @@ describe('syncPlaylist', () => {
 
   it('counts a track already present in the folder as alreadyPresent, not written', async () => {
     fakeFetch({ 'http://s/media/ootb-02.m4a': 'A2', 'http://s/media/ootb-02.lrc': 'L2' });
-    var dir = fakeDirHandle({ 'ELO - Sweet Talkin Woman.m4a': 'EXISTING' });
-    var summary = await syncPlaylist(dir, 'http://s', PLAYLIST);
+    var seeded = seedPlaylistDir('Road Trip', { '01 - ELO - Sweet Talkin Woman.m4a': 'EXISTING' });
+    var summary = await syncPlaylist(seeded.root, 'http://s', PLAYLIST);
     expect(summary).toEqual({ total: 2, written: 1, alreadyPresent: 1, failed: [], playlistFileError: null });
   });
 
@@ -178,7 +312,7 @@ describe('syncPlaylist', () => {
     var dir = fakeDirHandle({});
     var summary = await syncPlaylist(dir, 'http://s', { title: 'Empty Mix', items: [] });
     expect(summary).toEqual({ total: 0, written: 0, alreadyPresent: 0, failed: [], playlistFileError: null });
-    expect(new TextDecoder().decode(dir.files['Empty Mix.m3u'])).toBe('#EXTM3U\n');
+    expect(new TextDecoder().decode(plFiles(dir, 'Empty Mix')['Empty Mix.m3u'])).toBe('#EXTM3U\n');
   });
 
   it('tolerates a playlist with items missing altogether', async () => {
@@ -195,7 +329,7 @@ describe('syncPlaylist', () => {
       var summary = await syncPlaylist(dir, 'http://s', PLAYLIST);
       expect(summary.total).toBe(2);
       expect(summary.written).toBe(1);
-      expect(dir.files['ELO - Mr. Blue Sky.m4a']).toBe('A2');
+      expect(plFiles(dir, 'Road Trip')['02 - ELO - Mr. Blue Sky.m4a']).toBe('A2');
     });
 
     it('reports the failed track by id/title with an "HTTP {status}" reason', async () => {
@@ -205,22 +339,35 @@ describe('syncPlaylist', () => {
       expect(summary.failed).toEqual([{ id: 'ootb-03', title: 'Sweet Talkin Woman', reason: 'HTTP 404' }]);
     });
 
+    // BUG-416 — a failed track that isn't the LAST one queued must not
+    // shorten the playlist's effective total for the tracks written before
+    // it (a length derived by only touching succeeded indices would come up
+    // short when the very last track is the one that fails).
+    it('a trailing (last-queued) track failing does not corrupt the .m3u for the tracks that succeeded before it', async () => {
+      fakeFetch({ 'http://s/media/ootb-03.m4a': 'A1' });
+      var dir = fakeDirHandle({});
+      await syncPlaylist(dir, 'http://s', PLAYLIST);
+      expect(new TextDecoder().decode(plFiles(dir, 'Road Trip')['Road Trip.m3u'])).toBe(
+        '#EXTM3U\n#EXTINF:228,ELO - Sweet Talkin Woman\n01 - ELO - Sweet Talkin Woman.m4a\n'
+      );
+    });
+
     it('reports an FS write error by its message', async () => {
       fakeFetch({
         'http://s/media/ootb-03.m4a': 'A1',
         'http://s/media/ootb-02.m4a': 'A2',
         'http://s/media/ootb-02.lrc': 'L2'
       });
-      var dir = fakeDirHandle({});
-      var realGetFileHandle = dir.getFileHandle;
-      dir.getFileHandle = async function(name, opts) {
-        if (name === 'ELO - Sweet Talkin Woman.m4a' && opts && opts.create) throw new Error('disk full');
+      var seeded = seedPlaylistDir('Road Trip', {});
+      var realGetFileHandle = seeded.playlistDir.getFileHandle;
+      seeded.playlistDir.getFileHandle = async function(name, opts) {
+        if (name === '01 - ELO - Sweet Talkin Woman.m4a' && opts && opts.create) throw new Error('disk full');
         return realGetFileHandle(name, opts);
       };
-      var summary = await syncPlaylist(dir, 'http://s', PLAYLIST);
+      var summary = await syncPlaylist(seeded.root, 'http://s', PLAYLIST);
       expect(summary.failed).toEqual([{ id: 'ootb-03', title: 'Sweet Talkin Woman', reason: 'disk full' }]);
       expect(summary.written).toBe(1);
-      expect(dir.files['ELO - Mr. Blue Sky.m4a']).toBe('A2');
+      expect(plFiles(seeded.root, 'Road Trip')['02 - ELO - Mr. Blue Sky.m4a']).toBe('A2');
     });
 
     it('falls back to String(e) for a thrown value with no .message', async () => {
@@ -229,13 +376,13 @@ describe('syncPlaylist', () => {
         'http://s/media/ootb-02.m4a': 'A2',
         'http://s/media/ootb-02.lrc': 'L2'
       });
-      var dir = fakeDirHandle({});
-      var realGetFileHandle = dir.getFileHandle;
-      dir.getFileHandle = async function(name, opts) {
-        if (name === 'ELO - Sweet Talkin Woman.m4a' && opts && opts.create) throw 'oops';
+      var seeded = seedPlaylistDir('Road Trip', {});
+      var realGetFileHandle = seeded.playlistDir.getFileHandle;
+      seeded.playlistDir.getFileHandle = async function(name, opts) {
+        if (name === '01 - ELO - Sweet Talkin Woman.m4a' && opts && opts.create) throw 'oops';
         return realGetFileHandle(name, opts);
       };
-      var summary = await syncPlaylist(dir, 'http://s', PLAYLIST);
+      var summary = await syncPlaylist(seeded.root, 'http://s', PLAYLIST);
       expect(summary.failed).toEqual([{ id: 'ootb-03', title: 'Sweet Talkin Woman', reason: 'oops' }]);
     });
 
@@ -243,8 +390,8 @@ describe('syncPlaylist', () => {
       fakeFetch({ 'http://s/media/ootb-02.m4a': 'A2', 'http://s/media/ootb-02.lrc': 'L2' });
       var dir = fakeDirHandle({});
       await syncPlaylist(dir, 'http://s', PLAYLIST);
-      expect(new TextDecoder().decode(dir.files['Road Trip.m3u'])).toBe(
-        '#EXTM3U\n#EXTINF:245,ELO - Mr. Blue Sky\nELO - Mr. Blue Sky.m4a\n'
+      expect(new TextDecoder().decode(plFiles(dir, 'Road Trip')['Road Trip.m3u'])).toBe(
+        '#EXTM3U\n#EXTINF:245,ELO - Mr. Blue Sky\n02 - ELO - Mr. Blue Sky.m4a\n'
       );
     });
 
@@ -273,8 +420,8 @@ describe('syncPlaylists', () => {
       'pl-a': { total: 1, written: 1, alreadyPresent: 0, failed: [], playlistFileError: null },
       'pl-b': { total: 1, written: 1, alreadyPresent: 0, failed: [], playlistFileError: null }
     });
-    expect(dir.files['A.m3u']).toBeDefined();
-    expect(dir.files['B.m3u']).toBeDefined();
+    expect(plFiles(dir, 'A')['A.m3u']).toBeDefined();
+    expect(plFiles(dir, 'B')['B.m3u']).toBeDefined();
   });
 
   it('reports progress via onProgress(playlistId, done, total)', async () => {
@@ -291,6 +438,26 @@ describe('syncPlaylists', () => {
   it('is {} for an empty id list', async () => {
     var dir = fakeDirHandle({});
     expect(await syncPlaylists(dir, 'http://s', [])).toEqual({});
+  });
+
+  // BUG-416 (Musicolet folder-per-playlist) — each playlist gets its own
+  // grew-tv/<title> folder now, so a track shared by two playlists downloads
+  // (and dedup-checks) independently into each one rather than the old
+  // shared-flat-folder cross-playlist dedup (TASK-403 story 5). No symlinks
+  // are possible through the File System Access API, so a second physical
+  // copy is the deliberate cost of a folder a player can browse standalone.
+  it('two playlists sharing a track each get their own copy in their own subfolder, not deduped across playlists', async () => {
+    fakeFetch({
+      'http://s/api/playlist/pl-a': { title: 'A', items: [{ video: TRACK_NO_LYRICS }] },
+      'http://s/api/playlist/pl-b': { title: 'B', items: [{ video: TRACK_NO_LYRICS }] },
+      'http://s/media/ootb-03.m4a': 'AUDIO'
+    });
+    var dir = fakeDirHandle({});
+    var results = await syncPlaylists(dir, 'http://s', ['pl-a', 'pl-b']);
+    expect(results['pl-a'].written).toBe(1);
+    expect(results['pl-b'].written).toBe(1);
+    expect(plFiles(dir, 'A')['01 - ELO - Sweet Talkin Woman.m4a']).toBe('AUDIO');
+    expect(plFiles(dir, 'B')['01 - ELO - Sweet Talkin Woman.m4a']).toBe('AUDIO');
   });
 });
 
@@ -344,6 +511,28 @@ describe('syncCheckedPlaylists', () => {
     await syncCheckedPlaylists(dir, 'http://s', ['pl-a', 'pl-b']);
     expect(syncedPlaylistIds()).toEqual(['pl-b']);
   });
+
+  // BUG-416 — the synced flag was a one-way ratchet: markSynced only ever
+  // added an id, with no matching unmark, so a playlist that synced cleanly
+  // once kept reading "Synced" forever, even after a later resync (new
+  // tracks added to the playlist, one now missing) genuinely failed. The
+  // status must reflect the latest run's outcome, not "synced at some point".
+  it('unmarks a previously-synced playlist when a resync has a failed track', async () => {
+    fakeFetch({
+      'http://s/api/playlist/pl-a': { title: 'A', items: [{ video: TRACK_NO_LYRICS }] },
+      'http://s/media/ootb-03.m4a': 'A1'
+    });
+    var dir = fakeDirHandle({});
+    await syncCheckedPlaylists(dir, 'http://s', ['pl-a']);
+    expect(syncedPlaylistIds()).toEqual(['pl-a']);
+
+    fakeFetch({
+      'http://s/api/playlist/pl-a': { title: 'A', items: [{ video: TRACK_NO_LYRICS }, { video: TRACK_WITH_LYRICS }] }
+    });
+    var results = await syncCheckedPlaylists(dir, 'http://s', ['pl-a']);
+    expect(results['pl-a'].failed.length).toBeGreaterThan(0);
+    expect(syncedPlaylistIds()).toEqual([]);
+  });
 });
 
 // BUG-416 — the false-complete bug: every track can land and the page still
@@ -354,19 +543,29 @@ describe('BUG-416: the .m3u write is part of the completion contract', () => {
     items: [{ video: TRACK_NO_LYRICS }, { video: TRACK_WITH_LYRICS }]
   };
 
+  var store;
+  beforeEach(() => {
+    store = {};
+    vi.stubGlobal('localStorage', {
+      getItem: (k) => store[k] ?? null,
+      setItem: (k, v) => { store[k] = v; }
+    });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
   it('syncPlaylist reports a playlistFileError when the .m3u write fails, even though every track landed', async () => {
     fakeFetch({
       'http://s/media/ootb-03.m4a': 'A1',
       'http://s/media/ootb-02.m4a': 'A2',
       'http://s/media/ootb-02.lrc': 'L2'
     });
-    var dir = fakeDirHandle({});
-    var realGetFileHandle = dir.getFileHandle;
-    dir.getFileHandle = async function(name, opts) {
+    var seeded = seedPlaylistDir('Road Trip', {});
+    var realGetFileHandle = seeded.playlistDir.getFileHandle;
+    seeded.playlistDir.getFileHandle = async function(name, opts) {
       if (name === 'Road Trip.m3u' && opts && opts.create) throw new Error('disk full');
       return realGetFileHandle(name, opts);
     };
-    var summary = await syncPlaylist(dir, 'http://s', PLAYLIST);
+    var summary = await syncPlaylist(seeded.root, 'http://s', PLAYLIST);
     expect(summary.total).toBe(2);
     expect(summary.failed).toEqual([]);
     expect(summary.playlistFileError).toBe('playlist file "Road Trip.m3u" failed to write: disk full');
@@ -377,13 +576,13 @@ describe('BUG-416: the .m3u write is part of the completion contract', () => {
       'http://s/api/playlist/pl-a': { title: 'Road Trip', items: [{ video: TRACK_NO_LYRICS }] },
       'http://s/media/ootb-03.m4a': 'A1'
     });
-    var dir = fakeDirHandle({});
-    var realGetFileHandle = dir.getFileHandle;
-    dir.getFileHandle = async function(name, opts) {
+    var seeded = seedPlaylistDir('Road Trip', {});
+    var realGetFileHandle = seeded.playlistDir.getFileHandle;
+    seeded.playlistDir.getFileHandle = async function(name, opts) {
       if (name === 'Road Trip.m3u' && opts && opts.create) throw new Error('disk full');
       return realGetFileHandle(name, opts);
     };
-    var results = await syncCheckedPlaylists(dir, 'http://s', ['pl-a']);
+    var results = await syncCheckedPlaylists(seeded.root, 'http://s', ['pl-a']);
     expect(results['pl-a'].failed).toEqual([]);
     expect(results['pl-a'].playlistFileError).toBeTruthy();
     expect(syncedPlaylistIds()).toEqual([]);
@@ -397,16 +596,22 @@ describe('BUG-416: the .m3u write is part of the completion contract', () => {
       'http://s/media/ootb-02.m4a': 'A2',
       'http://s/media/ootb-02.lrc': 'L2'
     });
-    var dir = fakeDirHandle({});
-    var realGetFileHandle = dir.getFileHandle;
-    dir.getFileHandle = async function(name, opts) {
+    var root = fakeDirHandle({});
+    var grewTv = fakeDirHandle({});
+    var plA = fakeDirHandle({});
+    var plB = fakeDirHandle({});
+    grewTv.dirs['A'] = plA;
+    grewTv.dirs['B'] = plB;
+    root.dirs['grew-tv'] = grewTv;
+    var realGetFileHandleA = plA.getFileHandle;
+    plA.getFileHandle = async function(name, opts) {
       if (name === 'A.m3u' && opts && opts.create) throw new Error('disk full');
-      return realGetFileHandle(name, opts);
+      return realGetFileHandleA(name, opts);
     };
-    var results = await syncPlaylists(dir, 'http://s', ['pl-a', 'pl-b']);
+    var results = await syncPlaylists(root, 'http://s', ['pl-a', 'pl-b']);
     expect(results['pl-a'].playlistFileError).toBeTruthy();
     expect(results['pl-b'].playlistFileError).toBeNull();
-    expect(new TextDecoder().decode(dir.files['B.m3u']).startsWith('#EXTM3U\n')).toBe(true);
+    expect(new TextDecoder().decode(plB.files['B.m3u']).startsWith('#EXTM3U\n')).toBe(true);
   });
 
   it('fileExists no longer swallows a non-NotFoundError — it surfaces as a per-track failure instead of a silent (re)write', async () => {
@@ -415,17 +620,59 @@ describe('BUG-416: the .m3u write is part of the completion contract', () => {
     // swallow-and-proceed bug would write the file and count the track ok,
     // while the fix must fail the track before ever attempting the write.
     fakeFetch({ 'http://s/media/ootb-03.m4a': 'A1' });
-    var dir = fakeDirHandle({});
-    var realGetFileHandle = dir.getFileHandle;
-    dir.getFileHandle = async function(name, opts) {
-      if (name === 'ELO - Sweet Talkin Woman.m4a' && !(opts && opts.create)) {
+    var seeded = seedPlaylistDir('Road Trip', {});
+    var realGetFileHandle = seeded.playlistDir.getFileHandle;
+    seeded.playlistDir.getFileHandle = async function(name, opts) {
+      if (name === '01 - ELO - Sweet Talkin Woman.m4a' && !(opts && opts.create)) {
         var e = new Error('permission hiccup'); e.name = 'NotAllowedError'; throw e;
       }
       return realGetFileHandle(name, opts);
     };
-    var summary = await syncPlaylist(dir, 'http://s', { title: 'Road Trip', items: [{ video: TRACK_NO_LYRICS }] });
+    var summary = await syncPlaylist(seeded.root, 'http://s', { title: 'Road Trip', items: [{ video: TRACK_NO_LYRICS }] });
     expect(summary.failed).toEqual([{ id: 'ootb-03', title: 'Sweet Talkin Woman', reason: 'permission hiccup' }]);
     expect(summary.written).toBe(0);
-    expect(dir.files['ELO - Sweet Talkin Woman.m4a']).toBeUndefined();
+    expect(seeded.playlistDir.files['01 - ELO - Sweet Talkin Woman.m4a']).toBeUndefined();
+  });
+});
+
+// BUG-416 (Musicolet folder-per-playlist) — Musicolet resolves an .m3u's
+// tracks by matching pathnames against its own scanned library rather than
+// reading a bare filename relative to the playlist file, so it never
+// reliably recognized the old shared-flat-folder .m3u. Every playlist now
+// gets its own real subfolder a folder-browsing player plays as a set,
+// independent of any .m3u parsing.
+describe('BUG-416: each playlist syncs into its own grew-tv/<title> subfolder', () => {
+  it('writes tracks, .lrc and .m3u under grew-tv/<playlist title>/, not the picked root', async () => {
+    fakeFetch({
+      'http://s/media/ootb-03.m4a': 'A1',
+      'http://s/media/ootb-02.m4a': 'A2',
+      'http://s/media/ootb-02.lrc': 'L2'
+    });
+    var dir = fakeDirHandle({});
+    var PLAYLIST = { title: 'Road Trip', items: [{ video: TRACK_NO_LYRICS }, { video: TRACK_WITH_LYRICS }] };
+    await syncPlaylist(dir, 'http://s', PLAYLIST);
+    expect(dir.files).toEqual({});
+    expect(Object.keys(plFiles(dir, 'Road Trip')).sort()).toEqual([
+      '01 - ELO - Sweet Talkin Woman.m4a',
+      '02 - ELO - Mr. Blue Sky.lrc',
+      '02 - ELO - Mr. Blue Sky.m4a',
+      'Road Trip.m3u'
+    ]);
+  });
+
+  it('reports a playlistFileError, with no track attempted, when the playlist folder itself fails to create', async () => {
+    fakeFetch({
+      'http://s/media/ootb-03.m4a': 'A1',
+      'http://s/media/ootb-02.m4a': 'A2',
+      'http://s/media/ootb-02.lrc': 'L2'
+    });
+    var PLAYLIST = { title: 'Road Trip', items: [{ video: TRACK_NO_LYRICS }, { video: TRACK_WITH_LYRICS }] };
+    var dir = fakeDirHandle({});
+    dir.getDirectoryHandle = async function() { throw new Error('quota exceeded'); };
+    var summary = await syncPlaylist(dir, 'http://s', PLAYLIST);
+    expect(summary).toEqual({
+      total: 2, written: 0, alreadyPresent: 0, failed: [],
+      playlistFileError: 'playlist folder "Road Trip" failed to create: quota exceeded'
+    });
   });
 });
