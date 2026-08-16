@@ -5,7 +5,12 @@
 // staleness tracking, per the task spec) and rewrites the playlist's .m3u in
 // full. Takes the dir handle as a plain object so this stays unit-testable
 // with a fake implementing the same getFileHandle/createWritable shape — the
-// real File System Access API is not available outside a browser.
+// real File System Access API is not available outside a browser. BUG-416 —
+// a track/lyrics fetch is retried a few times on a rejected fetch() before
+// counting as a real per-track failure (see withRetry below): reported on a
+// mobile device syncing a longer playlist, where the same tracks failed
+// with a raw "Failed to fetch" every run while streaming those same tracks
+// worked fine — a transient network condition, not a missing file.
 import { mediaUrl, loadLyrics, loadPlaylist } from './app-api.js';
 import { trackFilename, lyricsFilename, playlistM3uFilename, playlistFolderName } from './downloads-filename.js';
 import { markSynced, unmarkSynced } from './downloads-synced.js';
@@ -48,8 +53,37 @@ async function writeFile(dirHandle, name, data) {
   await writable.close();
 }
 
+var FETCH_MAX_ATTEMPTS = 3;
+var FETCH_RETRY_DELAY_MS = 250;
+
+function wait(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
+// BUG-416 — a mobile browser's fetch() can reject outright (a dropped
+// connection, momentary resource pressure) well before this module's own
+// per-track failure handling would ever see a definitive answer from the
+// server; retrying in place resolves a blip without the user having to
+// notice a failure and re-run the whole sync themselves. Only wraps a
+// rejected fetch()/promise, never a resolved-but-not-ok HTTP response — a
+// real "HTTP 404" is a definitive answer, not a transient failure, and
+// retrying it three times over would only slow down a genuinely missing
+// file's failure report.
+async function withRetry(fn) {
+  var lastErr;
+  for (var attempt = 1; attempt <= FETCH_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (attempt < FETCH_MAX_ATTEMPTS) await wait(FETCH_RETRY_DELAY_MS);
+    }
+  }
+  throw lastErr;
+}
+
 async function fetchAudioBlob(serverUrl, track) {
-  var res = await fetch(mediaUrl(serverUrl, track.id + '.' + track.ext));
+  var res = await withRetry(function() { return fetch(mediaUrl(serverUrl, track.id + '.' + track.ext)); });
   if (!res.ok) throw res.status;
   return res.blob();
 }
@@ -81,7 +115,7 @@ export async function ensureTrackFiles(dirHandle, serverUrl, track, index, total
     var lrcName = lyricsFilename(track, index, total);
     var lrcPresent = await fileExists(dirHandle, lrcName);
     if (!lrcPresent) {
-      var text = await loadLyrics(serverUrl, track.lyrics);
+      var text = await withRetry(function() { return loadLyrics(serverUrl, track.lyrics); });
       await writeFile(dirHandle, lrcName, text);
     }
   }

@@ -122,6 +122,95 @@ describe('ensureTrackFiles', () => {
     await ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1);
     expect(dir.files['01 - ELO - Sweet Talkin Woman.lrc']).toBeUndefined();
   });
+
+  // BUG-416 — reported on a mobile device: the same tracks in a longer
+  // playlist consistently threw a raw "Failed to fetch" (a rejected fetch()
+  // promise, not an HTTP status) while streaming those same tracks worked
+  // fine — a transient network condition, not a missing file. A rejected
+  // fetch() is retried a few times in place before counting as a real
+  // per-track failure.
+  describe('transient fetch failures are retried, not treated as permanent', () => {
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    it('retries a transient audio fetch failure and succeeds', async () => {
+      var calls = 0;
+      global.fetch = async function() {
+        calls++;
+        if (calls === 1) throw new TypeError('Failed to fetch');
+        return { ok: true, status: 200, blob: async function() { return 'AUDIO'; } };
+      };
+      var dir = fakeDirHandle({});
+      var promise = ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1);
+      await vi.advanceTimersByTimeAsync(250);
+      var wasWritten = await promise;
+      expect(wasWritten).toBe(true);
+      expect(calls).toBe(2);
+      expect(dir.files['01 - ELO - Sweet Talkin Woman.m4a']).toBe('AUDIO');
+    });
+
+    it('does not retry a resolved-but-not-ok response (a real HTTP 404 is definitive, not transient)', async () => {
+      var calls = 0;
+      global.fetch = async function() {
+        calls++;
+        return { ok: false, status: 404 };
+      };
+      var dir = fakeDirHandle({});
+      await expect(ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1)).rejects.toBe(404);
+      expect(calls).toBe(1);
+    });
+
+    it('waits the retry delay before the next attempt, not less', async () => {
+      var calls = 0;
+      global.fetch = async function() {
+        calls++;
+        if (calls === 1) throw new TypeError('Failed to fetch');
+        return { ok: true, status: 200, blob: async function() { return 'AUDIO'; } };
+      };
+      var dir = fakeDirHandle({});
+      var promise = ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1);
+      await vi.advanceTimersByTimeAsync(249);
+      expect(calls).toBe(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await promise;
+      expect(calls).toBe(2);
+    });
+
+    it('gives up after exactly 3 attempts and reports the original failure reason', async () => {
+      var calls = 0;
+      global.fetch = async function() {
+        calls++;
+        throw new TypeError('Failed to fetch');
+      };
+      var dir = fakeDirHandle({});
+      var promise = ensureTrackFiles(dir, 'http://s', TRACK_NO_LYRICS, 1, 1).catch(function(e) { return e; });
+      // Exactly 2 waits between 3 attempts (none after the last, failed,
+      // attempt) — advancing by only that much must already leave the
+      // promise settled, not still pending on a further wait.
+      await vi.advanceTimersByTimeAsync(2 * 250);
+      expect(calls).toBe(3);
+      var err = await promise;
+      expect(err.message).toBe('Failed to fetch');
+    });
+
+    it('retries a transient lyrics fetch failure and succeeds', async () => {
+      var lyricsCalls = 0;
+      global.fetch = async function(url) {
+        if (String(url).indexOf('.lrc') !== -1) {
+          lyricsCalls++;
+          if (lyricsCalls === 1) throw new TypeError('Failed to fetch');
+          return { ok: true, status: 200, text: async function() { return 'LYRICS'; } };
+        }
+        return { ok: true, status: 200, blob: async function() { return 'AUDIO'; } };
+      };
+      var dir = fakeDirHandle({});
+      var promise = ensureTrackFiles(dir, 'http://s', TRACK_WITH_LYRICS, 1, 1);
+      await vi.advanceTimersByTimeAsync(250);
+      await promise;
+      expect(lyricsCalls).toBe(2);
+      expect(dir.files['01 - ELO - Mr. Blue Sky.lrc']).toBe('LYRICS');
+    });
+  });
 });
 
 describe('m3uText', () => {
