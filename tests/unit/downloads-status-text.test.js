@@ -69,4 +69,19 @@ describe('syncFailureText', () => {
   it('is null for an empty results map', () => {
     expect(syncFailureText({})).toBeNull();
   });
+
+  // BUG-416 — a playlist whose .m3u failed to write must be named too, even
+  // when every track landed (no per-track failure).
+  describe('playlistFileError (BUG-416)', () => {
+    it('names a playlist-file write failure when no track failed', () => {
+      expect(syncFailureText({ 'pl-a': { failed: [], playlistFileError: 'playlist file "Road Trip.m3u" failed to write: disk full' } }))
+        .toBe('playlist file "Road Trip.m3u" failed to write: disk full');
+    });
+    it('lists both a track failure and a playlist-file failure together', () => {
+      expect(syncFailureText({
+        'pl-a': { failed: [{ title: 'Track A', reason: 'HTTP 404' }], playlistFileError: null },
+        'pl-b': { failed: [], playlistFileError: 'playlist file "B.m3u" failed to write: disk full' }
+      })).toBe('1 track failed — Track A (HTTP 404) — playlist file "B.m3u" failed to write: disk full');
+    });
+  });
 });

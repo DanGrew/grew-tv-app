@@ -234,7 +234,7 @@ test.describe('with the File System Access API', () => {
     expect(files).toContain('ELO - Sweet Talkin Woman.m4a');
     expect(files).not.toContain('ELO - Turn to Stone.m4a');
     expect(files).toContain('Road Trip.m3u');
-    const m3u = await page.evaluate(() => window.__dlFiles['Road Trip.m3u']);
+    const m3u = await page.evaluate(() => new TextDecoder().decode(window.__dlFiles['Road Trip.m3u']));
     expect(m3u).not.toContain('Turn to Stone');
   });
 
@@ -245,5 +245,19 @@ test.describe('with the File System Access API', () => {
     await page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-check').check();
     await page.locator('#btn-sync').click();
     await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Not synced');
+  });
+
+  // BUG-416 story 4 — the .m3u must land as BOM-free bytes so a real player's
+  // #EXTM3U magic-string check recognizes it.
+  test('BUG-416: the written .m3u is BOM-free bytes with #EXTM3U as the literal first line', async ({ page }) => {
+    await page.goto('/companion/downloads.html?profile=kids');
+    await page.locator('#btn-choose-folder').click();
+    await page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-check').check();
+    await page.locator('#btn-sync').click();
+    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Synced');
+    const firstBytes = await page.evaluate(() => Array.from(window.__dlFiles['Road Trip.m3u'].slice(0, 3)));
+    expect(firstBytes).not.toEqual([0xef, 0xbb, 0xbf]);
+    const text = await page.evaluate(() => new TextDecoder().decode(window.__dlFiles['Road Trip.m3u']));
+    expect(text.startsWith('#EXTM3U\n')).toBe(true);
   });
 });
