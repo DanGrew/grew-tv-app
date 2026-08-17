@@ -581,4 +581,53 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
     const req = await queued; // must queue on this FIRST tap, not need a 2nd
     expect(req.url()).toContain('person=kids');
   });
+
+  // BUG-438 (found in real-device testing after the two guardClick fixes
+  // above shipped): a tap landing on the JUST-PAGED rail's own tile, before
+  // the slide-out/slide-in transition (TASK-433, var(--dur) ~180ms) finishes,
+  // still went nowhere — a DIFFERENT mechanism than guardClick. slideToRail
+  // pinned the incoming layer a fixed screen-width away (dir*100%) regardless
+  // of how far the live drag had already carried the outgoing #txtgrid, so
+  // the two layers didn't tile: the incoming layer had strictly farther left
+  // to travel than the outgoing layer's remaining distance, in the SAME fixed
+  // duration, leaving a real gap neither layer painted for part of the
+  // transition — a tap there hit #txtgrid-viewport itself, not a tile.
+  // Compounding it: that same tap's own pointerdown (bubbling to #grid-wrap)
+  // was treated as a fresh drag-gesture start regardless, and its
+  // unconditional `#txtgrid.style.transition = 'none'` froze the outgoing
+  // layer's OWN transition mid-flight while the incoming layer kept
+  // animating — breaking the tiling all over again even after the first fix.
+  // Reproduced at a FIXED pre-drag screen coordinate (the landing rail's tile
+  // occupies the same single-column slot) shortly after release, well inside
+  // var(--dur) — a real "swipe, then immediately tap" gesture. The assertion
+  // is deliberately loose about WHICH tile a that-early tap lands on (the
+  // outgoing rail's own tile is still legitimately live mid-transition, same
+  // as any animating UI) — the bug this guards is landing on NOTHING at all.
+  test('a tap on the landed rail while the slide transition is still animating must not be swallowed', async ({ page }) => {
+    await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+    const box = await page.locator('.ph-txt[data-id="mv-01"]').boundingBox();
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+
+    await page.evaluate(() => {
+      var el = document.getElementById('txtgrid');
+      function fire(type, cx) {
+        el.dispatchEvent(new PointerEvent(type, { pointerId: 1, clientX: cx, clientY: 0, bubbles: true, cancelable: true }));
+      }
+      fire('pointerdown', 100);
+      fire('pointermove', 130); // past ACTIVATE_THRESHOLD, activates the drag
+      fire('pointermove', 190); // past SWIPE_THRESHOLD (+90px, rightward = prev), QOTSA -> Muse
+      fire('pointerup', 190);
+    });
+
+    const hitPromise = page.evaluate(() => new Promise((resolve) => {
+      document.addEventListener('click', function(e) {
+        resolve(!!e.target.closest('button'));
+      }, { capture: true, once: true });
+    }));
+    await page.waitForTimeout(30); // a real finger's fastest realistic re-press, still well inside var(--dur)
+    await page.mouse.click(x, y);
+    const hitARealButton = await hitPromise;
+    expect(hitARealButton).toBe(true); // must land on SOME tile, never the bare #txtgrid-viewport/#grid-wrap
+  });
 });

@@ -498,6 +498,13 @@ export function initPage() {
   // so a single-row rail's empty space below the tiles still starts a drag;
   // the painted/transformed element stays #txtgrid.
   var drag = null;
+  // BUG-438 — true from slideToRail until the incoming layer's transitionend
+  // (finishSlide) swaps in the fresh #txtgrid. A tap landing in that window
+  // isn't a new drag attempt; onGridPointerDown used to treat it as one
+  // regardless, and its unconditional `transition: none` froze #txtgrid mid
+  // slide-out while the incoming layer kept animating — breaking slideToRail's
+  // constant-offset tiling and corrupting the tap's own click target.
+  var settling = false;
   function paintDrag(dx) {
     els.txtgrid.style.transform = 'translateX(' + pageOffset(dx, railIndex(), railList().length) + 'px)';
   }
@@ -519,12 +526,13 @@ export function initPage() {
     els.txtgrid.style.transform = '';
   }
   // The new rail's tiles, painted into an absolutely-positioned layer parked
-  // just off the visible edge (sidePct: 1 = right, -1 = left) so it can slide
-  // in alongside the outgoing #txtgrid rather than swap after a snap-back.
-  function buildIncomingEl(rail, sidePct) {
+  // startPx pixels off (a negative screen-width for a left entry, positive for
+  // right) so it can slide in alongside the outgoing #txtgrid rather than swap
+  // after a snap-back.
+  function buildIncomingEl(rail, startPx) {
     var el = document.createElement('div');
     el.className = 'txtgrid-slide';
-    el.style.transform = 'translateX(' + (sidePct * 100) + '%)';
+    el.style.transform = 'translateX(' + startPx + 'px)';
     paintTiles(el, rail.items);
     return el;
   }
@@ -532,6 +540,7 @@ export function initPage() {
     incoming.remove();
     els.txtgrid.style.transition = 'none';
     els.txtgrid.style.transform = '';
+    settling = false;
     selectRail(railId);
   }
   function runSlide(incoming, dir, railId) {
@@ -547,9 +556,25 @@ export function initPage() {
   // come in from the opposite edge, both animating together. The two-step
   // (append off-screen, force reflow, THEN set the transitioning end state)
   // is what makes the incoming layer's own move visible rather than instant.
+  //
+  // BUG-438 — pinning the incoming layer a fixed screen-width away (dir*100%)
+  // only tiles seamlessly against the outgoing #txtgrid when the outgoing grid
+  // is still at rest (dx=0) as the settle transition starts. It never is: dx
+  // is already past SWIPE_THRESHOLD by the time a real rail change lands here,
+  // so #txtgrid is already partway to its own target and has strictly LESS
+  // distance left to cover than the incoming layer's full screen-width, in the
+  // SAME fixed var(--dur) — the incoming layer arrives late, leaving a real gap
+  // neither layer paints for a portion of the transition. A tap landing there
+  // hits #txtgrid-viewport itself, not a tile — silently swallowed (needing a
+  // 2nd, later press). Starting incoming exactly one screen-width from
+  // #txtgrid's OWN current position (dx - dir*vw, not a bare -dir*vw) keeps
+  // the two layers exactly one screen-width apart, gap-free, for the whole
+  // transition, since both animate over the identical var(--dur) var(--ease).
   function slideToRail(target, dx) {
     var dir = Math.sign(dx);
-    var incoming = buildIncomingEl(target, -dir);
+    var vw = els.txtgridViewport.getBoundingClientRect().width;
+    var incoming = buildIncomingEl(target, dx - dir * vw);
+    settling = true;
     els.txtgridViewport.appendChild(incoming);
     void incoming.offsetWidth;
     runSlide(incoming, dir, target.id);
@@ -579,11 +604,22 @@ export function initPage() {
     els.txtgrid.addEventListener('click', swallowClick, { capture: true, once: true });
     setTimeout(function() { els.txtgrid.removeEventListener('click', swallowClick, { capture: true }); }, 0);
   }
+  // BUG-438 — an ordinary stationary tap (d.active never true, paintDrag never
+  // touched #txtgrid this gesture) still reached the false branch below and ran
+  // easeBackDrag() regardless — which unconditionally sets a FRESH transition +
+  // transform='' on #txtgrid. Landing mid a PRIOR swipe's still-running slide-out
+  // transition, that snap fires synchronously inside this tap's own pointerup
+  // handler — before the browser dispatches this same tap's click event — so the
+  // click's hit-test resolves against the just-shifted layout and lands on
+  // #txtgrid-viewport instead of the tile: the tap is swallowed outright, not
+  // just delayed. Only a real live drag that never crossed the paging threshold
+  // (d.active true, an actual snap-back to undo) has anything to ease back.
+  var SETTLE_MISS = { true: easeBackDrag, false: noop };
   function settleDrag(d) {
     var list = railList();
     var landRail = list[settleIndex(d.active, d.dx, railIndex(), list.length)];
     var target = [landRail].filter(Boolean).filter(function(r) { return r.id !== state.rail; })[0];
-    ({ true: function() { slideToRail(target, d.dx); }, false: easeBackDrag })[Boolean(target)]();
+    ({ true: function() { slideToRail(target, d.dx); }, false: function() { SETTLE_MISS[d.active](); } })[Boolean(target)]();
     ({ true: guardClick, false: noop })[Boolean(target)]();
   }
   function endGesture() {
@@ -601,13 +637,15 @@ export function initPage() {
     els.txtgrid.style.transform = '';
     drag = null;
   }
-  function onGridPointerDown(e) {
+  function startGesture(e) {
     drag = { x: e.clientX, y: e.clientY, id: e.pointerId, active: false, dx: 0 };
     els.txtgrid.style.transition = 'none';
     window.addEventListener('pointermove', onGridPointerMove);
     window.addEventListener('pointerup', onGridPointerUp);
     window.addEventListener('pointercancel', onGridPointerCancel);
   }
+  var ON_GRID_POINTERDOWN = { true: noop, false: startGesture };
+  function onGridPointerDown(e) { ON_GRID_POINTERDOWN[settling](e); }
   els.gridWrap.addEventListener('pointerdown', onGridPointerDown);
 
   // Render ONCE after both browse + continue-watching settle (the FEAT-020
