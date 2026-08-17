@@ -39,7 +39,11 @@ import { mountBreadcrumb } from './breadcrumb.js';
 // (`queue`, `sendMvAction` below) — actual advance/prev/shuffle/repeat still
 // runs on the client-owned seq untouched; the two are deliberately separate
 // state until a future task (if any) migrates playthrough itself onto the
-// engine.
+// engine. TASK-441 keeps that separate engine's OWN source_type/source_id/
+// current_video_id pointed at whatever the client-owned seq is actually
+// playing (sendMvSource/sendMvVideo below) — a read-model sync, not a driver
+// change, so the Queue View stops showing stale state left over from the last
+// time it was itself used.
 var SERVER = window.location.origin;
 
 var RESUME_BY_RESTART = {
@@ -82,8 +86,32 @@ export function initVideoPage() {
   function sendAction(action, body) { videoPlaybackAction(SERVER, action, person, body).catch(function() {}); }
   // FEAT-418 (TASK-419/420): the music-video Queue View's own action sender —
   // POSTs to the separate /api/music-video-playback engine, never the video
-  // engine above (mirrors sendAction's shape exactly).
-  function sendMvAction(action, body) { musicVideoPlaybackAction(SERVER, action, person, body).catch(function() {}); }
+  // engine above. Returns the POST promise (TASK-441) so the playthrough's
+  // own entry sync can chain play-video after play-source resolves. A
+  // function EXPRESSION, not a declaration — same reason screen-audio-page's
+  // own sendAction is one: it is an IO call (no DOM token, returns a value),
+  // which the no-pure-fn-outside-core arch check would otherwise flag as
+  // "move to core/", but it closes over SERVER/person and only fans out a
+  // request, so it belongs here.
+  var sendMvAction = function(action, body) { return musicVideoPlaybackAction(SERVER, action, person, body).catch(function() {}); };
+  // TASK-441 — source_type/source_id for the CURRENT mv playthrough, keyed off
+  // the same `mode` entryMode() already resolved (mvItem/mvPlaylist/mvArtist
+  // are mutually exclusive per page load) — mirrors the catalog's own
+  // "mv-item"/"mv-artist"/"mv-playlist" registered names
+  // (media-manager/db/music_video_playback_engine.py).
+  var MV_SOURCE_TYPE = { mvItem: 'mv-item', mvPlaylist: 'mv-playlist', mvArtist: 'mv-artist' };
+  var MV_SOURCE_ID = { mvItem: function() { return mvItem; }, mvPlaylist: function() { return mvPlaylist; }, mvArtist: function() { return mvArtist; } };
+  // TASK-441 — keeps the FEAT-418 queue engine's source/now-playing in step
+  // with the client-owned `seq` that actually drives playback. sendMvSource
+  // fires once, at mvBegin; sendMvVideo fires on every swap (mvBegin's first
+  // item, then every mvGoNext/mvGoPrev) — the same two-action, source-then-
+  // video pattern screen-audio-page's fireEntry/jumpToTrack already uses, to
+  // avoid the same un-awaited-race last-writer-wins hazard its own comment
+  // documents. No shuffle/repeat on play-source — both already default true
+  // server-side AND client-side (initSeq), the same omission TASK-420/421
+  // already made.
+  function sendMvSource() { return sendMvAction('play-source', { source_type: MV_SOURCE_TYPE[mode], source_id: MV_SOURCE_ID[mode]() }); }
+  function sendMvVideo(id) { sendMvAction('play-video', { video_id: id }); }
 
   // Breadcrumb (FEAT-021): a film is Home > Title; a series episode is Home >
   // Series > Episode. The series title is fetched once (graceful 'Series'
@@ -193,8 +221,10 @@ export function initVideoPage() {
       mountCrumbs();
     }).catch(function() { navTo('error.html'); });
   }
-  function mvGoNext() { [canAdvance(seq)].filter(Boolean).forEach(function() { seq = nextSeq(seq); mvSwap(); }); }
-  function mvGoPrev() { [hasPrev(seq)].filter(Boolean).forEach(function() { seq.index -= 1; mvSwap(); }); }
+  // TASK-441: every advance re-syncs the engine's now-playing to the item the
+  // seq just moved to — independent of mvSwap's own (unblocked) media swap.
+  function mvGoNext() { [canAdvance(seq)].filter(Boolean).forEach(function() { seq = nextSeq(seq); mvSwap(); sendMvVideo(currentItem(seq).id); }); }
+  function mvGoPrev() { [hasPrev(seq)].filter(Boolean).forEach(function() { seq.index -= 1; mvSwap(); sendMvVideo(currentItem(seq).id); }); }
   function mvEnded() {
     ({ 'true': mvGoNext, 'false': function() { player.stop(); } })[canAdvance(seq) + '']();
   }
@@ -204,6 +234,12 @@ export function initVideoPage() {
     document.getElementById('btn-mv-shuffle').classList.toggle('hidden', !mvIsMulti(seq));
     document.getElementById('btn-mv-repeat').classList.toggle('hidden', !mvIsMulti(seq));
     mvSetTransportOn();
+    // TASK-441: engine sync runs on its OWN chain, entirely independent of the
+    // initCaptions/mvSwap chain below — it must never gate the actual playback
+    // start. play-video is chained after play-source resolves (not fired in
+    // parallel) to avoid the same un-awaited-race last-writer-wins hazard
+    // screen-audio-page's fireEntry comment documents.
+    sendMvSource().then(function() { sendMvVideo(currentItem(seq).id); });
     initCaptions(SERVER).then(mvSwap).catch(function() {});
   }
 

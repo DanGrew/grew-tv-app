@@ -826,14 +826,17 @@ async function installVideoPlaybackBackend(page) {
 // items are already queued, e.g. via TASK-419's play-source, and only needs
 // something in the queue to render against). Seeded with a snapshot shaped
 // like build_snapshot's own (now_playing/play_next/from_source/then/shuffle/
-// repeat), it applies move/remove/toggle/play-video against the seeded lists
-// by entry_id (mirrors music_video_playback_engine.py's own
-// move_queue_entry/remove_queue_entry) and re-pushes over the
+// repeat), it applies move/remove/toggle/play-video/play-source against the
+// seeded lists by entry_id/video_id (mirrors music_video_playback_engine.py's
+// own move_queue_entry/remove_queue_entry/play_source) and re-pushes over the
 // `music_video_playback` channel — proof the TV overlay and the companion
-// mirror both repaint from a LIVE snapshot, not a static fixture. Answers
-// BOTH the TV's app-ws handshake (register_device/activate_person) and the
-// companion-ws one (list_devices/register_companion/snapshot_request) so one
-// fixture backs both surfaces.
+// mirror both repaint from a LIVE snapshot, not a static fixture; TASK-441's
+// tests also seed an EMPTY source_type/source_id and assert the player's own
+// entry sync (screen-video-page.js mvBegin/mvGoNext/mvGoPrev) fills it in,
+// with no Queue View interaction first. Answers BOTH the TV's app-ws
+// handshake (register_device/activate_person) and the companion-ws one
+// (list_devices/register_companion/snapshot_request) so one fixture backs
+// both surfaces.
 async function installMusicVideoQueueBackend(page, seedSnap) {
   var snap = JSON.parse(JSON.stringify(seedSnap));
   var live = null;
@@ -865,6 +868,10 @@ async function installMusicVideoQueueBackend(page, seedSnap) {
       var all = (snap.play_next || []).concat(snap.from_source || []).concat(snap.then || []);
       [all.filter(function(e) { return e.video_id === b.video_id; })[0]].filter(Boolean).forEach(function(e) { snap.now_playing = e; });
     },
+    // TASK-441: the player's own entry sync (screen-video-page.js mvBegin) now
+    // fires this once per playthrough — mirrors api/music_video_playback.py's
+    // own play-source handling (state.source_type/source_id).
+    'play-source': function(b) { snap.source_type = b.source_type; snap.source_id = b.source_id; },
     'toggle-shuffle': function() { snap.shuffle = !snap.shuffle; },
     'toggle-repeat': function() { snap.repeat = !snap.repeat; }
   };

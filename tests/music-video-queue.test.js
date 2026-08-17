@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installMusicVideoQueueBackend } = require('./fixtures/api.js');
+const { installApi, installMusicVideoQueueBackend, BROWSE, MUSIC_VIDEO_CARDS } = require('./fixtures/api.js');
 
 // FEAT-418 (TASK-420) — the music-video Queue View overlay. It hangs off the
 // persistent video player (screen-video-page.js, music-video mode) and draws
@@ -106,4 +106,63 @@ test('an empty snapshot renders a stable shell, not a crash', async ({ page }) =
   await openPlayer(page, { now_playing: null, play_next: [], from_source: [], then: [], shuffle: false, repeat: false });
   await openQueue(page);
   await expect(page.locator('.q-ends')).toContainText('Source ends');
+});
+
+// TASK-441 — the player's own entry sync (screen-video-page.js mvBegin/
+// mvGoNext/mvGoPrev), NOT a Queue View interaction, is what fills the
+// engine's source_type/source_id/now_playing. Seeded EMPTY (no queue rows
+// pre-loaded, unlike seedSnapshot() above) so a passing assertion proves the
+// player itself did the sync, not the fixture's own seed.
+function emptyStartSnap() {
+  return {
+    person_id: 'kids', now_playing: null, play_next: [],
+    from_source: [
+      { entry_id: 'e1', video_id: 'mv-01', title: 'Head Like a Haunted House', artist: 'QOTSA', poster: 'mv-01.jpg', duration: 210 },
+      { entry_id: 'e2', video_id: 'mv-02', title: 'No One Knows', artist: 'QOTSA', poster: 'mv-02.jpg', duration: 195 }
+    ],
+    then: [], shuffle: true, repeat: true, source_type: null, source_id: null
+  };
+}
+
+test('TASK-441: playing a music-video playlist directly syncs the engine\'s source + now-playing, no Queue View interaction first', async ({ page }) => {
+  await installApi(page);
+  const backend = await installMusicVideoQueueBackend(page, emptyStartSnap());
+  await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
+  await expect.poll(() => backend.snapshot().source_type).toBe('mv-playlist');
+  expect(backend.snapshot().source_id).toBe('pl-mv');
+  await expect.poll(() => (backend.snapshot().now_playing || {}).video_id).toBe('mv-01');
+  // FROM SOURCE lists the rest of the SAME playlist, not stale queue-editor state.
+  await openQueue(page);
+  await expect(page.locator('.now-playing .np-title')).toHaveText('Head Like a Haunted House');
+});
+
+test('TASK-441: playing an artist\'s music videos syncs source_type mv-artist / source_id the artist name', async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/browse**', function(route) {
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    });
+  });
+  const backend = await installMusicVideoQueueBackend(page, emptyStartSnap());
+  await page.goto('/app/homeview/video.html?musicVideoArtist=QOTSA&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
+  await expect.poll(() => backend.snapshot().source_type).toBe('mv-artist');
+  expect(backend.snapshot().source_id).toBe('QOTSA');
+});
+
+test('TASK-441: advancing to the next music video re-syncs the engine\'s now-playing', async ({ page }) => {
+  await installApi(page);
+  const backend = await installMusicVideoQueueBackend(page, emptyStartSnap());
+  await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
+  await expect.poll(() => (backend.snapshot().now_playing || {}).video_id).toBe('mv-01');
+  await page.locator('#btn-next').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
+  await expect.poll(() => (backend.snapshot().now_playing || {}).video_id).toBe('mv-02');
+  // Reopening the Queue View shows the MOVED-TO video as Now Playing, not the
+  // one that started the playthrough.
+  await openQueue(page);
+  await expect(page.locator('.now-playing .np-title')).toHaveText('No One Knows');
 });
