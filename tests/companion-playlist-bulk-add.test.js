@@ -1,10 +1,10 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, VIDEOS, BROWSE, PLAYLIST_CARDS } = require('./fixtures/api.js');
 
-// FEAT-036 (TASK-212) — the companion "Add all to playlist" bulk-add, the mirror of
-// the app's album-detail / playlist-detail "Add all" buttons. On companion-detail an
-// ALBUM gains a header "＋ Add all to playlist" control (a TV series does not); on
-// companion-playlist the manage row gains the same control. Both open the add sheet
+// FEAT-036 (TASK-212) — the companion bulk-add, the mirror of the app's
+// album-detail / playlist-detail "Add all" buttons. On companion-detail an ALBUM
+// gains a header "＋ Add all" control (a TV series does not); on companion-playlist
+// the manage row keeps the playlist-only "Add all to playlist" wording. Both open the add sheet
 // and POST add-source (a whole-album / whole-playlist SNAPSHOT) instead of add-track;
 // the playlist sheet excludes the current playlist (no self-add). New playlist hands
 // off to the companion create page carrying the bulk source. The app side of the WS
@@ -60,9 +60,9 @@ async function openAlbum(page) {
   await expect(page.locator('.detail-track-row').first()).toBeVisible();
 }
 
-test('an album offers a header Add all to playlist control', async ({ page }) => {
+test('an album offers a header Add all control', async ({ page }) => {
   await openAlbum(page);
-  await expect(page.locator('#btn-add-all')).toHaveText('＋ Add all to playlist');
+  await expect(page.locator('#btn-add-all')).toHaveText('＋ Add all');
 });
 
 test('a TV series (not an album) offers no Add all control', async ({ page }) => {
