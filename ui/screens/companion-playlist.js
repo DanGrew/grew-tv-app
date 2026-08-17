@@ -14,6 +14,7 @@ import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 import { mountStatusMenu } from './companion-status-menu.js';
+import { mountRowStep } from './companion-row-step.js';
 
 // FEAT-036 (TASK-205) — the companion playlist context: mirrors the TV's playlist
 // detail (its flat track list). The TV's screen-playlist-detail-page pushes
@@ -28,7 +29,7 @@ import { mountStatusMenu } from './companion-status-menu.js';
 // Play/Shuffle). An EMPTY playlist still lists + opens. The TV teleports and
 // echoes context — same per-person relay the browse / detail / artist companions ride.
 export function initPage() {
-  mountStatusMenu(['mode', 'screen', 'profile']);
+  mountStatusMenu(['mode', 'row', 'screen', 'profile']);
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
@@ -48,7 +49,8 @@ export function initPage() {
   // (rename/delete/add/reorder/remove — per-person POSTs) stays live; reach the
   // library via Back (local hop). CONTROL reloads to re-run reconnect.
   function reSync() { window.location.reload(); }
-  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); }
+  var applyRowStepMode = mountRowStep(mode, getApi);
+  function applyMode() { document.body.classList.toggle('browsing', mode.isDesynced()); applyRowStepMode(); }
   function onModeChange(browsing) { ({ true: applyMode, false: reSync })[browsing](); }
 
   // Back: Control drives the TV back; Browse is a local hop to the library.

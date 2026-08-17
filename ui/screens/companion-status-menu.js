@@ -6,10 +6,12 @@
 // the #status-menu popout itself (mirroring mountScreenBar building its own
 // content into an empty mount `<div>`) — a page names which rows it wants and
 // gets an empty mount point per row for that row's own existing mount function
-// (mountSyncBar, mountScreenBar) or population code (Atlas's door tiles) to
-// fill, unchanged. `#switch-profile` is the one row mountStatusMenu builds in
-// full, since every page's copy was identical markup + a page-owned click
-// listener wired afterward.
+// (mountSyncBar, mountScreenBar, mountRowStep) or population code (Atlas's
+// door tiles) to fill, unchanged. `#switch-profile` is the one row
+// mountStatusMenu builds in full, since every page's copy was identical
+// markup + a page-owned click listener wired afterward. TASK-408 adds the
+// `row` entry (`#row-step`, filled by companion-row-step.js) — the ▲/▼
+// row-step control's approved home, off the old #sync-bar placement.
 
 var ROW_EL = {
   mode: function() {
@@ -33,6 +35,11 @@ var ROW_EL = {
     var el = document.createElement('div');
     el.id = 'door';
     return el;
+  },
+  row: function() {
+    var el = document.createElement('div');
+    el.id = 'row-step';
+    return el;
   }
 };
 
@@ -42,7 +49,14 @@ var STATUS_MENU_CSS = '\n' +
   '#status-menu { display: none; flex-direction: column; gap: 14px; position: absolute; top: calc(100% + 8px); right: 0; z-index: 15; width: max-content; max-width: min(320px, calc(100vw - 24px)); padding: 16px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }\n' +
   '#status-menu.open { display: flex; }\n' +
   '#switch-profile { width: 100%; text-align: left; font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }\n' +
-  '#switch-profile:active, #switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }\n';
+  '#switch-profile:active, #switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }\n' +
+  '#row-step { display: flex; align-items: center; justify-content: space-between; gap: 10px; }\n' +
+  '#row-step.desync-off { opacity: 0.35; }\n' +
+  '.row-step-label { font-size: 14px; }\n' +
+  '.row-step-buttons { display: flex; gap: 8px; }\n' +
+  '.row-step-btn { font-size: 16px; line-height: 1; padding: 7px 13px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }\n' +
+  '.row-step-btn:active, .row-step-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }\n' +
+  '#row-step.desync-off .row-step-btn { pointer-events: none; }\n';
 
 // `rows` names, in menu order, which of mode/screen/profile/atlas this page
 // wants — e.g. ['mode', 'screen', 'profile', 'atlas']. Mounts into the page's
