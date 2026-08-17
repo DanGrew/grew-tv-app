@@ -70,14 +70,18 @@ test('Story 3: tapping the header icon again is the only thing that closes it', 
   await expect(page.locator('#status-menu')).not.toHaveClass(/open/);
 });
 
-// Search + the menu icon sit at the very top — directly below the connection
-// status line, above the queue quick-play buttons — and the open menu renders
-// entirely below the icon row, never overlapping it.
-test('Search and the menu icon sit above everything else, below the connection status; the open menu never overlaps them', async ({ page }) => {
-  const order = await page.evaluate(() =>
+// Search, the queue quick-play buttons and the menu icon all sit in the one
+// header row — directly below the connection status line — and the open menu
+// renders entirely below that row, never overlapping it.
+test('Search, the queue buttons and the menu icon share the header row, below the connection status; the open menu never overlaps them', async ({ page }) => {
+  const bodyOrder = await page.evaluate(() =>
     Array.from(document.body.children).map((el) => el.id));
-  expect(order.indexOf('conn-status')).toBeLessThan(order.indexOf('topbar-actions'));
-  expect(order.indexOf('topbar-actions')).toBeLessThan(order.indexOf('queue-actions'));
+  expect(bodyOrder.indexOf('conn-status')).toBeLessThan(bodyOrder.indexOf('topbar-actions'));
+
+  const topbarOrder = await page.evaluate(() =>
+    Array.from(document.getElementById('topbar-actions').children).map((el) => el.id));
+  expect(topbarOrder.indexOf('btn-search')).toBeLessThan(topbarOrder.indexOf('queue-actions'));
+  expect(topbarOrder.indexOf('queue-actions')).toBeLessThan(topbarOrder.indexOf('status-menu-mount'));
 
   await page.locator('#btn-status').click();
   const iconBox = await page.locator('#btn-status').boundingBox();
