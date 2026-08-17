@@ -5,7 +5,7 @@ import { nowPlaying, upNextLine, seriesMode } from '../../core/video-player-rout
 import { mvTransportVisibility } from '../../core/music-video-playthrough.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
-import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
+import { buildCrumbs, trailCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
 import { trimOnCrumb, entries as entriesTrail } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
@@ -52,7 +52,7 @@ export function initPage() {
     queue: document.getElementById('c-queue'),
     addPlaylist: document.getElementById('c-add-playlist')
   };
-  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '' } };
+  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '', mvSource: null } };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -79,7 +79,18 @@ export function initPage() {
   function railEntry() {
     return entriesTrail().filter(function(e) { return e.page === 'browse.html'; }).slice(-1)[0];
   }
-  function localGo(page, params) { window.location.href = page + queryString(params); }
+  // TASK-422: a music-video source crumb carries TV detail-page names (for the
+  // navigate intent); translate the one that isn't co-named on the companion
+  // (playlist-detail.html — companion's own is playlist.html?id=), mirroring
+  // companion-audio.js's own LOCAL_PAGE (BUG-044). artist.html needs no
+  // translation — the companion's own page shares the name and param.
+  var LOCAL_PAGE = {
+    'playlist-detail.html': function(p) { return { page: 'playlist.html', params: { id: p.playlist } }; }
+  };
+  function localGo(page, params) {
+    var t = [LOCAL_PAGE[page]].filter(Boolean).map(function(fn) { return fn(params); }).concat([{ page: page, params: params }])[0];
+    window.location.href = t.page + queryString(t.params);
+  }
   function navigate(page, params) {
     // Trim the trail to the clicked ancestor (Home clears) so a later Back can't
     // retrace past this jump (FEAT-032 stale-Back fix).
@@ -94,8 +105,14 @@ export function initPage() {
   }
   function seriesCrumbs() { return buildCrumbs('video', state.crumb); }
   var VIDEO_CRUMBS = { true: seriesCrumbs, false: filmCrumbs };
+  function nonMvCrumbs() { return VIDEO_CRUMBS[Boolean(state.crumb.seriesId)](); }
+  // TASK-422: a music video names its playback source (playlist/artist) instead —
+  // mirrors the TV's own playerCrumbs call, off the source the TV pushed on the
+  // context (state.crumb.mvSource); null degrades to Home > leaf (story 4).
+  function mvCrumbs() { return playerCrumbs(null, state.crumb.mvSource, state.crumb.videoTitle); }
+  var CRUMBS_BY_MODE = { true: mvCrumbs, false: nonMvCrumbs };
   function mountVideoCrumbs() {
-    mountCompanionBreadcrumb('breadcrumb', VIDEO_CRUMBS[Boolean(state.crumb.seriesId)](), navigate);
+    mountCompanionBreadcrumb('breadcrumb', CRUMBS_BY_MODE[state.musicVideo](), navigate);
   }
   function loadSeriesTitle(seriesId) {
     loadSeries(server, seriesId)
@@ -265,6 +282,7 @@ export function initPage() {
     els.title.textContent = displayTitle(payload);
     state.crumb.videoTitle = displayTitle(payload);
     state.musicVideo = !!payload.musicVideo;
+    state.crumb.mvSource = [payload.musicVideoSource].filter(Boolean).concat([null])[0];
     applyMusicVideoMode(state.musicVideo, !!payload.musicVideoMulti);
     SET_MV_ON[state.musicVideo + ''](payload);
     mountVideoCrumbs();

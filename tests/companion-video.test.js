@@ -243,3 +243,72 @@ test.describe('BUG-037: film player breadcrumb retraces to the genre grid', () =
     await expect(series).toHaveAttribute('data-params', /"series":"bluey"/);
   });
 });
+
+// TASK-422 — the companion mirrors the TV's music-video source crumb. A music
+// video never broadcasts a video_playback snapshot (client-owned seq), so the
+// source rides the SAME `video` context push BUG-037's own mockPlayer already
+// drives — screen-video-page.js's sendVideoContext carries musicVideoSource,
+// captured into state.crumb.mvSource here (onVideoContext).
+test.describe('TASK-422: music-video player breadcrumb names its playback source', () => {
+  function msg(type, payload) { return JSON.stringify({ type, payload }); }
+
+  function mockMvPlayer(page, source, title) {
+    return page.routeWebSocket(/:8766/, (ws) => {
+      function push() {
+        ws.send(msg('context', {
+          version: 2, context_id: 'video', display: { title },
+          musicVideo: true, musicVideoMulti: !!source, musicVideoShuffle: true, musicVideoRepeat: true,
+          musicVideoSource: source
+        }));
+        ws.send(msg('app_state', { person: 'kids', profile: 'kids', screen: 'player', itemId: 'mv-01', episodeId: 'mv-01' }));
+      }
+      ws.onMessage((raw) => {
+        const m = JSON.parse(raw);
+        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+        if (m.type === 'snapshot_request') push();
+        if (m.type === 'intent' && m.payload.intent === 'navigate') {
+          ws.send(msg('context', { version: 3, context_id: m.payload.params.page.replace('.html', '') }));
+        }
+      });
+    });
+  }
+
+  test('a music video played from a playlist shows Home › [Playlist] › [Video], mirroring the TV', async ({ page }) => {
+    await mockMvPlayer(page, { label: 'QOTSA Videos', page: 'playlist-detail.html', params: { playlist: 'pl-mv' } }, 'Head Like a Haunted House');
+    await page.goto('/companion/video.html');
+    await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
+    await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'QOTSA Videos', 'Head Like a Haunted House']);
+    const src = page.locator('#breadcrumb .crumb-link', { hasText: 'QOTSA Videos' });
+    await expect(src).toHaveAttribute('data-page', 'playlist-detail.html');
+    await expect(src).toHaveAttribute('data-params', /"playlist":"pl-mv"/);
+  });
+
+  test('a music video played from an artist\'s rail shows Home › [Artist] › [Video]', async ({ page }) => {
+    await mockMvPlayer(page, { label: 'QOTSA', page: 'artist.html', params: { artist: 'QOTSA' } }, 'Head Like a Haunted House');
+    await page.goto('/companion/video.html');
+    await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'QOTSA', 'Head Like a Haunted House']);
+    const src = page.locator('#breadcrumb .crumb-link', { hasText: 'QOTSA' });
+    await expect(src).toHaveAttribute('data-page', 'artist.html');
+  });
+
+  test('a standalone music-video pick has no source crumb — Home › [Video] only (story 4)', async ({ page }) => {
+    await mockMvPlayer(page, null, 'Head Like a Haunted House');
+    await page.goto('/companion/video.html');
+    await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'Head Like a Haunted House']);
+    await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home']);
+  });
+
+  // Browse (desynced) mode: the source crumb carries the TV page name
+  // (playlist-detail.html); the companion translates it to its own
+  // playlist.html?id= so the local hop lands (BUG-044's own LOCAL_PAGE pattern).
+  test('in Browse mode the playlist source crumb hops to the companion\'s own playlist page', async ({ page }) => {
+    await mockMvPlayer(page, { label: 'QOTSA Videos', page: 'playlist-detail.html', params: { playlist: 'pl-mv' } }, 'Head Like a Haunted House');
+    await page.goto('/companion/video.html');
+    await expect(page.locator('#breadcrumb .crumb-link', { hasText: 'QOTSA Videos' })).toBeVisible();
+    await page.locator('#btn-status').click();
+    await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
+    await expect(page.locator('body')).toHaveClass(/browsing/);
+    await page.locator('#breadcrumb .crumb-link', { hasText: 'QOTSA Videos' }).click();
+    await expect(page).toHaveURL(/companion\/playlist\.html\?id=pl-mv$/);
+  });
+});

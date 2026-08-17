@@ -10,7 +10,7 @@ import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-pla
 import { currentItem, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist, startIndex, initSeq, toggleShuffle, toggleRepeat, canAdvance, nextSeq } from '../../core/music-video-playthrough.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { gridIndex } from '../../core/playlist-name.js';
-import { buildCrumbs } from '../../core/breadcrumb.js';
+import { buildCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
 // FEAT-037 (TASK-222) — the PERSISTENT video player document. Replaces the old
@@ -82,6 +82,11 @@ export function initVideoPage() {
   var seriesTitle = null;  // cached series title for the middle crumb
   var seq = initSeq([], 0);  // music-video mode only (core/music-video-playthrough)
   var enginePending = null;  // ENGINE_TIMEOUT_MS watchdog, armed per engine action, cleared on first swap
+  // TASK-422: the music-video playback source's own crumb — { label, page, params }
+  // linking to its playlist/artist page, mirroring BUG-044's audio sourceCrumb.
+  // Built once per entry (startMvPlaylist/startMvArtist, before mvBegin), never
+  // per-swap; stays null for a standalone mvItem pick (no source page, story 4).
+  var mvSourceCrumb = null;
 
   function sendAction(action, body) { videoPlaybackAction(SERVER, action, person, body).catch(function() {}); }
   // FEAT-418 (TASK-419/420): the music-video Queue View's own action sender —
@@ -116,12 +121,21 @@ export function initVideoPage() {
   // Breadcrumb (FEAT-021): a film is Home > Title; a series episode is Home >
   // Series > Episode. The series title is fetched once (graceful 'Series'
   // fallback); the leaf carries the current item title and is rebuilt on each swap.
+  // TASK-422: a music video instead names its playback source (playlist/artist),
+  // mirroring BUG-044's audio playerCrumbs — no browse-rail entry (the TV player
+  // has none, same as audio); mvSourceCrumb null degrades to Home > leaf (story 4).
+  var CRUMBS_FOR = {
+    'true':  function() { return playerCrumbs(null, mvSourceCrumb, currentTitle); },
+    'false': function() {
+      return buildCrumbs('video', {
+        seriesId: seriesId,
+        seriesTitle: [seriesTitle].filter(Boolean).concat(['Series'])[0],
+        videoTitle: currentTitle
+      });
+    }
+  };
   function mountCrumbs() {
-    mountBreadcrumb('breadcrumb', buildCrumbs('video', {
-      seriesId: seriesId,
-      seriesTitle: [seriesTitle].filter(Boolean).concat(['Series'])[0],
-      videoTitle: currentTitle
-    }));
+    mountBreadcrumb('breadcrumb', CRUMBS_FOR[isMusicVideo + '']());
   }
   function ensureSeriesTitle() {
     loadSeries(SERVER, seriesId)
@@ -264,7 +278,8 @@ export function initVideoPage() {
         musicVideo: isMusicVideo,
         musicVideoMulti: mvIsMulti(seq),
         musicVideoShuffle: !!seq.shuffle,
-        musicVideoRepeat: !!seq.repeat
+        musicVideoRepeat: !!seq.repeat,
+        musicVideoSource: mvSourceCrumb
       });
     });
   }
@@ -455,6 +470,13 @@ export function initVideoPage() {
       .then(function() { sendAction('play-queue', {}); })
       .catch(function() {});
   }
+  // TASK-422: the mv source crumb's own { label, page, params } targets, one per
+  // entry mode with a source page — mirrors companion-audio.js's SOURCE_CRUMB.
+  // mvItem has no entry (a lone pick has no source page, story 4).
+  var MV_SOURCE_CRUMB = {
+    mvPlaylist: function(title) { return { label: title, page: 'playlist-detail.html', params: { playlist: mvPlaylist } }; },
+    mvArtist:   function() { return { label: mvArtist, page: 'artist.html', params: { artist: mvArtist } }; }
+  };
   // Music-video entries (TASK-374): build the local seq, THEN begin (mvBegin
   // primes captions + series-mode + the first mvSwap) — none of these ever
   // call sendAction, so the video engine's own state is untouched.
@@ -470,6 +492,7 @@ export function initVideoPage() {
         // a specific track — the playthrough starts there, same as an audio
         // playlist starts from the tapped track, then carries on in order.
         seq = initSeq(items, startIndex(items, mvTrack));
+        mvSourceCrumb = MV_SOURCE_CRUMB.mvPlaylist(pl.title);
         mvBegin();
       })
       .catch(function() { navTo('error.html'); });
@@ -478,6 +501,7 @@ export function initVideoPage() {
     loadBrowse(SERVER, profile)
       .then(function(browse) {
         seq = initSeq(musicVideosByArtist(browse.content, mvArtist), 0);
+        mvSourceCrumb = MV_SOURCE_CRUMB.mvArtist();
         mvBegin();
       })
       .catch(function() { navTo('error.html'); });

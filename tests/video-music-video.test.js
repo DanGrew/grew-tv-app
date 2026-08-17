@@ -37,7 +37,41 @@ test('a single music video pick plays in the video player, full picture and soun
   // The light seq descriptor for a lone pick carries no title (only the id) —
   // the breadcrumb leaf must come from the fetched record, not stay blank.
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Head Like a Haunted House');
+  // TASK-422 (story 4): no playlist/artist source — Home › Title only, unchanged.
+  await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'Head Like a Haunted House']);
+  await expect(page.locator('#breadcrumb .crumb-link')).toHaveText(['Home']);
   expect(calls).toEqual([]); // never touches the video-playback engine or watch_progress
+});
+
+// TASK-422 — the music-video breadcrumb names its playback source (playlist or
+// artist), mirroring BUG-044's audio sourceCrumb. Built once at entry
+// (screen-video-page.js's startMvPlaylist/startMvArtist, before mvBegin) off the
+// SAME local entry state BUG-044's own pattern reads — never the FEAT-418 queue
+// engine snapshot.
+test('a music video played from a playlist shows Home › [Playlist] › [Video], and the source crumb returns to that playlist', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
+  await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'QOTSA Videos', 'Head Like a Haunted House']);
+  const src = page.locator('#breadcrumb .crumb-link', { hasText: 'QOTSA Videos' });
+  await expect(src).toHaveAttribute('data-page', 'playlist-detail.html');
+  await expect(src).toHaveAttribute('data-params', JSON.stringify({ playlist: 'pl-mv' }));
+  await src.click();
+  await expect(page).toHaveURL(/playlist-detail\.html\?.*playlist=pl-mv/);
+});
+
+test('a music video played from an artist\'s rail shows Home › [Artist] › [Video], and the source crumb returns to that artist', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?musicVideoArtist=QOTSA&from=browse');
+  await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'QOTSA', 'Head Like a Haunted House']);
+  const src = page.locator('#breadcrumb .crumb-link', { hasText: 'QOTSA' });
+  await expect(src).toHaveAttribute('data-page', 'artist.html');
+  await expect(src).toHaveAttribute('data-params', JSON.stringify({ artist: 'QOTSA' }));
+  await src.click();
+  await expect(page).toHaveURL(/artist\.html\?.*artist=QOTSA/);
+});
+
+test('a music-video playlist track tapped mid-playlist still names the playlist as the source, not the tapped track', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&musicVideoTrack=mv-02&from=detail-playlist');
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
+  await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'QOTSA Videos', 'No One Knows']);
 });
 
 test('a music-video playlist plays through in the playlist\'s order, each starting as the one before ends', async ({ page }) => {
