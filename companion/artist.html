@@ -28,14 +28,15 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 #list-wrap::-webkit-scrollbar { display: none; }
 #songlist { display: flex; flex-direction: column; gap: 7px; }
 .album-head { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 600; padding: 14px 4px 4px; }
-.detail-track-row { display: flex; align-items: center; gap: 7px; }
+.detail-track-row { display: flex; align-items: center; gap: 7px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 12px 11px; min-height: 48px; transition: border-color var(--dur) var(--ease); }
+.detail-track-row:has(.song:active), .detail-track-row:has(.song:focus) { border-color: var(--focus); }
 .detail-track-row .song { flex: 1; }
-.song { background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 12px 11px; font-size: 14px; min-height: 48px; display: flex; align-items: center; gap: 7px; color: var(--text); font-family: inherit; cursor: pointer; text-align: left; touch-action: manipulation; transition: border-color var(--dur) var(--ease); }
+.song { background: none; border: none; padding: 0; font-size: 14px; display: flex; align-items: center; gap: 7px; color: var(--text); font-family: inherit; cursor: pointer; text-align: left; touch-action: manipulation; }
+.song:focus { outline: none; }
 .ph-cover { width: 40px; height: 40px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
 .ph-cover-ph { width: 40px; height: 40px; border-radius: var(--radius-sm); flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--surface); color: var(--text-muted); font-size: 18px; }
 .song .s-info { flex: 1; display: flex; flex-direction: column; gap: 2px; line-height: 1.2; }
 .song .s-sub { font-size: 11px; color: var(--text-muted); }
-.song:active, .song:focus { outline: none; border-color: var(--focus); }
 .song.desync-off { opacity: 0.35; pointer-events: none; }
 .detail-add-btn { flex-shrink: 0; align-self: center; padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-hi); color: var(--text); font-size: 13px; font-family: inherit; white-space: nowrap; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .detail-add-btn:active, .detail-add-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
