@@ -95,6 +95,16 @@ test.describe('Road Trip playlist (2 tracks)', () => {
     await expect(page).toHaveURL(/companion\/audio\.html$/);
   });
 
+  // TASK-408 — the companion ▲/▼ row-step buttons, a row inside the header's
+  // popout menu: while synced, they nudge the TV's browse focus one rail row.
+  test('the ▲/▼ row-step buttons send navigate_up/navigate_down while synced', async ({ page }) => {
+    await page.locator('#btn-status').click();
+    await page.locator('#row-step .row-step-btn[aria-label="Focus row down"]').click();
+    await expect.poll(() => sentIntents).toContain('navigate_down');
+    await page.locator('#row-step .row-step-btn[aria-label="Focus row up"]').click();
+    await expect.poll(() => sentIntents).toContain('navigate_up');
+  });
+
   test('the breadcrumb Home crumb teleports the TV back to browse', async ({ page }) => {
     await expect(page.locator('#breadcrumb .crumb-link')).toHaveCount(1);
     await page.locator('#breadcrumb .crumb-link').first().click();
@@ -365,6 +375,15 @@ test.describe('desync mode (Browse) — playlist self-load + edit', () => {
     await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
     await expect(page.locator('.ph-txt')).toHaveCount(2);
     await expect(page.locator('body')).toHaveClass(/browsing/);
+  });
+
+  // TASK-408 story 4 — desynced, the row-step control reads as inactive too.
+  test('the ▲/▼ row-step row greys out and emits nothing while desynced', async ({ page }) => {
+    await page.goto('/companion/playlist.html?id=pl-roadtrip');
+    await page.locator('#btn-status').click();
+    await expect(page.locator('#row-step')).toHaveClass(/desync-off/);
+    await page.locator('#row-step .row-step-btn[aria-label="Focus row down"]').click({ force: true });
+    expect(sentIntents.filter((i) => i === 'navigate_down')).toHaveLength(0);
   });
 
   test('editing stays live while browsing — the kebab popover remove POSTs and repaints', async ({ page }) => {

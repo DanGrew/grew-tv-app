@@ -28,13 +28,30 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 #list-wrap::-webkit-scrollbar { display: none; }
 #songlist { display: flex; flex-direction: column; gap: 7px; }
 .album-head { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 600; padding: 14px 4px 4px; }
-.song { background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 12px 11px; font-size: 14px; min-height: 48px; display: flex; align-items: center; gap: 7px; color: var(--text); font-family: inherit; cursor: pointer; text-align: left; touch-action: manipulation; transition: border-color var(--dur) var(--ease); }
+.detail-track-row { display: flex; align-items: center; gap: 7px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 12px 11px; min-height: 48px; transition: border-color var(--dur) var(--ease); }
+.detail-track-row:has(.song:active), .detail-track-row:has(.song:focus) { border-color: var(--focus); }
+.detail-track-row .song { flex: 1; }
+.song { background: none; border: none; padding: 0; font-size: 14px; display: flex; align-items: center; gap: 7px; color: var(--text); font-family: inherit; cursor: pointer; text-align: left; touch-action: manipulation; }
+.song:focus { outline: none; }
 .ph-cover { width: 40px; height: 40px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
 .ph-cover-ph { width: 40px; height: 40px; border-radius: var(--radius-sm); flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--surface); color: var(--text-muted); font-size: 18px; }
 .song .s-info { flex: 1; display: flex; flex-direction: column; gap: 2px; line-height: 1.2; }
 .song .s-sub { font-size: 11px; color: var(--text-muted); }
-.song:active, .song:focus { outline: none; border-color: var(--focus); }
 .song.desync-off { opacity: 0.35; pointer-events: none; }
+.detail-add-btn { flex-shrink: 0; align-self: center; padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-hi); color: var(--text); font-size: 13px; font-family: inherit; white-space: nowrap; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.detail-add-btn:active, .detail-add-btn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#add-sheet { display: none; position: fixed; inset: 0; z-index: 10; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); }
+.add-sheet-panel { background: #16213e; border: 2px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 24px; width: 100%; max-width: 360px; max-height: 76vh; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); }
+.add-sheet-title { font-size: 18px; text-align: center; }
+#add-sheet-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.add-choice { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.add-choice:active, .add-choice:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.add-queue { padding: 12px 14px; border: 2px solid var(--focus); border-radius: var(--radius-sm); background: var(--surface-hi); color: var(--text); font-size: 16px; font-family: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.add-queue:active, .add-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+.add-sheet-act { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.add-sheet-act:active, .add-sheet-act:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#btn-add-create { border-color: #7ee787; color: #7ee787; }
+#add-status { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 .no-actions { color: var(--text-muted); font-size: 16px; text-align: center; margin-top: 40px; }
 #breadcrumb { flex-shrink: 0; }
 .breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -76,6 +93,15 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 <div id="breadcrumb"></div>
 <div id="ctx-title"></div>
 <div id="list-wrap"><div id="songlist"></div></div>
+<div id="add-sheet" role="dialog" aria-modal="true">
+  <div class="add-sheet-panel">
+    <div class="add-sheet-title">Add to playlist</div>
+    <div id="add-sheet-list"></div>
+    <button id="btn-add-create" class="add-sheet-act" type="button">&#65291; New playlist</button>
+    <button id="btn-add-cancel" class="add-sheet-act" type="button">Cancel</button>
+  </div>
+</div>
+<div id="add-status"></div>
 <script type="module">
 import { initPage } from '../ui/screens/companion-artist.js';
 initPage();
