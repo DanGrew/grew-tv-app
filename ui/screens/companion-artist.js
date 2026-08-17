@@ -1,5 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadAlbum, mediaUrl } from '../../core/app-api.js';
+import { loadBrowse, loadAlbum, mediaUrl, addToPlaylist, playbackAction } from '../../core/app-api.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { albumsByArtist, artistFromId } from '../../core/home-rails.js';
 import { artistTracks } from '../../core/artist-tracks.js';
@@ -7,6 +7,7 @@ import { episodeLabel } from '../../core/detail-view.js';
 import { fmt } from '../../core/time.js';
 import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { pushUnique as pushTrail, trimOnCrumb, entries as entriesTrail, railEntry } from '../../core/nav-trail.js';
+import { playlistCards } from '../../core/playlist-pick.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
@@ -31,7 +32,8 @@ export function initPage() {
     ctxTitle: document.getElementById('ctx-title'),
     listEl: document.getElementById('songlist')
   };
-  var state = { artist: null, profile: null, model: { title: '', items: [] } };
+  var state = { artist: null, profile: null, person: null, model: { title: '', items: [] } };
+  var addState = { add: null, queue: null, createHref: '', statusTimer: null };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -64,6 +66,74 @@ export function initPage() {
     mountCompanionBreadcrumb('breadcrumb', ({ true: trailCrumbs(rail, artistName), false: buildCrumbs('artist', { artistName: artistName }) })[Boolean(rail)], navigate);
   }
 
+  // TASK-440 — the artist song list's "Add to playlist" sheet, ported from
+  // companion-detail's per-track openAddSheet/albumTrackNode (an artist's tracks
+  // are music-only, same as an album's, so this is the same machinery).
+  function activeProfile() { return [state.profile].filter(Boolean).concat(['adults'])[0]; }
+  function hideStatus() { document.getElementById('add-status').style.display = 'none'; }
+  function showStatus(text) {
+    var el = document.getElementById('add-status');
+    el.textContent = text;
+    el.style.display = 'block';
+    clearTimeout(addState.statusTimer);
+    addState.statusTimer = setTimeout(hideStatus, 2500);
+  }
+  function closeAddSheet() { document.getElementById('add-sheet').style.display = 'none'; }
+  function addExisting(id, title) {
+    addState.add(id)
+      .then(function() { closeAddSheet(); showStatus('Added to ' + title); })
+      .catch(function() { closeAddSheet(); showStatus('Could not add to playlist.'); });
+  }
+  function createNew() { window.location.href = addState.createHref; }
+  function choiceBtn(card) {
+    var b = document.createElement('button');
+    b.className = 'add-choice';
+    b.setAttribute('data-id', card.id);
+    b.textContent = '♪ ' + card.title;
+    b.addEventListener('click', function() { addExisting(card.id, card.title); });
+    return b;
+  }
+  function queueChoiceBtn() {
+    var b = document.createElement('button');
+    b.className = 'add-queue';
+    b.textContent = '☰ Play Next';
+    b.addEventListener('click', addState.queue);
+    return b;
+  }
+  function showAddSheet(cards) {
+    var list = document.getElementById('add-sheet-list');
+    list.innerHTML = '';
+    [addState.queue].filter(Boolean).forEach(function() { list.appendChild(queueChoiceBtn()); });
+    cards.forEach(function(c) { list.appendChild(choiceBtn(c)); });
+    document.getElementById('add-sheet').style.display = 'flex';
+  }
+  function loadAndShowSheet() {
+    loadBrowse(server, activeProfile())
+      .then(function(res) { showAddSheet(playlistCards([res.content].filter(Boolean).concat([[]])[0])); })
+      .catch(function() { showStatus('Could not load playlists.'); });
+  }
+  function openAddSheet(item) {
+    addState.add = function(id) { return addToPlaylist(server, id, item.video.id); };
+    addState.queue = function() { queueThenClose(item); };
+    addState.createHref = 'playlist-create.html?addTrack=' + encodeURIComponent(item.video.id) +
+      '&profile=' + encodeURIComponent(activeProfile());
+    loadAndShowSheet();
+  }
+  function queueTrack(item) {
+    playbackAction(server, 'queue-track', state.person, { track_id: item.video.id })
+      .then(function() { showStatus('Queued to Play Next'); })
+      .catch(function() { showStatus('Could not queue track.'); });
+  }
+  function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
+  function addBtn(item) {
+    var b = document.createElement('button');
+    b.className = 'detail-add-btn';
+    b.setAttribute('data-add', item.video.id);
+    b.textContent = '＋';
+    b.addEventListener('click', function() { openAddSheet(item); });
+    return b;
+  }
+
   // A ♪ placeholder (consistent with the audio-player .cover placeholder) shown
   // when a track has no cover art — and swapped in on a 404 via the img onerror.
   function placeholderCover() {
@@ -94,6 +164,16 @@ export function initPage() {
     btn.addEventListener('click', function() { api.sendIntent('play', { id: video.id }); });
     return btn;
   }
+  // A song track row: the play tile + a single ＋ control beside it (TASK-440,
+  // mirrors companion-detail's albumTrackNode) — the add sheet's top option is
+  // ▶ Play Next, playlist cards below. A <button> can't nest, so they are siblings.
+  function songTrackNode(item) {
+    var row = document.createElement('div');
+    row.className = 'detail-track-row';
+    row.appendChild(songRow(item));
+    row.appendChild(addBtn(item));
+    return row;
+  }
 
   function albumHead(title) {
     var h = document.createElement('div');
@@ -108,7 +188,7 @@ export function initPage() {
   }
   function renderSongs() {
     var ctx = { last: null };
-    state.model.items.forEach(function(it) { maybeHead(ctx, it); els.listEl.appendChild(songRow(it)); });
+    state.model.items.forEach(function(it) { maybeHead(ctx, it); els.listEl.appendChild(songTrackNode(it)); });
   }
   function renderNoContent() {
     var p = document.createElement('div');
@@ -161,8 +241,10 @@ export function initPage() {
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
-  // Profile keys the catalog (FEAT-026 TASK-158 — reloads when it changes).
+  // Profile keys the catalog (FEAT-026 TASK-158 — reloads when it changes). Person
+  // (captured first, GATES-CHECKS.md) keys the per-person queue-track POST.
   function onAppState(snap) {
+    state.person = [snap.person].filter(Boolean).concat([state.person])[0];
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(function(p) {
       state.profile = p;
       loadSongs();
@@ -170,6 +252,8 @@ export function initPage() {
   }
 
   document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });
+  document.getElementById('btn-add-create').addEventListener('click', createNew);
+  document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
   mountSyncBar(mode, onModeChange);
   applyMode();
   // Browse-mode entry: browse linked here with ?id=<artist>, so seed the artist
