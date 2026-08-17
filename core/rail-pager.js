@@ -16,6 +16,33 @@ export function isHorizontalDrag(dx, dy) {
   return Math.abs(dx) > Math.abs(dy);
 }
 
+// BUG-438 — companion-browse.js used to call preventDefault() on a pointermove
+// the moment shouldActivateDrag went true, at the 8px noise floor: a real
+// finger tap on a touchscreen drifts past 8px constantly (more so right after
+// a swipe, when the thumb still has sideways motion), and on a touch UA,
+// preventDefault mid-gesture cancels that gesture's own click outright — not
+// delayed, not misrouted, just never fired. touch-action: pan-y already
+// hands the browser no native horizontal behaviour to suppress, so
+// preventDefault was never needed to protect the drag itself; gating it on
+// SWIPE_THRESHOLD instead — the same line already meaning "this could
+// actually page" — leaves a tap that never reaches it free to click.
+export function isRealDrag(dx) {
+  return Math.abs(dx) >= SWIPE_THRESHOLD;
+}
+
+// BUG-438 — a released gesture that never paged (settleDrag's "no target"
+// branch) still needs to read as a tap on SOME element, but a touch UA's own
+// native click synthesis is not reliable enough to depend on: real-device
+// testing found it withholding click entirely once total movement passes a
+// small, browser-owned slop distance — well under what a human still means
+// as "a tap", and not something this app's own preventDefault calls control
+// either way. Reusing SWIPE_THRESHOLD in both axes: past it in x it would
+// have paged (a different branch entirely), and past it in y is a real
+// scroll, not a tap gone slightly sideways — either way, not this.
+export function isTapRelease(dx, dy) {
+  return Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD;
+}
+
 // Once a drag has committed to paging (active), it stays active for the rest
 // of the gesture even if the finger drifts more vertical — only the earliest,
 // still-ambiguous movement decides direction, past a small noise floor. A

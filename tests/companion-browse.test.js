@@ -650,4 +650,41 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
     const hitARealButton = await hitPromise;
     expect(hitARealButton).toBe(true); // must land on SOME tile, never the bare #txtgrid-viewport/#grid-wrap
   });
+
+  // BUG-438 (found in real-device testing after all three prior fixes above
+  // shipped): even with the gap and the transition-reset both fixed, a real
+  // TOUCH tap drifting 8-39px sideways — ordinary finger jitter, more so
+  // right after a swipe when the thumb still has sideways motion — still
+  // went nowhere. activateDrag() called preventDefault() the instant
+  // shouldActivateDrag's 8px noise floor was crossed; on a touch UA (unlike
+  // mouse), preventDefault mid-gesture cancels that gesture's OWN click
+  // outright, even though the drag never reached SWIPE_THRESHOLD and never
+  // paged anywhere. The jitter test above (TASK-421) uses page.mouse, which
+  // always fires a trailing click regardless of preventDefault — invisible
+  // to this exact defect, and why it shipped undetected. Reproduced here
+  // with real CDP touch events (touchstart/touchmove/touchend) — the only
+  // way to see a UA actually withhold the click, confirmed live against the
+  // dev server: zero click events fired for this exact gesture pre-fix.
+  test.describe('a real touch tap with sideways jitter, below the swipe threshold', () => {
+    test.use({ hasTouch: true });
+
+    test('still queues on the FIRST press', async ({ page, context }) => {
+      await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+      const box = await page.locator('.ph-cell-queue[data-queue="mv-01"]').boundingBox();
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+
+      const queued = page.waitForRequest(req =>
+        req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 1 }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + 20, y: y + 3, id: 1 }] }); // 20px sideways — well under the 40px swipe threshold
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+
+      const req = await queued;
+      expect(req.url()).toContain('person=kids');
+      await expect(page.locator('#pager-name')).toHaveText('QOTSA'); // never paged — the drag stayed under threshold
+    });
+  });
 });

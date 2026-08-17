@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { firstRailId, isHorizontalDrag, shouldActivateDrag, pageOffset, swipeTarget, settleIndex, stepIndex, arrowDisabled } from '../../core/rail-pager.js';
+import { firstRailId, isHorizontalDrag, shouldActivateDrag, isRealDrag, isTapRelease, pageOffset, swipeTarget, settleIndex, stepIndex, arrowDisabled } from '../../core/rail-pager.js';
 
 describe('firstRailId', () => {
   it('the first rail\'s id', () => {
@@ -40,6 +40,38 @@ describe('shouldActivateDrag', () => {
   });
   it('under the floor stays false even though dx already beats dy', () => {
     expect(shouldActivateDrag(false, 5, 2)).toBe(false);
+  });
+});
+
+describe('isRealDrag', () => {
+  it('false under the swipe threshold — a tap-jitter distance', () => {
+    expect(isRealDrag(8)).toBe(false);
+    expect(isRealDrag(-20)).toBe(false);
+  });
+  it('right at the swipe threshold counts as real', () => {
+    expect(isRealDrag(40)).toBe(true);
+    expect(isRealDrag(-40)).toBe(true);
+  });
+  it('true well past the threshold either direction', () => {
+    expect(isRealDrag(120)).toBe(true);
+    expect(isRealDrag(-120)).toBe(true);
+  });
+});
+
+describe('isTapRelease', () => {
+  it('true when both axes stayed under the threshold', () => {
+    expect(isTapRelease(20, 15)).toBe(true);
+    expect(isTapRelease(-20, -15)).toBe(true);
+  });
+  it('false once x reaches the threshold', () => {
+    expect(isTapRelease(40, 0)).toBe(false);
+  });
+  it('false once y reaches the threshold — a real scroll, not a tap', () => {
+    expect(isTapRelease(0, 40)).toBe(false);
+  });
+  it('false when either axis is well past the threshold', () => {
+    expect(isTapRelease(200, 0)).toBe(false);
+    expect(isTapRelease(0, 200)).toBe(false);
   });
 });
 

@@ -6,7 +6,7 @@ import { playNextCount } from '../../core/queue-view.js';
 import { screenPage, tileHint } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, railsForSection } from '../../core/home-rails.js';
-import { firstRailId, pageOffset, settleIndex, stepIndex, arrowDisabled, shouldActivateDrag } from '../../core/rail-pager.js';
+import { firstRailId, pageOffset, settleIndex, stepIndex, arrowDisabled, shouldActivateDrag, isRealDrag, isTapRelease } from '../../core/rail-pager.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute } from '../../core/home-rails.js';
@@ -511,13 +511,21 @@ export function initPage() {
   function paintDrag(dx) {
     els.txtgrid.style.transform = 'translateX(' + pageOffset(dx, railIndex(), railList().length) + 'px)';
   }
+  // BUG-438 — preventDefault() used to run the instant shouldActivateDrag
+  // (8px) went true, cancelling this touch gesture's own click on a UA the
+  // moment it did — which a real tap crosses constantly, especially right
+  // after a swipe. Gating it on isRealDrag's 40px line instead leaves a tap
+  // that never actually pages free to click; touch-action: pan-y already
+  // means the browser had nothing native to suppress here regardless.
+  var PREVENT_IF_DRAGGING = { true: function(e) { e.preventDefault(); }, false: noop };
   function activateDrag(e, d, dx) {
     d.active = true;
-    e.preventDefault();
+    PREVENT_IF_DRAGGING[isRealDrag(dx)](e);
     paintDrag(dx);
   }
   function trackDrag(e, d, dx, dy) {
     d.dx = dx;
+    d.dy = dy;
     ({ true: activateDrag, false: noop })[shouldActivateDrag(d.active, dx, dy)](e, d, dx);
   }
   function onGridPointerMove(e) {
@@ -607,6 +615,27 @@ export function initPage() {
     els.txtgrid.addEventListener('click', swallowClick, { capture: true, once: true });
     setTimeout(function() { els.txtgrid.removeEventListener('click', swallowClick, { capture: true }); }, 0);
   }
+  // BUG-438 — real-device testing (an on-screen click-target log, no devtools
+  // needed) found that a touch tap with ordinary sideways jitter never fires
+  // a native `click` AT ALL once past some small, browser-owned slop
+  // distance — confirmed with a bare, app-free element: no preventDefault
+  // call of ours is involved, the browser itself withholds it. So a tap that
+  // (by our own math) never paged can still go unfired natively. The mirror
+  // of guardClick: wait one macrotask for a real click to show up; if none
+  // did, dispatch one ourselves at the release point. A same-gesture click
+  // that DOES arrive natively (mouse always; touch, sometimes) always lands
+  // inside that same window, so this never double-fires.
+  function clickAt(el) { el.click(); }
+  var TAP_MISS = { true: noop, false: function(x, y) { [document.elementFromPoint(x, y)].filter(Boolean).forEach(clickAt); } };
+  function tapFallback(x, y) {
+    var firedNatively = false;
+    function markFired() { firedNatively = true; }
+    document.addEventListener('click', markFired, { capture: true, once: true });
+    setTimeout(function() {
+      document.removeEventListener('click', markFired, { capture: true });
+      TAP_MISS[firedNatively](x, y);
+    }, 0);
+  }
   // BUG-438 — an ordinary stationary tap (d.active never true, paintDrag never
   // touched #txtgrid this gesture) still reached the false branch below and ran
   // easeBackDrag() regardless — which unconditionally sets a FRESH transition +
@@ -618,12 +647,12 @@ export function initPage() {
   // just delayed. Only a real live drag that never crossed the paging threshold
   // (d.active true, an actual snap-back to undo) has anything to ease back.
   var SETTLE_MISS = { true: easeBackDrag, false: noop };
-  function settleDrag(d) {
+  function settleDrag(d, x, y) {
     var list = railList();
     var landRail = list[settleIndex(d.active, d.dx, railIndex(), list.length)];
     var target = [landRail].filter(Boolean).filter(function(r) { return r.id !== state.rail; })[0];
     ({ true: function() { slideToRail(target, d.dx); }, false: function() { SETTLE_MISS[d.active](); } })[Boolean(target)]();
-    ({ true: guardClick, false: noop })[Boolean(target)]();
+    ({ true: guardClick, false: function() { ({ true: tapFallback, false: noop })[isTapRelease(d.dx, d.dy)](x, y); } })[Boolean(target)]();
   }
   function endGesture() {
     window.removeEventListener('pointermove', onGridPointerMove);
@@ -632,7 +661,8 @@ export function initPage() {
   }
   function onGridPointerUp(e) {
     endGesture();
-    [drag].filter(Boolean).filter(function(d) { return d.id === e.pointerId; }).forEach(settleDrag);
+    [drag].filter(Boolean).filter(function(d) { return d.id === e.pointerId; })
+      .forEach(function(d) { settleDrag(d, e.clientX, e.clientY); });
     drag = null;
   }
   function onGridPointerCancel() {
@@ -641,7 +671,7 @@ export function initPage() {
     drag = null;
   }
   function startGesture(e) {
-    drag = { x: e.clientX, y: e.clientY, id: e.pointerId, active: false, dx: 0 };
+    drag = { x: e.clientX, y: e.clientY, id: e.pointerId, active: false, dx: 0, dy: 0 };
     els.txtgrid.style.transition = 'none';
     window.addEventListener('pointermove', onGridPointerMove);
     window.addEventListener('pointerup', onGridPointerUp);
