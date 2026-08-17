@@ -16,6 +16,7 @@ import { desyncOpenPage, tileOffDesynced } from '../../core/companion-button-mod
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 import { mountStatusMenu } from './companion-status-menu.js';
+import { mountRowStep } from './companion-row-step.js';
 
 // FEAT-028 / TASK-168 — companion drill-down browse (replaces the flat
 // FEAT-020/TASK-139 tab + all-rails + flat-search layout). The companion walks
@@ -48,7 +49,7 @@ var SECTION_LEVEL = { true: 'rails', false: 'sections' };
 var DRILL_CTX = { browse: true, 'rail-grid': true };
 
 export function initPage() {
-  mountStatusMenu(['mode', 'screen', 'profile', 'atlas']);
+  mountStatusMenu(['mode', 'row', 'screen', 'profile', 'atlas']);
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
@@ -78,6 +79,7 @@ export function initPage() {
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
+  var applyRowStepMode = mountRowStep(mode, getApi);
 
   // TASK-410 — the section picker is a bottom-pinned dock (one tab per section),
   // not the old chip row, so it never scrolls out of view. Icon is presentation
@@ -407,6 +409,7 @@ export function initPage() {
     document.getElementById('switch-profile').classList.toggle('desync-off', mode.isDesynced());
     document.getElementById('btn-play-queue').classList.toggle('desync-off', mode.isDesynced());
     document.getElementById('btn-play-queue-music').classList.toggle('desync-off', mode.isDesynced());
+    applyRowStepMode();
   }
 
   function render() {

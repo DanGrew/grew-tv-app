@@ -47,6 +47,16 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('#section-dock .dock-tab-label')).toHaveText(['TV Series', 'Films', 'Home Movies']);
 });
 
+// TASK-408 — the companion ▲/▼ row-step buttons, a row inside the header's
+// popout menu: while synced, they nudge the TV's browse focus one rail row.
+test('the ▲/▼ row-step buttons send navigate_up/navigate_down while synced', async ({ page }) => {
+  await page.locator('#btn-status').click();
+  await page.locator('#row-step .row-step-btn[aria-label="Focus row down"]').click();
+  await expect.poll(() => intents.some((i) => i.intent === 'navigate_down')).toBe(true);
+  await page.locator('#row-step .row-step-btn[aria-label="Focus row up"]').click();
+  await expect.poll(() => intents.some((i) => i.intent === 'navigate_up')).toBe(true);
+});
+
 test('L1 shows section chips from the server sections — no rails/grid yet', async ({ page }) => {
   await expect(page.locator('#rails-wrap')).toBeHidden();
   await expect(page.locator('#grid-wrap')).toBeHidden();
@@ -384,6 +394,16 @@ test.describe('desync mode', () => {
     await expect(page.locator('#switch-profile')).not.toHaveClass(/desync-off/);
     await browseOpt(page).click();
     await expect(page.locator('#switch-profile')).toHaveClass(/desync-off/);
+  });
+
+  // TASK-408 story 4 — desynced, the row-step control reads as inactive (the
+  // whole row dims, label included) and emits nothing.
+  test('the ▲/▼ row-step row greys out and emits nothing in Browse mode', async ({ page }) => {
+    await expect(page.locator('#row-step')).not.toHaveClass(/desync-off/);
+    await browseOpt(page).click();
+    await expect(page.locator('#row-step')).toHaveClass(/desync-off/);
+    await page.locator('#row-step .row-step-btn[aria-label="Focus row down"]').click({ force: true });
+    expect(intents.filter((i) => i.intent === 'navigate_down')).toHaveLength(0);
   });
 });
 

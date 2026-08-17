@@ -14,6 +14,7 @@ import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
 import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 import { mountStatusMenu } from './companion-status-menu.js';
+import { mountRowStep } from './companion-row-step.js';
 
 // Companion series context (TASK-118): the episode list with per-episode
 // progress, fetched straight from the backend (catalog + progress are backend
@@ -23,7 +24,7 @@ import { mountStatusMenu } from './companion-status-menu.js';
 // TASK-321: an ALBUM has no Play-next — you tap a track to start it (mirrors the
 // TV album page, which dropped its header Play/Shuffle).
 export function initPage() {
-  mountStatusMenu(['mode', 'screen', 'profile']);
+  mountStatusMenu(['mode', 'row', 'screen', 'profile']);
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
@@ -38,6 +39,7 @@ export function initPage() {
   function noop() {}
   function getApi() { return api; }
   function onDevices(devices) { updateBar(devices); }
+  var applyRowStepMode = mountRowStep(mode, getApi);
 
   // FEAT-032 (TASK-218) / BUG-021: the breadcrumb is built from the recorded nav
   // trail's top — whatever it is. Opened from an artist's albums page, the top is
@@ -365,6 +367,7 @@ export function initPage() {
   function applySwitchProfile() { document.getElementById('switch-profile').classList.toggle('desync-off', mode.isDesynced()); }
   function onToggle(desynced) {
     applySwitchProfile();
+    applyRowStepMode();
     ({ true: render, false: reSync })[desynced]();
   }
 
