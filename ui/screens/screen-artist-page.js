@@ -2,12 +2,14 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, loadAlbum } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadAlbum, addToPlaylist, playbackAction } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 import { albumsByArtist } from '../../core/home-rails.js';
 import { artistTracks } from '../../core/artist-tracks.js';
+import { playlistCards } from '../../core/playlist-pick.js';
+import { gridIndex } from '../../core/playlist-name.js';
 
 // TASK-322 (FEAT-046) — the artist page is a SONG LIST of all the artist's tracks,
 // grouped by album (newest album first, track order within), reusing the album/
@@ -47,6 +49,99 @@ export function initArtistPage() {
     navTo('browse.html', { tab: 'music' });
   }
 
+  // TASK-440 — the artist song list's "Add to playlist" sheet, ported from
+  // screen-album-detail-page's per-track openAddSheet (album tracks and artist
+  // tracks are both music-only, so this is the same machinery minus the album
+  // header's bulk "Add all" — the artist page has no equivalent action).
+  var addState = { add: null, queue: null, createParams: {}, returnFocus: function() {}, cells: [], statusTimer: null };
+
+  function focusAdd(i) { addState.cells[i].focus(); }
+  function focusRow(id) {
+    [document.querySelector('.detail-row[data-id="' + id + '"]')].filter(Boolean).forEach(function(r) { r.focus(); });
+  }
+  function closeAddSheet() {
+    document.getElementById('add-sheet').style.display = 'none';
+    addState.returnFocus();
+  }
+  function hideStatus() { document.getElementById('add-status').style.display = 'none'; }
+  function showStatus(text) {
+    var el = document.getElementById('add-status');
+    el.textContent = text;
+    el.style.display = 'block';
+    clearTimeout(addState.statusTimer);
+    addState.statusTimer = setTimeout(hideStatus, 2500);
+  }
+  function addExisting(id, title) {
+    addState.add(id)
+      .then(function() { closeAddSheet(); showStatus('Added to ' + title); })
+      .catch(function() { closeAddSheet(); showStatus('Could not add to playlist.'); });
+  }
+  function createNew() { navTo('playlist-create.html', addState.createParams); }
+
+  function moveAdd(e) {
+    var i = addState.cells.indexOf(document.activeElement);
+    var ni = gridIndex(i, 1, addState.cells.length, e.key);
+    [ni].filter(function(x) { return x !== i; }).filter(function() { return i > -1; }).forEach(function(x) { e.preventDefault(); focusAdd(x); });
+  }
+  var ADD_CLOSE = { Escape: true, Backspace: true };
+  function closeKeys(e) {
+    [ADD_CLOSE[e.key]].filter(Boolean).forEach(function() { e.preventDefault(); closeAddSheet(); });
+  }
+  function onAddKey(e) { e.stopPropagation(); moveAdd(e); closeKeys(e); }
+
+  function buildQueueChoice() {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'add-queue';
+    b.textContent = '☰ Play Next';
+    b.addEventListener('click', addState.queue);
+    b.addEventListener('keydown', onAddKey);
+    document.getElementById('add-sheet-list').appendChild(b);
+    return b;
+  }
+  function queueCells() { return [addState.queue].filter(Boolean).map(buildQueueChoice); }
+
+  function buildPlaylistChoice(card) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'add-choice';
+    b.textContent = '♪ ' + card.title;
+    b.setAttribute('data-id', card.id);
+    b.addEventListener('click', function() { addExisting(card.id, card.title); });
+    b.addEventListener('keydown', onAddKey);
+    document.getElementById('add-sheet-list').appendChild(b);
+    return b;
+  }
+  function showAddSheet(cards) {
+    document.getElementById('add-sheet-list').innerHTML = '';
+    addState.cells = queueCells()
+      .concat(cards.map(buildPlaylistChoice))
+      .concat([document.getElementById('btn-add-create'), document.getElementById('btn-add-cancel')]);
+    document.getElementById('add-sheet').style.display = 'flex';
+    focusAdd(0);
+  }
+  function loadAndShowSheet() {
+    loadBrowse(SERVER, profile)
+      .then(function(res) { showAddSheet(playlistCards(res.content)); })
+      .catch(function() { showStatus('Could not load playlists.'); });
+  }
+  function queueTrack(item) {
+    playbackAction(SERVER, 'queue-track', getPerson(), { track_id: item.video.id })
+      .then(function() { showStatus('Queued to Play Next'); })
+      .catch(function() { showStatus('Could not queue track.'); });
+  }
+  function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
+
+  // Per-row: the single ＋ opens the sheet for ONE track — Play Next on top,
+  // playlist cards below (mirrors the album page). Return focus to the track row.
+  function openAddSheet(item) {
+    addState.add = function(id) { return addToPlaylist(SERVER, id, item.video.id); };
+    addState.queue = function() { queueThenClose(item); };
+    addState.createParams = { addTrack: item.video.id };
+    addState.returnFocus = function() { focusRow(item.video.id); };
+    loadAndShowSheet();
+  }
+
   var wsApp = connectApp(window.location.origin, function(intent, params) {
     var INTENTS = {
       navigate_up:   function() { detailArrow({ key: 'ArrowUp',   preventDefault: function() {} }); },
@@ -65,6 +160,10 @@ export function initArtistPage() {
   // Live snapshot so the companion mirrors this artist state.
   wsApp.sendAppState({ screen: 'artist', artist: artist, profile: profile });
 
+  document.getElementById('btn-add-create').addEventListener('click', createNew);
+  document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
+  document.getElementById('btn-add-create').addEventListener('keydown', onAddKey);
+  document.getElementById('btn-add-cancel').addEventListener('keydown', onAddKey);
   document.addEventListener('keydown', dispatchKey);
 
   initPage({
@@ -92,7 +191,7 @@ export function initArtistPage() {
       mountBreadcrumb('breadcrumb', buildCrumbs('artist', { artistName: artist }));
       return Promise.all(albums.map(function(a) { return loadAlbum(SERVER, a.id).catch(function() { return null; }); }))
         .then(function(details) {
-          buildDetailList(SERVER, artistTracks(artist, details), progress, onPlayItem, null, null, null, null, { suppressResume: true, albumHeaders: true });
+          buildDetailList(SERVER, artistTracks(artist, details), progress, onPlayItem, openAddSheet, null, null, null, { suppressResume: true, albumHeaders: true });
           focusFirstRow();
         });
     })
