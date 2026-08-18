@@ -212,6 +212,16 @@ export function initPage() {
     api.sendIntent('navigate', { page: 'audio.html', params: { playQueue: 1, from: 'browse' } });
   }
 
+  // TASK-445 — the Play All twin: shown only while drilled into the section
+  // that has one (mirrors the TV's own tab-scoped button, screen-browse-page.js
+  // PLAY_ALL_PARAMS), and drives the TV via the same navigate() funnel every
+  // other companion action uses — so it greys out while desynced too.
+  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 } };
+  function onPlayAll() {
+    [PLAY_ALL_PARAMS[state.section]].filter(Boolean)
+      .forEach(function(params) { api.sendIntent('navigate', { page: 'video.html', params: Object.assign({ from: 'browse' }, params) }); });
+  }
+
   // Bare text-label tile: title + an optional resume-percent badge, no poster.
   function nameTile(card) {
     var hint = tileHint(state.progress, card);
@@ -402,6 +412,7 @@ export function initPage() {
   }
   document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
   document.getElementById('btn-play-queue-music').addEventListener('click', onPlayQueueMusic);
+  document.getElementById('btn-play-all').addEventListener('click', onPlayAll);
 
   // Switch-profile drives the TV, so it greys out while desynced (the WS layer
   // already no-ops its intent; this is the visible half — no dead click).
@@ -409,6 +420,8 @@ export function initPage() {
     document.getElementById('switch-profile').classList.toggle('desync-off', mode.isDesynced());
     document.getElementById('btn-play-queue').classList.toggle('desync-off', mode.isDesynced());
     document.getElementById('btn-play-queue-music').classList.toggle('desync-off', mode.isDesynced());
+    document.getElementById('btn-play-all').classList.toggle('desync-off', mode.isDesynced());
+    document.getElementById('btn-play-all').style.display = ({ 'true': 'block', 'false': 'none' })[!!PLAY_ALL_PARAMS[state.section] + ''];
     applyRowStepMode();
   }
 

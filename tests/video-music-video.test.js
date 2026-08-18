@@ -96,6 +96,34 @@ test('an artist\'s music videos play through in order the same way', async ({ pa
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/); // no third item — no-op
 });
 
+// TASK-445 — Play All spans every artist. The shared beforeEach's
+// MUSIC_VIDEO_CARDS has 3 videos across 2 artists; with more than one item
+// left after the anchored first, initSeq's fair shuffle of "the rest" is
+// genuinely random (unseeded Math.random in the browser), so this override
+// trims to exactly 2 videos across 2 artists — the single "rest" item is then
+// deterministic, same as the mvArtist test above relies on for QOTSA's two.
+test('Play All spans every artist, artist-then-title order, and has no source page (Home > leaf)', async ({ page }) => {
+  await page.route('**/api/browse**', function(route) {
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({
+        profile: 'kids', genreLabels: BROWSE.kids.genreLabels,
+        content: BROWSE.kids.content.concat([
+          { kind: 'video', id: 'mv-01', title: 'Head Like a Haunted House', poster: 'mv-01.jpg', duration: 210, section: 'music-videos', artist: 'QOTSA', itemType: 'music-video' },
+          { kind: 'video', id: 'mv-03', title: 'Starlight', poster: 'mv-03.jpg', duration: 240, section: 'music-videos', artist: 'Muse', itemType: 'music-video' }
+        ])
+      })
+    });
+  });
+  await page.goto('/app/homeview/video.html?musicVideoAll=1&from=browse');
+  // Muse < QOTSA alphabetically: Starlight plays first, spanning past QOTSA's rail.
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-03/);
+  await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'Starlight']);
+  await page.locator('#btn-mv-repeat').click(); // repeat defaults on — off so the boundary is a clean no-op
+  await page.locator('#btn-next').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
+});
+
 test('the last video in a playthrough ends, playback stops cleanly back to browse', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);

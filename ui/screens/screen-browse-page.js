@@ -48,6 +48,21 @@ export function initBrowsePage() {
   }
   function onPlayQueueMusic() { navTo('audio.html', { playQueue: 1, from: 'browse' }); }
 
+  // TASK-445 — Play All: a whole-catalog "play everything of this type"
+  // control, shown only on a tab that has one. Keyed by tab id (not
+  // hardcoded to Music Videos) so a future tab (TASK-446's Home Movies) adds
+  // one map entry, no branch. renderBrowse's onTabChange fires this on every
+  // tab select, including the initial one.
+  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 } };
+  function showPlayAll(tabId) {
+    var btn = document.getElementById('btn-play-all');
+    btn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[!!PLAY_ALL_PARAMS[tabId] + ''];
+  }
+  function onPlayAll() {
+    [PLAY_ALL_PARAMS[getActiveTab()]].filter(Boolean)
+      .forEach(function(params) { navTo('video.html', Object.assign({ from: 'browse' }, params)); });
+  }
+
   // Transient ＋Queue confirmation toast (films queued from a tile badge).
   var statusTimer = null;
   function hideStatus() { document.getElementById('queue-status').style.display = 'none'; }
@@ -91,6 +106,7 @@ export function initBrowsePage() {
 
   document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
   document.getElementById('btn-play-queue-music').addEventListener('click', onPlayQueueMusic);
+  document.getElementById('btn-play-all').addEventListener('click', onPlayAll);
   document.addEventListener('keydown', dispatchKey);
   mountBreadcrumb('breadcrumb', buildCrumbs('browse'));
 
@@ -236,7 +252,7 @@ export function initBrowsePage() {
       // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) wins
       // over the last-visited tab; renderBrowse falls back when neither matches.
       var initialTab = [getParam('tab')].filter(Boolean).concat([sessionStorage.getItem(LAST_TAB_KEY)]).filter(Boolean)[0];
-      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist, recents);
+      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist, recents, showPlayAll);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
       refreshQueue();
       refreshQueueMusic();

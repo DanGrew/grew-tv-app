@@ -137,6 +137,25 @@ test('a music-video tile carries a ＋ Queue badge that POSTs to its own engine'
   expect(filmQueued).toBe(false);
 });
 
+// TASK-445 — the Play All control: hidden on a tab with no whole-catalog
+// source, shown on Music Videos, navigates to the mvAll entry.
+test('Play All is hidden on Films, shown on Music Videos, and navigates to the whole-catalog entry', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await page.route('**/api/browse**', function(route) {
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    });
+  });
+  await openFilms(page);
+  await expect(page.locator('#btn-play-all')).toBeHidden();
+  await page.locator('.sidebar-tab[data-tab="music-videos"]').click();
+  await expect(page.locator('#btn-play-all')).toBeVisible();
+  await page.locator('#btn-play-all').click();
+  await expect(page).toHaveURL(/video\.html\?.*musicVideoAll=1/);
+});
+
 test('rail-grid film tiles also carry the ＋ badge and queue', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);

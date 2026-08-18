@@ -152,6 +152,23 @@ test('TASK-441: playing an artist\'s music videos syncs source_type mv-artist / 
   expect(backend.snapshot().source_id).toBe('QOTSA');
 });
 
+// TASK-445 — Play All syncs the SAME way, source_id null (mv-all has no
+// per-source id, unlike mv-artist/mv-playlist).
+test('TASK-441/445: Play All syncs source_type mv-all / source_id null', async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/browse**', function(route) {
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    });
+  });
+  const backend = await installMusicVideoQueueBackend(page, emptyStartSnap());
+  await page.goto('/app/homeview/video.html?musicVideoAll=1&from=browse');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect.poll(() => backend.snapshot().source_type).toBe('mv-all');
+  expect(backend.snapshot().source_id).toBe(null);
+});
+
 test('TASK-441: advancing to the next music video re-syncs the engine\'s now-playing', async ({ page }) => {
   await installApi(page);
   const backend = await installMusicVideoQueueBackend(page, emptyStartSnap());

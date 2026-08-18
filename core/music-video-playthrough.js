@@ -137,16 +137,18 @@ export function mvTransportVisibility(isMusicVideo, isMultiSeq) {
 
 // Which entry function should run for a video.html load, in priority order:
 // the durable video Play Queue wins if requested, then a music-video source
-// (playlist beats artist beats a lone item pick — the three are mutually
-// exclusive in practice; the priority is a defensive fallback, not a real
-// choice), then a series, else a standalone single. Kept in core (not the
-// page) because it branches — ui/** must stay cyclomatic-1.
+// (playlist beats artist beats a lone item pick beats the TASK-445 whole-
+// catalog Play All — the four are mutually exclusive in practice; the
+// priority is a defensive fallback, not a real choice), then a series, else a
+// standalone single. Kept in core (not the page) because it branches — ui/**
+// must stay cyclomatic-1.
 export function entryMode(p) {
   var params = p || {};
   if (params.playQueue) return 'queue';
   if (params.mvPlaylist) return 'mvPlaylist';
   if (params.mvArtist) return 'mvArtist';
   if (params.mvItem) return 'mvItem';
+  if (params.mvAll) return 'mvAll';
   if (params.isSeries) return 'series';
   return 'single';
 }
@@ -171,6 +173,27 @@ export function musicVideosByArtist(cards, artist) {
   if (!cards) return [];
   var mine = cards.filter(function(c) { return c.section === 'music-videos' && c.artist === artist; });
   return mine.sort(compareByTitle);
+}
+
+// TASK-445 — every available music video across every artist (the Play All
+// source), artist-then-title order: mirrors both the backend's own mv-all
+// source (media-manager/db/content_store.get_all_music_video_ids, "ORDER BY
+// artist, title") and the Music Videos tab's own A-Z artist rails
+// (core/home-rails.js musicVideoRails), so Play All's order matches what the
+// owner already sees browsing. Excludes playlist cards the same way
+// musicVideoRails' own `videos` filter does (a playlist has no `artist`).
+function artistOf(c) { return c.artist || ''; }
+export function compareByArtistThenTitle(a, b) {
+  var aa = artistOf(a);
+  var ba = artistOf(b);
+  if (aa < ba) return -1;
+  if (aa > ba) return 1;
+  return compareByTitle(a, b);
+}
+export function musicVideosAll(cards) {
+  if (!cards) return [];
+  var mine = cards.filter(function(c) { return c.section === 'music-videos' && c.artist; });
+  return mine.sort(compareByArtistThenTitle);
 }
 
 // Where a playthrough should start within a resolved item list, given the id

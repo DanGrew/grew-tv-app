@@ -468,6 +468,53 @@ test.describe('music Play Queue button', () => {
   });
 });
 
+// TASK-445 — the companion Play All twin: shown only while drilled into a
+// section that has one (Music Videos), drives the TV via navigate (mirroring
+// the music Play Queue button above), and greys out while desynced.
+test.describe('companion Play All button', () => {
+  test.beforeEach(async ({ page }) => {
+    intents = [];
+    await installApi(page);
+    await mockApp(page, intents);
+    await page.route('**/api/browse**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    }));
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music Videos']);
+  });
+
+  test('hidden at the sections root, shown once drilled into Music Videos', async ({ page }) => {
+    await expect(page.locator('#btn-play-all')).toBeHidden();
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
+    await expect(page.locator('#btn-play-all')).toBeVisible();
+  });
+
+  test('hidden again on a section with no whole-catalog source', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
+    await expect(page.locator('#btn-play-all')).toBeVisible();
+    await page.locator('.dock-tab[data-section="films"]').click();
+    await expect(page.locator('#btn-play-all')).toBeHidden();
+  });
+
+  test('drives the TV to the whole-catalog entry', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
+    await page.locator('#btn-play-all').click();
+    await expect.poll(() => {
+      const nav = intents.find((i) => i.intent === 'navigate' && i.params.page === 'video.html');
+      return nav && nav.params.params.musicVideoAll;
+    }).toBe(1);
+  });
+
+  test('greys out in Browse mode (no dead click)', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
+    await expect(page.locator('#btn-play-all')).not.toHaveClass(/desync-off/);
+    await page.locator('#btn-status').click();
+    await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
+    await expect(page.locator('#btn-play-all')).toHaveClass(/desync-off/);
+  });
+});
+
 // TASK-258 (2): the VIDEO queue button reads a compact "🎬 (N)" — media icon +
 // bracketed count, no "Video" word or list icon (mirrors the music button). A
 // dedicated mock carries a `person` in app_state (the top-level mock omits it, so
