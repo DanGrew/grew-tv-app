@@ -148,6 +148,14 @@ function genresOf(card) {
   return ['other'];
 }
 
+// TASK-444 — the `people` tags a Home Movies card belongs to: explicit
+// people[], else ['other'] so an untagged clip still lands in a rail rather
+// than disappearing (mirrors genresOf's fallback shape, keyed differently).
+function peopleOf(card) {
+  if (Array.isArray(card.people) && card.people.length) return card.people;
+  return ['other'];
+}
+
 // A box-set is a collection of films (collectionType 'boxset', section 'films').
 // It gets its own Films rail rather than repeating inside the genre rows.
 function isBoxset(card) { return card.collectionType === 'boxset'; }
@@ -170,9 +178,26 @@ function sortItems(items) {
   return items.sort(function(a, b) { return cmpStr(titleOf(a), titleOf(b)); });
 }
 
+// A home-movie clip's own capture date (tags.date, 'YYYY-MM-DD' — see
+// home-movie-ingest.py), or '' when absent. Mirrors albumYear's tags read.
+function captureDateOf(card) {
+  var tags = card.tags || {};
+  return tags.date || '';
+}
+
+// TASK-444 — Home Movies rail item order: newest capture date first. Ties
+// (including two clips with no readable date) fall back to title, same
+// tie-break shape as albumsByArtist's year comparator.
+function cmpDateDesc(a, b) {
+  var da = captureDateOf(a), db = captureDateOf(b);
+  if (da === db) return cmpStr(titleOf(a), titleOf(b));
+  return cmpStr(db, da);
+}
+
 // Group cards into rails keyed by a slug list, A-Z by rail label then tile
-// title. keyer(card) -> [slug]; labeler(slug) -> display title.
-function groupRails(cards, keyer, labeler, prefix) {
+// title (or itemCmp when given — TASK-444's Home Movies rails sort by capture
+// date instead). keyer(card) -> [slug]; labeler(slug) -> display title.
+function groupRails(cards, keyer, labeler, prefix, itemCmp) {
   var groups = {};
   cards.forEach(function(card) {
     keyer(card).forEach(function(slug) {
@@ -180,9 +205,10 @@ function groupRails(cards, keyer, labeler, prefix) {
       groups[slug].push(card);
     });
   });
+  var cmp = itemCmp || function(a, b) { return cmpStr(titleOf(a), titleOf(b)); };
   return Object.keys(groups)
     .map(function(slug) {
-      return { id: prefix + slug, slug: slug, title: labeler(slug), items: sortItems(groups[slug]) };
+      return { id: prefix + slug, slug: slug, title: labeler(slug), items: groups[slug].sort(cmp) };
     })
     .sort(function(a, b) { return cmpStr(a.title, b.title); });
 }
@@ -405,11 +431,16 @@ export function buildTabs(cards) {
 // own leading "Box Sets" rail and kept out of the genre rows. genreLabels maps
 // genre slugs to display names.
 //
-// Home Movies (TASK-183, FEAT-025) is two structural rails, split on the card's
-// own `kind`: Continue Watching -> Collections (kind:'series') -> Videos
-// (standalone kind:'video'). Each structural rail is A-Z and omitted when empty.
-// (No person rails — home content carries no people tags, so they collapsed to a
-// single "Other" dump; dropped per owner feedback 2026-06-12.)
+// Home Movies (TASK-444, reinstating the FEAT-025/TASK-183 person rails this
+// time with real tags) is Continue Watching -> one rail per `people` tag
+// value, through the SAME groupRails path Series/Films use for genre rails —
+// keyed on peopleOf instead of genresOf, with no genreLabels-style override
+// (title-cased slug only) since people have no display-name map. A clip tagged
+// with more than one kid appears in each of those kids' rails (groupRails'
+// keyer already fans a card out to every slug it returns, same as genres).
+// An untagged clip lands in a single "Other" rail (peopleOf's fallback) rather
+// than disappearing. Sort differs from genre rails: newest-first by capture
+// date (cmpDateDesc) instead of A-Z by title.
 export function buildTabRails(sectionId, cards, cwRows, genreLabels, recents) {
   var all = (cards || []).map(withDurationSec);
   var byId = cardIndex(all);
@@ -417,11 +448,8 @@ export function buildTabRails(sectionId, cards, cwRows, genreLabels, recents) {
   if (sectionId === 'music-videos') return musicVideoRails(all);
   var inTab = all.filter(function(c) { return sectionOf(c) === sectionId; });
   if (sectionId === 'home-movies') {
-    var collections = inTab.filter(function(c) { return c.kind === 'series'; });
-    var standalones = inTab.filter(function(c) { return (c.kind || 'video') === 'video'; });
-    return continueRail(sectionId, cwRows, byId)
-      .concat(simpleRail('collections', 'Collections', collections))
-      .concat(simpleRail('videos', 'Videos', standalones));
+    var personRails = groupRails(inTab, peopleOf, titleCase, 'person:', cmpDateDesc);
+    return continueRail(sectionId, cwRows, byId).concat(personRails);
   }
   var boxsets = inTab.filter(isBoxset);
   var rest = inTab.filter(function(c) { return !isBoxset(c); });
