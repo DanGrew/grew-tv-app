@@ -80,8 +80,10 @@ test('Search, the queue buttons and the menu icon share the header row, below th
 
   const topbarOrder = await page.evaluate(() =>
     Array.from(document.getElementById('topbar-actions').children).map((el) => el.id));
-  expect(topbarOrder.indexOf('btn-search')).toBeLessThan(topbarOrder.indexOf('queue-actions'));
-  expect(topbarOrder.indexOf('queue-actions')).toBeLessThan(topbarOrder.indexOf('status-menu-mount'));
+  // TASK-445 — the queue buttons + Play All moved into their own #queue-menu
+  // popout (mounted at #queue-menu-mount), a separate icon from ☰ status.
+  expect(topbarOrder.indexOf('btn-search')).toBeLessThan(topbarOrder.indexOf('queue-menu-mount'));
+  expect(topbarOrder.indexOf('queue-menu-mount')).toBeLessThan(topbarOrder.indexOf('status-menu-mount'));
 
   await page.locator('#btn-status').click();
   const iconBox = await page.locator('#btn-status').boundingBox();

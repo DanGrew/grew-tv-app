@@ -7,7 +7,7 @@ import { connectApp } from '../../core/app-ws.js';
 import { loadSeries, loadProgress, loadVideo, loadPlaylist, loadBrowse, loadVideoPlayback, videoPlaybackAction, musicVideoPlaybackAction, addToPlaylist } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
-import { currentItem, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist, startIndex, initSeq, toggleShuffle, toggleRepeat, canAdvance, nextSeq } from '../../core/music-video-playthrough.js';
+import { currentItem, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist, musicVideosAll, startIndex, initSeq, toggleShuffle, toggleRepeat, canAdvance, nextSeq } from '../../core/music-video-playthrough.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { gridIndex } from '../../core/playlist-name.js';
 import { buildCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
@@ -66,12 +66,13 @@ export function initVideoPage() {
   var mvPlaylist = getParam('musicVideoPlaylist');
   var mvArtist   = getParam('musicVideoArtist');
   var mvTrack    = getParam('musicVideoTrack');
+  var mvAll      = getParam('musicVideoAll');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
   var person   = getPerson();
   var isSeries = !!seriesId;
-  var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, isSeries: isSeries });
-  var MV_MODE = { mvItem: true, mvPlaylist: true, mvArtist: true };
+  var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, isSeries: isSeries });
+  var MV_MODE = { mvItem: true, mvPlaylist: true, mvArtist: true, mvAll: true };
   var isMusicVideo = !!MV_MODE[mode];
   var wsApp = null;
   var player;
@@ -104,8 +105,8 @@ export function initVideoPage() {
   // are mutually exclusive per page load) — mirrors the catalog's own
   // "mv-item"/"mv-artist"/"mv-playlist" registered names
   // (media-manager/db/music_video_playback_engine.py).
-  var MV_SOURCE_TYPE = { mvItem: 'mv-item', mvPlaylist: 'mv-playlist', mvArtist: 'mv-artist' };
-  var MV_SOURCE_ID = { mvItem: function() { return mvItem; }, mvPlaylist: function() { return mvPlaylist; }, mvArtist: function() { return mvArtist; } };
+  var MV_SOURCE_TYPE = { mvItem: 'mv-item', mvPlaylist: 'mv-playlist', mvArtist: 'mv-artist', mvAll: 'mv-all' };
+  var MV_SOURCE_ID = { mvItem: function() { return mvItem; }, mvPlaylist: function() { return mvPlaylist; }, mvArtist: function() { return mvArtist; }, mvAll: function() { return null; } };
   // TASK-441 — keeps the FEAT-418 queue engine's source/now-playing in step
   // with the client-owned `seq` that actually drives playback. sendMvSource
   // fires once, at mvBegin; sendMvVideo fires on every swap (mvBegin's first
@@ -506,11 +507,23 @@ export function initVideoPage() {
       })
       .catch(function() { navTo('error.html'); });
   }
+  // TASK-445 — Play All: every music video in the catalog, no source page to
+  // link back to (mvSourceCrumb stays null, degrading to Home > leaf like
+  // mvItem — story 4 has no equivalent here since there is no single item).
+  function startMvAll() {
+    loadBrowse(SERVER, profile)
+      .then(function(browse) {
+        seq = initSeq(musicVideosAll(browse.content), 0);
+        mvBegin();
+      })
+      .catch(function() { navTo('error.html'); });
+  }
   var ENTRY = {
     queue: startQueue,
     mvPlaylist: startMvPlaylist,
     mvArtist: startMvArtist,
     mvItem: startMvItem,
+    mvAll: startMvAll,
     series: startSeries,
     single: startSingle
   };

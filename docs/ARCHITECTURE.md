@@ -63,7 +63,7 @@ module or a screen** — this index rots otherwise (it did).
 - `video-queue-view.js` — video Queue View model + markup (FEAT-040)
 - `music-video-queue-view.js` — music-video Queue View model + markup, mirroring `queue-view.js`'s every-row-editable bucketing (FEAT-418/TASK-420) against its own `music_video_playback` snapshot (TASK-419), with poster art and no now-playing position
 - `video-player-router.js` — persistent video-player view-router (FEAT-037)
-- `music-video-playthrough.js` — client-owned playthrough for a single music video, a music-video playlist or an artist's music videos: order + index + Shuffle/Repeat, no server engine, no resume (TASK-374/407)
+- `music-video-playthrough.js` — client-owned playthrough for a single music video, a music-video playlist, an artist's music videos, or the whole-catalog Play All (TASK-445): order + index + Shuffle/Repeat, no server engine, no resume (TASK-374/407)
 - `player-math.js` — pure video-player render arithmetic: `progressPct` / `clampTime` / `wrapIndex` / `frameDrop` (TASK-305)
 - `lrc.js` — LRC parse + rolling-frame lyric selection (FEAT-018)
 - `cover-mosaic.js` — playlist cover-mosaic markup (FEAT-039)

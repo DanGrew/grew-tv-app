@@ -9,7 +9,7 @@ import { personGlyph } from '../../core/profile-config.js';
 // rails. Pure grouping/ordering lives in core/home-rails.js; this module owns
 // the DOM and the two-zone (sidebar / rails) d-pad focus model. Module state
 // holds the last-rendered data so a tab switch can rebuild the rails.
-var STATE = { server: null, cards: [], cw: [], recents: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null };
+var STATE = { server: null, cards: [], cw: [], recents: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null, onTabChange: null };
 
 function tilesIn(railEl) {
   return Array.from(railEl.querySelectorAll('.film-tile'));
@@ -216,10 +216,14 @@ function markActive(tabId) {
 // augments Music/Music Videos with their own always-present (possibly empty)
 // Playlists rail (TASK-378, shared with the companion — TASK-424) so the TV
 // always renders the "Playlists ＋" heading there; other tabs pass through as-is.
+// TASK-445 — onTabChange lets the page show/hide a tab-scoped control (Play
+// All) without this module knowing what Play All is; fires on every select,
+// including the initial one, so the page's first render is already correct.
 function selectTab(tabId) {
   STATE.activeTab = tabId;
   markActive(tabId);
   renderRailRows(railsForSection(tabId, STATE.cards, STATE.cw, STATE.labels, STATE.recents));
+  [STATE.onTabChange].filter(Boolean).forEach(function(fn) { fn(tabId); });
 }
 
 function tabButton(tab) {
@@ -271,7 +275,7 @@ export function getActiveTab() {
 // rows feed both the per-tab Continue Watching rail and the tiles' progress bars
 // (via progressMapFromCW). `recents` (FEAT-045/TASK-318, from the same
 // continue-watching response) feeds the Music tab's Recently Played rail.
-export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue, onCreatePlaylist, recents) {
+export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue, onCreatePlaylist, recents, onTabChange) {
   STATE.server = server;
   STATE.cards = cards;
   STATE.cw = cwRows;
@@ -282,6 +286,7 @@ export function renderBrowse(server, cards, cwRows, labels, profile, person, onS
   STATE.onSelect = onSelect;
   STATE.onQueue = onQueue;
   STATE.onCreatePlaylist = onCreatePlaylist;
+  STATE.onTabChange = onTabChange;
   document.getElementById('profile-label').textContent = personGlyph(person) + ' ' + person.name + ' ▸';
   var tabs = buildTabs(cards);
   var ids = tabs.map(function(t) { return t.id; });

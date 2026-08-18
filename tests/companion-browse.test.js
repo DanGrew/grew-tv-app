@@ -431,6 +431,7 @@ test.describe('music Play Queue button', () => {
     await musicMock(page, [], []);
     await page.goto('/companion/browse.html');
     await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();  // settled
+    await page.locator('#btn-queue-menu').click();
     await expect(page.locator('#btn-play-queue-music')).toBeHidden();
   });
 
@@ -438,6 +439,7 @@ test.describe('music Play Queue button', () => {
     const intents2 = [];
     await musicMock(page, intents2, [{ track_id: 'a' }, { track_id: 'b' }]);
     await page.goto('/companion/browse.html');
+    await page.locator('#btn-queue-menu').click();
     await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 (2)');
     await page.locator('#btn-play-queue-music').click();
     await expect.poll(() => {
@@ -449,22 +451,87 @@ test.describe('music Play Queue button', () => {
   test('greys out in Browse mode (no dead click)', async ({ page }) => {
     await musicMock(page, [], [{ track_id: 'a' }]);
     await page.goto('/companion/browse.html');
+    await page.locator('#btn-queue-menu').click();
     await expect(page.locator('#btn-play-queue-music')).toBeVisible();
     await expect(page.locator('#btn-play-queue-music')).not.toHaveClass(/desync-off/);
-    // TASK-412 — Mode now lives inside the header's popout menu.
+    // TASK-412 — Mode lives in the SEPARATE ☰ status menu (TASK-445 split the
+    // two popouts apart); open it too, alongside the still-open queue menu.
     await page.locator('#btn-status').click();
     await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
     await expect(page.locator('#btn-play-queue-music')).toHaveClass(/desync-off/);
   });
 
-  // TASK-258 (3): the music queue button carries no purple `--accent` tint — its
-  // border matches the video button + every other button (the white --focus).
-  test('is de-purpled — its border matches the other buttons, not the accent', async ({ page }) => {
+  // TASK-258 (3): the music queue button carries no purple `--accent` tint —
+  // its border matches the video button, not some one-off colour. TASK-445
+  // moved both into the #queue-menu popout as full-width rows (matching
+  // switch-profile's own resting --border, not the pill buttons' old
+  // permanent --focus white), so the fixed literal this used to assert is
+  // gone; the real invariant — the two queue buttons agree with each other —
+  // still holds and is what this compares.
+  test('is de-purpled — its border matches the video queue button, not the accent', async ({ page }) => {
     await musicMock(page, [], [{ track_id: 'a' }]);
     await page.goto('/companion/browse.html');
+    await page.locator('#btn-queue-menu').click();
     await expect(page.locator('#btn-play-queue-music')).toBeVisible();
-    const border = await page.locator('#btn-play-queue-music').evaluate(el => getComputedStyle(el).borderTopColor);
-    expect(border).toBe('rgb(255, 255, 255)');       // --focus white, NOT rgb(185, 140, 255) accent
+    const musicBorder = await page.locator('#btn-play-queue-music').evaluate(el => getComputedStyle(el).borderTopColor);
+    const videoBorder = await page.locator('#btn-play-queue').evaluate(el => getComputedStyle(el).borderTopColor);
+    expect(musicBorder).toBe(videoBorder);
+    expect(musicBorder).not.toBe('rgb(185, 140, 255)');   // the old --accent purple
+  });
+});
+
+// TASK-445 — the companion Play All twin: lives in the SEPARATE #queue-menu
+// popout (its own ▶ icon beside the ☰ status menu, not folded into it — play
+// controls, not settings/navigation) alongside the two Play Queue buttons,
+// which used to sit in a flat #queue-actions row that breaks on a
+// phone-width screen once a fourth button joins Search. Shown only while
+// drilled into a section that has one (Music Videos), drives the TV via
+// navigate (mirroring the music Play Queue button above), and greys out
+// while desynced, same as switch-profile.
+test.describe('companion Play All menu row', () => {
+  test.beforeEach(async ({ page }) => {
+    intents = [];
+    await installApi(page);
+    await mockApp(page, intents);
+    await page.route('**/api/browse**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
+    }));
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#section-dock .dock-tab')).toContainText(['Music Videos']);
+    await page.locator('#btn-queue-menu').click();
+  });
+
+  test('hidden at the sections root, shown once drilled into Music Videos', async ({ page }) => {
+    await expect(page.locator('#btn-play-all')).toBeHidden();
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
+    await expect(page.locator('#btn-play-all')).toBeVisible();
+  });
+
+  test('hidden again on a section with no whole-catalog source', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
+    await expect(page.locator('#btn-play-all')).toBeVisible();
+    await page.locator('.dock-tab[data-section="films"]').click();
+    await expect(page.locator('#btn-play-all')).toBeHidden();
+  });
+
+  test('drives the TV to the whole-catalog entry', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
+    await page.locator('#btn-play-all').click();
+    await expect.poll(() => {
+      const nav = intents.find((i) => i.intent === 'navigate' && i.params.page === 'video.html');
+      return nav && nav.params.params.musicVideoAll;
+    }).toBe(1);
+  });
+
+  test('greys out in Browse mode (no dead click)', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="music-videos"]').click();
+    await expect(page.locator('#btn-play-all')).not.toHaveClass(/desync-off/);
+    // Mode lives in the SEPARATE ☰ status menu; open it too, alongside the
+    // still-open queue menu (each popout is independent, TASK-445).
+    await page.locator('#btn-status').click();
+    await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
+    await expect(page.locator('#btn-play-all')).toHaveClass(/desync-off/);
   });
 });
 

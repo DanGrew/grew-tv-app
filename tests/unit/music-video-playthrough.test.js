@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { currentItem, hasNext, hasPrev, upNextItem, isMulti, entryMode, musicVideosByArtist, compareByTitle, startIndex, playlistTrackTarget, playlistQueueKey, initSeq, fairShuffle, toggleShuffle, toggleRepeat, canAdvance, nextSeq, mvTransportVisibility } from '../../core/music-video-playthrough.js';
+import { currentItem, hasNext, hasPrev, upNextItem, isMulti, entryMode, musicVideosByArtist, musicVideosAll, compareByTitle, compareByArtistThenTitle, startIndex, playlistTrackTarget, playlistQueueKey, initSeq, fairShuffle, toggleShuffle, toggleRepeat, canAdvance, nextSeq, mvTransportVisibility } from '../../core/music-video-playthrough.js';
 
 function seq(items, index) { return { items: items, index: index }; }
 function mv(id, title) { return { id: id, title: title }; }
@@ -97,9 +97,14 @@ describe('entryMode', () => {
     expect(entryMode({ mvItem: 'mv1' })).toBe('mvItem');
     expect(entryMode({ mvArtist: 'ELO', mvItem: 'mv1' })).toBe('mvArtist');
   });
+  it('is "mvAll" when Play All is requested (and no playlist/artist/item)', () => {
+    expect(entryMode({ mvAll: true })).toBe('mvAll');
+    expect(entryMode({ mvItem: 'mv1', mvAll: true })).toBe('mvItem');
+  });
   it('is "series" when a series id is flagged (and no music-video param)', () => {
     expect(entryMode({ isSeries: true })).toBe('series');
     expect(entryMode({ mvItem: 'mv1', isSeries: true })).toBe('mvItem');
+    expect(entryMode({ mvAll: true, isSeries: true })).toBe('mvAll');
   });
   it('is "single" for a standalone film — the default with nothing set', () => {
     expect(entryMode({})).toBe('single');
@@ -145,6 +150,48 @@ describe('compareByTitle', () => {
   it('treats an untitled item as sorting first', () => {
     expect(compareByTitle({ title: null }, { title: 'Alpha' })).toBe(-1);
     expect(compareByTitle({ title: 'Alpha' }, { title: null })).toBe(1);
+  });
+});
+
+// TASK-445 — the Play All source: every artist's music videos, not just one.
+describe('musicVideosAll', () => {
+  const cards = [
+    { section: 'music-videos', artist: 'Zzz Band', id: 'mv-3', title: 'Other Artist' },
+    { section: 'music-videos', artist: 'QOTSA', id: 'mv-1', title: 'Song B' },
+    { section: 'music-videos', artist: 'QOTSA', id: 'mv-2', title: 'Song A' },
+    { section: 'music', artist: 'QOTSA', id: 'alb-1', title: 'An Album' },
+    { section: 'music-videos', collectionType: 'music-video-playlist', id: 'pl-1', title: 'A Playlist' }
+  ];
+  it('spans every artist, artist-then-title order', () => {
+    expect(musicVideosAll(cards).map(c => c.id)).toEqual(['mv-2', 'mv-1', 'mv-3']);
+  });
+  it('excludes cards from other sections', () => {
+    expect(musicVideosAll(cards).some(c => c.id === 'alb-1')).toBe(false);
+  });
+  it('excludes a music-video playlist card (no artist of its own)', () => {
+    expect(musicVideosAll(cards).some(c => c.id === 'pl-1')).toBe(false);
+  });
+  it('is empty for absent cards', () => {
+    expect(musicVideosAll(null)).toEqual([]);
+  });
+});
+
+describe('compareByArtistThenTitle', () => {
+  it('is negative when a\'s artist sorts before b\'s', () => {
+    expect(compareByArtistThenTitle({ artist: 'A' }, { artist: 'B' })).toBe(-1);
+  });
+  it('is positive when a\'s artist sorts after b\'s', () => {
+    expect(compareByArtistThenTitle({ artist: 'B' }, { artist: 'A' })).toBe(1);
+  });
+  it('falls back to title order for the same artist', () => {
+    expect(compareByArtistThenTitle(
+      { artist: 'A', title: 'Alpha' }, { artist: 'A', title: 'Beta' })).toBe(-1);
+    expect(compareByArtistThenTitle(
+      { artist: 'A', title: 'Alpha' }, { artist: 'A', title: 'Alpha' })).toBe(0);
+  });
+  it('treats a missing artist as sorting first', () => {
+    expect(compareByArtistThenTitle({ artist: null }, { artist: 'A' })).toBe(-1);
+    expect(compareByArtistThenTitle({ artist: 'A' }, { artist: null })).toBe(1);
   });
 });
 
