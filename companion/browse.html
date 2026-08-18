@@ -71,8 +71,19 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
 #door:empty { display: none; }
 .door-tile { width: 100%; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; padding: 10px 13px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .door-tile:active, .door-tile:focus { outline: none; border-color: var(--focus); color: var(--focus); }
-#queue-actions { display: flex; gap: 10px; flex-shrink: 0; }
-#btn-play-queue, #btn-play-queue-music, #btn-play-all { flex: 0 0 auto; font-size: 18px; line-height: 1; padding: 8px 13px; border-radius: 999px; border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+/* TASK-445 — a SEPARATE popout beside the ☰ status menu (play controls, not
+   settings/navigation): Play All + the two Play Queue buttons, which used to
+   sit in a flat #queue-actions row that breaks on a phone-width screen once
+   a fourth button joins Search. Mirrors #status-menu's own popout shape
+   (position/open class), anchored to its OWN icon via #queue-menu-mount's
+   position:relative rather than #topbar-actions' — status-menu can get away
+   with anchoring to the row because ☰ is the rightmost item; this icon isn't. */
+#queue-menu-mount { position: relative; }
+#btn-queue-menu { flex: 0 0 auto; font-size: 18px; line-height: 1; padding: 8px 13px; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#btn-queue-menu:active, #btn-queue-menu:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#queue-menu { display: none; flex-direction: column; gap: 10px; position: absolute; top: calc(100% + 8px); right: 0; z-index: 15; width: max-content; max-width: min(280px, calc(100vw - 24px)); padding: 14px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
+#queue-menu.open { display: flex; }
+#btn-play-queue, #btn-play-queue-music, #btn-play-all { width: 100%; text-align: left; font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 #btn-play-queue:active, #btn-play-queue:focus, #btn-play-queue-music:active, #btn-play-queue-music:focus, #btn-play-all:active, #btn-play-all:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #screen-bar { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
 #screen-bar:empty { display: none; }
@@ -123,10 +134,13 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
 <div id="conn-status">connecting…</div>
 <div id="topbar-actions">
   <button id="btn-search" type="button" aria-label="Search">🔍</button>
-  <div id="queue-actions">
-    <button id="btn-play-all" type="button" style="display:none">▶ Play All</button>
-    <button id="btn-play-queue" type="button" style="display:none">&#127909; (0)</button>
-    <button id="btn-play-queue-music" type="button" style="display:none">&#127925; (0)</button>
+  <div id="queue-menu-mount">
+    <button id="btn-queue-menu" type="button" aria-label="Play controls">▶</button>
+    <div id="queue-menu">
+      <button id="btn-play-all" type="button" style="display:none">▶ Play All</button>
+      <button id="btn-play-queue" type="button" style="display:none">&#127909; (0)</button>
+      <button id="btn-play-queue-music" type="button" style="display:none">&#127925; (0)</button>
+    </div>
   </div>
   <div id="status-menu-mount"></div>
 </div>

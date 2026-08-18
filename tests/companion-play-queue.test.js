@@ -43,6 +43,9 @@ test('Play Queue button shows the count and drives the TV to start the queue', a
   await mockQueue(page, 2);
   await page.goto('/companion/browse.html');
   await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
+  // TASK-445 — Play Queue moved into the SEPARATE #queue-menu popout (its own
+  // ▶ icon beside ☰), off the flat #queue-actions row.
+  await page.locator('#btn-queue-menu').click();
   await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (2)');
   await page.locator('#btn-play-queue').click();
   await expect.poll(() => intents.find(i => i.intent === 'navigate' && i.params.page === 'video.html')).toBeTruthy();

@@ -191,7 +191,7 @@ export function initPage() {
   }
 
   // FEAT-040/TASK-255 — the MUSIC twin of the Play-Queue button, sitting beside the
-  // video one (side-by-side in #queue-actions). Count read from the read-only GET
+  // video one in the #queue-menu popout (TASK-445). Count read from the read-only GET
   // /api/playback snapshot (music override queue = play_next). The 🎵 icon (vs the
   // video 🎬) tells which queue each resumes apart — TASK-258 dropped the "Music"/
   // "Video" word for a compact "🎵 (N)" and de-purpled it to match the video button.
@@ -413,6 +413,16 @@ export function initPage() {
   document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
   document.getElementById('btn-play-queue-music').addEventListener('click', onPlayQueueMusic);
   document.getElementById('btn-play-all').addEventListener('click', onPlayAll);
+
+  // TASK-445 — a SEPARATE popout, its own icon beside the ☰ status menu (not
+  // folded into it — this is play controls, not settings/navigation): three
+  // TV-driving buttons that used to sit in a flat #queue-actions row, which
+  // breaks on a phone-width screen once Play All joins Search + the two queue
+  // buttons. Opens/closes only via its own icon, mirroring #btn-status exactly
+  // (never on an outside tap, so the drill underneath stays usable).
+  document.getElementById('btn-queue-menu').addEventListener('click', function() {
+    document.getElementById('queue-menu').classList.toggle('open');
+  });
 
   // Switch-profile drives the TV, so it greys out while desynced (the WS layer
   // already no-ops its intent; this is the visible half — no dead click).
