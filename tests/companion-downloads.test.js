@@ -39,6 +39,23 @@ function installFakeDownloadsEnv() {
       },
       getDirectoryHandle: function(dname) {
         return Promise.resolve(makeDirHandle(path + dname + '/'));
+      },
+      // BUG-437 — the disk-status re-check walks a playlist dir's direct
+      // children (core/downloads-disk-status.js's audioFileCount), matching
+      // the real FileSystemDirectoryHandle.values() async-iterator shape:
+      // one { kind: 'file', name } entry per direct child key under `path`.
+      values: function() {
+        var entries = Object.keys(window.__dlFiles).filter(function(key) {
+          return key.indexOf(path) === 0 && key.slice(path.length).indexOf('/') === -1;
+        }).map(function(key) { return { kind: 'file', name: key.slice(path.length) }; });
+        var i = 0;
+        return {
+          next: function() {
+            var done = i >= entries.length;
+            return Promise.resolve(done ? { value: undefined, done: true } : { value: entries[i++], done: false });
+          },
+          [Symbol.asyncIterator]: function() { return this; }
+        };
       }
     };
   }
@@ -181,6 +198,8 @@ test.describe('with the File System Access API', () => {
     await page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-check').check();
     await page.locator('#btn-sync').click();
     await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Synced');
+    // BUG-437 story 3 — the summary line also updates once a live sync completes.
+    await expect(page.locator('#sync-summary')).toHaveText('1 of 2 synced');
     const files = await page.evaluate(() => Object.keys(window.__dlFiles));
     expect(files).toContain('grew-tv/Road Trip/01 - ELO - Sweet Talkin Woman.m4a');
     expect(files).toContain('grew-tv/Road Trip/02 - ELO - Turn to Stone.m4a');
@@ -203,6 +222,40 @@ test.describe('with the File System Access API', () => {
     await page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-check').check();
     await expect(page.locator('#btn-sync')).toBeEnabled();
     await expect(page.locator('#btn-sync')).toHaveText('Sync selected (1)');
+  });
+
+  // BUG-437 — a folder that already has every track + its .m3u (from an
+  // earlier sync run, a different browser/profile sharing the same picked
+  // folder, or a manual copy) reads Synced as soon as it loads, without
+  // ever tapping Sync in this browser (stories 1 & 2 — the check runs the
+  // same way whichever path handed the page the folder handle).
+  test('BUG-437: a folder that already has every track + its .m3u reads Synced without syncing in this browser', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__dlFiles = {
+        'grew-tv/Road Trip/01 - Already There.m4a': new Uint8Array(),
+        'grew-tv/Road Trip/02 - Also There.m4a': new Uint8Array(),
+        'grew-tv/Road Trip/Road Trip.m3u': new Uint8Array()
+      };
+    });
+    await page.goto('/companion/downloads.html?profile=kids');
+    await page.locator('#btn-choose-folder').click();
+    await expect(page.locator('.pl-row', { hasText: 'Road Trip' }).locator('.pl-status')).toHaveText('2 tracks — Synced');
+  });
+
+  // BUG-437 story 3 — a page-level "N of M synced" line, updating as each
+  // playlist's own disk check resolves (Road Trip's folder is pre-seeded
+  // complete; Empty Mix has no folder at all, so it stays Not synced).
+  test('BUG-437: the summary line counts how many playlists are Synced', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__dlFiles = {
+        'grew-tv/Road Trip/01 - Already There.m4a': new Uint8Array(),
+        'grew-tv/Road Trip/02 - Also There.m4a': new Uint8Array(),
+        'grew-tv/Road Trip/Road Trip.m3u': new Uint8Array()
+      };
+    });
+    await page.goto('/companion/downloads.html?profile=kids');
+    await page.locator('#btn-choose-folder').click();
+    await expect(page.locator('#sync-summary')).toHaveText('1 of 2 synced');
   });
 
   // BUG-416 (Musicolet folder-per-playlist) — each playlist now lives in its

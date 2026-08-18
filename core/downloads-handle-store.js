@@ -51,3 +51,14 @@ export async function ensureReadWritePermission(handle) {
   var requested = await handle.requestPermission(opts);
   return requested === 'granted';
 }
+
+// BUG-437 — the Downloads page's own on-load disk-status re-check
+// (core/downloads-disk-status.js) needs to know it may read the folder
+// without ever prompting: queryPermission never shows a picker (only
+// requestPermission does), so this is safe to call on page load with no
+// user gesture, unlike ensureReadWritePermission's requestPermission
+// fallback above, which is reserved for the Sync tap.
+export async function hasReadPermission(handle) {
+  var status = await handle.queryPermission({ mode: 'read' });
+  return status === 'granted';
+}
