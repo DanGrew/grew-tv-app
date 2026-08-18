@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { getStoredHandle, setStoredHandle, ensureReadWritePermission } from '../../core/downloads-handle-store.js';
+import { getStoredHandle, setStoredHandle, ensureReadWritePermission, hasReadPermission } from '../../core/downloads-handle-store.js';
 
 // A minimal fake of the IndexedDB contract this module actually calls
 // (open -> onupgradeneeded/onsuccess/onerror, one object store's get/put,
@@ -159,5 +159,26 @@ describe('ensureReadWritePermission', () => {
   it('is false when the request is denied', async () => {
     var handle = fakeHandle('prompt', 'denied');
     expect(await ensureReadWritePermission(handle)).toBe(false);
+  });
+});
+
+// BUG-437 — the Downloads page's on-load disk-status re-check runs with no
+// user gesture, so it may only ever query, never request (requestPermission
+// is reserved for the Sync tap's ensureReadWritePermission above).
+describe('hasReadPermission', () => {
+  it('is true when read access is already granted', async () => {
+    var handle = fakeHandle('granted');
+    expect(await hasReadPermission(handle)).toBe(true);
+    expect(handle.calls.query).toEqual([{ mode: 'read' }]);
+    expect(handle.calls.request).toEqual([]);
+  });
+  it('is false, with no request, when not granted', async () => {
+    var handle = fakeHandle('prompt');
+    expect(await hasReadPermission(handle)).toBe(false);
+    expect(handle.calls.request).toEqual([]);
+  });
+  it('is false when read access was denied', async () => {
+    var handle = fakeHandle('denied');
+    expect(await hasReadPermission(handle)).toBe(false);
   });
 });

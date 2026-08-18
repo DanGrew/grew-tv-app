@@ -7,9 +7,11 @@
 // text) lives in core/ — this module is DOM glue only, kept cyclomatic-1.
 import { loadBrowse } from '../../core/app-api.js';
 import { playlistCards } from '../../core/playlist-pick.js';
-import { getStoredHandle, setStoredHandle, ensureReadWritePermission } from '../../core/downloads-handle-store.js';
+import { getStoredHandle, setStoredHandle, ensureReadWritePermission, hasReadPermission } from '../../core/downloads-handle-store.js';
 import { syncCheckedPlaylists } from '../../core/downloads-sync.js';
+import { refreshPlaylistSyncStatus } from '../../core/downloads-disk-status.js';
 import { playlistStatusText, syncFailureText } from '../../core/downloads-status-text.js';
+import { isSynced } from '../../core/downloads-synced.js';
 
 var PANEL_DISPLAY = { true: 'flex', false: 'none' };
 var CHECK_TOGGLE = { true: false, false: true };
@@ -30,6 +32,7 @@ export function initPage() {
     folderPicker: document.getElementById('folder-picker'),
     playlistPanel: document.getElementById('playlist-panel'),
     folderChip: document.getElementById('folder-chip'),
+    summary: document.getElementById('sync-summary'),
     list: document.getElementById('pl-list'),
     syncBtn: document.getElementById('btn-sync'),
     status: document.getElementById('dl-status')
@@ -96,9 +99,19 @@ export function initPage() {
     els.syncBtn.disabled = syncDisabled();
   }
 
+  // BUG-437 — plain derived count off today's isSynced() flag: no new
+  // state, just a summary line above the row list that a re-render (initial
+  // isSynced-only render, each disk check resolving, or a live sync
+  // completing) picks up for free, same as every row's own status text.
+  function renderSummary() {
+    var synced = state.playlists.filter(function(pl) { return isSynced(pl.id); }).length;
+    els.summary.textContent = synced + ' of ' + state.playlists.length + ' synced';
+  }
+
   function render() {
     renderList();
     renderSyncBtn();
+    renderSummary();
   }
 
   function onTrackProgress(playlistId, done, total) {
@@ -135,11 +148,37 @@ export function initPage() {
   }
   els.syncBtn.addEventListener('click', onSyncClick);
 
+  // BUG-437 — one on-load pass re-deriving each row's Synced status from
+  // the actual grew-tv/<title>/ folder, not just today's persisted flag
+  // (see the constraint: queryPermission never prompts, so this is safe to
+  // run with no user gesture; requestPermission is reserved for the Sync
+  // tap). A check that resolves false (not on disk) still updates the flag
+  // — that's a normal check result. A check that rejects (a real FS error)
+  // leaves the row exactly as it was; row and count pick up each resolution
+  // independently via its own render(), not a batched one at the end.
+  function refreshOneSyncStatus(pl) {
+    refreshPlaylistSyncStatus(state.handle, pl).then(render).catch(function() {});
+  }
+
+  function refreshSyncStatuses() {
+    state.playlists.forEach(refreshOneSyncStatus);
+  }
+
+  function afterReadPermission(granted) {
+    var ACT = { true: refreshSyncStatuses, false: function() {} };
+    ACT[Boolean(granted) + '']();
+  }
+
+  function checkSyncStatuses() {
+    hasReadPermission(state.handle).then(afterReadPermission).catch(function() {});
+  }
+
   function loadPlaylists() {
     loadBrowse(server, profile)
       .then(function(res) {
         state.playlists = playlistCards([res.content].filter(Boolean).concat([[]])[0]);
         render();
+        checkSyncStatuses();
       })
       .catch(function() { showStatus('Could not load playlists.'); });
   }
