@@ -10,13 +10,16 @@ const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js')
 // shuffle is a live Queue View toggle (owner correction from an earlier
 // two-button design), tested below.
 //
-// NOT covered here: queue isolation (a queued film must never play after a
-// Home Movies Play All source ends) is a pure backend engine/API concern —
-// this app has no client-side queue-vs-source precedence logic of its own to
-// test (every advance is a plain server round-trip), so re-asserting it
-// against a hand-authored JS mock would only prove the mock, not the app.
-// It's covered thoroughly in grew-tv's own suite
-// (test_video_playback_engine.py QueueIsolationTests).
+// NOT covered here: the dual-queue domain split (a queued film must never
+// surface, or play, while Home Movies Play All plays, and vice versa) is a
+// pure backend engine/API concern — this app has no client-side
+// queue-vs-source/domain logic of its own to test (every advance is a plain
+// server round-trip, reading one `override_queue` snapshot key with no
+// domain awareness), so re-asserting it against a hand-authored JS mock would
+// only prove the mock, not the app. It's covered thoroughly in grew-tv's own
+// suite (test_video_playback_engine.py's DualQueueTests +
+// HomeMoviesQueueDomainTests, test_api_video_playback[_unit].py, and the
+// schema/state-sync round-trip tests).
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
