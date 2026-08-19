@@ -52,8 +52,11 @@ export function initBrowsePage() {
   // control, shown only on a tab that has one. Keyed by tab id (not
   // hardcoded to Music Videos) so a future tab (TASK-446's Home Movies) adds
   // one map entry, no branch. renderBrowse's onTabChange fires this on every
-  // tab select, including the initial one.
-  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 } };
+  // tab select, including the initial one. TASK-446 (owner correction): ONE
+  // entry point, always unshuffled — shuffle is a live toggle inside the
+  // player's Queue View (core/video-queue-view.js), matching every other
+  // media source's shuffle UX, not a second pre-entry button.
+  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 }, 'home-movies': { homeMoviesAll: 1 } };
   function showPlayAll(tabId) {
     var btn = document.getElementById('btn-play-all');
     btn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[!!PLAY_ALL_PARAMS[tabId] + ''];

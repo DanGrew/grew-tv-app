@@ -67,11 +67,12 @@ export function initVideoPage() {
   var mvArtist   = getParam('musicVideoArtist');
   var mvTrack    = getParam('musicVideoTrack');
   var mvAll      = getParam('musicVideoAll');
+  var homeMoviesAll = getParam('homeMoviesAll');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
   var person   = getPerson();
   var isSeries = !!seriesId;
-  var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, isSeries: isSeries });
+  var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, isSeries: isSeries });
   var MV_MODE = { mvItem: true, mvPlaylist: true, mvArtist: true, mvAll: true };
   var isMusicVideo = !!MV_MODE[mode];
   var wsApp = null;
@@ -460,6 +461,21 @@ export function initVideoPage() {
       .then(function() { sendAction('play-video', { video_id: videoId }); })
       .catch(function() {});
   }
+  // TASK-446 — Home Movies Play All: SERVER-authoritative like startSeries
+  // above (the video engine's own `home-movies-all` source), not the
+  // client-owned mv* path below — isMusicVideo is false for this mode, so
+  // breadcrumbs/resync/snapshot-render/series-transport all fall through to
+  // the exact same code series already exercises, for free. No series id to
+  // fetch a title for (mirrors startSingle, not startSeries). ONE entry point,
+  // always unshuffled — shuffle is a live Queue View toggle (owner
+  // correction), not a param here, matching every other media source.
+  function startHomeMoviesAll() {
+    mountCrumbs();
+    armEngineTimeout();
+    initCaptions(SERVER)
+      .then(function() { sendAction('play-source', { source_type: 'home-movies-all' }); })
+      .catch(function() {});
+  }
   // FEAT-040 (Play Queue): entered with ?playQueue (no video/series) — fire
   // play-queue (the server pops + plays the queue head) and render from the
   // snapshot like the others. Lets you START the queue without opening a random
@@ -524,6 +540,7 @@ export function initVideoPage() {
     mvArtist: startMvArtist,
     mvItem: startMvItem,
     mvAll: startMvAll,
+    homeMoviesAll: startHomeMoviesAll,
     series: startSeries,
     single: startSingle
   };

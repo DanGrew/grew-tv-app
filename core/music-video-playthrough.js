@@ -139,9 +139,13 @@ export function mvTransportVisibility(isMusicVideo, isMultiSeq) {
 // the durable video Play Queue wins if requested, then a music-video source
 // (playlist beats artist beats a lone item pick beats the TASK-445 whole-
 // catalog Play All — the four are mutually exclusive in practice; the
-// priority is a defensive fallback, not a real choice), then a series, else a
-// standalone single. Kept in core (not the page) because it branches — ui/**
-// must stay cyclomatic-1.
+// priority is a defensive fallback, not a real choice), then the TASK-446
+// Home Movies whole-catalog Play All (SERVER-authoritative — the video
+// engine's own `home-movies-all` source, not a client-owned seq like the mv*
+// modes above; screen-video-page.js's isMusicVideo stays false for it, so it
+// gets the exact same snapshot-driven treatment a series already does), then
+// a series, else a standalone single. Kept in core (not the page) because it
+// branches — ui/** must stay cyclomatic-1.
 export function entryMode(p) {
   var params = p || {};
   if (params.playQueue) return 'queue';
@@ -149,6 +153,7 @@ export function entryMode(p) {
   if (params.mvArtist) return 'mvArtist';
   if (params.mvItem) return 'mvItem';
   if (params.mvAll) return 'mvAll';
+  if (params.homeMoviesAll) return 'homeMoviesAll';
   if (params.isSeries) return 'series';
   return 'single';
 }

@@ -215,8 +215,10 @@ export function initPage() {
   // TASK-445 — the Play All twin: shown only while drilled into the section
   // that has one (mirrors the TV's own tab-scoped button, screen-browse-page.js
   // PLAY_ALL_PARAMS), and drives the TV via the same navigate() funnel every
-  // other companion action uses — so it greys out while desynced too.
-  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 } };
+  // other companion action uses — so it greys out while desynced too. TASK-446
+  // (owner correction): ONE entry point, always unshuffled — shuffle is a live
+  // toggle inside the player's Queue View, matching every other media source.
+  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 }, 'home-movies': { homeMoviesAll: 1 } };
   function onPlayAll() {
     [PLAY_ALL_PARAMS[state.section]].filter(Boolean)
       .forEach(function(params) { api.sendIntent('navigate', { page: 'video.html', params: Object.assign({ from: 'browse' }, params) }); });

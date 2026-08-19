@@ -9,6 +9,11 @@ const VIDEOS = {
   'bluey-s1e01':      { id: 'bluey-s1e01',      title: 'Daddy Putdown',    profile: 'kids',   duration: 420,  poster: 'bluey.jpg',     subtitles: 'bluey-s1e01.vtt',   type: 'animation', format: 'tv-series', tags: null, available: true },
   'bluey-s1e02':      { id: 'bluey-s1e02',      title: 'The Weekend',      profile: 'kids',   duration: 430,  poster: 'bluey.jpg',     subtitles: null,                type: 'animation', format: 'tv-series', tags: null, available: true },
   'bluey-s1e03':      { id: 'bluey-s1e03',      title: 'Hammerbarn',       profile: 'kids',   duration: 440,  poster: 'bluey.jpg',     subtitles: null,                type: 'animation', format: 'tv-series', tags: null, available: true },
+  // TASK-446: the home-movies-all Play All source's fixture cards — two, so
+  // series-mode transport (prev/next) is live and an explicit `next` at the
+  // last item can be exercised (queue-isolation e2e coverage).
+  'millie-walk':      { id: 'millie-walk',      title: 'Millie Walk',      profile: 'kids',   duration: 30,   poster: 'millie.jpg',    subtitles: null,                type: 'home',       format: 'home-movie', tags: { date: '2026-01-06' }, available: true },
+  'beach-day':        { id: 'beach-day',        title: 'Beach Day',        profile: 'kids',   duration: 45,   poster: 'beach.jpg',     subtitles: null,                type: 'home',       format: 'home-movie', tags: { date: '2026-01-07' }, available: true },
   // FEAT-018 audio: album tracks + a standalone single. mediaType audio + ext m4a
   // drive {id}.m4a + the <audio> player; artist drives the now-playing line.
   'ootb-01':          { id: 'ootb-01',          title: 'Turn to Stone',    profile: 'kids',   duration: 227,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
@@ -199,7 +204,8 @@ const BROWSE = {
       { kind: 'video',  id: 'toy-story-main',    title: 'Toy Story',    poster: 'toy-story.jpg', duration: 4860, type: 'animation', section: 'films',       genres: ['animation', 'comedy'], people: null },
       { kind: 'video',  id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg',      duration: 6000, type: 'animation', section: 'films',       genres: null,                    people: null },
       { kind: 'series', id: 'bluey',             title: 'Bluey',        poster: 'bluey.jpg',                     type: 'animation', section: 'series',      genres: ['animation'],           people: null },
-      { kind: 'video',  id: 'millie-walk',       title: 'Millie Walk',  poster: 'millie.jpg',    duration: 30,   type: 'home',      section: 'home-movies', genres: null,                    people: ['millie'] }
+      { kind: 'video',  id: 'millie-walk',       title: 'Millie Walk',  poster: 'millie.jpg',    duration: 30,   type: 'home',      section: 'home-movies', genres: null,                    people: ['millie'] },
+      { kind: 'video',  id: 'beach-day',         title: 'Beach Day',    poster: 'beach.jpg',     duration: 45,   type: 'home',      section: 'home-movies', genres: null,                    people: ['millie'] }
     ]
   },
   adults: {
@@ -694,10 +700,19 @@ function seriesOrderIds(id) {
   return s ? s.items.map(function(it) { return it.video.id; }) : [];
 }
 
+// TASK-446 — the home-movies-all whole-catalog source: every home-movie clip
+// in BROWSE.kids.content, mirroring the real catalog's capture-date order.
+// Two fixture cards — enough for series-mode transport (prev/next) to be
+// live and an explicit `next` at the last item to be e2e-exercisable (queue
+// isolation); multi-item order/shuffle itself is unit-tested against the
+// real engine (grew-tv's own test suite), not re-proven here.
+var HOME_MOVIES_ALL_IDS = ['millie-walk', 'beach-day'];
+
 async function installVideoPlaybackBackend(page) {
-  var state = { sourceType: null, sourceId: null, idx: 0, repeat: false, queue: [], current: null };
+  var state = { sourceType: null, sourceId: null, idx: 0, repeat: false, shuffle: false, queue: [], current: null };
   var live = null;
-  function order() { return seriesOrderIds(state.sourceId); }
+  var ORDER_BY_SOURCE_TYPE = { 'home-movies-all': function() { return HOME_MOVIES_ALL_IDS; } };
+  function order() { return (ORDER_BY_SOURCE_TYPE[state.sourceType] || function() { return seriesOrderIds(state.sourceId); })(); }
   function resolve(id) {
     var v = VIDEOS[id] || { id: id };
     return { item_id: id, title: v.title, poster: v.poster, duration: v.duration, subtitles: v.subtitles, type: v.type, ext: v.ext };
@@ -720,7 +735,7 @@ async function installVideoPlaybackBackend(page) {
       items: o.map(resolve),
       override_queue: pendingQueue().map(function(e) { var r = resolve(e.video_id); r.entry_id = e.entry_id; return r; }),
       source_type: state.sourceType, source_id: state.sourceId,
-      repeat: state.repeat, shuffle: false
+      repeat: state.repeat, shuffle: state.shuffle
     };
   }
   function push() {
@@ -778,6 +793,7 @@ async function installVideoPlaybackBackend(page) {
       state.idx = state.repeat ? wrap(state.idx - 1, len) : Math.max(state.idx - 1, 0);
     },
     'toggle-repeat': function() { state.repeat = !state.repeat; },
+    'toggle-shuffle': function() { state.shuffle = !state.shuffle; },
     'position': function() {}
   };
   var NO_BROADCAST = { position: true };

@@ -208,6 +208,76 @@ describe('BUG-024 — Repeat greyed on a non-repeatable source', () => {
   });
 });
 
+// TASK-446 — Shuffle is a live Queue View toggle for a whole-catalog source
+// (home-movies-all), the same shape Repeat already has, but gated by SOURCE
+// TYPE (not item count): a structural collection (series/boxset/film) has a
+// meaningful narrative order and never gets the pill at all — not shown-
+// disabled (BUG-024's film case), genuinely omitted, since that would be
+// permanent clutter rather than a rare edge case.
+function homeMoviesSnap(idx, shuffle) {
+  var items = [item('hm1', 'Millie Walk', 30, 'hm1.jpg'), item('hm2', 'Beach Day', 45, 'hm2.jpg')];
+  return {
+    now_playing: items[idx],
+    current_item_index: idx,
+    items: items,
+    override_queue: [],
+    source_type: 'home-movies-all',
+    source_id: null,
+    repeat: true,
+    shuffle: shuffle
+  };
+}
+
+describe('videoQueueModel — shuffleable predicate (TASK-446)', () => {
+  it('is true for the home-movies-all source', () => {
+    expect(videoQueueModel(homeMoviesSnap(0, false)).shuffleable).toBe(true);
+  });
+  it('is false for a series/film source', () => {
+    expect(videoQueueModel(snap(0, false)).shuffleable).toBe(false);
+    expect(videoQueueModel(filmSnap(false)).shuffleable).toBe(false);
+  });
+  it('is false for an empty / absent snapshot', () => {
+    expect(videoQueueModel(null).shuffleable).toBe(false);
+    expect(videoQueueModel({}).shuffleable).toBe(false);
+  });
+  it('carries the shuffle flag', () => {
+    expect(videoQueueModel(homeMoviesSnap(0, true)).shuffle).toBe(true);
+    expect(videoQueueModel(homeMoviesSnap(0, false)).shuffle).toBe(false);
+  });
+});
+
+describe('TASK-446 — Shuffle pill omitted for a non-shuffleable source', () => {
+  it('never renders on the TV for a series', () => {
+    var html = videoQueueViewHtml(snap(1, false));
+    expect(html).not.toContain('data-action="toggle-shuffle"');
+  });
+  it('never renders on the TV for a film', () => {
+    var html = videoQueueViewHtml(filmSnap(false));
+    expect(html).not.toContain('data-action="toggle-shuffle"');
+  });
+  it('never renders on the companion for a series', () => {
+    var html = companionVideoQueueHtml(snap(1, false));
+    expect(html).not.toContain('data-action="toggle-shuffle"');
+  });
+});
+
+describe('TASK-446 — Shuffle pill live for home-movies-all, reflecting the flag', () => {
+  it('renders the TV Shuffle pill on when shuffled, glyph + aria-label intact', () => {
+    var html = videoQueueViewHtml(homeMoviesSnap(0, true));
+    expect(html).toContain('class="np-pill on" data-act="transport" data-action="toggle-shuffle" aria-label="Shuffle">&#128256; Shuffle</button>');
+  });
+  it('renders the TV Shuffle pill off when ordered, glyph + aria-label intact', () => {
+    var html = videoQueueViewHtml(homeMoviesSnap(0, false));
+    expect(html).toContain('class="np-pill" data-act="transport" data-action="toggle-shuffle" aria-label="Shuffle">&#128256; Shuffle</button>');
+  });
+  it('renders the companion Shuffle button reflecting the flag, glyph + aria-label intact', () => {
+    var on = companionVideoQueueHtml(homeMoviesSnap(0, true));
+    var off = companionVideoQueueHtml(homeMoviesSnap(0, false));
+    expect(on).toContain('class="ph-tbtn on" data-act="transport" data-action="toggle-shuffle" aria-label="Shuffle">&#128256;</button>');
+    expect(off).toContain('class="ph-tbtn" data-act="transport" data-action="toggle-shuffle" aria-label="Shuffle">&#128256;</button>');
+  });
+});
+
 describe('BUG-024 — Coming Up follows Repeat', () => {
   it('Coming Up is empty when repeat is off', () => {
     expect(videoQueueViewHtml(snap(1, false))).toContain('Nothing coming up');

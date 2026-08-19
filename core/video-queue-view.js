@@ -130,6 +130,12 @@ function thenSection(before, repeat) {
   return { key: 'then', label: 'Then', hint: 'repeats from the top · jump to any', rows: before.map(sourceRow) };
 }
 
+// TASK-446 — which source types may be shuffled. A structural collection
+// (series/boxset) has a meaningful narrative order; a whole-catalog source
+// (home-movies-all) does not, so only it offers Shuffle. A future shuffleable
+// source adds one entry here, no branch — mirrors REPEAT's own item-count gate.
+var SHUFFLEABLE_SOURCE_TYPES = { 'home-movies-all': true };
+
 // The bucketed view-model from a `video_playback` snapshot.
 export function videoQueueModel(snap) {
   var s = snap || {};
@@ -144,16 +150,24 @@ export function videoQueueModel(snap) {
     fromSeriesSection(after, queue.length, repeat),
     thenSection(before, repeat)
   ].filter(Boolean);
-  return { nowPlaying: nowPlayingModel(s), repeat: repeat, repeatable: items.length > 1, sections: sections };
+  return {
+    nowPlaying: nowPlayingModel(s), repeat: repeat, repeatable: items.length > 1,
+    shuffle: !!s.shuffle, shuffleable: !!SHUFFLEABLE_SOURCE_TYPES[s.source_type],
+    sections: sections
+  };
 }
 
 // ── TV overlay markup ───────────────────────────────────────────────────────
 // Reuses the music Queue View's CSS classes (.now-playing/.np-*/.rail-label/
 // .q-row/.q-act/...) so video.html carries the same overlay styles.
 
-// Repeat is a live toggle inside the Queue View (data-act=transport -> the overlay
-// fires toggle-repeat; the snapshot flips the `on` state). Video has no shuffle of
-// the override queue (FEAT-040), so Repeat is the lone transport pill here.
+// Shuffle + Repeat are live toggles inside the Queue View (data-act=transport
+// -> the overlay fires toggle-shuffle / toggle-repeat; the snapshot flips the
+// `on` state) — mirrors music's own Queue View pills (core/queue-view.js)
+// exactly. TASK-446: Shuffle only renders for a shuffleable source
+// (SHUFFLEABLE_SOURCE_TYPES) — a series/boxset never had shuffle meaning, so
+// it is omitted there entirely (not shown-disabled — that would be permanent
+// clutter for every series ever watched, unlike Repeat's rare single-item edge).
 function pill(label, on, action, name) {
   return '<button type="button" class="np-pill' + (on ? ' on' : '') + '" data-act="transport" data-action="' + action + '" aria-label="' + name + '">' + label + '</button>';
 }
@@ -165,12 +179,17 @@ function disabledPill(label, name) {
   return '<button type="button" class="np-pill is-disabled" disabled aria-label="' + name + '">' + label + '</button>';
 }
 
+function shufflePillHtml(shuffle, shuffleable) {
+  if (!shuffleable) return '';
+  return pill('&#128256; Shuffle', shuffle, 'toggle-shuffle', 'Shuffle');
+}
+
 function repeatPill(repeat, repeatable) {
   if (!repeatable) return disabledPill('&#128257; Repeat', 'Repeat');
   return pill('&#128257; Repeat', repeat, 'toggle-repeat', 'Repeat');
 }
 
-function nowPlayingHtml(np, repeat, repeatable) {
+function nowPlayingHtml(np, repeat, repeatable, shuffle, shuffleable) {
   if (!np) return '';
   return '<div class="rail-label">Now Playing</div>' +
     '<div class="now-playing">' +
@@ -179,6 +198,7 @@ function nowPlayingHtml(np, repeat, repeatable) {
         '<div class="np-title">' + escapeHtml(np.title) + '</div>' +
         '<div class="np-status">' +
           '<div class="np-transport">' +
+            shufflePillHtml(shuffle, shuffleable) +
             repeatPill(repeat, repeatable) +
           '</div>' +
           '<span class="np-time">' + escapeHtml(np.durationText) + '</span>' +
@@ -272,7 +292,7 @@ function videoPanels(m, rowEmpty, next, comingUp) {
 // shell). Empty/absent snapshot still renders a stable shell.
 export function videoQueueViewHtml(snap) {
   var m = videoQueueModel(snap);
-  return tabShellHtml(nowPlayingHtml(m.nowPlaying, m.repeat, m.repeatable), videoPanels(m, panelBody, nextBody, panelBody));
+  return tabShellHtml(nowPlayingHtml(m.nowPlaying, m.repeat, m.repeatable, m.shuffle, m.shuffleable), videoPanels(m, panelBody, nextBody, panelBody));
 }
 
 // ── companion (phone) Queue View ───────────────────────────────────────────
@@ -297,11 +317,20 @@ function phRepeatBtn(repeat, repeatable) {
   return phTransportBtn('transport', 'toggle-repeat', '&#128257;', repeat, 'Repeat');
 }
 
-function phTransport(repeat, repeatable) {
+// TASK-446: mirror of the TV shufflePillHtml — omitted entirely (not shown
+// disabled) for a non-shuffleable source (series/boxset), same reasoning:
+// permanent clutter beats a rare edge case, unlike Repeat's single-item one.
+function phShuffleBtn(shuffle, shuffleable) {
+  if (!shuffleable) return '';
+  return phTransportBtn('transport', 'toggle-shuffle', '&#128256;', shuffle, 'Shuffle');
+}
+
+function phTransport(repeat, repeatable, shuffle, shuffleable) {
   return '<div class="ph-transport">' +
     phTransportBtn('transport', 'previous', '&#9198;', false, 'Previous') +
     phTransportBtn('toggle', '', '&#9199;', false, 'Play / pause') +
     phTransportBtn('transport', 'next', '&#9197;', false, 'Next') +
+    phShuffleBtn(shuffle, shuffleable) +
     phRepeatBtn(repeat, repeatable) +
   '</div>';
 }
@@ -317,7 +346,7 @@ function phNowPlaying(m) {
         '<div class="by">' + escapeHtml(np.durationText) + '</div>' +
       '</div>' +
     '</div>' +
-    phTransport(m.repeat, m.repeatable);
+    phTransport(m.repeat, m.repeatable, m.shuffle, m.shuffleable);
 }
 
 function phAct(entry, act, dir, enabled, glyph, label) {
