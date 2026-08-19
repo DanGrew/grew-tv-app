@@ -55,6 +55,18 @@ cross-repo sweep `claude-workflow/tools/mutation-all` (which runs this same
 `npm run test:mutation`). Speed is handled by *when* you run it, never by narrowing
 which tests run.
 
+### Scoping to a branch's diff — `--changed`
+
+`npm run test:mutation -- --changed` (TASK-448, mirrors
+`media-manager/tools/mutation-test.sh`'s TASK-482 shape) scopes the run to this
+branch's diff against `origin/main`, intersected with `stryker.conf.json`'s
+`mutate` glob — never wider than what's already gated, and the same 0-survivors
+bar — via Stryker's own `--mutate` CLI override. At or under 10 changed files in
+that intersection it runs with no approval needed; over 10 it stops before
+invoking Stryker and prints the count and file list for the owner to approve,
+then re-run with `--changed --approved`. A small PR no longer has to choose
+between the full sweep and skipping the gate outright.
+
 ### Which tests run — the whole unit suite, opt-out
 
 Stryker runs the **whole** `tests/unit/**` suite against each mutant — no
