@@ -9,6 +9,8 @@ const VIDEOS = {
   'bluey-s1e01':      { id: 'bluey-s1e01',      title: 'Daddy Putdown',    profile: 'kids',   duration: 420,  poster: 'bluey.jpg',     subtitles: 'bluey-s1e01.vtt',   type: 'animation', format: 'tv-series', tags: null, available: true },
   'bluey-s1e02':      { id: 'bluey-s1e02',      title: 'The Weekend',      profile: 'kids',   duration: 430,  poster: 'bluey.jpg',     subtitles: null,                type: 'animation', format: 'tv-series', tags: null, available: true },
   'bluey-s1e03':      { id: 'bluey-s1e03',      title: 'Hammerbarn',       profile: 'kids',   duration: 440,  poster: 'bluey.jpg',     subtitles: null,                type: 'animation', format: 'tv-series', tags: null, available: true },
+  // TASK-446: the home-movies-all Play All source's one fixture card.
+  'millie-walk':      { id: 'millie-walk',      title: 'Millie Walk',      profile: 'kids',   duration: 30,   poster: 'millie.jpg',    subtitles: null,                type: 'home',       format: 'home-movie', tags: { date: '2026-01-06' }, available: true },
   // FEAT-018 audio: album tracks + a standalone single. mediaType audio + ext m4a
   // drive {id}.m4a + the <audio> player; artist drives the now-playing line.
   'ootb-01':          { id: 'ootb-01',          title: 'Turn to Stone',    profile: 'kids',   duration: 227,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
@@ -694,10 +696,19 @@ function seriesOrderIds(id) {
   return s ? s.items.map(function(it) { return it.video.id; }) : [];
 }
 
+// TASK-446 — the home-movies-all whole-catalog source: every home-movie clip
+// in BROWSE.kids.content, mirroring the real catalog's capture-date order.
+// Only one fixture card today (millie-walk) — enough to prove play-source
+// wires through and the player shows it; multi-item order/shuffle is unit-
+// tested against the real engine (grew-tv's own test suite), not re-proven
+// here against a one-item fixture.
+var HOME_MOVIES_ALL_IDS = ['millie-walk'];
+
 async function installVideoPlaybackBackend(page) {
   var state = { sourceType: null, sourceId: null, idx: 0, repeat: false, queue: [], current: null };
   var live = null;
-  function order() { return seriesOrderIds(state.sourceId); }
+  var ORDER_BY_SOURCE_TYPE = { 'home-movies-all': function() { return HOME_MOVIES_ALL_IDS; } };
+  function order() { return (ORDER_BY_SOURCE_TYPE[state.sourceType] || function() { return seriesOrderIds(state.sourceId); })(); }
   function resolve(id) {
     var v = VIDEOS[id] || { id: id };
     return { item_id: id, title: v.title, poster: v.poster, duration: v.duration, subtitles: v.subtitles, type: v.type, ext: v.ext };

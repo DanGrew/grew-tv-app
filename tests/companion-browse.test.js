@@ -535,6 +535,61 @@ test.describe('companion Play All menu row', () => {
   });
 });
 
+// TASK-446 — the Home Movies Play All / Shuffle All twin: Home Movies is in
+// the default BROWSE fixture (unlike Music Videos above), so no MUSIC_VIDEO_
+// CARDS-style route override is needed.
+test.describe('companion Home Movies Play All / Shuffle All menu row', () => {
+  test.beforeEach(async ({ page }) => {
+    intents = [];
+    await installApi(page);
+    await mockApp(page, intents);
+    await page.goto('/companion/browse.html');
+    await page.locator('#btn-queue-menu').click();
+  });
+
+  test('both hidden at the sections root, shown once drilled into Home Movies', async ({ page }) => {
+    await expect(page.locator('#btn-play-all')).toBeHidden();
+    await expect(page.locator('#btn-shuffle-all')).toBeHidden();
+    await page.locator('.dock-tab[data-section="home-movies"]').click();
+    await expect(page.locator('#btn-play-all')).toBeVisible();
+    await expect(page.locator('#btn-shuffle-all')).toBeVisible();
+  });
+
+  test('both hidden again on a section with no whole-catalog source', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="home-movies"]').click();
+    await expect(page.locator('#btn-play-all')).toBeVisible();
+    await page.locator('.dock-tab[data-section="films"]').click();
+    await expect(page.locator('#btn-play-all')).toBeHidden();
+    await expect(page.locator('#btn-shuffle-all')).toBeHidden();
+  });
+
+  test('Play All drives the TV to the ordered whole-catalog entry', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="home-movies"]').click();
+    await page.locator('#btn-play-all').click();
+    await expect.poll(() => {
+      const nav = intents.find((i) => i.intent === 'navigate' && i.params.page === 'video.html');
+      return nav && nav.params.params;
+    }).toEqual({ from: 'browse', homeMoviesAll: 1 });
+  });
+
+  test('Shuffle All drives the TV to the shuffled whole-catalog entry', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="home-movies"]').click();
+    await page.locator('#btn-shuffle-all').click();
+    await expect.poll(() => {
+      const nav = intents.find((i) => i.intent === 'navigate' && i.params.page === 'video.html');
+      return nav && nav.params.params;
+    }).toEqual({ from: 'browse', homeMoviesAll: 1, shuffle: 1 });
+  });
+
+  test('greys out in Browse mode (no dead click)', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="home-movies"]').click();
+    await expect(page.locator('#btn-shuffle-all')).not.toHaveClass(/desync-off/);
+    await page.locator('#btn-status').click();
+    await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
+    await expect(page.locator('#btn-shuffle-all')).toHaveClass(/desync-off/);
+  });
+});
+
 // TASK-258 (2): the VIDEO queue button reads a compact "🎬 (N)" — media icon +
 // bracketed count, no "Video" word or list icon (mirrors the music button). A
 // dedicated mock carries a `person` in app_state (the top-level mock omits it, so

@@ -53,13 +53,26 @@ export function initBrowsePage() {
   // hardcoded to Music Videos) so a future tab (TASK-446's Home Movies) adds
   // one map entry, no branch. renderBrowse's onTabChange fires this on every
   // tab select, including the initial one.
-  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 } };
+  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 }, 'home-movies': { homeMoviesAll: 1 } };
+  // TASK-446 — Shuffle All: the same whole-catalog source, shuffled — its own
+  // sibling control (not a pre-entry toggle on Play All) because the video
+  // engine's shuffle is decided once, at play-source time (no in-player
+  // toggle-shuffle action exists for video, unlike music). Home Movies only
+  // for now — same keyed-by-tab shape as PLAY_ALL_PARAMS, so a future tab
+  // adds a map entry, no branch.
+  var SHUFFLE_ALL_PARAMS = { 'home-movies': { homeMoviesAll: 1, shuffle: 1 } };
   function showPlayAll(tabId) {
     var btn = document.getElementById('btn-play-all');
     btn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[!!PLAY_ALL_PARAMS[tabId] + ''];
+    var sbtn = document.getElementById('btn-shuffle-all');
+    sbtn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[!!SHUFFLE_ALL_PARAMS[tabId] + ''];
   }
   function onPlayAll() {
     [PLAY_ALL_PARAMS[getActiveTab()]].filter(Boolean)
+      .forEach(function(params) { navTo('video.html', Object.assign({ from: 'browse' }, params)); });
+  }
+  function onShuffleAll() {
+    [SHUFFLE_ALL_PARAMS[getActiveTab()]].filter(Boolean)
       .forEach(function(params) { navTo('video.html', Object.assign({ from: 'browse' }, params)); });
   }
 
@@ -107,6 +120,7 @@ export function initBrowsePage() {
   document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
   document.getElementById('btn-play-queue-music').addEventListener('click', onPlayQueueMusic);
   document.getElementById('btn-play-all').addEventListener('click', onPlayAll);
+  document.getElementById('btn-shuffle-all').addEventListener('click', onShuffleAll);
   document.addEventListener('keydown', dispatchKey);
   mountBreadcrumb('breadcrumb', buildCrumbs('browse'));
 

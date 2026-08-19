@@ -216,9 +216,16 @@ export function initPage() {
   // that has one (mirrors the TV's own tab-scoped button, screen-browse-page.js
   // PLAY_ALL_PARAMS), and drives the TV via the same navigate() funnel every
   // other companion action uses — so it greys out while desynced too.
-  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 } };
+  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 }, 'home-movies': { homeMoviesAll: 1 } };
+  // TASK-446 — the Shuffle All twin, mirroring the TV's own
+  // SHUFFLE_ALL_PARAMS (screen-browse-page.js).
+  var SHUFFLE_ALL_PARAMS = { 'home-movies': { homeMoviesAll: 1, shuffle: 1 } };
   function onPlayAll() {
     [PLAY_ALL_PARAMS[state.section]].filter(Boolean)
+      .forEach(function(params) { api.sendIntent('navigate', { page: 'video.html', params: Object.assign({ from: 'browse' }, params) }); });
+  }
+  function onShuffleAll() {
+    [SHUFFLE_ALL_PARAMS[state.section]].filter(Boolean)
       .forEach(function(params) { api.sendIntent('navigate', { page: 'video.html', params: Object.assign({ from: 'browse' }, params) }); });
   }
 
@@ -413,6 +420,7 @@ export function initPage() {
   document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
   document.getElementById('btn-play-queue-music').addEventListener('click', onPlayQueueMusic);
   document.getElementById('btn-play-all').addEventListener('click', onPlayAll);
+  document.getElementById('btn-shuffle-all').addEventListener('click', onShuffleAll);
 
   // TASK-445 — a SEPARATE popout, its own icon beside the ☰ status menu (not
   // folded into it — this is play controls, not settings/navigation): three
@@ -432,6 +440,8 @@ export function initPage() {
     document.getElementById('btn-play-queue-music').classList.toggle('desync-off', mode.isDesynced());
     document.getElementById('btn-play-all').classList.toggle('desync-off', mode.isDesynced());
     document.getElementById('btn-play-all').style.display = ({ 'true': 'block', 'false': 'none' })[!!PLAY_ALL_PARAMS[state.section] + ''];
+    document.getElementById('btn-shuffle-all').classList.toggle('desync-off', mode.isDesynced());
+    document.getElementById('btn-shuffle-all').style.display = ({ 'true': 'block', 'false': 'none' })[!!SHUFFLE_ALL_PARAMS[state.section] + ''];
     applyRowStepMode();
   }
 

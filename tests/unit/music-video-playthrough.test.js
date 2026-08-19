@@ -101,10 +101,15 @@ describe('entryMode', () => {
     expect(entryMode({ mvAll: true })).toBe('mvAll');
     expect(entryMode({ mvItem: 'mv1', mvAll: true })).toBe('mvItem');
   });
-  it('is "series" when a series id is flagged (and no music-video param)', () => {
+  it('is "homeMoviesAll" when the TASK-446 Home Movies Play All is requested (and no mv* param)', () => {
+    expect(entryMode({ homeMoviesAll: true })).toBe('homeMoviesAll');
+    expect(entryMode({ mvAll: true, homeMoviesAll: true })).toBe('mvAll');
+  });
+  it('is "series" when a series id is flagged (and no music-video/home-movies param)', () => {
     expect(entryMode({ isSeries: true })).toBe('series');
     expect(entryMode({ mvItem: 'mv1', isSeries: true })).toBe('mvItem');
     expect(entryMode({ mvAll: true, isSeries: true })).toBe('mvAll');
+    expect(entryMode({ homeMoviesAll: true, isSeries: true })).toBe('homeMoviesAll');
   });
   it('is "single" for a standalone film — the default with nothing set', () => {
     expect(entryMode({})).toBe('single');

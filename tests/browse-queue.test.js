@@ -156,6 +156,32 @@ test('Play All is hidden on Films, shown on Music Videos, and navigates to the w
   await expect(page).toHaveURL(/video\.html\?.*musicVideoAll=1/);
 });
 
+// TASK-446 — Home Movies gets both Play All (ordered) and Shuffle All; Home
+// Movies is in the default BROWSE fixture (unlike Music Videos above), so no
+// route override is needed.
+test('Play All and Shuffle All are hidden on Films, shown on Home Movies, and navigate to the home-movies-all entry', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await openFilms(page);
+  await expect(page.locator('#btn-play-all')).toBeHidden();
+  await expect(page.locator('#btn-shuffle-all')).toBeHidden();
+  await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
+  await expect(page.locator('#btn-play-all')).toBeVisible();
+  await expect(page.locator('#btn-shuffle-all')).toBeVisible();
+  await page.locator('#btn-play-all').click();
+  await expect(page).toHaveURL(/video\.html\?.*homeMoviesAll=1/);
+  await expect(page).not.toHaveURL(/shuffle=/);
+});
+
+test('Shuffle All navigates to the home-movies-all entry with shuffle=1', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await openFilms(page);
+  await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
+  await page.locator('#btn-shuffle-all').click();
+  await expect(page).toHaveURL(/video\.html\?from=browse&homeMoviesAll=1&shuffle=1/);
+});
+
 test('rail-grid film tiles also carry the ＋ badge and queue', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
