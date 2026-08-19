@@ -83,8 +83,8 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
 #btn-queue-menu:active, #btn-queue-menu:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #queue-menu { display: none; flex-direction: column; gap: 10px; position: absolute; top: calc(100% + 8px); right: 0; z-index: 15; width: max-content; max-width: min(280px, calc(100vw - 24px)); padding: 14px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 #queue-menu.open { display: flex; }
-#btn-play-queue, #btn-play-queue-music, #btn-play-all, #btn-shuffle-all { width: 100%; text-align: left; font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
-#btn-play-queue:active, #btn-play-queue:focus, #btn-play-queue-music:active, #btn-play-queue-music:focus, #btn-play-all:active, #btn-play-all:focus, #btn-shuffle-all:active, #btn-shuffle-all:focus { outline: none; border-color: var(--focus); color: var(--focus); }
+#btn-play-queue, #btn-play-queue-music, #btn-play-all { width: 100%; text-align: left; font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+#btn-play-queue:active, #btn-play-queue:focus, #btn-play-queue-music:active, #btn-play-queue-music:focus, #btn-play-all:active, #btn-play-all:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #screen-bar { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
 #screen-bar:empty { display: none; }
 .screen-bar-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
@@ -138,7 +138,6 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
     <button id="btn-queue-menu" type="button" aria-label="Play controls">▶</button>
     <div id="queue-menu">
       <button id="btn-play-all" type="button" style="display:none">▶ Play All</button>
-      <button id="btn-shuffle-all" type="button" style="display:none">🔀 Shuffle All</button>
       <button id="btn-play-queue" type="button" style="display:none">&#127909; (0)</button>
       <button id="btn-play-queue-music" type="button" style="display:none">&#127925; (0)</button>
     </div>

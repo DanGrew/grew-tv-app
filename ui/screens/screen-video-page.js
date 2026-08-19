@@ -68,7 +68,6 @@ export function initVideoPage() {
   var mvTrack    = getParam('musicVideoTrack');
   var mvAll      = getParam('musicVideoAll');
   var homeMoviesAll = getParam('homeMoviesAll');
-  var homeMoviesShuffle = getParam('shuffle');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
   var person   = getPerson();
@@ -467,14 +466,14 @@ export function initVideoPage() {
   // client-owned mv* path below — isMusicVideo is false for this mode, so
   // breadcrumbs/resync/snapshot-render/series-transport all fall through to
   // the exact same code series already exercises, for free. No series id to
-  // fetch a title for (mirrors startSingle, not startSeries). `shuffle`
-  // (TASK-446, story 2) rides straight through to play-source, which
-  // materializes it server-side.
+  // fetch a title for (mirrors startSingle, not startSeries). ONE entry point,
+  // always unshuffled — shuffle is a live Queue View toggle (owner
+  // correction), not a param here, matching every other media source.
   function startHomeMoviesAll() {
     mountCrumbs();
     armEngineTimeout();
     initCaptions(SERVER)
-      .then(function() { sendAction('play-source', { source_type: 'home-movies-all', shuffle: !!homeMoviesShuffle }); })
+      .then(function() { sendAction('play-source', { source_type: 'home-movies-all' }); })
       .catch(function() {});
   }
   // FEAT-040 (Play Queue): entered with ?playQueue (no video/series) — fire
