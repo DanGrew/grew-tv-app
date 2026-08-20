@@ -29,6 +29,14 @@ var DESTINATIONS = [
     port: 8090,
     tvPath: '/app/tv.html',
     remotePath: '/app/remote.html'
+  },
+  {
+    id: 'ark',
+    name: 'Ark',
+    icon: '🐟',
+    port: 8095,
+    tvPath: '/tank.html',
+    remotePath: '/remote.html'
   }
 ];
 
