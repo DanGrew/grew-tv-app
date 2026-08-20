@@ -4,10 +4,11 @@ import { setup as setupPlayer } from './screen-video-player.js';
 import { setupVideoQueue } from './screen-video-queue.js';
 import { setupMusicVideoQueue } from './screen-music-video-queue.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadSeries, loadProgress, loadVideo, loadPlaylist, loadBrowse, loadVideoPlayback, videoPlaybackAction, musicVideoPlaybackAction, addToPlaylist } from '../../core/app-api.js';
+import { loadSeries, loadProgress, loadPlaylist, loadBrowse, loadVideoPlayback, loadMusicVideoPlayback, videoPlaybackAction, musicVideoPlaybackAction, addToPlaylist } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { isSwap, upNextItem, upNextLine, seriesMode } from '../../core/video-player-router.js';
-import { currentItem, hasPrev, upNextItem as mvUpNextItem, isMulti as mvIsMulti, entryMode, musicVideosByArtist, musicVideosAll, startIndex, initSeq, toggleShuffle, toggleRepeat, canAdvance, nextSeq } from '../../core/music-video-playthrough.js';
+import { entryMode } from '../../core/music-video-playthrough.js';
+import * as mvRouter from '../../core/music-video-playback-router.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { gridIndex } from '../../core/playlist-name.js';
 import { buildCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
@@ -28,22 +29,21 @@ import { mountBreadcrumb } from './breadcrumb.js';
 // is nothing to advance to. Both paths resume from watch_progress (the single
 // source of truth for per-item position; the player saves there as it plays).
 //
-// A MUSIC VIDEO (single pick, a music-video playlist, or an artist's music
-// videos — TASK-374) is NEITHER of the above: it runs its own small, client-
-// owned playthrough (core/music-video-playthrough.js) — order + index live on
-// this page, never on a server engine, and never resuming (mv* functions
-// below). The owner explicitly ruled out routing it through the video engine
-// above or the music engine; reusing either was named as the risk this task
-// had to avoid. FEAT-418 (TASK-419/420) later added a THIRD, dedicated
-// music-video engine on its own channel purely to back a Queue View overlay
-// (`queue`, `sendMvAction` below) — actual advance/prev/shuffle/repeat still
-// runs on the client-owned seq untouched; the two are deliberately separate
-// state until a future task (if any) migrates playthrough itself onto the
-// engine. TASK-441 keeps that separate engine's OWN source_type/source_id/
-// current_video_id pointed at whatever the client-owned seq is actually
-// playing (sendMvSource/sendMvVideo below) — a read-model sync, not a driver
-// change, so the Queue View stops showing stale state left over from the last
-// time it was itself used.
+// A MUSIC VIDEO (single pick, a music-video playlist, an artist's music
+// videos, or the whole-catalog Play All — TASK-374/445) is NEITHER of the
+// above: it is SERVER-AUTHORITATIVE too, on its OWN engine + channel
+// (FEAT-418, TASK-419/420) — the owner explicitly ruled out routing it
+// through the video engine above or the music engine, so it got a third,
+// dedicated one rather than reusing either. BUG-485 retired the earlier
+// client-owned `seq` playthrough (core/music-video-playthrough.js,
+// TASK-374/407) that used to drive this directly: every mv* function below
+// instead fires a `/api/music-video-playback` action and renders from the
+// `music_video_playback` snapshot the backend pushes (core/
+// music-video-playback-router.js turns it into the view-model), the exact
+// same play-source/next/previous/toggle-* shape the series/film engine above
+// already uses — so the Queue View's own row controls, the TV's on-screen
+// transport, and the companion's Plane-B POSTs all drive the SAME state and
+// can never disagree about what is actually playing.
 var SERVER = window.location.origin;
 
 var RESUME_BY_RESTART = {
@@ -82,7 +82,7 @@ export function initVideoPage() {
   var loadedId = null;     // which item id is currently loaded in <video>
   var currentTitle = '';   // current item's title (for the breadcrumb leaf)
   var seriesTitle = null;  // cached series title for the middle crumb
-  var seq = initSeq([], 0);  // music-video mode only (core/music-video-playthrough)
+  var mvSnapshot = {};     // latest music_video_playback snapshot (music-video mode only)
   var enginePending = null;  // ENGINE_TIMEOUT_MS watchdog, armed per engine action, cleared on first swap
   // TASK-422: the music-video playback source's own crumb — { label, page, params }
   // linking to its playlist/artist page, mirroring BUG-044's audio sourceCrumb.
@@ -91,32 +91,28 @@ export function initVideoPage() {
   var mvSourceCrumb = null;
 
   function sendAction(action, body) { videoPlaybackAction(SERVER, action, person, body).catch(function() {}); }
-  // FEAT-418 (TASK-419/420): the music-video Queue View's own action sender —
-  // POSTs to the separate /api/music-video-playback engine, never the video
-  // engine above. Returns the POST promise (TASK-441) so the playthrough's
-  // own entry sync can chain play-video after play-source resolves. A
-  // function EXPRESSION, not a declaration — same reason screen-audio-page's
-  // own sendAction is one: it is an IO call (no DOM token, returns a value),
-  // which the no-pure-fn-outside-core arch check would otherwise flag as
-  // "move to core/", but it closes over SERVER/person and only fans out a
-  // request, so it belongs here.
+  // FEAT-418 (TASK-419/420, BUG-485): the music-video engine's own action
+  // sender — POSTs to the separate /api/music-video-playback engine, never the
+  // video engine above. Returns the POST promise so mvBegin's entry chain can
+  // fire play-video after play-source resolves. A function EXPRESSION, not a
+  // declaration — same reason screen-audio-page's own sendAction is one: it is
+  // an IO call (no DOM token, returns a value), which the no-pure-fn-outside-
+  // core arch check would otherwise flag as "move to core/", but it closes
+  // over SERVER/person and only fans out a request, so it belongs here.
   var sendMvAction = function(action, body) { return musicVideoPlaybackAction(SERVER, action, person, body).catch(function() {}); };
-  // TASK-441 — source_type/source_id for the CURRENT mv playthrough, keyed off
-  // the same `mode` entryMode() already resolved (mvItem/mvPlaylist/mvArtist
-  // are mutually exclusive per page load) — mirrors the catalog's own
-  // "mv-item"/"mv-artist"/"mv-playlist" registered names
+  // source_type/source_id for the CURRENT mv playthrough, keyed off the same
+  // `mode` entryMode() already resolved (mvItem/mvPlaylist/mvArtist/mvAll are
+  // mutually exclusive per page load) — mirrors the catalog's own
+  // "mv-item"/"mv-artist"/"mv-playlist"/"mv-all" registered names
   // (media-manager/db/music_video_playback_engine.py).
   var MV_SOURCE_TYPE = { mvItem: 'mv-item', mvPlaylist: 'mv-playlist', mvArtist: 'mv-artist', mvAll: 'mv-all' };
   var MV_SOURCE_ID = { mvItem: function() { return mvItem; }, mvPlaylist: function() { return mvPlaylist; }, mvArtist: function() { return mvArtist; }, mvAll: function() { return null; } };
-  // TASK-441 — keeps the FEAT-418 queue engine's source/now-playing in step
-  // with the client-owned `seq` that actually drives playback. sendMvSource
-  // fires once, at mvBegin; sendMvVideo fires on every swap (mvBegin's first
-  // item, then every mvGoNext/mvGoPrev) — the same two-action, source-then-
-  // video pattern screen-audio-page's fireEntry/jumpToTrack already uses, to
-  // avoid the same un-awaited-race last-writer-wins hazard its own comment
-  // documents. No shuffle/repeat on play-source — both already default true
-  // server-side AND client-side (initSeq), the same omission TASK-420/421
-  // already made.
+  // The two-action entry pattern (play-source then play-video), mirroring the
+  // shipped music page's own fireEntry/jumpToTrack — sendMvVideo fires only
+  // from mvBegin's own start id (a tapped mvItem/mvTrack); a plain next/
+  // previous fires its own action directly (ON_NEXT/ON_PREV below), the
+  // engine walks its own order. No shuffle/repeat on play-source — both
+  // already default true server-side when omitted (TASK-420/421).
   function sendMvSource() { return sendMvAction('play-source', { source_type: MV_SOURCE_TYPE[mode], source_id: MV_SOURCE_ID[mode]() }); }
   function sendMvVideo(id) { sendMvAction('play-video', { video_id: id }); }
 
@@ -172,10 +168,10 @@ export function initVideoPage() {
   // action — only the push was lost). Once activate_person is confirmed, pull
   // the current snapshot directly (the same GET FEAT-040's Play Queue already
   // reads) and apply it — a no-op if the push already landed (isSwap sees the
-  // same item_id), the fix if it didn't. Music-video mode never touches this
-  // engine, so it sits out.
+  // same item_id), the fix if it didn't. BUG-485: music-video mode now rides
+  // its own engine the same way, so it gets the same resync off its own GET.
   var RESYNC_ON_ACTIVATE = {
-    'true':  function() {},
+    'true':  function() { loadMusicVideoPlayback(SERVER, person).then(applyMvSnapshot).catch(function() {}); },
     'false': function() { loadVideoPlayback(SERVER, person).then(applySnapshot).catch(function() {}); }
   };
   function resyncOnActivate() { RESYNC_ON_ACTIVATE[isMusicVideo + ''](); }
@@ -225,65 +221,89 @@ export function initVideoPage() {
     })[!!next + '']();
   }
 
-  // ── music-video playthrough (TASK-374): a client-owned seq, never the video
-  // engine above. Always starts at 0 — no loadProgress, no resume (the video
-  // player "assumes resume"; this deliberately never asks it to). No "Up next"
-  // countdown either — a music video advances directly, like a song
-  // (screen-audio-page's onEnded), not like a film's 5s overlay.
-  function mvSwap() {
-    var item = currentItem(seq);
-    loadVideo(SERVER, item.id).then(function(record) {
-      loadedId = record.id;
-      currentTitle = record.title;
-      player.playVideo(record, from, 0);
-      [mvUpNextItem(seq)].filter(Boolean).forEach(function(n) { player.setUpNext('Up next: ', n.title); });
-      mountCrumbs();
-    }).catch(function() { navTo('error.html'); });
+  // ── music-video playthrough (BUG-485): server-authoritative, mirroring the
+  // series/film block above but over the `music_video_playback` snapshot
+  // (core/music-video-playback-router.js). Always starts at 0 — no
+  // loadProgress, no resume (the video player "assumes resume"; this
+  // deliberately never asks it to). No "Up next" countdown either — a music
+  // video advances directly, like a song (screen-audio-page's onEnded), not
+  // like a film's 5s overlay.
+  function renderMvUpNextLine() {
+    [mvRouter.upNextLine(mvSnapshot)].filter(Boolean).forEach(function(l) { player.setUpNext(l.prefix, l.label); });
   }
-  // TASK-441: every advance re-syncs the engine's now-playing to the item the
-  // seq just moved to — independent of mvSwap's own (unblocked) media swap.
-  function mvGoNext() { [canAdvance(seq)].filter(Boolean).forEach(function() { seq = nextSeq(seq); mvSwap(); sendMvVideo(currentItem(seq).id); }); }
-  function mvGoPrev() { [hasPrev(seq)].filter(Boolean).forEach(function() { seq.index -= 1; mvSwap(); sendMvVideo(currentItem(seq).id); }); }
+  function mvSwap(np) {
+    clearEngineTimeout();
+    loadedId = np.video_id;
+    currentTitle = np.title;
+    player.playVideo({ id: np.video_id, title: np.title, subtitles: np.subtitles, ext: np.ext }, from, 0);
+    renderMvUpNextLine();
+    mountCrumbs();
+  }
   function mvEnded() {
-    ({ 'true': mvGoNext, 'false': function() { player.stop(); } })[canAdvance(seq) + '']();
+    ({ 'true': function() { sendMvAction('next', {}); }, 'false': function() { player.stop(); } })[!!mvRouter.upNextItem(mvSnapshot) + '']();
   }
-  function mvBegin() {
-    player.setSeriesMode(mvIsMulti(seq));
+  // Add to playlist (below) always targets the CURRENTLY PLAYING video, read
+  // off the live snapshot rather than a locally-tracked id.
+  function mvNowPlayingId() { return [mvRouter.nowPlaying(mvSnapshot)].filter(Boolean).concat([{}])[0].video_id; }
+  // One entry point every mv* start function below chains through: fire
+  // play-source, then (only when a specific item was tapped — a lone pick, or
+  // a playlist track) play-video to explicitly become current, mirroring the
+  // shipped music page's own two-action fireEntry pattern. An artist rail or
+  // Play All has no tapped item — play-source's own first entry is what plays,
+  // same as startSeries/startHomeMoviesAll need no follow-up action either.
+  function mvBegin(startId) {
     document.getElementById('btn-add-playlist').classList.remove('hidden');
-    document.getElementById('btn-mv-shuffle').classList.toggle('hidden', !mvIsMulti(seq));
-    document.getElementById('btn-mv-repeat').classList.toggle('hidden', !mvIsMulti(seq));
-    mvSetTransportOn();
-    // TASK-441: engine sync runs on its OWN chain, entirely independent of the
-    // initCaptions/mvSwap chain below — it must never gate the actual playback
-    // start. play-video is chained after play-source resolves (not fired in
-    // parallel) to avoid the same un-awaited-race last-writer-wins hazard
-    // screen-audio-page's fireEntry comment documents.
-    sendMvSource().then(function() { sendMvVideo(currentItem(seq).id); });
-    initCaptions(SERVER).then(mvSwap).catch(function() {});
+    armEngineTimeout();
+    initCaptions(SERVER)
+      .then(function() { return sendMvSource(); })
+      .then(function() { [startId].filter(Boolean).forEach(sendMvVideo); })
+      .catch(function() {});
   }
 
-  // TASK-407 — Shuffle + Repeat, TV side. The pill's on/off state mirrors
-  // seq.shuffle/repeat straight onto the buttons; the companion mirror reads
-  // the same two flags off the context push below (mirror invariant).
-  function mvSetTransportOn() {
-    document.getElementById('btn-mv-shuffle').classList.toggle('on', !!seq.shuffle);
-    document.getElementById('btn-mv-repeat').classList.toggle('on', !!seq.repeat);
+  // TASK-407 — Shuffle + Repeat, TV side. The pill's on/off state mirrors the
+  // snapshot's own shuffle/repeat straight onto the buttons; the companion
+  // mirror reads the same two flags off the context push below (mirror
+  // invariant). BUG-485: both pills now POST straight to the engine — the
+  // resulting snapshot (queue.applySnapshot + mvSetTransportOn below) is what
+  // actually updates the on/off state, same as every other Queue View action.
+  function mvSetTransportOn(snap) {
+    document.getElementById('btn-mv-shuffle').classList.toggle('on', !!snap.shuffle);
+    document.getElementById('btn-mv-repeat').classList.toggle('on', !!snap.repeat);
   }
-  function mvToggleShuffle() { seq = toggleShuffle(seq); mvSetTransportOn(); sendVideoContext(); }
-  function mvToggleRepeat() { seq = toggleRepeat(seq); mvSetTransportOn(); sendVideoContext(); }
+  function mvApplyMulti(multi) {
+    player.setSeriesMode(multi);
+    document.getElementById('btn-mv-shuffle').classList.toggle('hidden', !multi);
+    document.getElementById('btn-mv-repeat').classList.toggle('hidden', !multi);
+  }
+  function mvToggleShuffle() { sendMvAction('toggle-shuffle', {}); }
+  function mvToggleRepeat() { sendMvAction('toggle-repeat', {}); }
+
+  // BUG-485: the Queue View overlay AND the actual <video> element now render
+  // off the SAME snapshot — repaint the overlay, then swap media only when the
+  // now-playing item actually changed (isSwap), mirroring applySnapshot above.
+  var MV_SWAP = { 'true': function(np) { mvSwap(np); }, 'false': function() { renderMvUpNextLine(); } };
+  function renderMvNowPlaying(np) { MV_SWAP[mvRouter.isSwap(loadedId, mvSnapshot) + ''](np); }
+  function applyMvSnapshot(snap) {
+    mvSnapshot = snap;
+    mvApplyMulti(mvRouter.isMulti(snap));
+    mvSetTransportOn(snap);
+    queue.applySnapshot(snap);
+    [snap.now_playing].filter(Boolean).forEach(renderMvNowPlaying);
+    sendVideoContext();
+  }
 
   // The music-video context push (also fired on every new video load, below) —
-  // pulled out so a shuffle/repeat toggle can re-send it immediately, without
-  // waiting for the next video to start, so the companion's pills never lag.
+  // reflects the live engine snapshot so the companion's title/up-next/pills
+  // never lag behind what the Queue View or the TV's own buttons just did.
   function sendVideoContext() {
     [wsApp].filter(Boolean).forEach(function(ws) {
       ws.sendContext({
         context_id: 'video',
         display: player.currentVideoDisplay(),
         musicVideo: isMusicVideo,
-        musicVideoMulti: mvIsMulti(seq),
-        musicVideoShuffle: !!seq.shuffle,
-        musicVideoRepeat: !!seq.repeat,
+        musicVideoMulti: mvRouter.isMulti(mvSnapshot),
+        musicVideoShuffle: !!mvSnapshot.shuffle,
+        musicVideoRepeat: !!mvSnapshot.repeat,
         musicVideoSource: mvSourceCrumb
       });
     });
@@ -291,7 +311,7 @@ export function initVideoPage() {
 
   // TASK-378 — "Add to playlist" for the CURRENTLY PLAYING music video (works from
   // any mv entry mode — a lone pick, inside a music-video playlist, or an artist's
-  // videos — currentItem(seq) is always the one on screen). Music-video-only: the
+  // videos — mvNowPlayingId() is always the one on screen). Music-video-only: the
   // button stays hidden (CSS) for a series/film, and mvBegin is the only place that
   // reveals it. One sheet, no Play Next option (that is the album-detail per-track
   // sheet's own thing) — just the profile's music-video playlists + New playlist,
@@ -313,12 +333,12 @@ export function initVideoPage() {
     addStatusTimer = setTimeout(hideAddStatus, 2500);
   }
   function addExisting(id, title) {
-    addToPlaylist(SERVER, id, currentItem(seq).id)
+    addToPlaylist(SERVER, id, mvNowPlayingId())
       .then(function() { closeAddSheet(); showAddStatus('Added to ' + title); })
       .catch(function() { closeAddSheet(); showAddStatus('Could not add to playlist.'); });
   }
   function createNewPlaylist() {
-    navTo('playlist-create.html', { addTrack: currentItem(seq).id, collectionType: 'music-video-playlist' });
+    navTo('playlist-create.html', { addTrack: mvNowPlayingId(), collectionType: 'music-video-playlist' });
   }
   function moveAdd(e) {
     var i = addState.cells.indexOf(document.activeElement);
@@ -353,12 +373,12 @@ export function initVideoPage() {
       .catch(function() { showAddStatus('Could not load playlists.'); });
   }
 
-  // Music-video mode never fires a video-playback engine action (next/prev/end
-  // all resolve against the local seq instead) — the owner ruled out routing a
-  // music video through this engine (TASK-374).
+  // Music-video mode never fires the video-playback engine (next/prev/end all
+  // resolve against its OWN engine instead, above) — the owner ruled out
+  // routing a music video through this one (TASK-374).
   var ON_ENDED = { 'true': mvEnded, 'false': advanceAuto };
-  var ON_NEXT  = { 'true': mvGoNext, 'false': function() { sendAction('next', {}); } };
-  var ON_PREV  = { 'true': mvGoPrev, 'false': function() { sendAction('previous', {}); } };
+  var ON_NEXT  = { 'true': function() { sendMvAction('next', {}); }, 'false': function() { sendAction('next', {}); } };
+  var ON_PREV  = { 'true': function() { sendMvAction('previous', {}); }, 'false': function() { sendAction('previous', {}); } };
 
   player = setupPlayer({
     video: document.getElementById('video'),
@@ -428,13 +448,9 @@ export function initVideoPage() {
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
-  // FEAT-418 (TASK-419/420): a music-video snapshot only ever repaints the
-  // Queue View overlay — it never drives now-playing/prev/next (that stays the
-  // client-owned seq above), unlike applySnapshot's full video-engine handling.
-  function applyMvQueueSnapshot(snap) { queue.applySnapshot(snap); }
   wsApp = connectApp(window.location.origin, appIntent, {
     onVideoPlayback: applySnapshot,
-    onMusicVideoPlayback: applyMvQueueSnapshot,
+    onMusicVideoPlayback: applyMvSnapshot,
     onPersonActive: resyncOnActivate
   });
 
@@ -497,45 +513,35 @@ export function initVideoPage() {
     mvPlaylist: function(title) { return { label: title, page: 'playlist-detail.html', params: { playlist: mvPlaylist } }; },
     mvArtist:   function() { return { label: mvArtist, page: 'artist.html', params: { artist: mvArtist } }; }
   };
-  // Music-video entries (TASK-374): build the local seq, THEN begin (mvBegin
-  // primes captions + series-mode + the first mvSwap) — none of these ever
-  // call sendAction, so the video engine's own state is untouched.
+  // Music-video entries (TASK-374, BUG-485): fire the engine's play-source for
+  // this mode, then begin (mvBegin primes captions + the engine timeout + the
+  // optional play-video jump). The server resolves the source's own order now
+  // (mv-artist/mv-all no longer need a client-side loadBrowse fetch to sort —
+  // the engine's catalog resolution already matches it, TASK-445).
   function startMvItem() {
-    seq = initSeq([{ id: mvItem, title: '' }], 0);
-    mvBegin();
+    mvBegin(mvItem);
   }
   function startMvPlaylist() {
     loadPlaylist(SERVER, mvPlaylist)
       .then(function(pl) {
-        var items = pl.items.map(function(it) { return it.video; });
+        mvSourceCrumb = MV_SOURCE_CRUMB.mvPlaylist(pl.title);
         // TASK-376/377: reached from the playlist's own detail screen, tapping
         // a specific track — the playthrough starts there, same as an audio
-        // playlist starts from the tapped track, then carries on in order.
-        seq = initSeq(items, startIndex(items, mvTrack));
-        mvSourceCrumb = MV_SOURCE_CRUMB.mvPlaylist(pl.title);
-        mvBegin();
+        // playlist starts from the tapped track, then carries on in order. No
+        // tapped track ⇒ mvBegin(undefined), the playlist's own first item.
+        mvBegin(mvTrack);
       })
       .catch(function() { navTo('error.html'); });
   }
   function startMvArtist() {
-    loadBrowse(SERVER, profile)
-      .then(function(browse) {
-        seq = initSeq(musicVideosByArtist(browse.content, mvArtist), 0);
-        mvSourceCrumb = MV_SOURCE_CRUMB.mvArtist();
-        mvBegin();
-      })
-      .catch(function() { navTo('error.html'); });
+    mvSourceCrumb = MV_SOURCE_CRUMB.mvArtist();
+    mvBegin();
   }
   // TASK-445 — Play All: every music video in the catalog, no source page to
   // link back to (mvSourceCrumb stays null, degrading to Home > leaf like
   // mvItem — story 4 has no equivalent here since there is no single item).
   function startMvAll() {
-    loadBrowse(SERVER, profile)
-      .then(function(browse) {
-        seq = initSeq(musicVideosAll(browse.content), 0);
-        mvBegin();
-      })
-      .catch(function() { navTo('error.html'); });
+    mvBegin();
   }
   var ENTRY = {
     queue: startQueue,

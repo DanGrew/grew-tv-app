@@ -1,5 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadSeries, videoPlaybackAction, loadBrowse, addToPlaylist } from '../../core/app-api.js';
+import { loadSeries, videoPlaybackAction, musicVideoPlaybackAction, loadBrowse, addToPlaylist } from '../../core/app-api.js';
 import { screenPage, displayTitle, seriesIdFromSnap, queryString } from '../../core/companion-utils.js';
 import { nowPlaying, upNextLine, seriesMode } from '../../core/video-player-router.js';
 import { mvTransportVisibility } from '../../core/music-video-playthrough.js';
@@ -15,16 +15,20 @@ import { mountScreenBar } from './companion-screen-bar.js';
 import { mountSyncBar } from './companion-sync-bar.js';
 import { mountStatusMenu } from './companion-status-menu.js';
 
-// Companion player transport (FEAT-017 + FEAT-037/TASK-223). Two planes, by design
-// (the music-companion migration hasn't landed yet, so the shared intent rail must
-// stay). PLANE B — server-authoritative video engine: prev/next/repeat POST to
-// /api/video-playback for the active person and now-playing / up-next / repeat
-// repaint from the per-person `video_playback` snapshot (onVideoPlayback), the SAME
-// snapshot the persistent TV player renders — so a media change the companion drives
-// swaps the TV in place, no forced reload. PLANE A — the legacy WS intent rail still
-// carries play/pause, graduated skip, captions, volume and reset (the <video>'s own
-// transport has no server action); the progress bar is interpolated locally between
-// 1 Hz app_state snapshots. No scrub — seek is a relative skip(deltaSec).
+// Companion player transport (FEAT-017 + FEAT-037/TASK-223). Two planes, by
+// design. PLANE B — server-authoritative engine: prev/next/repeat/shuffle POST
+// straight to the active person's engine (film/series -> /api/video-playback,
+// a music video -> /api/music-video-playback, BUG-485) — the server advances
+// it and broadcasts the resolved snapshot, which repaints BOTH surfaces, so a
+// media change the companion drives swaps the TV in place, no forced reload.
+// Now-playing / up-next / the pills' on/off state still ride the TV's own
+// `context` push (onVideoContext below), not a direct snapshot read here —
+// unchanged plumbing, now reflecting the engine's truth for a music video too
+// instead of the retired client-owned seq. PLANE A — the legacy WS intent
+// rail still carries play/pause, graduated skip, captions, volume and reset
+// (the <video>'s own transport has no server action); the progress bar is
+// interpolated locally between 1 Hz app_state snapshots. No scrub — seek is a
+// relative skip(deltaSec).
 var JUMP = [
   { d: -10, label: '-10s' }, { d: -30, label: '-30s' }, { d: -120, label: '-2m' }, { d: -600, label: '-10m' }, { d: -1800, label: '-30m' },
   { d: 10, label: '+10s' }, { d: 30, label: '+30s' }, { d: 120, label: '+2m' }, { d: 600, label: '+10m' }, { d: 1800, label: '+30m' }
@@ -159,23 +163,23 @@ export function initPage() {
   }
 
   // PLANE B transport: each fires the same server action the TV player fires
-  // (TASK-222), keyed to the active person — the server advances the engine and
-  // broadcasts the resolved `video_playback` snapshot, which repaints BOTH surfaces.
-  // A music video (TASK-374) never fires this — it has no video-playback engine
-  // session, so a companion tap sends the WS `next`/`prev` intent instead (Plane
-  // A), reaching the TV player's own local playthrough the same way toggle/skip
-  // already do.
+  // (TASK-222 for film/series, FEAT-418/BUG-485 for a music video), keyed to
+  // the active person — the server advances the engine and broadcasts the
+  // resolved snapshot, which repaints BOTH surfaces. A music video posts to
+  // its OWN engine (/api/music-video-playback), never the video-playback one —
+  // the two channels stay apart the same way the TV player's own ON_NEXT/
+  // ON_PREV dispatch does.
   function sendVideoAction(action) { videoPlaybackAction(server, action, state.person).catch(noop); }
-  var PREV_ACTION = { 'true': function() { api.sendIntent('prev'); }, 'false': function() { sendVideoAction('previous'); } };
-  var NEXT_ACTION = { 'true': function() { api.sendIntent('next'); }, 'false': function() { sendVideoAction('next'); } };
-  // TASK-407 — Repeat rides the same Plane A/Plane B split as prev/next above:
-  // a music video's repeat lives in the TV's own client-owned seq (WS intent),
-  // never the video-playback engine. Shuffle is mv-only — its button is
-  // hidden outright for a film/series (applyMusicVideoMode), so the 'false'
-  // branch here is unreachable in practice; kept as a safe no-op rather than
-  // an assumption a stray tap can't happen.
-  var REPEAT_ACTION = { 'true': function() { api.sendIntent('toggleRepeat'); }, 'false': function() { sendVideoAction('toggle-repeat'); } };
-  var SHUFFLE_ACTION = { 'true': function() { api.sendIntent('toggleShuffle'); }, 'false': function() {} };
+  function sendMvAction(action) { musicVideoPlaybackAction(server, action, state.person).catch(noop); }
+  var PREV_ACTION = { 'true': function() { sendMvAction('previous'); }, 'false': function() { sendVideoAction('previous'); } };
+  var NEXT_ACTION = { 'true': function() { sendMvAction('next'); }, 'false': function() { sendVideoAction('next'); } };
+  // TASK-407 — Repeat rides the same Plane B split as prev/next above. Shuffle
+  // is mv-only — its button is hidden outright for a film/series
+  // (applyMusicVideoMode), so the 'false' branch here is unreachable in
+  // practice; kept as a safe no-op rather than an assumption a stray tap
+  // can't happen.
+  var REPEAT_ACTION = { 'true': function() { sendMvAction('toggle-repeat'); }, 'false': function() { sendVideoAction('toggle-repeat'); } };
+  var SHUFFLE_ACTION = { 'true': function() { sendMvAction('toggle-shuffle'); }, 'false': function() {} };
 
   // ── server `video_playback` snapshot -> companion (the now-playing source of
   // truth, mirroring the TV). Now-playing + the breadcrumb leaf, the inline up-next
@@ -269,8 +273,9 @@ export function initPage() {
     HIDE_NAV[on + ''](multi);
   }
   // Repeat's/Shuffle's on/off state during a music video comes off the
-  // context push's own flags (the client-owned seq, never the video-playback
-  // engine snapshot — onVideoPlayback already ignores that snapshot outright
+  // context push's own flags (BUG-485: the TV's own music-video engine
+  // snapshot, relayed through sendVideoContext — never the video-playback
+  // engine's own snapshot; onVideoPlayback already ignores that one outright
   // while state.musicVideo is true, so there is no ordering race with
   // renderRepeat below). Left alone for a film/series, where renderRepeat
   // (off the engine snapshot) is the sole owner of the on/off state.

@@ -108,6 +108,15 @@ export function loadPlayback(serverUrl, person) {
   return getJson(serverUrl + '/api/playback?person=' + encodeURIComponent(person || ''));
 }
 
+// BUG-485 (mirrors loadVideoPlayback): read-only MUSIC-VIDEO playback snapshot
+// for a person, backed by api/music_video_playback.py's GET route. The BUG-439
+// activate-person resync now covers music-video mode too — screen-video-page.js
+// applies this the same way it applies a fresh WS push (core/
+// music-video-playback-router.js).
+export function loadMusicVideoPlayback(serverUrl, person) {
+  return getJson(serverUrl + '/api/music-video-playback?person=' + encodeURIComponent(person || ''));
+}
+
 export function loadVideo(serverUrl, id) {
   return getJson(serverUrl + '/api/video/' + encodeURIComponent(id));
 }
