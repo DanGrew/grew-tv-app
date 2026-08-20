@@ -440,14 +440,16 @@ export function setup(config) {
 
   // Build the native subtitle <track> for the current video (FEAT-015). Absent
   // subtitles ⇒ no track and the CC button stays hidden. On/off follows the
-  // global sticky pref (FEAT-017), not a per-video default.
+  // global sticky pref (FEAT-017), not a per-video default. A home movie
+  // (BUG-489) never gets a CC button, even one still carrying a stray
+  // pre-BUG-449 `subtitles` ref — belt-and-braces on top of the data cleanup.
   function setSubtitleTrack(record) {
     Array.prototype.slice.call(video.querySelectorAll('track'))
       .forEach(function(t) { video.removeChild(t); });
     var cc = document.getElementById('btn-cc');
     cc.classList.add('hidden');
     captionsOn = getCaptions();
-    [record.subtitles].filter(Boolean).forEach(function(file) {
+    [record.subtitles].filter(Boolean).filter(function() { return record.itemType !== 'home-movie'; }).forEach(function(file) {
       var track = document.createElement('track');
       track.kind = 'subtitles';
       track.srclang = 'en';

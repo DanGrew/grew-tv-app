@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
-const { pickPerson } = require('./fixtures/nav.js');
+const { pickPerson, enterBrowse } = require('./fixtures/nav.js');
 
 // Host-agnostic: the app derives its backend from the page origin (BUG-009), so
 // match by path glob, not a hardcoded host.
@@ -622,6 +622,18 @@ test('CC button hidden for a video without subtitles', async ({ page }) => {
   await page.locator('.film-tile[data-id="finding-nemo-main"]').click();
   await expect(page.locator('#screen-video')).toBeVisible();
   await expect(page.locator('#btn-cc')).toHaveClass(/hidden/);
+});
+
+// BUG-489: a home movie never shows CC, even one still carrying a stray
+// `subtitles` ref stamped before BUG-449's ingest fix — beach-day's fixture
+// carries exactly that stray ref (tests/fixtures/api.js).
+test('CC button hidden for a home movie carrying a stale subtitles ref (BUG-489)', async ({ page }) => {
+  await enterBrowse(page, 'kids');
+  await page.goto('/app/homeview/video.html?video=beach-day');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#video')).toHaveAttribute('src', /beach-day/);
+  await expect(page.locator('#btn-cc')).toHaveClass(/hidden/);
+  expect(await page.locator('#video track').count()).toBe(0);
 });
 
 test('subtitles show by default on first play, backend unset (BUG-003)', async ({ page }) => {
