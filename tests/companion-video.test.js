@@ -79,6 +79,13 @@ test('play/pause stays on the legacy intent rail — it is NOT a video-playback 
   expect(posts).toHaveLength(0);
 });
 
+// TASK-488 — the film companion's own Quick Pause link, mirroring audio.html's.
+test('Quick Pause marks the source as video and links to the disconnected page', async ({ page }) => {
+  await page.locator('#c-quickpause').click();
+  await expect(page).toHaveURL(/quick-pause\.html/);
+  expect(await page.evaluate(() => localStorage.getItem('grew-tv-quickpause-source'))).toBe('video');
+});
+
 // TASK-415 — the popout menu's Switch profile, ported from companion-browse.js.
 // The module beforeEach's playback-backend socket doesn't echo `navigate`, so
 // this re-registers a minimal recorder and re-navigates for its own connection.
