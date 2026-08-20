@@ -78,3 +78,46 @@ test('the full companion audio player links out to Quick Pause', async ({ page }
   await page.locator('#c-quickpause').click();
   await expect(page).toHaveURL(/quick-pause\.html/);
 });
+
+// TASK-488 — film's disconnected Quick Pause, mirroring music's but pause-only:
+// reached via video.html's own Quick Pause button, which stamps the source
+// signal quick-pause.html reads to pick its button set and Reconnect target.
+test.describe('reached from the film companion', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('grew-tv-companion-target', 'tv-1');
+      localStorage.setItem('grew-tv-quickpause-source', 'video');
+    });
+  });
+
+  test('shows only Play/Pause — no Next or Previous', async ({ page }) => {
+    await page.goto('/companion/quick-pause.html');
+    await expect(page.locator('#qp-toggle')).toBeVisible();
+    await expect(page.locator('#qp-next')).toBeHidden();
+    await expect(page.locator('#qp-prev')).toBeHidden();
+  });
+
+  test('Play/Pause POSTs toggle for the targeted device, same as music', async ({ page }) => {
+    const posts = spyQuickIntent(page);
+    await page.goto('/companion/quick-pause.html');
+    await page.locator('#qp-toggle').click();
+    await expect.poll(() => posts.length).toBe(1);
+    expect(posts[0]).toEqual({ action: 'toggle', body: { device_id: 'tv-1' } });
+  });
+
+  test('Reconnect takes you back to the film companion, not music', async ({ page }) => {
+    await page.goto('/companion/quick-pause.html');
+    await page.locator('#qp-reconnect').click();
+    await expect(page).toHaveURL(/video\.html/);
+  });
+});
+
+test('the full companion film player links out to Quick Pause', async ({ page }) => {
+  await installApi(page);
+  await page.addInitScript(() => {
+    localStorage.setItem('grew-tv-companion-target', 'tv-1');
+  });
+  await page.goto('/companion/video.html');
+  await page.locator('#c-quickpause').click();
+  await expect(page).toHaveURL(/quick-pause\.html/);
+});

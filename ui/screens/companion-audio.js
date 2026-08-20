@@ -27,6 +27,10 @@ var JUMP = [
   { d: -30, label: '-30s' }, { d: -10, label: '-10s' }, { d: 10, label: '+10s' }, { d: 30, label: '+30s' }
 ];
 var PLAY_ICON = { 'true': '⏸', 'false': '▶' };
+// TASK-488: read by companion-quick-pause.js by name, not import — matches how
+// core/companion-ws.js's TARGET_KEY is already read there (that page opens no
+// connection, so pulling in either module would be the wrong coupling).
+var QP_SOURCE_KEY = 'grew-tv-quickpause-source';
 
 export function initPage() {
   mountStatusMenu(['mode', 'screen', 'profile']);
@@ -355,7 +359,7 @@ export function initPage() {
   // and echoes the new lyricsOn back on app_state — reflectLyrics repaints the pill.
   els.lyrics.addEventListener('click', function() { api.sendIntent('lyrics'); });
   document.getElementById('c-queue').addEventListener('click', function() { window.location.href = 'queue.html'; });
-  document.getElementById('c-quickpause').addEventListener('click', function() { window.location.href = 'quick-pause.html'; });
+  document.getElementById('c-quickpause').addEventListener('click', function() { localStorage.setItem(QP_SOURCE_KEY, 'audio'); window.location.href = 'quick-pause.html'; });
   // BUG-007: same switch-profile path the browse companion uses — drives the TV
   // to the picker via `navigate`, which echoes a `profile` context onContext follows.
   document.getElementById('switch-profile').addEventListener('click', function() { api.sendIntent('navigate', switchProfileTarget()); });

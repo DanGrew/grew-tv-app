@@ -30,6 +30,10 @@ var JUMP = [
   { d: 10, label: '+10s' }, { d: 30, label: '+30s' }, { d: 120, label: '+2m' }, { d: 600, label: '+10m' }, { d: 1800, label: '+30m' }
 ];
 var PLAY_ICON = { 'true': '⏸', 'false': '▶' };
+// TASK-488: read by companion-quick-pause.js by name, not import — matches how
+// core/companion-ws.js's TARGET_KEY is already read there (that page opens no
+// connection, so pulling in either module would be the wrong coupling).
+var QP_SOURCE_KEY = 'grew-tv-quickpause-source';
 
 export function initPage() {
   mountStatusMenu(['mode', 'screen', 'profile']);
@@ -383,6 +387,7 @@ export function initPage() {
   // series Video Queue View otherwise.
   var QUEUE_HREF = { 'true': 'music-video-queue.html', 'false': 'video-queue.html' };
   document.getElementById('c-queue').addEventListener('click', function() { window.location.href = QUEUE_HREF[state.musicVideo + '']; });
+  document.getElementById('c-quickpause').addEventListener('click', function() { localStorage.setItem(QP_SOURCE_KEY, 'video'); window.location.href = 'quick-pause.html'; });
   els.addPlaylist.addEventListener('click', openAddSheet);
   document.getElementById('btn-add-create').addEventListener('click', createNewPlaylist);
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
