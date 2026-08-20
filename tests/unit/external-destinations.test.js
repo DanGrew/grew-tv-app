@@ -31,7 +31,10 @@ describe('externalDestinations', () => {
 });
 
 describe('destinationUrls', () => {
-  var atlas = externalDestinations()[0];
+  var atlas;
+  beforeEach(() => {
+    atlas = externalDestinations()[0];
+  });
 
   it('builds both URLs against the given host (the host grew-tv was served from)', () => {
     expect(destinationUrls(atlas, '192.168.1.50')).toEqual({
