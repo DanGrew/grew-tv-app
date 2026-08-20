@@ -1,7 +1,7 @@
 import { externalDestinations, destinationUrls, launchExternalParams } from '../../core/external-destinations.js';
 
 describe('externalDestinations', () => {
-  it('carries the Atlas entry with its exact config (name, icon, port, paths — no baked host)', () => {
+  it('carries the Atlas and Ark entries with their exact config (name, icon, port, paths — no baked host)', () => {
     expect(externalDestinations()).toEqual([
       {
         id: 'atlas',
@@ -10,6 +10,14 @@ describe('externalDestinations', () => {
         port: 8090,
         tvPath: '/app/tv.html',
         remotePath: '/app/remote.html'
+      },
+      {
+        id: 'ark',
+        name: 'Ark',
+        icon: '🐟',
+        port: 8095,
+        tvPath: '/tank.html',
+        remotePath: '/remote.html'
       }
     ]);
   });
@@ -18,7 +26,7 @@ describe('externalDestinations', () => {
     var first = externalDestinations();
     expect(first).not.toBe(externalDestinations());
     first.push({ id: 'x' });
-    expect(externalDestinations()).toHaveLength(1);
+    expect(externalDestinations()).toHaveLength(2);
   });
 });
 
