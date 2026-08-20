@@ -2,7 +2,7 @@ import {
   loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, saveProgress,
   loadContinueWatching, loadConfig, loadSettings, saveSettings, scanDevices,
   mediaUrl, loadLyrics, resetProgress, playbackAction, videoPlaybackAction, musicVideoPlaybackAction,
-  loadVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
+  loadVideoPlayback, loadMusicVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
   addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
   deletePlaylist, renamePlaylist
 } from '../../core/app-api.js';
@@ -340,6 +340,17 @@ describe('loadVideoPlayback / loadPlayback', () => {
     var calls = fakeFetch({});
     await loadPlayback('http://s');
     expect(calls[0].url).toBe('http://s/api/playback?person=');
+  });
+  it('loadMusicVideoPlayback GETs /api/music-video-playback keyed by person', async () => {
+    var calls = fakeFetch({ now_playing: null });
+    await loadMusicVideoPlayback('http://s', 'mom');
+    expect(calls[0].url).toBe('http://s/api/music-video-playback?person=mom');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('loadMusicVideoPlayback defaults an absent person', async () => {
+    var calls = fakeFetch({});
+    await loadMusicVideoPlayback('http://s');
+    expect(calls[0].url).toBe('http://s/api/music-video-playback?person=');
   });
 });
 
