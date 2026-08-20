@@ -1,12 +1,17 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, BROWSE, MUSIC_VIDEO_CARDS } = require('./fixtures/api.js');
+const { installApi, installMusicVideoPlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS } = require('./fixtures/api.js');
 const { enterBrowse } = require('./fixtures/nav.js');
 
-// TASK-374 — a music video plays through its OWN client-owned playthrough
-// (core/music-video-playthrough.js), never the server-authoritative video
-// engine (video-playback.test.js) or the music queue engine. No
-// installVideoPlaybackBackend here — deliberately: there is no engine session
-// for a music video to ride, and these tests assert that stays true.
+// BUG-485 — a music video plays through its OWN server-authoritative engine
+// (media-manager/db/music_video_playback_engine.py, FEAT-418), the same
+// play-source/next/previous/toggle-* shape film/series already use
+// (video-playback.test.js) — never the film/series video-playback engine or
+// the music queue engine. installMusicVideoPlaybackBackend (tests/fixtures/
+// api.js) simulates it: Play All / an artist rail / a playlist / a lone pick
+// all resolve their own ordered source, and every Queue View action, TV
+// button, and companion Plane-B POST drives the SAME snapshot that swaps the
+// actual <video> element — retiring the earlier client-owned `seq` this bug
+// fixed (core/music-video-playthrough.js's old order+index half, TASK-374/407).
 
 function engineCalls(page) {
   var calls = [];
@@ -19,6 +24,7 @@ function engineCalls(page) {
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
+  await installMusicVideoPlaybackBackend(page);
   await page.route('**/api/browse**', function(route) {
     return route.fulfill({
       status: 200, contentType: 'application/json',
@@ -34,8 +40,6 @@ test('a single music video pick plays in the video player, full picture and soun
   // Built from the record's OWN ext (m4v, TASK-377 never re-encodes), not a
   // hardcoded .mp4 — that mismatch 404'd real playback.
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01\.m4v$/);
-  // The light seq descriptor for a lone pick carries no title (only the id) —
-  // the breadcrumb leaf must come from the fetched record, not stay blank.
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Head Like a Haunted House');
   // TASK-422 (story 4): no playlist/artist source — Home › Title only, unchanged.
   await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'Head Like a Haunted House']);
@@ -96,25 +100,11 @@ test('an artist\'s music videos play through in order the same way', async ({ pa
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/); // no third item — no-op
 });
 
-// TASK-445 — Play All spans every artist. The shared beforeEach's
-// MUSIC_VIDEO_CARDS has 3 videos across 2 artists; with more than one item
-// left after the anchored first, initSeq's fair shuffle of "the rest" is
-// genuinely random (unseeded Math.random in the browser), so this override
-// trims to exactly 2 videos across 2 artists — the single "rest" item is then
-// deterministic, same as the mvArtist test above relies on for QOTSA's two.
+// TASK-445 — Play All spans every artist: the shared beforeEach's
+// MUSIC_VIDEO_CARDS has mv-01/mv-02 (QOTSA) + mv-03 (Muse) — the engine's own
+// mv-all source resolves artist-then-title, deterministically (no client
+// shuffle math to pin down, unlike the retired seq's own anchor-then-shuffle).
 test('Play All spans every artist, artist-then-title order, and has no source page (Home > leaf)', async ({ page }) => {
-  await page.route('**/api/browse**', function(route) {
-    return route.fulfill({
-      status: 200, contentType: 'application/json',
-      body: JSON.stringify({
-        profile: 'kids', genreLabels: BROWSE.kids.genreLabels,
-        content: BROWSE.kids.content.concat([
-          { kind: 'video', id: 'mv-01', title: 'Head Like a Haunted House', poster: 'mv-01.jpg', duration: 210, section: 'music-videos', artist: 'QOTSA', itemType: 'music-video' },
-          { kind: 'video', id: 'mv-03', title: 'Starlight', poster: 'mv-03.jpg', duration: 240, section: 'music-videos', artist: 'Muse', itemType: 'music-video' }
-        ])
-      })
-    });
-  });
   await page.goto('/app/homeview/video.html?musicVideoAll=1&from=browse');
   // Muse < QOTSA alphabetically: Starlight plays first, spanning past QOTSA's rail.
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-03/);
@@ -140,6 +130,7 @@ test('stopped part-way and picked again starts from the beginning, no resume off
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
   expect(await page.evaluate(() => document.getElementById('video').currentTime)).toBe(0);
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
   expect(await page.evaluate(() => document.getElementById('video').currentTime)).toBe(0);
   expect(calls.some(function(u) { return u.indexOf('/api/progress/') > -1; })).toBe(false);
 });
@@ -155,9 +146,8 @@ test('pause, resume, next and previous work as they do for a song', async ({ pag
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/); // already first — no-op, no wrap
 });
 
-// FEAT-418 (TASK-420): the Queue button now opens the music-video Queue View
-// (its own engine, tests/music-video-queue.test.js) instead of hiding —
-// superseded the pre-TASK-420 "queue is hidden" behaviour.
+// FEAT-418 (TASK-420): the Queue button opens the music-video Queue View
+// (its own engine, tests/music-video-queue.test.js).
 test('the Queue button is visible for a music video and opens the music-video Queue View', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
   await expect(page.locator('#btn-queue')).toBeVisible();
@@ -219,13 +209,6 @@ test('Repeat off: the playthrough still ends cleanly at the last item', async ({
 });
 
 test('a music-video card selects the "music-video" route, not the plain video engine route', async ({ page }) => {
-  await installApi(page);
-  await page.route('**/api/browse**', function(route) {
-    return route.fulfill({
-      status: 200, contentType: 'application/json',
-      body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
-    });
-  });
   var appWs = null;
   // BUG-055 pattern (homeview.test.js): every screen boots connectApp, so a
   // captured socket can still be the profile picker's pre-nav one — reset on
@@ -251,13 +234,6 @@ test('a music-video card selects the "music-video" route, not the plain video en
 // to both — and an unknown route silently no-ops there rather than throwing,
 // which turns a missed entry into a dead tap instead of a visible error.
 test('picking a music video from the rail grid plays it, like the browse page does', async ({ page }) => {
-  await installApi(page);
-  await page.route('**/api/browse**', function(route) {
-    return route.fulfill({
-      status: 200, contentType: 'application/json',
-      body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
-    });
-  });
   await page.goto('/app/homeview/profile.html');
   await enterBrowse(page, 'kids');
   await page.goto('/app/homeview/rail-grid.html?section=music-videos&rail=mv-artist:QOTSA');
@@ -267,13 +243,6 @@ test('picking a music video from the rail grid plays it, like the browse page do
 });
 
 test('a music-video playlist card opens its playlist detail, same as any other playlist (TASK-376 — not a direct playthrough)', async ({ page }) => {
-  await installApi(page);
-  await page.route('**/api/browse**', function(route) {
-    return route.fulfill({
-      status: 200, contentType: 'application/json',
-      body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_VIDEO_CARDS) })
-    });
-  });
   var appWs = null;
   page.on('framenavigated', function(frame) { if (frame === page.mainFrame()) appWs = null; });
   await page.routeWebSocket(/:8766/, function(ws) { appWs = ws; });
@@ -287,7 +256,6 @@ test('a music-video playlist card opens its playlist detail, same as any other p
 
 test('tapping a track inside a music-video playlist detail plays it through the video player, starting from that track (TASK-374/376/377)', async ({ page }) => {
   const calls = engineCalls(page);
-  await installApi(page);
   await page.goto('/app/homeview/playlist-detail.html?playlist=pl-mv');
   await expect(page.locator('.detail-row[data-id="mv-02"]')).toBeVisible();
   await page.locator('.detail-row[data-id="mv-02"]').click();
@@ -298,7 +266,6 @@ test('tapping a track inside a music-video playlist detail plays it through the 
 });
 
 test('a plain audio playlist is unaffected — tapping a track still plays through the audio player', async ({ page }) => {
-  await installApi(page);
   await page.goto('/app/homeview/playlist-detail.html?playlist=pl-roadtrip');
   await expect(page.locator('.detail-row').first()).toBeVisible();
   await page.locator('.detail-row').first().click();

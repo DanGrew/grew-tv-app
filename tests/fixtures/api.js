@@ -841,75 +841,160 @@ async function installVideoPlaybackBackend(page) {
   return { seed: seed, snapshot: snapshot };
 }
 
-// FEAT-418 (TASK-419/420): a lean record + re-broadcast mock for the
-// music-video Queue View e2e — NOT a full engine simulation like
-// installVideoPlaybackBackend's ENGINE table (deliberately: this task assumes
-// items are already queued, e.g. via TASK-419's play-source, and only needs
-// something in the queue to render against). Seeded with a snapshot shaped
-// like build_snapshot's own (now_playing/play_next/from_source/then/shuffle/
-// repeat), it applies move/remove/toggle/play-video/play-source against the
-// seeded lists by entry_id/video_id (mirrors music_video_playback_engine.py's
-// own move_queue_entry/remove_queue_entry/play_source) and re-pushes over the
-// `music_video_playback` channel — proof the TV overlay and the companion
-// mirror both repaint from a LIVE snapshot, not a static fixture; TASK-441's
-// tests also seed an EMPTY source_type/source_id and assert the player's own
-// entry sync (screen-video-page.js mvBegin/mvGoNext/mvGoPrev) fills it in,
-// with no Queue View interaction first. Answers BOTH the TV's app-ws
-// handshake (register_device/activate_person) and the companion-ws one
-// (list_devices/register_companion/snapshot_request) so one fixture backs
-// both surfaces.
-async function installMusicVideoQueueBackend(page, seedSnap) {
-  var snap = JSON.parse(JSON.stringify(seedSnap));
+// FEAT-418 (TASK-419/420, BUG-485): a full source-registry engine simulation
+// for the music-video Queue View AND the actual playthrough — the mv twin of
+// installVideoPlaybackBackend's ENGINE table, mirroring
+// media-manager/db/music_video_playback_engine.py's own play-source/play-
+// video/next/previous/toggle-*/queue-* transitions closely enough for e2e
+// determinism. Deliberately does NOT reproduce real shuffle math (a fresh
+// fair permutation is inherently random) — `state.shuffle` is tracked and
+// toggle-able but never actually reorders `state.pass`, the same
+// simplification installVideoPlaybackBackend's own home-movies-all shuffle
+// flag already makes; real shuffle order is proven server-side (grew-tv's own
+// pytest suite), not re-proven here. Sources resolve against this fixture's
+// static catalog tables (VIDEOS/PLAYLISTS/MUSIC_VIDEO_CARDS) directly, same as
+// the real engine resolves against its own DB rather than the mocked
+// `/api/browse` route — a test overriding that route for browse-page
+// rendering has no bearing on what this fixture's mv-artist/mv-all resolve to.
+// Answers BOTH the TV's app-ws handshake (list_devices/activate_person) and
+// the companion-ws one (register_companion/snapshot_request) so one fixture
+// backs both surfaces. `seed(action, body)` lets a test pre-load state (e.g.
+// queue-video before the page opens) without a raw snapshot literal.
+function mvArtistIds(artist) {
+  return MUSIC_VIDEO_CARDS
+    .filter(function(c) { return c.section === 'music-videos' && c.artist === artist; })
+    .slice()
+    .sort(function(a, b) { return a.title < b.title ? -1 : (a.title > b.title ? 1 : 0); })
+    .map(function(c) { return c.id; });
+}
+function mvAllIds() {
+  return MUSIC_VIDEO_CARDS
+    .filter(function(c) { return c.section === 'music-videos' && c.artist; })
+    .slice()
+    .sort(function(a, b) {
+      if (a.artist !== b.artist) return a.artist < b.artist ? -1 : 1;
+      return a.title < b.title ? -1 : (a.title > b.title ? 1 : 0);
+    })
+    .map(function(c) { return c.id; });
+}
+function mvPlaylistIds(id) {
+  var pl = PLAYLISTS[id];
+  return pl ? pl.items.map(function(it) { return it.video.id; }) : [];
+}
+var MV_GEN = {
+  'mv-item': function(id) { return [id]; },
+  'mv-artist': mvArtistIds,
+  'mv-playlist': mvPlaylistIds,
+  'mv-all': mvAllIds
+};
+function mvResolveBase(sourceType, sourceId) { return (MV_GEN[sourceType] || function() { return []; })(sourceId); }
+
+async function installMusicVideoPlaybackBackend(page) {
+  var state = { sourceType: null, sourceId: null, pass: [], pos: 0, currentVideoId: null, currentEntryId: null, queue: [], shuffle: true, repeat: true };
   var live = null;
-  var posts = [];
+  function resolve(id) {
+    var v = VIDEOS[id] || { id: id };
+    return { video_id: id, title: v.title, artist: v.artist, poster: v.poster, duration: v.duration, subtitles: v.subtitles, ext: v.ext };
+  }
+  function nowPlayingId() {
+    if (state.currentVideoId) return state.currentVideoId;
+    return (state.pos >= 0 && state.pos < state.pass.length) ? state.pass[state.pos] : null;
+  }
+  // Pending "Play Next" = the queue minus the currently-playing durable head
+  // (mirrors build_snapshot — only the FRONT is hidden, and only when it IS
+  // the now-playing video's own queue entry).
+  function pendingQueue() {
+    var q = state.queue;
+    return (q.length && state.currentEntryId && q[0].entry_id === state.currentEntryId) ? q.slice(1) : q;
+  }
+  function fromSourceIds() { return state.pass.slice(state.pos + 1); }
+  function thenIds() { return state.repeat ? state.pass.slice() : []; }
+  function snapshot() {
+    var npId = nowPlayingId();
+    return {
+      person_id: 'kids',
+      now_playing: npId ? resolve(npId) : null,
+      play_next: pendingQueue().map(function(e) { var r = resolve(e.video_id); r.entry_id = e.entry_id; return r; }),
+      from_source: fromSourceIds().map(resolve),
+      then: thenIds().map(resolve),
+      shuffle: state.shuffle, repeat: state.repeat,
+      source_type: state.sourceType, source_id: state.sourceId,
+      item_count: state.pass.length
+    };
+  }
   function push() {
-    [live].filter(Boolean).forEach(function(ws) { ws.send(JSON.stringify({ type: 'music_video_playback', payload: snap })); });
+    [live].filter(Boolean).forEach(function(ws) { ws.send(JSON.stringify({ type: 'music_video_playback', payload: snapshot() })); });
   }
-  function listFor(entryId) {
-    return ['play_next', 'from_source', 'then'].filter(function(key) {
-      return (snap[key] || []).some(function(e) { return e.entry_id === entryId; });
-    })[0];
-  }
-  var ACTION = {
-    'move-queue-entry': function(b) {
-      [listFor(b.entry_id)].filter(Boolean).forEach(function(k) {
-        var i = snap[k].findIndex(function(e) { return e.entry_id === b.entry_id; });
-        var j = i + (b.direction === 'up' ? -1 : 1);
-        [j].filter(function(x) { return x >= 0 && x < snap[k].length; }).forEach(function(x) {
-          var t = snap[k][i]; snap[k][i] = snap[k][x]; snap[k][x] = t;
-        });
-      });
-    },
-    'remove-queue-entry': function(b) {
-      [listFor(b.entry_id)].filter(Boolean).forEach(function(k) {
-        snap[k] = snap[k].filter(function(e) { return e.entry_id !== b.entry_id; });
-      });
+
+  var ENGINE = {
+    'play-source': function(b) {
+      var sourceId = b.source_id === undefined ? null : b.source_id;
+      // RESUME in place for the same already-loaded source (mirrors
+      // engine.play_source) — a re-open never reshuffles/restarts.
+      if (state.sourceType === b.source_type && state.sourceId === sourceId && state.pass.length) return;
+      state.sourceType = b.source_type;
+      state.sourceId = sourceId;
+      state.shuffle = b.shuffle === undefined ? true : !!b.shuffle;
+      state.repeat = b.repeat === undefined ? true : !!b.repeat;
+      state.pass = mvResolveBase(state.sourceType, state.sourceId);
+      state.pos = 0;
+      state.currentVideoId = state.pass.length ? state.pass[0] : null;
+      state.currentEntryId = null;
     },
     'play-video': function(b) {
-      var all = (snap.play_next || []).concat(snap.from_source || []).concat(snap.then || []);
-      [all.filter(function(e) { return e.video_id === b.video_id; })[0]].filter(Boolean).forEach(function(e) { snap.now_playing = e; });
+      state.currentVideoId = b.video_id;
+      state.currentEntryId = null;
+      var idx = state.pass.indexOf(b.video_id);
+      if (idx > -1) state.pos = idx;
     },
-    // TASK-441: the player's own entry sync (screen-video-page.js mvBegin) now
-    // fires this once per playthrough — mirrors api/music_video_playback.py's
-    // own play-source handling (state.source_type/source_id).
-    'play-source': function(b) { snap.source_type = b.source_type; snap.source_id = b.source_id; },
-    'toggle-shuffle': function() { snap.shuffle = !snap.shuffle; },
-    'toggle-repeat': function() { snap.repeat = !snap.repeat; }
+    'next': function() {
+      if (state.queue.length && state.currentEntryId && state.queue[0].entry_id === state.currentEntryId) state.queue.shift();
+      if (state.queue.length) {
+        state.currentVideoId = state.queue[0].video_id;
+        state.currentEntryId = state.queue[0].entry_id;
+        return;
+      }
+      var next = state.pos + 1;
+      state.currentVideoId = null;
+      state.currentEntryId = null;
+      state.pos = (next < state.pass.length || !state.repeat) ? next : 0;
+    },
+    'previous': function() {
+      if (state.currentEntryId) { state.currentEntryId = null; state.currentVideoId = null; return; }
+      if (state.pos <= 0) return;
+      state.pos -= 1; state.currentVideoId = null; state.currentEntryId = null;
+    },
+    'toggle-shuffle': function() { state.shuffle = !state.shuffle; },
+    'toggle-repeat': function() { state.repeat = !state.repeat; },
+    'queue-video': function(b) {
+      state.queue.push({ entry_id: 'e' + (state.queue.length + 1), video_id: b.video_id });
+    },
+    'remove-queue-entry': function(b) {
+      if (state.currentEntryId === b.entry_id) state.currentEntryId = null;
+      state.queue = state.queue.filter(function(e) { return e.entry_id !== b.entry_id; });
+    },
+    'move-queue-entry': function(b) {
+      var i = state.queue.findIndex(function(e) { return e.entry_id === b.entry_id; });
+      var j = i + (b.direction === 'up' ? -1 : 1);
+      if (i < 0 || j < 0 || j >= state.queue.length) return;
+      var tmp = state.queue[i]; state.queue[i] = state.queue[j]; state.queue[j] = tmp;
+    }
   };
+
   await page.routeWebSocket(/:8766/, function(ws) {
     live = ws;
-    push();
+    [state.sourceType].filter(Boolean).forEach(push);
     ws.onMessage(function(raw) {
       var m = JSON.parse(raw);
       var REPLY = {
         register_device: function() {},
+        list_devices: function() {
+          ws.send(JSON.stringify({ type: 'devices', payload: { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] } }));
+        },
         activate_person: function() {
           [m.payload.person_id].filter(Boolean).forEach(function(pid) {
             ws.send(JSON.stringify({ type: 'person_active', payload: { person_id: pid, device_id: m.payload.device_id } }));
           });
-        },
-        list_devices: function() {
-          ws.send(JSON.stringify({ type: 'devices', payload: { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] } }));
         },
         register_companion: function() {},
         snapshot_request: function() {
@@ -920,20 +1005,25 @@ async function installMusicVideoQueueBackend(page, seedSnap) {
       [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
     });
   });
+  // GET /api/music-video-playback?person= -> read-only snapshot. Registered
+  // before the action route; matched first for the query-form URL.
+  await page.route(/\/api\/music-video-playback\?/, function(route) {
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(snapshot()) });
+  });
   await page.route('**/api/music-video-playback/*', function(route) {
     var action = decodeURIComponent(route.request().url().split('/api/music-video-playback/')[1].split('?')[0]);
     var body = JSON.parse(route.request().postData() || '{}');
-    posts.push({ action: action, body: body });
-    [ACTION[action]].filter(Boolean).forEach(function(fn) { fn(body); });
+    [ENGINE[action]].filter(Boolean).forEach(function(fn) { fn(body); });
     route.fulfill({ status: 204, body: '' });
     push();
   });
-  return { posts: posts, snapshot: function() { return snap; } };
+  function seed(action, body) { [ENGINE[action]].filter(Boolean).forEach(function(fn) { fn(body || {}); }); }
+  return { seed: seed, snapshot: snapshot };
 }
 
 module.exports = {
   VIDEOS, SERIES, ALBUMS, TRACKS, EPISODES, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, MUSIC_VIDEO_CARDS, BROWSE, CONFIG, nextOf,
-  installApi, installPlaybackBackend, installVideoPlaybackBackend, installMusicVideoQueueBackend,
+  installApi, installPlaybackBackend, installVideoPlaybackBackend, installMusicVideoPlaybackBackend,
   // TASK-326: pure response builders + the CW row builder, so the stub<->contract
   // shape test can exercise the exact objects the routes above emit.
   browseResponse, videoResponse, albumResponse, playlistResponse, continueWatchingResponse, midWatchRows

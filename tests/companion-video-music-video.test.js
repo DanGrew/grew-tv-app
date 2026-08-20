@@ -1,22 +1,28 @@
 const { test, expect } = require('@playwright/test');
 const { installApi } = require('./fixtures/api.js');
 
-// TASK-374 — companion mirror for a music video: the companion shows
-// the music video as what is playing and its controls drive it — but NEVER
-// through the video-playback engine (Plane B), since a music video has no
-// engine session at all. This is its OWN small WS mock (not
-// installVideoPlaybackBackend, whose snapshot_request answers with an ENGINE
-// session) — it replies to the companion handshake with the `context`/
-// `app_state` pair screen-video-page.js actually sends while a music video
-// plays: `musicVideo` + `musicVideoMulti` ride the CONTEXT, app_state is
-// untouched by music-video mode.
+// TASK-374, BUG-485 — companion mirror for a music video: the companion shows
+// the music video as what is playing (title/up-next/pill on-off still ride the
+// TV's own `context` push, unchanged plumbing — this is its OWN small WS mock,
+// not installMusicVideoPlaybackBackend, whose snapshot_request answers with a
+// full engine session instead of a bare context push), but its transport now
+// drives it over PLANE B — a direct POST to the music-video engine
+// (/api/music-video-playback), the SAME mechanism film/series already use,
+// never the video-playback engine (a music video has no session there) and
+// never the WS intent rail (BUG-485 retired that route for prev/next/shuffle/
+// repeat along with the client-owned seq it used to reach).
 
 async function installMusicVideoBackend(page, opts) {
   var o = opts || {};
   var intents = [];
   var videoPlaybackPosts = [];
+  var musicVideoPlaybackPosts = [];
   await page.route('**/api/video-playback/**', function(route) {
     videoPlaybackPosts.push(route.request().url());
+    route.fulfill({ status: 204, body: '' });
+  });
+  await page.route('**/api/music-video-playback/**', function(route) {
+    musicVideoPlaybackPosts.push(route.request().url());
     route.fulfill({ status: 204, body: '' });
   });
   await page.routeWebSocket(/:8766/, function(ws) {
@@ -43,7 +49,7 @@ async function installMusicVideoBackend(page, opts) {
       [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
     });
   });
-  return { intents: intents, videoPlaybackPosts: videoPlaybackPosts };
+  return { intents: intents, videoPlaybackPosts: videoPlaybackPosts, musicVideoPlaybackPosts: musicVideoPlaybackPosts };
 }
 
 test('the companion shows the music video as what is playing', async ({ page }) => {
@@ -54,7 +60,7 @@ test('the companion shows the music video as what is playing', async ({ page }) 
   await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
 });
 
-test('pause/resume and next/previous drive the TV over the WS intent rail, never the video-playback engine', async ({ page }) => {
+test('pause/resume stays on the WS intent rail; next/previous POST straight to the music-video engine (BUG-485)', async ({ page }) => {
   await installApi(page);
   const backend = await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: true });
   await page.goto('/companion/video.html');
@@ -63,8 +69,10 @@ test('pause/resume and next/previous drive the TV over the WS intent rail, never
   await page.locator('#c-next').click();
   await page.locator('#c-prev').click();
   const intentTypes = backend.intents.filter(function(m) { return m.type === 'intent'; }).map(function(m) { return m.payload.intent; });
-  expect(intentTypes).toEqual(expect.arrayContaining(['toggle', 'next', 'prev']));
-  expect(backend.videoPlaybackPosts).toEqual([]);
+  expect(intentTypes).toEqual(['toggle']); // next/prev no longer ride the intent rail
+  expect(backend.videoPlaybackPosts).toEqual([]); // never the film/series engine
+  expect(backend.musicVideoPlaybackPosts.some(function(u) { return u.includes('/next'); })).toBe(true);
+  expect(backend.musicVideoPlaybackPosts.some(function(u) { return u.includes('/previous'); })).toBe(true);
 });
 
 // FEAT-418 (TASK-420): the queue link now stays visible for a music video and
@@ -110,7 +118,7 @@ test('Shuffle/Repeat on/off state on the companion mirrors the TV context', asyn
   await expect(page.locator('#c-shuffle')).toHaveClass(/on/);
 });
 
-test('tapping Repeat/Shuffle on the companion drives the TV over the WS intent rail, never the video-playback engine', async ({ page }) => {
+test('tapping Repeat/Shuffle on the companion POSTs straight to the music-video engine (BUG-485)', async ({ page }) => {
   await installApi(page);
   const backend = await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: true });
   await page.goto('/companion/video.html');
@@ -118,8 +126,10 @@ test('tapping Repeat/Shuffle on the companion drives the TV over the WS intent r
   await page.locator('#c-repeat').click();
   await page.locator('#c-shuffle').click();
   const intentTypes = backend.intents.filter(function(m) { return m.type === 'intent'; }).map(function(m) { return m.payload.intent; });
-  expect(intentTypes).toEqual(expect.arrayContaining(['toggleRepeat', 'toggleShuffle']));
-  expect(backend.videoPlaybackPosts).toEqual([]);
+  expect(intentTypes).toEqual([]); // no longer ride the intent rail
+  expect(backend.videoPlaybackPosts).toEqual([]); // never the film/series engine
+  expect(backend.musicVideoPlaybackPosts.some(function(u) { return u.includes('/toggle-repeat'); })).toBe(true);
+  expect(backend.musicVideoPlaybackPosts.some(function(u) { return u.includes('/toggle-shuffle'); })).toBe(true);
 });
 
 test('a lone music video pick greys ⏮/⏭ on the companion (single-item playthrough)', async ({ page }) => {
