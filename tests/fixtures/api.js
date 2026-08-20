@@ -12,8 +12,11 @@ const VIDEOS = {
   // TASK-446: the home-movies-all Play All source's fixture cards — two, so
   // series-mode transport (prev/next) is live and an explicit `next` at the
   // last item can be exercised (queue-isolation e2e coverage).
-  'millie-walk':      { id: 'millie-walk',      title: 'Millie Walk',      profile: 'kids',   duration: 30,   poster: 'millie.jpg',    subtitles: null,                type: 'home',       format: 'home-movie', tags: { date: '2026-01-06' }, available: true },
-  'beach-day':        { id: 'beach-day',        title: 'Beach Day',        profile: 'kids',   duration: 45,   poster: 'beach.jpg',     subtitles: null,                type: 'home',       format: 'home-movie', tags: { date: '2026-01-07' }, available: true },
+  'millie-walk':      { id: 'millie-walk',      title: 'Millie Walk',      profile: 'kids',   duration: 30,   poster: 'millie.jpg',    subtitles: null,                type: 'home',       format: 'home-movie', itemType: 'home-movie', tags: { date: '2026-01-06' }, available: true },
+  // BUG-489: beach-day carries a stray `subtitles` ref, as a pre-BUG-449 home-movie
+  // record still would after ingest — the player must gate CC off by itemType
+  // regardless.
+  'beach-day':        { id: 'beach-day',        title: 'Beach Day',        profile: 'kids',   duration: 45,   poster: 'beach.jpg',     subtitles: 'beach-day.vtt',      type: 'home',       format: 'home-movie', itemType: 'home-movie', tags: { date: '2026-01-07' }, available: true },
   // FEAT-018 audio: album tracks + a standalone single. mediaType audio + ext m4a
   // drive {id}.m4a + the <audio> player; artist drives the now-playing line.
   'ootb-01':          { id: 'ootb-01',          title: 'Turn to Stone',    profile: 'kids',   duration: 227,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
@@ -715,7 +718,9 @@ async function installVideoPlaybackBackend(page) {
   function order() { return (ORDER_BY_SOURCE_TYPE[state.sourceType] || function() { return seriesOrderIds(state.sourceId); })(); }
   function resolve(id) {
     var v = VIDEOS[id] || { id: id };
-    return { item_id: id, title: v.title, poster: v.poster, duration: v.duration, subtitles: v.subtitles, type: v.type, ext: v.ext };
+    // BUG-489: itemType mirrors media-manager's _resolve_video (video_playback.py)
+    // so the player can gate CC off a home movie from the engine snapshot alone.
+    return { item_id: id, title: v.title, poster: v.poster, duration: v.duration, subtitles: v.subtitles, type: v.type, ext: v.ext, itemType: v.itemType };
   }
   // FEAT-040/TASK-247: now_playing is the queued item when one is playing
   // (state.current), else the source item at the index.

@@ -188,7 +188,10 @@ export function initVideoPage() {
     loadProgress(SERVER, np.item_id, person)
       .catch(zeroProgress)
       .then(function(prog) {
-        player.playVideo({ id: np.item_id, title: np.title, subtitles: np.subtitles }, from, resumeStart(restartThis, prog));
+        // BUG-489: itemType rides the engine snapshot (video_playback.py's
+        // _resolve_video) so the player can gate CC off for a home movie
+        // without a second fetch.
+        player.playVideo({ id: np.item_id, title: np.title, subtitles: np.subtitles, itemType: np.itemType }, from, resumeStart(restartThis, prog));
         renderUpNextLine();
         mountCrumbs();
       });
