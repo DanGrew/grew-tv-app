@@ -219,10 +219,13 @@ export function initBrowsePage() {
     // video playlist card routes through 'playlist' like any other playlist
     // (TASK-376) — see playlist-detail for how a music-video track plays.
     'music-video': function(card) { navTo('video.html', { musicVideo: card.id, from: 'browse' }); },
-    // TASK-486 — a Play All rail tile (All or a kid) carries its own exact
-    // video.html query params (home-rails.js playAllTile); this route is a
-    // plain lookup, no branch, same shape as every other entry here.
-    'play-all': function(card) { navTo('video.html', Object.assign({ from: 'browse' }, card.navParams)); }
+    // TASK-486 (revision) — a Play All rail tile (All or a kid) opens the
+    // scoped clip LIST first, like a boxset/series (detail.html's own
+    // 'series' route above), not playback directly. navParams carries the
+    // exact home-movies-list.html query params (home-rails.js playAllTile);
+    // this route is a plain lookup, no branch, same shape as every other
+    // entry here.
+    'play-all': function(card) { navTo('home-movies-list.html', Object.assign({ from: 'browse' }, card.navParams)); }
   };
 
   // cardRoute (core) gives 'album' for a music card else the card's kind;

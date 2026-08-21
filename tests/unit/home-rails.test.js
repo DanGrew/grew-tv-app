@@ -1,4 +1,4 @@
-import { buildRails, buildTabs, buildTabRails, railsForSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail, homeMoviesPlayAllRail } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, railsForSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail, homeMoviesPlayAllRail, homeMoviesListItems, homeMoviesListTitle, homeMoviesListPlayParams } from '../../core/home-rails.js';
 
 // TASK-235 — the create affordance is the Playlists rail-heading ＋ button (in the
 // browse screen), not a synthetic card. withPlaylistsRail just GUARANTEES the rail
@@ -774,6 +774,56 @@ describe('homeMoviesPlayAllRail (TASK-486)', () => {
   it('still leads with an All tile when every clip is untagged (person rails = just "other")', () => {
     const rail = homeMoviesPlayAllRail([{ id: 'person:other', slug: 'other', title: 'Other', items: [{ id: 'plain' }] }])[0];
     expect(rail.items.map(t => t.title)).toEqual(['All']);
+  });
+});
+
+// TASK-486 (revision) — the Play All LIST screen's own data, shared verbatim
+// by the TV screen and its companion mirror (screen-home-movies-list-page.js /
+// companion-home-movies-list.js), so the two can never disagree on scope.
+describe('homeMoviesListTitle / homeMoviesListItems (TASK-486 revision)', () => {
+  const HOME = [
+    { kind: 'video', id: 'm-walk', title: 'Millie Walk', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-05' } },
+    { kind: 'video', id: 'm-park', title: 'At The Park', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-10' } },
+    { kind: 'video', id: 'both',   title: 'Both Kids',   section: 'home-movies', people: ['millie', 'ollie'], tags: { date: '2026-01-08' } },
+    { kind: 'video', id: 'o-swim', title: 'Ollie Swim',  section: 'home-movies', people: ['ollie'], tags: { date: '2026-01-07' } },
+    { kind: 'video', id: 'plain',  title: 'Plain Clip',  section: 'home-movies' },
+    { kind: 'video', id: 'film-a', title: 'A Film',      section: 'films' }
+  ];
+
+  it('homeMoviesListTitle is "All" for no person, else the title-cased tag', () => {
+    expect(homeMoviesListTitle(null)).toBe('All');
+    expect(homeMoviesListTitle(undefined)).toBe('All');
+    expect(homeMoviesListTitle('millie')).toBe('Millie');
+  });
+
+  it('homeMoviesListItems with no person returns every home-movie clip, newest first, wrapped as {video}', () => {
+    const items = homeMoviesListItems(HOME, null);
+    expect(items.map(i => i.video.id)).toEqual(['m-park', 'both', 'o-swim', 'm-walk', 'plain']);
+    expect(items.every(i => i.video)).toBe(true);
+  });
+
+  it('homeMoviesListItems excludes non-home-movie cards even with no person scope', () => {
+    expect(homeMoviesListItems(HOME, null).some(i => i.video.id === 'film-a')).toBe(false);
+  });
+
+  it('homeMoviesListItems scoped to a person returns only that person\'s tagged clips, newest first', () => {
+    const items = homeMoviesListItems(HOME, 'millie');
+    expect(items.map(i => i.video.id)).toEqual(['m-park', 'both', 'm-walk']);
+  });
+
+  it('homeMoviesListItems scoped to a person with no clips is empty', () => {
+    expect(homeMoviesListItems(HOME, 'nemo')).toEqual([]);
+  });
+
+  it('homeMoviesListItems tolerates null/undefined cards', () => {
+    expect(homeMoviesListItems(null, 'millie')).toEqual([]);
+    expect(homeMoviesListItems(undefined, null)).toEqual([]);
+  });
+
+  it('homeMoviesListPlayParams carries the scope + an optional tapped-row video id', () => {
+    expect(homeMoviesListPlayParams(null, undefined)).toEqual({ from: 'home-movies-list', homeMoviesAll: 1, video: undefined });
+    expect(homeMoviesListPlayParams('millie', undefined)).toEqual({ from: 'home-movies-list', homeMoviesPerson: 'millie', video: undefined });
+    expect(homeMoviesListPlayParams('millie', 'm-walk')).toEqual({ from: 'home-movies-list', homeMoviesPerson: 'millie', video: 'm-walk' });
   });
 });
 

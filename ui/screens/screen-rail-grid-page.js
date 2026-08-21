@@ -42,10 +42,10 @@ export function initRailGridPage() {
     // entry the lookup below silently no-ops, so a tap on this grid did nothing
     // at all once cardRoute started returning 'music-video'.
     'music-video': function(card) { navTo('video.html', { musicVideo: card.id, from: 'grid' }); },
-    // TASK-486 — the Play All rail's own tiles land in this grid too (a
-    // companion drill into the 'home-movies-play-all' rail); the tile's
-    // navParams carries the exact query params, same lookup as the browse page.
-    'play-all': function(card) { navTo('video.html', Object.assign({ from: 'grid' }, card.navParams)); }
+    // TASK-486 (revision) — the Play All rail's own tiles land in this grid
+    // too (a companion drill into the 'home-movies-play-all' rail); a tap
+    // opens the scoped clip list, same target + navParams as the browse page.
+    'play-all': function(card) { navTo('home-movies-list.html', Object.assign({ from: 'grid' }, card.navParams)); }
   };
   function onSelect(card) {
     [SELECT[cardRoute(card)]].filter(Boolean).forEach(function(fn) { fn(card); });

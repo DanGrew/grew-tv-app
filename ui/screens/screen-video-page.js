@@ -385,8 +385,12 @@ export function initVideoPage() {
     video: document.getElementById('video'),
     server: SERVER,
     onStop: function() {
+      // TASK-486 (revision): Stop from a Play All list entry (the list's own
+      // Play All button or a tapped row) returns to that SAME scoped list,
+      // mirroring `detail` returning to its series — never a bare browse drop.
       var STOP_NAV = {
         detail: function() { navTo('detail.html', { series: seriesId }); },
+        'home-movies-list': function() { navTo('home-movies-list.html', { homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson }); },
         browse: function() { navTo('browse.html'); }
       };
       [STOP_NAV[from]].filter(Boolean).concat([function() { navTo('browse.html'); }])[0]();
@@ -489,21 +493,27 @@ export function initVideoPage() {
   // fetch a title for (mirrors startSingle, not startSeries). ONE entry point,
   // always unshuffled — shuffle is a live Queue View toggle (owner
   // correction), not a param here, matching every other media source.
+  // `item_id: videoId` mirrors startSeries above (a row tapped in the list
+  // screen carries `video`, same as an episode row); no tapped row (the
+  // list's own header Play All button) leaves videoId falsy, so play-source
+  // starts at its own fresh index 0 — the engine already no-ops a falsy
+  // item_id (play-source's `if item_id:` guard), same as startSeries relies on.
   function startHomeMoviesAll() {
     mountCrumbs();
     armEngineTimeout();
     initCaptions(SERVER)
-      .then(function() { sendAction('play-source', { source_type: 'home-movies-all' }); })
+      .then(function() { sendAction('play-source', { source_type: 'home-movies-all', item_id: videoId }); })
       .catch(function() {});
   }
-  // TASK-486 — a Play All rail kid tile: SERVER-authoritative exactly like
-  // startHomeMoviesAll above, the video engine's own `home-movies-by-person`
-  // source, source_id the tapped tile's `people` tag value.
+  // TASK-486 (revision) — a Play All rail kid tile: SERVER-authoritative
+  // exactly like startHomeMoviesAll above, the video engine's own
+  // `home-movies-by-person` source, source_id the tapped tile's `people` tag
+  // value, item_id the tapped list row (see startHomeMoviesAll above).
   function startHomeMoviesByPerson() {
     mountCrumbs();
     armEngineTimeout();
     initCaptions(SERVER)
-      .then(function() { sendAction('play-source', { source_type: 'home-movies-by-person', source_id: homeMoviesPerson }); })
+      .then(function() { sendAction('play-source', { source_type: 'home-movies-by-person', source_id: homeMoviesPerson, item_id: videoId }); })
       .catch(function() {});
   }
   // FEAT-040 (Play Queue): entered with ?playQueue (no video/series) — fire

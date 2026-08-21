@@ -12,6 +12,7 @@
 //   video     -> { seriesId, seriesTitle, videoTitle }   (seriesId absent => film)
 //   rail-grid -> { sectionId, sectionTitle, railTitle }  (FEAT-028 / TASK-167)
 //   artist    -> { artistName }                          (FEAT-029)
+//   home-movies-list -> { title }                         (TASK-486 revision)
 
 var HOME_PAGE = 'browse.html';
 var DETAIL_PAGE = 'detail.html';
@@ -65,12 +66,24 @@ function artistCrumbs(ctx) {
   return [home(), albumsLink(), leaf(ctx.artistName)];
 }
 
+// TASK-486 (revision) — the Play All list screen: Home › Home Movies (the tab)
+// › All/kid name. The Home Movies crumb returns to the browse page on that tab
+// (browse honours ?tab=), same shape as artistCrumbs' Music crumb.
+function homeMoviesTabLink() {
+  return link('Home Movies', HOME_PAGE, { tab: 'home-movies' });
+}
+
+function homeMoviesListCrumbs(ctx) {
+  return [home(), homeMoviesTabLink(), leaf(ctx.title)];
+}
+
 var BUILDERS = {
   browse: browseCrumbs,
   detail: detailCrumbs,
   video: videoCrumbs,
   'rail-grid': railGridCrumbs,
-  artist: artistCrumbs
+  artist: artistCrumbs,
+  'home-movies-list': homeMoviesListCrumbs
 };
 
 // Build the crumb trail for a screen + context. Unknown screen -> [] so a caller

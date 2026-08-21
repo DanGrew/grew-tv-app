@@ -32,7 +32,10 @@ test('Play All fires play-source for home-movies-all, unshuffled, and plays the 
   });
   await page.goto('/app/homeview/video.html?homeMoviesAll=1&from=browse');
   const req = await playSource;
-  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movies-all' });
+  // item_id rides every entry now (TASK-486 revision: a list-row tap carries
+  // `video`, mirroring a series episode row) — null here since no row was
+  // tapped, matching startSeries' own always-present item_id.
+  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movies-all', item_id: null });
   await expect(page.locator('#video')).toHaveAttribute('src', /millie-walk/);
 });
 
@@ -53,8 +56,19 @@ test('a Play All rail kid tile fires play-source for home-movies-by-person, scop
   });
   await page.goto('/app/homeview/video.html?homeMoviesPerson=millie&from=browse');
   const req = await playSource;
-  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movies-by-person', source_id: 'millie' });
+  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movies-by-person', source_id: 'millie', item_id: null });
   await expect(page.locator('#video')).toHaveAttribute('src', /millie-walk/);
+});
+
+// TASK-486 (revision) — a tapped row in the list screen carries `video`,
+// which rides through as item_id so play-source jumps straight to it.
+test('a tapped list row plays that specific clip via item_id', async ({ page }) => {
+  const playSource = page.waitForRequest(function(req) {
+    return req.url().includes('/api/video-playback/play-source') && req.method() === 'POST';
+  });
+  await page.goto('/app/homeview/video.html?homeMoviesPerson=millie&video=millie-walk&from=home-movies-list');
+  const req = await playSource;
+  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movies-by-person', source_id: 'millie', item_id: 'millie-walk' });
 });
 
 // TASK-446 (owner correction) — Shuffle is a live Queue View toggle for Home

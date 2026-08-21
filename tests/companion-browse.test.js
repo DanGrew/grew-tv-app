@@ -376,6 +376,16 @@ test.describe('desync mode', () => {
     expect(intents.filter((i) => i.intent === 'select')).toHaveLength(0);
   });
 
+  // TASK-486 (revision) — a Play All tile now opens locally too (its own
+  // navParams, not the generic ?id= the other desync pages read).
+  test('Browse mode Play All tile tap opens the list locally with its own navParams (no select intent)', async ({ page }) => {
+    await browseOpt(page).click();
+    await page.locator('.dock-tab[data-section="home-movies"]').click();
+    await page.locator('#txtgrid .ph-txt[data-id="play-all:Millie"]').click();
+    await page.waitForURL('**/companion/home-movies-list.html?homeMoviesPerson=millie');
+    expect(intents.filter((i) => i.intent === 'select')).toHaveLength(0);
+  });
+
   // FEAT-038 (DSYNC-2c): tapping Control = "jump to where the TV is", so it must
   // clear the local drill trail. Otherwise the reloaded synced browse restores +
   // re-drives the companion's old spot onto the TV (the stray rail-grid nav that

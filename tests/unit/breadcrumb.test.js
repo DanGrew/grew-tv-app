@@ -45,6 +45,14 @@ describe('buildCrumbs', () => {
     expect(crumbs[2]).toMatchObject({ label: 'ELO', current: true });
   });
 
+  it('home-movies-list is Home > Home Movies (clickable, ?tab=home-movies) > title leaf (TASK-486 revision)', () => {
+    var crumbs = buildCrumbs('home-movies-list', { title: 'Millie' });
+    expect(crumbs).toHaveLength(3);
+    expect(crumbs[0]).toMatchObject({ label: 'Home', page: 'browse.html', current: false });
+    expect(crumbs[1]).toMatchObject({ label: 'Home Movies', page: 'browse.html', params: { tab: 'home-movies' }, current: false });
+    expect(crumbs[2]).toMatchObject({ label: 'Millie', current: true });
+  });
+
   it('unknown screen yields an empty trail', () => {
     expect(buildCrumbs('mystery')).toEqual([]);
   });

@@ -32,6 +32,11 @@ describe('desyncOpenPage (route -> companion page)', () => {
     expect(desyncOpenPage('playlist')).toBe('playlist.html');
     expect(desyncOpenPage('artist')).toBe('artist.html');
   });
+  // TASK-486 (revision) — a Play All tile now opens a clip LIST, so it gets a
+  // desync page too (previously play-only, no desync page).
+  it('routes a Play All tile to its own list page', () => {
+    expect(desyncOpenPage('play-all')).toBe('home-movies-list.html');
+  });
   // A playlist MUST NOT route to detail.html — that calls /api/series and 404s.
   it('never sends a playlist to detail (the /api/series 404 bug)', () => {
     expect(desyncOpenPage('playlist')).not.toBe('detail.html');
@@ -43,11 +48,12 @@ describe('desyncOpenPage (route -> companion page)', () => {
 });
 
 describe('tile openability when desynced', () => {
-  it('series, album, playlist and artist are locally openable', () => {
+  it('series, album, playlist, artist and play-all are locally openable', () => {
     expect(tileOpenableDesynced('series')).toBe(true);
     expect(tileOpenableDesynced('album')).toBe(true);
     expect(tileOpenableDesynced('playlist')).toBe(true);
     expect(tileOpenableDesynced('artist')).toBe(true);
+    expect(tileOpenableDesynced('play-all')).toBe(true);
   });
 
   it('a bare video/film is NOT openable (play-only)', () => {
@@ -66,6 +72,7 @@ describe('tileOffDesynced (grey non-openable tiles)', () => {
     expect(tileOffDesynced('album', true)).toBe(false);
     expect(tileOffDesynced('playlist', true)).toBe(false);
     expect(tileOffDesynced('artist', true)).toBe(false);
+    expect(tileOffDesynced('play-all', true)).toBe(false);
     expect(tileOffDesynced('video', true)).toBe(true);
   });
 });

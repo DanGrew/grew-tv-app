@@ -3,7 +3,7 @@ import { loadBrowse, loadContinueWatching, videoPlaybackAction, musicVideoPlayba
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { queueCount } from '../../core/video-player-router.js';
 import { playNextCount } from '../../core/queue-view.js';
-import { screenPage, tileHint } from '../../core/companion-utils.js';
+import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, railsForSection } from '../../core/home-rails.js';
 import { firstRailId, pageOffset, settleIndex, stepIndex, arrowDisabled, shouldActivateDrag, isRealDrag, isTapRelease } from '../../core/rail-pager.js';
@@ -499,9 +499,14 @@ export function initPage() {
   // page locally — detail (series/album), playlist, or artist per the card's
   // route — carrying the id so that page self-loads without the TV. A
   // non-openable card (film) is a no-op (its tile is greyed).
+  // TASK-486 (revision): a Play All tile's local-open target needs its own
+  // navParams (homeMoviesAll/homeMoviesPerson), not the generic `?id=` every
+  // other desync page reads — navParams wins when the tile carries one,
+  // falling back to the id convention for series/album/playlist/artist.
   function openItemLocal(card) {
     var page = desyncOpenPage(cardRoute(card));
-    [page].filter(Boolean).forEach(function(p) { window.location.href = p + '?id=' + encodeURIComponent(card.id); });
+    var params = [card.navParams].filter(Boolean).concat([{ id: card.id }])[0];
+    [page].filter(Boolean).forEach(function(p) { window.location.href = p + queryString(params); });
   }
   function openItem(card) {
     ({ true: function() { openItemLocal(card); }, false: function() { api.sendIntent('select', { id: card.id }); } })[mode.isDesynced()]();

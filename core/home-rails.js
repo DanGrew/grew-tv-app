@@ -438,10 +438,13 @@ export function buildTabs(cards) {
 // Home Movies "Play All" rail: All (TASK-446's whole-catalog source) first,
 // then one per kid, in the SAME tag set + order as the person rails just
 // built (personRails) — no separate tagging concept. `navParams` carries the
-// exact video.html query params the tile's own onSelect handler needs
-// (home-movies-all's existing `homeMoviesAll` param for All, the new
-// `homeMoviesPerson` param keyed by tag value for a kid) — kept data-only so
-// the ui/** consumer stays a plain lookup (cyclomatic-1), no branch there.
+// exact home-movies-list.html query params the tile's own onSelect handler
+// needs (the `homeMoviesAll` param for All, the `homeMoviesPerson` param
+// keyed by tag value for a kid) — kept data-only so the ui/** consumer stays
+// a plain lookup (cyclomatic-1), no branch there. Revised (owner, 2026-08-21):
+// a tap opens the scoped clip LIST first (like a boxset/series), not playback
+// directly — the SAME params now also drive screen-home-movies-list-page.js
+// (which owns the actual Play All start) and its companion mirror.
 function playAllTile(title, navParams) {
   return { kind: 'play-all', id: 'play-all:' + title, title: title, navParams: navParams };
 }
@@ -459,6 +462,42 @@ export function homeMoviesPlayAllRail(personRails) {
   var allTile = playAllTile('All', { homeMoviesAll: 1 });
   var rail = { id: 'home-movies-play-all', title: 'Play All', items: [allTile].concat(kidTiles) };
   return rails.length ? [rail] : [];
+}
+
+// TASK-486 (revision) — the Play All list screen's title: 'All' for the
+// whole-catalog scope (person null/undefined), else the tapped kid's display
+// name, title-cased the SAME way the person rail itself is (titleCase above)
+// so the two screens never name one kid two different ways.
+export function homeMoviesListTitle(person) {
+  return person ? titleCase(person) : 'All';
+}
+
+// TASK-486 (revision) — the Play All list screen's own clip list: every
+// available Home Movies card when person is null/undefined ('All'), else only
+// the clips tagged with that person (peopleOf — the SAME tag test the browse
+// rails use), newest capture date first (cmpDateDesc — the SAME order the
+// person rails already show, so the list reads consistently with the rail
+// below it). Wrapped as `{video: card}` — buildDetailList's own row shape
+// (core/detail-view.js episodeLabel &c. all read item.video).
+// TASK-486 (revision) — the exact video.html query params a hand-off from the
+// list screen carries: the source scope (homeMoviesAll/homeMoviesPerson,
+// unchanged from the tile's own navParams) plus `video` (the tapped row's id,
+// undefined for the header Play All button — navTo drops an undefined value,
+// so the entry starts at its own fresh index 0, exactly as it did before this
+// revision). Kept in core (no DOM) so the ui/** screen stays a plain call.
+export function homeMoviesListPlayParams(person, id) {
+  var sourceParam = { 'true': { homeMoviesPerson: person }, 'false': { homeMoviesAll: 1 } }[!!person + ''];
+  return Object.assign({ from: 'home-movies-list' }, sourceParam, { video: id });
+}
+
+export function homeMoviesListItems(cards, person) {
+  if (!cards) return [];
+  var inTab = cards.filter(function(c) { return sectionOf(c) === 'home-movies'; });
+  var scoped = person ? inTab.filter(function(c) { return peopleOf(c).indexOf(person) > -1; }) : inTab;
+  // scoped is always a FRESH array (both branches above come from .filter()),
+  // never the caller's own `cards` — sorting it in place is safe, same
+  // reasoning sortItems (above) already relies on to skip its own copy.
+  return scoped.sort(cmpDateDesc).map(function(c) { return { video: c }; });
 }
 
 // Home Movies (TASK-444, reinstating the FEAT-025/TASK-183 person rails this
