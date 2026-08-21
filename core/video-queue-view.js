@@ -131,11 +131,12 @@ function thenSection(before, repeat) {
 }
 
 // TASK-446 — which source types may be shuffled. A structural collection
-// (series/boxset) has a meaningful narrative order; a whole-catalog or
-// per-kid Play All source (home-movies-all, TASK-486's home-movies-by-person)
-// does not, so only those offer Shuffle. A future shuffleable source adds one
-// entry here, no branch — mirrors REPEAT's own item-count gate.
-var SHUFFLEABLE_SOURCE_TYPES = { 'home-movies-all': true, 'home-movies-by-person': true };
+// (series/boxset) has a meaningful narrative order; a whole-catalog, per-kid,
+// or per-month Play All source (home-movies-all, TASK-486's
+// home-movies-by-person, TASK-491's home-movie-month) does not, so only those
+// offer Shuffle. A future shuffleable source adds one entry here, no branch —
+// mirrors REPEAT's own item-count gate.
+var SHUFFLEABLE_SOURCE_TYPES = { 'home-movies-all': true, 'home-movies-by-person': true, 'home-movie-month': true };
 
 // The bucketed view-model from a `video_playback` snapshot.
 export function videoQueueModel(snap) {

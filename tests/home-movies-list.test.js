@@ -39,6 +39,14 @@ test('a kid tile opens a list scoped to that kid\'s clips', async ({ page }) => 
   await expect(page.locator('.detail-row')).toHaveCount(2);
 });
 
+// TASK-491 — both fixture clips are captured in January 2026 (tests/fixtures/api.js),
+// so the month tile's own list is the same two-item scope as the kid tile above.
+test('a month tile opens a list scoped to that month\'s clips', async ({ page }) => {
+  await enterList(page, 'play-all:Jan 2026');
+  await expect(page.locator('#detail-title')).toHaveText('Jan 2026');
+  await expect(page.locator('.detail-row')).toHaveCount(2);
+});
+
 test('the header Play All button starts the scoped source, unshuffled, from the top', async ({ page }) => {
   await enterList(page, 'play-all:Millie');
   const playSource = page.waitForRequest(function(req) {
@@ -57,6 +65,29 @@ test('tapping a row plays that specific clip via item_id', async ({ page }) => {
   await page.locator('.detail-row[data-id="beach-day"]').click();
   await expect(page).toHaveURL(/video\.html\?.*video=beach-day/);
   expect(JSON.parse((await playSource).postData())).toEqual({ source_type: 'home-movies-all', item_id: 'beach-day' });
+});
+
+// TASK-491 — the month tile's own header Play All button, mirroring the kid
+// tile's own test above.
+test('the header Play All button starts the month-scoped source, unshuffled, from the top', async ({ page }) => {
+  await enterList(page, 'play-all:Jan 2026');
+  const playSource = page.waitForRequest(function(req) {
+    return req.url().includes('/api/video-playback/play-source') && req.method() === 'POST';
+  });
+  await page.locator('#btn-play-next').click();
+  await expect(page).toHaveURL(/video\.html\?.*homeMoviesMonth=2026-01/);
+  expect(JSON.parse((await playSource).postData())).toEqual({ source_type: 'home-movie-month', source_id: '2026-01', item_id: null });
+});
+
+// TASK-491 — a tapped row in a month-scoped list, mirroring the All-scoped test above.
+test('tapping a row in a month-scoped list plays that specific clip via item_id', async ({ page }) => {
+  await enterList(page, 'play-all:Jan 2026');
+  const playSource = page.waitForRequest(function(req) {
+    return req.url().includes('/api/video-playback/play-source') && req.method() === 'POST';
+  });
+  await page.locator('.detail-row[data-id="beach-day"]').click();
+  await expect(page).toHaveURL(/video\.html\?.*video=beach-day/);
+  expect(JSON.parse((await playSource).postData())).toEqual({ source_type: 'home-movie-month', source_id: '2026-01', item_id: 'beach-day' });
 });
 
 test('Back from the list returns to the Home Movies tab', async ({ page }) => {

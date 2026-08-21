@@ -25,11 +25,12 @@ var SERVER = window.location.origin;
 
 export function initHomeMoviesListPage() {
   var person = getParam('homeMoviesPerson');
+  var month = getParam('homeMoviesMonth');
   var profile = [getProfile()].filter(Boolean).concat(['kids'])[0];
-  var title = homeMoviesListTitle(person);
+  var title = homeMoviesListTitle(person, month);
   var state = { items: [], progress: {} };
 
-  function play(id) { navTo('video.html', homeMoviesListPlayParams(person, id)); }
+  function play(id) { navTo('video.html', homeMoviesListPlayParams(person, id, month)); }
   function onPlayItem(item) { play(item.video.id); }
   function playAll() { play(undefined); }
 
@@ -77,9 +78,9 @@ export function initHomeMoviesListPage() {
     };
     [INTENTS[intent]].filter(Boolean).forEach(function(fn) { fn(); });
   });
-  wsApp.sendContext({ context_id: 'home-movies-list', home_movies_person: person });
+  wsApp.sendContext({ context_id: 'home-movies-list', home_movies_person: person, home_movies_month: month });
   // Live snapshot so the companion mirrors this list's context.
-  wsApp.sendAppState({ screen: 'home-movies-list', homeMoviesPerson: person, profile: profile });
+  wsApp.sendAppState({ screen: 'home-movies-list', homeMoviesPerson: person, homeMoviesMonth: month, profile: profile });
 
   document.getElementById('btn-play-next').addEventListener('click', playAll);
   document.addEventListener('keydown', dispatchKey);
@@ -103,7 +104,7 @@ export function initHomeMoviesListPage() {
   ])
     .then(function(res) {
       var cards = [res[0].content].filter(Boolean).concat([[]])[0];
-      state.items = homeMoviesListItems(cards, person);
+      state.items = homeMoviesListItems(cards, person, month);
       state.progress = progressMapFromCW([res[1].content].filter(Boolean).concat([[]])[0]);
       mountBreadcrumb('breadcrumb', buildCrumbs('home-movies-list', { title: title }));
       document.getElementById('detail-title').textContent = title;
