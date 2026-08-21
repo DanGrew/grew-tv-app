@@ -40,8 +40,12 @@ export function actionEnabled(action, desynced) {
 // (core/home-rails.js) is the input. NB a playlist MUST route to playlist.html
 // (loadPlaylist / /api/playlist) — sending a playlist id to detail.html hits
 // /api/series and 404s.
+// TASK-486 (revision): a Play All tile now opens a clip LIST first (like a
+// boxset/series), not playback directly — so it gets a desync page too, same
+// as series/album/artist. Its navParams (home-rails.js playAllTile), not a
+// bare id, is what openItemLocal must send on (companion-browse.js).
 // @card-route-table unhandled: video, music-video, track
-var DESYNC_PAGE = { series: 'detail.html', album: 'detail.html', playlist: 'playlist.html', artist: 'artist.html' };
+var DESYNC_PAGE = { series: 'detail.html', album: 'detail.html', playlist: 'playlist.html', artist: 'artist.html', 'play-all': 'home-movies-list.html' };
 export function desyncOpenPage(route) { return DESYNC_PAGE[route] || null; }
 export function tileOpenableDesynced(route) { return desyncOpenPage(route) != null; }
 

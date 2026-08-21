@@ -156,20 +156,41 @@ test('Play All is hidden on Films, shown on Music Videos, and navigates to the w
   await expect(page).toHaveURL(/video\.html\?.*musicVideoAll=1/);
 });
 
-// TASK-446 — Home Movies gets ONE Play All entry, always unshuffled; shuffle
-// is a live toggle inside the player's Queue View (tests/video-home-movies.
-// test.js), not a second browse-page button. Home Movies is in the default
-// BROWSE fixture (unlike Music Videos above), so no route override is needed.
-test('Play All is hidden on Films, shown on Home Movies, and navigates to the home-movies-all entry unshuffled', async ({ page }) => {
+// TASK-486 — Home Movies no longer gets the header Play All button (TASK-446):
+// its whole-catalog entry point is now the Play All rail's own "All" tile,
+// always unshuffled; shuffle is a live toggle inside the player's Queue View
+// (tests/video-home-movies.test.js). Home Movies is in the default BROWSE
+// fixture (unlike Music Videos above), so no route override is needed.
+test('Play All header button stays hidden on Home Movies (TASK-486 replaces it with the rail)', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
   await openFilms(page);
   await expect(page.locator('#btn-play-all')).toBeHidden();
   await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
-  await expect(page.locator('#btn-play-all')).toBeVisible();
-  await page.locator('#btn-play-all').click();
-  await expect(page).toHaveURL(/video\.html\?.*homeMoviesAll=1/);
-  await expect(page).not.toHaveURL(/shuffle=/);
+  await expect(page.locator('#btn-play-all')).toBeHidden();
+});
+
+// TASK-486 (revision) — a Play All rail tile now opens the scoped clip list
+// FIRST (like a boxset/series), not playback directly: All tile -> the
+// list's own homeMoviesAll scope, a kid tile -> its own homeMoviesPerson
+// scope. The list's own header Play All button/row taps are what actually
+// fire play-source (tests/homeview.test.js, tests/video-home-movies.test.js).
+test('Play All rail All tile opens the whole-catalog list', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
+  await page.locator('.film-tile[data-id="play-all:All"]').click();
+  await expect(page).toHaveURL(/home-movies-list\.html\?.*homeMoviesAll=1/);
+});
+
+test('Play All rail kid tile opens that kid\'s scoped clip list', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
+  await page.locator('.film-tile[data-id="play-all:Millie"]').click();
+  await expect(page).toHaveURL(/home-movies-list\.html\?.*homeMoviesPerson=millie/);
 });
 
 test('rail-grid film tiles also carry the ＋ badge and queue', async ({ page }) => {

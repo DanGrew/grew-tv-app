@@ -228,9 +228,22 @@ function homeMoviesSnap(idx, shuffle) {
   };
 }
 
+// TASK-486 — the Play All rail's per-kid tile source shares the same shuffle
+// gate as home-movies-all (a whole-catalog listen has no narrative order,
+// neither does one kid's).
+function homeMoviesByPersonSnap(idx, shuffle) {
+  var s = homeMoviesSnap(idx, shuffle);
+  s.source_type = 'home-movies-by-person';
+  s.source_id = 'alice';
+  return s;
+}
+
 describe('videoQueueModel — shuffleable predicate (TASK-446)', () => {
   it('is true for the home-movies-all source', () => {
     expect(videoQueueModel(homeMoviesSnap(0, false)).shuffleable).toBe(true);
+  });
+  it('is true for the TASK-486 home-movies-by-person source', () => {
+    expect(videoQueueModel(homeMoviesByPersonSnap(0, false)).shuffleable).toBe(true);
   });
   it('is false for a series/film source', () => {
     expect(videoQueueModel(snap(0, false)).shuffleable).toBe(false);

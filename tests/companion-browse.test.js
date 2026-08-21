@@ -376,6 +376,16 @@ test.describe('desync mode', () => {
     expect(intents.filter((i) => i.intent === 'select')).toHaveLength(0);
   });
 
+  // TASK-486 (revision) — a Play All tile now opens locally too (its own
+  // navParams, not the generic ?id= the other desync pages read).
+  test('Browse mode Play All tile tap opens the list locally with its own navParams (no select intent)', async ({ page }) => {
+    await browseOpt(page).click();
+    await page.locator('.dock-tab[data-section="home-movies"]').click();
+    await page.locator('#txtgrid .ph-txt[data-id="play-all:Millie"]').click();
+    await page.waitForURL('**/companion/home-movies-list.html?homeMoviesPerson=millie');
+    expect(intents.filter((i) => i.intent === 'select')).toHaveLength(0);
+  });
+
   // FEAT-038 (DSYNC-2c): tapping Control = "jump to where the TV is", so it must
   // clear the local drill trail. Otherwise the reloaded synced browse restores +
   // re-drives the companion's old spot onto the TV (the stray rail-grid nav that
@@ -535,48 +545,50 @@ test.describe('companion Play All menu row', () => {
   });
 });
 
-// TASK-446 — the Home Movies Play All twin: ONE entry point, always
-// unshuffled (shuffle is a live Queue View toggle, tests/video-home-movies.
-// test.js, not a second browse-page button). Home Movies is in the default
-// BROWSE fixture (unlike Music Videos above), so no MUSIC_VIDEO_CARDS-style
-// route override is needed.
-test.describe('companion Home Movies Play All menu row', () => {
+// TASK-486 — Home Movies drops the header Play All button entirely (TASK-446):
+// its whole-catalog entry point is now the Play All rail's own "All" tile, a
+// plain grid tile like any other (companion drives, TV mirrors — FEAT-017/028).
+// Home Movies is in the default BROWSE fixture, so no route override is needed.
+test.describe('companion Home Movies Play All', () => {
   test.beforeEach(async ({ page }) => {
     intents = [];
     await installApi(page);
     await mockApp(page, intents);
     await page.goto('/companion/browse.html');
+  });
+
+  test('header Play All button stays hidden on Home Movies (TASK-486 replaces it with the rail)', async ({ page }) => {
     await page.locator('#btn-queue-menu').click();
-  });
-
-  test('hidden at the sections root, shown once drilled into Home Movies', async ({ page }) => {
-    await expect(page.locator('#btn-play-all')).toBeHidden();
     await page.locator('.dock-tab[data-section="home-movies"]').click();
-    await expect(page.locator('#btn-play-all')).toBeVisible();
-  });
-
-  test('hidden again on a section with no whole-catalog source', async ({ page }) => {
-    await page.locator('.dock-tab[data-section="home-movies"]').click();
-    await expect(page.locator('#btn-play-all')).toBeVisible();
-    await page.locator('.dock-tab[data-section="films"]').click();
     await expect(page.locator('#btn-play-all')).toBeHidden();
   });
 
-  test('drives the TV to the whole-catalog entry, unshuffled', async ({ page }) => {
+  test('drilling into Home Movies lands on the Play All rail, All tile leading', async ({ page }) => {
     await page.locator('.dock-tab[data-section="home-movies"]').click();
-    await page.locator('#btn-play-all').click();
+    await expect(page.locator('#pager-name')).toHaveText('Play All');
+    await expect(page.locator('#txtgrid .ph-txt').first()).toHaveAttribute('data-id', 'play-all:All');
+  });
+
+  test('the All tile drives the TV to the home-movies-all entry, unshuffled', async ({ page }) => {
+    await page.locator('.dock-tab[data-section="home-movies"]').click();
+    await page.locator('#txtgrid .ph-txt[data-id="play-all:All"]').click();
     await expect.poll(() => {
-      const nav = intents.find((i) => i.intent === 'navigate' && i.params.page === 'video.html');
-      return nav && nav.params.params;
-    }).toEqual({ from: 'browse', homeMoviesAll: 1 });
+      const sel = intents.find((i) => i.intent === 'select');
+      return sel && sel.params.id;
+    }).toBe('play-all:All');
   });
 
-  test('greys out in Browse mode (no dead click)', async ({ page }) => {
+  test('a kid tile drives the TV to the home-movies-by-person entry for that kid', async ({ page }) => {
+    // Millie's tile sits in the SAME Play All rail/grid as All (both fixture
+    // clips are tagged 'millie') — no pager-next needed, unlike the person
+    // browse rail (a separate rail this Play All rail sits ahead of).
     await page.locator('.dock-tab[data-section="home-movies"]').click();
-    await expect(page.locator('#btn-play-all')).not.toHaveClass(/desync-off/);
-    await page.locator('#btn-status').click();
-    await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
-    await expect(page.locator('#btn-play-all')).toHaveClass(/desync-off/);
+    await expect(page.locator('#pager-name')).toHaveText('Play All');
+    await page.locator('#txtgrid .ph-txt[data-id="play-all:Millie"]').click();
+    await expect.poll(() => {
+      const sel = intents.find((i) => i.intent === 'select');
+      return sel && sel.params.id;
+    }).toBe('play-all:Millie');
   });
 });
 

@@ -52,7 +52,10 @@ test('Play All fires play-source for home-movies-all, unshuffled, and plays the 
   });
   await page.goto('/app/homeview/video.html?homeMoviesAll=1&from=browse');
   const req = await playSource;
-  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movies-all' });
+  // item_id rides every entry now (TASK-486 revision: a list-row tap carries
+  // `video`, mirroring a series episode row) — null here since no row was
+  // tapped, matching startSeries' own always-present item_id.
+  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movies-all', item_id: null });
   await expect(page.locator('#video')).toHaveAttribute('src', /millie-walk/);
 });
 
@@ -62,6 +65,30 @@ test('breadcrumb degrades to Home > leaf — no source page', async ({ page }) =
   await page.goto('/app/homeview/video.html?homeMoviesAll=1&from=browse');
   await expect(page.locator('#breadcrumb .crumb-link')).toHaveText('Home');
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Millie Walk');
+});
+
+// TASK-486 — the Play All rail's per-kid tile: SERVER-authoritative exactly
+// like home-movies-all above, the video engine's own home-movies-by-person
+// source, source_id the tapped tile's own `people` tag value.
+test('a Play All rail kid tile fires play-source for home-movies-by-person, scoped to that kid', async ({ page }) => {
+  const playSource = page.waitForRequest(function(req) {
+    return req.url().includes('/api/video-playback/play-source') && req.method() === 'POST';
+  });
+  await page.goto('/app/homeview/video.html?homeMoviesPerson=millie&from=browse');
+  const req = await playSource;
+  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movies-by-person', source_id: 'millie', item_id: null });
+  await expect(page.locator('#video')).toHaveAttribute('src', /millie-walk/);
+});
+
+// TASK-486 (revision) — a tapped row in the list screen carries `video`,
+// which rides through as item_id so play-source jumps straight to it.
+test('a tapped list row plays that specific clip via item_id', async ({ page }) => {
+  const playSource = page.waitForRequest(function(req) {
+    return req.url().includes('/api/video-playback/play-source') && req.method() === 'POST';
+  });
+  await page.goto('/app/homeview/video.html?homeMoviesPerson=millie&video=millie-walk&from=home-movies-list');
+  const req = await playSource;
+  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movies-by-person', source_id: 'millie', item_id: 'millie-walk' });
 });
 
 // TASK-446 (owner correction) — Shuffle is a live Queue View toggle for Home
@@ -76,6 +103,14 @@ test.describe('Shuffle — a live Queue View toggle', () => {
 
   test('the Shuffle pill is offered for home-movies-all', async ({ page }) => {
     await openQueue(page);
+    await expect(page.locator('.np-pill[data-action="toggle-shuffle"]')).toBeVisible();
+  });
+
+  // TASK-486 — the per-kid source shares the same shuffle gate as All.
+  test('the Shuffle pill is offered for a home-movies-by-person entry too', async ({ page }) => {
+    await page.goto('/app/homeview/video.html?homeMoviesPerson=millie&from=browse');
+    await page.locator('#btn-queue').click();
+    await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
     await expect(page.locator('.np-pill[data-action="toggle-shuffle"]')).toBeVisible();
   });
 

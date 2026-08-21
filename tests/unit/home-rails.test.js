@@ -1,4 +1,4 @@
-import { buildRails, buildTabs, buildTabRails, railsForSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, railsForSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail, homeMoviesPlayAllRail, homeMoviesListItems, homeMoviesListTitle, homeMoviesListPlayParams } from '../../core/home-rails.js';
 
 // TASK-235 — the create affordance is the Playlists rail-heading ＋ button (in the
 // browse screen), not a synthetic card. withPlaylistsRail just GUARANTEES the rail
@@ -176,12 +176,12 @@ describe('buildTabRails', () => {
     expect(rails[0].items.map(c => c.id)).toEqual(['bluey']);
   });
 
-  it('Home Movies -> one rail per people tag, A-Z by label, item in each matching rail (TASK-444)', () => {
+  it('Home Movies -> Play All rail then one rail per people tag, A-Z by label, item in each matching rail (TASK-444/486)', () => {
     const rails = buildTabRails('home-movies', TYPED, [], {});
-    expect(rails.map(r => r.title)).toEqual(['Millie', 'Ollie', 'Other']); // A-Z
-    expect(rails[0].items.map(c => c.id)).toEqual(['m-walk', 'm-park']);  // both tagged Millie, newest capture date first
-    expect(rails[1].items.map(c => c.id)).toEqual(['m-walk']);            // m-walk also tagged Ollie
-    expect(rails[2].items.map(c => c.id)).toEqual(['orphan']);            // untagged -> Other
+    expect(rails.map(r => r.title)).toEqual(['Play All', 'Millie', 'Ollie', 'Other']); // Play All leads, then A-Z
+    expect(rails[1].items.map(c => c.id)).toEqual(['m-walk', 'm-park']);  // both tagged Millie, newest capture date first
+    expect(rails[2].items.map(c => c.id)).toEqual(['m-walk']);            // m-walk also tagged Ollie
+    expect(rails[3].items.map(c => c.id)).toEqual(['orphan']);            // untagged -> Other
   });
 
   it('does not mutate input cards', () => {
@@ -628,7 +628,10 @@ describe('cardRoute (browse navigation, FEAT-027)', () => {
 // the set cardRoute()'s branches above actually produce.
 describe('CARD_ROUTES', () => {
   it('lists every value cardRoute() can return', () => {
-    expect(CARD_ROUTES).toEqual(['artist', 'playlist', 'music-video', 'album', 'video', 'series', 'track']);
+    expect(CARD_ROUTES).toEqual(['artist', 'playlist', 'music-video', 'album', 'video', 'series', 'track', 'play-all']);
+  });
+  it('cardRoute maps a TASK-486 Play All tile to "play-all" via the fallback branch', () => {
+    expect(cardRoute({ kind: 'play-all', id: 'play-all:All' })).toBe('play-all');
   });
 });
 
@@ -646,10 +649,10 @@ describe('Home Movies person rails (TASK-444)', () => {
     { kind: 'video', id: 'plain',  title: 'Plain Clip',  section: 'home-movies' }
   ];
 
-  it('adds one rail per kid, title-cased slug, A-Z by rail title', () => {
+  it('adds one rail per kid, title-cased slug, A-Z by rail title, after the TASK-486 Play All rail', () => {
     const rails = buildTabRails('home-movies', HOME, [], {});
-    expect(rails.map(r => r.title)).toEqual(['Millie', 'Ollie', 'Other']);
-    expect(rails.map(r => r.id)).toEqual(['person:millie', 'person:ollie', 'person:other']);
+    expect(rails.map(r => r.title)).toEqual(['Play All', 'Millie', 'Ollie', 'Other']);
+    expect(rails.map(r => r.id)).toEqual(['home-movies-play-all', 'person:millie', 'person:ollie', 'person:other']);
   });
 
   it("sorts a rail's items newest-first by capture date, not A-Z by title", () => {
@@ -672,10 +675,10 @@ describe('Home Movies person rails (TASK-444)', () => {
     expect(other.items.map(c => c.id)).toEqual(['plain']);
   });
 
-  it('orders rails Continue → person rails', () => {
+  it('orders rails Continue → Play All (TASK-486) → person rails', () => {
     const cw = [{ item_id: 'm-walk', title: 'Millie Walk', poster: 'm.jpg', position_secs: 5, duration_secs: 30, collection_id: null, collection_title: null }];
     const ids = buildTabRails('home-movies', HOME, cw, {}).map(r => r.id);
-    expect(ids).toEqual(['continue', 'person:millie', 'person:ollie', 'person:other']);
+    expect(ids).toEqual(['continue', 'home-movies-play-all', 'person:millie', 'person:ollie', 'person:other']);
   });
 
   it('omits a person rail with no clips (no rail for a kid nobody has tagged)', () => {
@@ -714,6 +717,113 @@ describe('Home Movies person rails (TASK-444)', () => {
     ];
     const millie = buildTabRails('home-movies', mixed, [], {}).find(r => r.id === 'person:millie');
     expect(millie.items.map(c => c.id)).toEqual(['dated', 'undated']);
+  });
+});
+
+// TASK-486 — the Home Movies "Play All" tile rail: All + one tile per kid,
+// replacing TASK-446's single header button. Kid tiles reuse EXACTLY the
+// person rails' own tag set (personRails, TASK-444) — no separate tagging
+// concept — and drop 'other' since "All" already covers untagged clips.
+describe('homeMoviesPlayAllRail (TASK-486)', () => {
+  const PERSON_RAILS = [
+    { id: 'person:millie', slug: 'millie', title: 'Millie', items: [{ id: 'm-walk' }] },
+    { id: 'person:ollie', slug: 'ollie', title: 'Ollie', items: [{ id: 'o-swim' }] },
+    { id: 'person:other', slug: 'other', title: 'Other', items: [{ id: 'plain' }] }
+  ];
+
+  it('leads with an All tile, then one tile per kid in the person rails\' own order', () => {
+    const rail = homeMoviesPlayAllRail(PERSON_RAILS)[0];
+    expect(rail.id).toBe('home-movies-play-all');
+    expect(rail.title).toBe('Play All');
+    expect(rail.items.map(t => t.title)).toEqual(['All', 'Millie', 'Ollie']);
+  });
+
+  it('drops the "other" (untagged) rail — no separate tile, All already covers it', () => {
+    const rail = homeMoviesPlayAllRail(PERSON_RAILS)[0];
+    expect(rail.items.some(t => t.title === 'Other')).toBe(false);
+  });
+
+  it('the All tile carries the TASK-446 home-movies-all nav params and its own prefixed id', () => {
+    const rail = homeMoviesPlayAllRail(PERSON_RAILS)[0];
+    const all = rail.items.find(t => t.title === 'All');
+    expect(all.kind).toBe('play-all');
+    expect(all.id).toBe('play-all:All');
+    expect(all.navParams).toEqual({ homeMoviesAll: 1 });
+  });
+
+  it("a kid tile carries the person's own tag value as homeMoviesPerson and its own prefixed id", () => {
+    const rail = homeMoviesPlayAllRail(PERSON_RAILS)[0];
+    const millie = rail.items.find(t => t.title === 'Millie');
+    expect(millie.kind).toBe('play-all');
+    expect(millie.id).toBe('play-all:Millie');
+    expect(millie.navParams).toEqual({ homeMoviesPerson: 'millie' });
+  });
+
+  it('tile ids are distinct across All + every kid', () => {
+    const rail = homeMoviesPlayAllRail(PERSON_RAILS)[0];
+    const ids = rail.items.map(t => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('is omitted entirely when there are no person rails (no home movies at all)', () => {
+    expect(homeMoviesPlayAllRail([])).toEqual([]);
+    expect(homeMoviesPlayAllRail(null)).toEqual([]);
+    expect(homeMoviesPlayAllRail(undefined)).toEqual([]);
+  });
+
+  it('still leads with an All tile when every clip is untagged (person rails = just "other")', () => {
+    const rail = homeMoviesPlayAllRail([{ id: 'person:other', slug: 'other', title: 'Other', items: [{ id: 'plain' }] }])[0];
+    expect(rail.items.map(t => t.title)).toEqual(['All']);
+  });
+});
+
+// TASK-486 (revision) — the Play All LIST screen's own data, shared verbatim
+// by the TV screen and its companion mirror (screen-home-movies-list-page.js /
+// companion-home-movies-list.js), so the two can never disagree on scope.
+describe('homeMoviesListTitle / homeMoviesListItems (TASK-486 revision)', () => {
+  const HOME = [
+    { kind: 'video', id: 'm-walk', title: 'Millie Walk', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-05' } },
+    { kind: 'video', id: 'm-park', title: 'At The Park', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-10' } },
+    { kind: 'video', id: 'both',   title: 'Both Kids',   section: 'home-movies', people: ['millie', 'ollie'], tags: { date: '2026-01-08' } },
+    { kind: 'video', id: 'o-swim', title: 'Ollie Swim',  section: 'home-movies', people: ['ollie'], tags: { date: '2026-01-07' } },
+    { kind: 'video', id: 'plain',  title: 'Plain Clip',  section: 'home-movies' },
+    { kind: 'video', id: 'film-a', title: 'A Film',      section: 'films' }
+  ];
+
+  it('homeMoviesListTitle is "All" for no person, else the title-cased tag', () => {
+    expect(homeMoviesListTitle(null)).toBe('All');
+    expect(homeMoviesListTitle(undefined)).toBe('All');
+    expect(homeMoviesListTitle('millie')).toBe('Millie');
+  });
+
+  it('homeMoviesListItems with no person returns every home-movie clip, newest first, wrapped as {video}', () => {
+    const items = homeMoviesListItems(HOME, null);
+    expect(items.map(i => i.video.id)).toEqual(['m-park', 'both', 'o-swim', 'm-walk', 'plain']);
+    expect(items.every(i => i.video)).toBe(true);
+  });
+
+  it('homeMoviesListItems excludes non-home-movie cards even with no person scope', () => {
+    expect(homeMoviesListItems(HOME, null).some(i => i.video.id === 'film-a')).toBe(false);
+  });
+
+  it('homeMoviesListItems scoped to a person returns only that person\'s tagged clips, newest first', () => {
+    const items = homeMoviesListItems(HOME, 'millie');
+    expect(items.map(i => i.video.id)).toEqual(['m-park', 'both', 'm-walk']);
+  });
+
+  it('homeMoviesListItems scoped to a person with no clips is empty', () => {
+    expect(homeMoviesListItems(HOME, 'nemo')).toEqual([]);
+  });
+
+  it('homeMoviesListItems tolerates null/undefined cards', () => {
+    expect(homeMoviesListItems(null, 'millie')).toEqual([]);
+    expect(homeMoviesListItems(undefined, null)).toEqual([]);
+  });
+
+  it('homeMoviesListPlayParams carries the scope + an optional tapped-row video id', () => {
+    expect(homeMoviesListPlayParams(null, undefined)).toEqual({ from: 'home-movies-list', homeMoviesAll: 1, video: undefined });
+    expect(homeMoviesListPlayParams('millie', undefined)).toEqual({ from: 'home-movies-list', homeMoviesPerson: 'millie', video: undefined });
+    expect(homeMoviesListPlayParams('millie', 'm-walk')).toEqual({ from: 'home-movies-list', homeMoviesPerson: 'millie', video: 'm-walk' });
   });
 });
 
