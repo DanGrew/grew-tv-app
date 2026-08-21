@@ -81,6 +81,7 @@ export function initVideoPage() {
   var snapshot = null;     // latest video_playback snapshot (series mode only)
   var loadedId = null;     // which item id is currently loaded in <video>
   var currentTitle = '';   // current item's title (for the breadcrumb leaf)
+  var currentItemType = null;  // current item's itemType, for advanceAuto's countdown skip below
   var seriesTitle = null;  // cached series title for the middle crumb
   var mvSnapshot = {};     // latest music_video_playback snapshot (music-video mode only)
   var enginePending = null;  // ENGINE_TIMEOUT_MS watchdog, armed per engine action, cleared on first swap
@@ -180,6 +181,7 @@ export function initVideoPage() {
     clearEngineTimeout();
     loadedId = np.item_id;
     currentTitle = np.title;
+    currentItemType = np.itemType;
     var restartThis = [restart].filter(Boolean).filter(function() { return np.item_id === videoId; })[0];
     loadProgress(SERVER, np.item_id, person)
       .catch(zeroProgress)
@@ -213,10 +215,19 @@ export function initVideoPage() {
   // (FEAT-040/TASK-251 — a standalone film plays via play-video), so `next` is the
   // override-queue front when one is queued (a film queued after a film plays
   // next), else the source walk (series wrap under repeat), else nothing.
+  //
+  // TASK-487: a home movie skips the countdown and advances straight to `next`
+  // instead — the same principle already applied to a music video (mvEnded
+  // below never shows it either): a short standalone clip doesn't need a 5s
+  // "up next" pause between it and the next one.
+  var ADVANCE_NEXT = {
+    'true':  function(next) { player.startUpNext(next.title, function() { sendAction('next', {}); }); },
+    'false': function() { sendAction('next', {}); }
+  };
   function advanceAuto() {
     var next = upNextItem(snapshot);
     ({
-      'true':  function() { player.startUpNext(next.title, function() { sendAction('next', {}); }); },
+      'true':  function() { ADVANCE_NEXT[(currentItemType !== 'home-movie') + ''](next); },
       'false': function() { player.stop(); }
     })[!!next + '']();
   }
