@@ -743,17 +743,19 @@ describe('homeMoviesPlayAllRail (TASK-486)', () => {
     expect(rail.items.some(t => t.title === 'Other')).toBe(false);
   });
 
-  it('the All tile carries the TASK-446 home-movies-all nav params', () => {
+  it('the All tile carries the TASK-446 home-movies-all nav params and its own prefixed id', () => {
     const rail = homeMoviesPlayAllRail(PERSON_RAILS)[0];
     const all = rail.items.find(t => t.title === 'All');
     expect(all.kind).toBe('play-all');
+    expect(all.id).toBe('play-all:All');
     expect(all.navParams).toEqual({ homeMoviesAll: 1 });
   });
 
-  it("a kid tile carries the person's own tag value as homeMoviesPerson", () => {
+  it("a kid tile carries the person's own tag value as homeMoviesPerson and its own prefixed id", () => {
     const rail = homeMoviesPlayAllRail(PERSON_RAILS)[0];
     const millie = rail.items.find(t => t.title === 'Millie');
     expect(millie.kind).toBe('play-all');
+    expect(millie.id).toBe('play-all:Millie');
     expect(millie.navParams).toEqual({ homeMoviesPerson: 'millie' });
   });
 
