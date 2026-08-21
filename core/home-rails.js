@@ -493,12 +493,13 @@ export function homeMoviesPlayAllRail(personRails) {
 // entirely when there are no home-movie clips at all, same as
 // homeMoviesPlayAllRail.
 export function homeMoviesMonthRail(homeMovieCards) {
-  var months = {};
-  (homeMovieCards || []).forEach(function(c) {
+  if (!homeMovieCards) return [];
+  var months = new Set();
+  homeMovieCards.forEach(function(c) {
     var ym = monthOf(c);
-    if (ym) months[ym] = true;
+    if (ym) months.add(ym);
   });
-  var yms = Object.keys(months).sort().reverse();
+  var yms = Array.from(months).sort().reverse();
   var tiles = yms.map(function(ym) { return playAllTile(monthLabel(ym), { homeMoviesMonth: ym }); });
   var rail = { id: 'home-movies-play-all-month', title: 'Play All by month', items: tiles };
   return tiles.length ? [rail] : [];

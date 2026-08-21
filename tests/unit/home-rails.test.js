@@ -818,6 +818,16 @@ describe('homeMoviesMonthRail (TASK-491)', () => {
     const rail = homeMoviesMonthRail(undated)[0];
     expect(rail.items.length).toBe(2); // still just Aug + Jul
   });
+
+  it('labels every calendar month correctly, not just the two exercised above', () => {
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const oneOfEach = MONTHS.map((name, i) => {
+      const mm = String(i + 1).padStart(2, '0');
+      return { kind: 'video', id: 'clip-' + mm, title: name, section: 'home-movies', tags: { date: '2026-' + mm + '-01' } };
+    });
+    const rail = homeMoviesMonthRail(oneOfEach)[0];
+    expect(rail.items.map(t => t.title)).toEqual(MONTHS.slice().reverse().map(name => name + ' 2026'));
+  });
 });
 
 // TASK-486 (revision) — the Play All LIST screen's own data, shared verbatim
