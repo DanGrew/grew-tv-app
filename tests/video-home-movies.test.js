@@ -26,6 +26,38 @@ test.beforeEach(async ({ page }) => {
   await installVideoPlaybackBackend(page);
 });
 
+// TASK-487 — a home movie is a short standalone clip with no meaningful
+// resume, like a music video (video-music-video.test.js's own "no resume
+// offered" case); loadProgress used to gate EVERY swap on a network round
+// trip that bought nothing for this type, which read as a loading gap.
+// Covers both stories: a queued auto-advance transition between clips, and a
+// single tap-to-play start — both route through the same swapVideo.
+function progressCalls(page) {
+  var calls = [];
+  page.on('request', function(req) {
+    if (req.url().indexOf('/api/progress/') > -1) calls.push(req.url());
+  });
+  return calls;
+}
+
+test('a single home-movie pick starts at 0 with no watch-progress round trip', async ({ page }) => {
+  const calls = progressCalls(page);
+  await page.goto('/app/homeview/video.html?video=millie-walk&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /millie-walk/);
+  expect(await page.evaluate(() => document.getElementById('video').currentTime)).toBe(0);
+  expect(calls).toEqual([]);
+});
+
+test('the queued auto-advance transition between home-movie clips never touches watch-progress either', async ({ page }) => {
+  const calls = progressCalls(page);
+  await page.goto('/app/homeview/video.html?homeMoviesAll=1&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /millie-walk/);
+  await page.locator('#btn-next').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /beach-day/);
+  expect(await page.evaluate(() => document.getElementById('video').currentTime)).toBe(0);
+  expect(calls).toEqual([]);
+});
+
 test('Play All fires play-source for home-movies-all, unshuffled, and plays the resolved item', async ({ page }) => {
   const playSource = page.waitForRequest(function(req) {
     return req.url().includes('/api/video-playback/play-source') && req.method() === 'POST';

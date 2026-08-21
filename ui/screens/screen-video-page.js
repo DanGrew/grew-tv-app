@@ -176,21 +176,33 @@ export function initVideoPage() {
   };
   function resyncOnActivate() { RESYNC_ON_ACTIVATE[isMusicVideo + ''](); }
 
+  function playSwappedVideo(np, startSec) {
+    // BUG-489: itemType rides the engine snapshot (video_playback.py's
+    // _resolve_video) so the player can gate CC off for a home movie
+    // without a second fetch.
+    player.playVideo({ id: np.item_id, title: np.title, subtitles: np.subtitles, itemType: np.itemType }, from, startSec);
+    renderUpNextLine();
+    mountCrumbs();
+  }
+  // TASK-487: a home movie is a short standalone clip, like a music video
+  // (mvSwap below) — it always starts at 0. loadProgress used to gate EVERY
+  // swap on a network round trip that bought nothing for a type with no
+  // meaningful resume; skipping it here removes that round trip from both
+  // the queued auto-advance transition and a single tap-to-play start.
+  var SWAP_START = {
+    'true':  function(np) { playSwappedVideo(np, 0); },
+    'false': function(np) {
+      var restartThis = [restart].filter(Boolean).filter(function() { return np.item_id === videoId; })[0];
+      loadProgress(SERVER, np.item_id, person)
+        .catch(zeroProgress)
+        .then(function(prog) { playSwappedVideo(np, resumeStart(restartThis, prog)); });
+    }
+  };
   function swapVideo(np) {
     clearEngineTimeout();
     loadedId = np.item_id;
     currentTitle = np.title;
-    var restartThis = [restart].filter(Boolean).filter(function() { return np.item_id === videoId; })[0];
-    loadProgress(SERVER, np.item_id, person)
-      .catch(zeroProgress)
-      .then(function(prog) {
-        // BUG-489: itemType rides the engine snapshot (video_playback.py's
-        // _resolve_video) so the player can gate CC off for a home movie
-        // without a second fetch.
-        player.playVideo({ id: np.item_id, title: np.title, subtitles: np.subtitles, itemType: np.itemType }, from, resumeStart(restartThis, prog));
-        renderUpNextLine();
-        mountCrumbs();
-      });
+    SWAP_START[(np.itemType === 'home-movie') + ''](np);
   }
 
   // A changed now-playing swaps media in place; an unchanged one (a flag-only
