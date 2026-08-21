@@ -199,12 +199,12 @@ var MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // TASK-491 — a year-month's display label ('2026-08' -> 'Aug 2026'), the
-// month tile rail's own title. The raw slug for an unparseable value (should
-// not happen — every clip gets a capture year-month at ingest).
+// month tile rail's own title. Every value reaching this is one monthOf
+// itself derived from a real capture date (every clip gets one at ingest),
+// so no fallback for an unparseable value is needed.
 function monthLabel(yearMonth) {
   var parts = String(yearMonth).split('-');
-  var name = MONTH_NAMES[parseInt(parts[1], 10) - 1];
-  return name ? name + ' ' + parts[0] : yearMonth;
+  return MONTH_NAMES[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
 }
 
 // TASK-444 — Home Movies rail item order: newest capture date first. Ties

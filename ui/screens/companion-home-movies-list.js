@@ -34,8 +34,10 @@ export function initPage() {
   // homeMoviesPerson/homeMoviesMonth start undefined (never null) so the
   // FIRST context/URL capture of the 'All' scope (a legitimate null for
   // both) still counts as a change — captureScope's own dedupe below only
-  // drops a REPEAT of the same value, per field.
-  var state = { homeMoviesPerson: undefined, homeMoviesMonth: undefined, profile: null, person: null, model: { title: '', items: [] } };
+  // drops a REPEAT of the same value, per field. scopeCaptured is a plain
+  // flag (not `person !== undefined || month !== undefined`, which would be
+  // cyclomatic-2 here) set by either capture block below.
+  var state = { homeMoviesPerson: undefined, homeMoviesMonth: undefined, scopeCaptured: false, profile: null, person: null, model: { title: '', items: [] } };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -131,11 +133,11 @@ export function initPage() {
 
   // Home Movies cards need BOTH the scope (context) and the profile (app_state,
   // picks the catalog); they can arrive in either order, so load only once
-  // EITHER scope field is captured (person and month are mutually exclusive —
-  // exactly one Play All tile sets one — so only one field ever leaves its
+  // a scope field has been captured (person and month are mutually exclusive
+  // — exactly one Play All tile sets one — so only one field ever leaves its
   // undefined sentinel for a given entry) and re-load if the profile changes.
   function loadClips() {
-    [state.profile].filter(Boolean).filter(function() { return state.homeMoviesPerson !== undefined || state.homeMoviesMonth !== undefined; }).forEach(function(profile) {
+    [state.profile].filter(Boolean).filter(function() { return state.scopeCaptured; }).forEach(function(profile) {
       loadBrowse(server, profile)
         .then(function(b) {
           var cards = [b.content].filter(Boolean).concat([[]])[0];
@@ -155,10 +157,12 @@ export function initPage() {
   function captureScope(payload) {
     [payload.home_movies_person].filter(function(p) { return p !== undefined; }).filter(function(p) { return p !== state.homeMoviesPerson; }).forEach(function(p) {
       state.homeMoviesPerson = p;
+      state.scopeCaptured = true;
       loadClips();
     });
     [payload.home_movies_month].filter(function(m) { return m !== undefined; }).filter(function(m) { return m !== state.homeMoviesMonth; }).forEach(function(m) {
       state.homeMoviesMonth = m;
+      state.scopeCaptured = true;
       loadClips();
     });
   }
