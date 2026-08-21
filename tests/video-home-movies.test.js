@@ -26,6 +26,26 @@ test.beforeEach(async ({ page }) => {
   await installVideoPlaybackBackend(page);
 });
 
+// TASK-487: a home movie is a short standalone clip, like a music video — the
+// 5s "Up next" countdown (video-playback.test.js's series/film behaviour)
+// reads as an extra gap between two short clips, so it's skipped here in
+// favour of an immediate advance, mirroring mvEnded's existing behaviour for
+// a music video.
+test('auto-advance at end of a home movie skips the countdown and advances immediately', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?homeMoviesAll=1&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /millie-walk/);
+  const nextReq = page.waitForRequest(function(req) {
+    return req.url().includes('/api/video-playback/next') && req.method() === 'POST';
+  }, { timeout: 2000 });
+  await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
+  // Checked the instant the (synchronous) ended handler returns — the series/
+  // film countdown would already have made this visible by now; a home movie
+  // must never show it at all, not just "not any more" after it later clears.
+  await expect(page.locator('#upnext-overlay')).toBeHidden({ timeout: 200 });
+  await nextReq;
+  await expect(page.locator('#video')).toHaveAttribute('src', /beach-day/);
+});
+
 test('Play All fires play-source for home-movies-all, unshuffled, and plays the resolved item', async ({ page }) => {
   const playSource = page.waitForRequest(function(req) {
     return req.url().includes('/api/video-playback/play-source') && req.method() === 'POST';
