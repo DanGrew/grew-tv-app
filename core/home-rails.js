@@ -84,8 +84,11 @@ function sectionOf(card) { return card.section || 'films'; }
 // CARD_ROUTES is every value the function below can return — the single source
 // of truth both a consumer table and arch-check's `no-missing-card-route` rule
 // read (TASK-383). Add a new return branch below -> add its value here too, or
-// the check can't see the new route to enforce it.
-export var CARD_ROUTES = ['artist', 'playlist', 'music-video', 'album', 'video', 'series', 'track'];
+// the check can't see the new route to enforce it. TASK-486: 'play-all' needs
+// no new branch below — a Play All tile's own `kind: 'play-all'` already falls
+// through the final `card.kind || 'video'` line, same as 'series'/'artist'
+// would if their own earlier checks were removed.
+export var CARD_ROUTES = ['artist', 'playlist', 'music-video', 'album', 'video', 'series', 'track', 'play-all'];
 
 export function cardRoute(card) {
   if (card.kind === 'artist') return 'artist';
@@ -431,16 +434,46 @@ export function buildTabs(cards) {
 // own leading "Box Sets" rail and kept out of the genre rows. genreLabels maps
 // genre slugs to display names.
 //
+// TASK-486 — one ACTION tile (kind:'play-all', never a browse card) for the
+// Home Movies "Play All" rail: All (TASK-446's whole-catalog source) first,
+// then one per kid, in the SAME tag set + order as the person rails just
+// built (personRails) — no separate tagging concept. `navParams` carries the
+// exact video.html query params the tile's own onSelect handler needs
+// (home-movies-all's existing `homeMoviesAll` param for All, the new
+// `homeMoviesPerson` param keyed by tag value for a kid) — kept data-only so
+// the ui/** consumer stays a plain lookup (cyclomatic-1), no branch there.
+function playAllTile(title, navParams) {
+  return { kind: 'play-all', id: 'play-all:' + title, title: title, navParams: navParams };
+}
+
+// The 'other' rail (peopleOf's untagged fallback, TASK-444) gets no tile here
+// — "All" already covers untagged clips, so there is no separate tile for
+// them (owner, 2026-08-20). Omitted entirely (mirrors simpleRail's own
+// omit-if-empty) when personRails is empty — Home Movies has no clips at
+// all, so there is nothing for even the All tile to play.
+export function homeMoviesPlayAllRail(personRails) {
+  var rails = personRails || [];
+  var kidTiles = rails
+    .filter(function(r) { return r.slug !== 'other'; })
+    .map(function(r) { return playAllTile(r.title, { homeMoviesPerson: r.slug }); });
+  var allTile = playAllTile('All', { homeMoviesAll: 1 });
+  var rail = { id: 'home-movies-play-all', title: 'Play All', items: [allTile].concat(kidTiles) };
+  return rails.length ? [rail] : [];
+}
+
 // Home Movies (TASK-444, reinstating the FEAT-025/TASK-183 person rails this
-// time with real tags) is Continue Watching -> one rail per `people` tag
-// value, through the SAME groupRails path Series/Films use for genre rails —
-// keyed on peopleOf instead of genresOf, with no genreLabels-style override
-// (title-cased slug only) since people have no display-name map. A clip tagged
-// with more than one kid appears in each of those kids' rails (groupRails'
-// keyer already fans a card out to every slug it returns, same as genres).
-// An untagged clip lands in a single "Other" rail (peopleOf's fallback) rather
-// than disappearing. Sort differs from genre rails: newest-first by capture
-// date (cmpDateDesc) instead of A-Z by title.
+// time with real tags) is Continue Watching -> Play All (TASK-486) -> one
+// rail per `people` tag value, through the SAME groupRails path Series/Films
+// use for genre rails — keyed on peopleOf instead of genresOf, with no
+// genreLabels-style override (title-cased slug only) since people have no
+// display-name map. A clip tagged with more than one kid appears in each of
+// those kids' rails (groupRails' keyer already fans a card out to every slug
+// it returns, same as genres). An untagged clip lands in a single "Other"
+// rail (peopleOf's fallback) rather than disappearing. Sort differs from
+// genre rails: newest-first by capture date (cmpDateDesc) instead of A-Z by
+// title. The Play All rail (TASK-486) replaces TASK-446's single header
+// button — it reuses this SAME tag set (personRails, minus 'other') for its
+// per-kid tiles, so it can never drift from what the browse rails below it show.
 export function buildTabRails(sectionId, cards, cwRows, genreLabels, recents) {
   var all = (cards || []).map(withDurationSec);
   var byId = cardIndex(all);
@@ -449,7 +482,9 @@ export function buildTabRails(sectionId, cards, cwRows, genreLabels, recents) {
   var inTab = all.filter(function(c) { return sectionOf(c) === sectionId; });
   if (sectionId === 'home-movies') {
     var personRails = groupRails(inTab, peopleOf, titleCase, 'person:', cmpDateDesc);
-    return continueRail(sectionId, cwRows, byId).concat(personRails);
+    return continueRail(sectionId, cwRows, byId)
+      .concat(homeMoviesPlayAllRail(personRails))
+      .concat(personRails);
   }
   var boxsets = inTab.filter(isBoxset);
   var rest = inTab.filter(function(c) { return !isBoxset(c); });

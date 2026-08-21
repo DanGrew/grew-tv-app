@@ -49,14 +49,16 @@ export function initBrowsePage() {
   function onPlayQueueMusic() { navTo('audio.html', { playQueue: 1, from: 'browse' }); }
 
   // TASK-445 — Play All: a whole-catalog "play everything of this type"
-  // control, shown only on a tab that has one. Keyed by tab id (not
-  // hardcoded to Music Videos) so a future tab (TASK-446's Home Movies) adds
-  // one map entry, no branch. renderBrowse's onTabChange fires this on every
-  // tab select, including the initial one. TASK-446 (owner correction): ONE
-  // entry point, always unshuffled — shuffle is a live toggle inside the
-  // player's Queue View (core/video-queue-view.js), matching every other
-  // media source's shuffle UX, not a second pre-entry button.
-  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 }, 'home-movies': { homeMoviesAll: 1 } };
+  // control, shown only on a tab that has one. Keyed by tab id, no branch.
+  // renderBrowse's onTabChange fires this on every tab select, including the
+  // initial one. TASK-446 (owner correction): ONE entry point, always
+  // unshuffled — shuffle is a live toggle inside the player's Queue View
+  // (core/video-queue-view.js), matching every other media source's shuffle
+  // UX, not a second pre-entry button. TASK-486 drops 'home-movies' from this
+  // map — its whole-catalog entry point is now the Play All rail's own "All"
+  // tile (home-rails.js homeMoviesPlayAllRail), replacing this header button
+  // for that tab; Music Videos keeps the header button as-is.
+  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 } };
   function showPlayAll(tabId) {
     var btn = document.getElementById('btn-play-all');
     btn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[!!PLAY_ALL_PARAMS[tabId] + ''];
@@ -216,7 +218,11 @@ export function initBrowsePage() {
     // playthrough (never the plain 'video' route's server engine). A music-
     // video playlist card routes through 'playlist' like any other playlist
     // (TASK-376) — see playlist-detail for how a music-video track plays.
-    'music-video': function(card) { navTo('video.html', { musicVideo: card.id, from: 'browse' }); }
+    'music-video': function(card) { navTo('video.html', { musicVideo: card.id, from: 'browse' }); },
+    // TASK-486 — a Play All rail tile (All or a kid) carries its own exact
+    // video.html query params (home-rails.js playAllTile); this route is a
+    // plain lookup, no branch, same shape as every other entry here.
+    'play-all': function(card) { navTo('video.html', Object.assign({ from: 'browse' }, card.navParams)); }
   };
 
   // cardRoute (core) gives 'album' for a music card else the card's kind;

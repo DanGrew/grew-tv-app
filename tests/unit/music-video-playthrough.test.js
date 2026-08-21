@@ -24,11 +24,17 @@ describe('entryMode', () => {
     expect(entryMode({ homeMoviesAll: true })).toBe('homeMoviesAll');
     expect(entryMode({ mvAll: true, homeMoviesAll: true })).toBe('mvAll');
   });
+  it('is "homeMoviesPerson" when a TASK-486 Play All rail kid tile is tapped (and no All/mv* param)', () => {
+    expect(entryMode({ homeMoviesPerson: 'Alice' })).toBe('homeMoviesPerson');
+    expect(entryMode({ homeMoviesAll: true, homeMoviesPerson: 'Alice' })).toBe('homeMoviesAll');
+    expect(entryMode({ mvAll: true, homeMoviesPerson: 'Alice' })).toBe('mvAll');
+  });
   it('is "series" when a series id is flagged (and no music-video/home-movies param)', () => {
     expect(entryMode({ isSeries: true })).toBe('series');
     expect(entryMode({ mvItem: 'mv1', isSeries: true })).toBe('mvItem');
     expect(entryMode({ mvAll: true, isSeries: true })).toBe('mvAll');
     expect(entryMode({ homeMoviesAll: true, isSeries: true })).toBe('homeMoviesAll');
+    expect(entryMode({ homeMoviesPerson: 'Alice', isSeries: true })).toBe('homeMoviesPerson');
   });
   it('is "single" for a standalone film — the default with nothing set', () => {
     expect(entryMode({})).toBe('single');

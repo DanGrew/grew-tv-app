@@ -13,9 +13,11 @@
 // (playlist beats artist beats a lone item pick beats the TASK-445 whole-
 // catalog Play All — the four are mutually exclusive in practice; the
 // priority is a defensive fallback, not a real choice), then the TASK-446
-// Home Movies whole-catalog Play All (SERVER-authoritative — the video
-// engine's own `home-movies-all` source, not the mv* modes above — those
-// route through the music-video engine instead), then a series, else a
+// Home Movies whole-catalog Play All / TASK-486 per-kid Play All (both
+// SERVER-authoritative — the video engine's own `home-movies-all` /
+// `home-movies-by-person` sources, not the mv* modes above — those route
+// through the music-video engine instead; the two are mutually exclusive,
+// one Play All rail tile sets exactly one param), then a series, else a
 // standalone single. Kept in core (not the page) because it branches —
 // ui/** must stay cyclomatic-1.
 export function entryMode(p) {
@@ -26,6 +28,7 @@ export function entryMode(p) {
   if (params.mvItem) return 'mvItem';
   if (params.mvAll) return 'mvAll';
   if (params.homeMoviesAll) return 'homeMoviesAll';
+  if (params.homeMoviesPerson) return 'homeMoviesPerson';
   if (params.isSeries) return 'series';
   return 'single';
 }

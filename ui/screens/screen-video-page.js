@@ -68,11 +68,12 @@ export function initVideoPage() {
   var mvTrack    = getParam('musicVideoTrack');
   var mvAll      = getParam('musicVideoAll');
   var homeMoviesAll = getParam('homeMoviesAll');
+  var homeMoviesPerson = getParam('homeMoviesPerson');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
   var person   = getPerson();
   var isSeries = !!seriesId;
-  var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, isSeries: isSeries });
+  var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson, isSeries: isSeries });
   var MV_MODE = { mvItem: true, mvPlaylist: true, mvArtist: true, mvAll: true };
   var isMusicVideo = !!MV_MODE[mode];
   var wsApp = null;
@@ -495,6 +496,16 @@ export function initVideoPage() {
       .then(function() { sendAction('play-source', { source_type: 'home-movies-all' }); })
       .catch(function() {});
   }
+  // TASK-486 — a Play All rail kid tile: SERVER-authoritative exactly like
+  // startHomeMoviesAll above, the video engine's own `home-movies-by-person`
+  // source, source_id the tapped tile's `people` tag value.
+  function startHomeMoviesByPerson() {
+    mountCrumbs();
+    armEngineTimeout();
+    initCaptions(SERVER)
+      .then(function() { sendAction('play-source', { source_type: 'home-movies-by-person', source_id: homeMoviesPerson }); })
+      .catch(function() {});
+  }
   // FEAT-040 (Play Queue): entered with ?playQueue (no video/series) — fire
   // play-queue (the server pops + plays the queue head) and render from the
   // snapshot like the others. Lets you START the queue without opening a random
@@ -550,6 +561,7 @@ export function initVideoPage() {
     mvItem: startMvItem,
     mvAll: startMvAll,
     homeMoviesAll: startHomeMoviesAll,
+    homeMoviesPerson: startHomeMoviesByPerson,
     series: startSeries,
     single: startSingle
   };
