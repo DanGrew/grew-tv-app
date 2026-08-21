@@ -711,10 +711,18 @@ function seriesOrderIds(id) {
 // real engine (grew-tv's own test suite), not re-proven here.
 var HOME_MOVIES_ALL_IDS = ['millie-walk', 'beach-day'];
 
+// TASK-486 — the home-movies-by-person Play All rail source: both fixture
+// clips are tagged 'millie' (see BROWSE.kids.content above), so a request for
+// that tag resolves the same two-item order as the whole-catalog source.
+var HOME_MOVIES_BY_PERSON_IDS = { millie: HOME_MOVIES_ALL_IDS };
+
 async function installVideoPlaybackBackend(page) {
   var state = { sourceType: null, sourceId: null, idx: 0, repeat: false, shuffle: false, queue: [], current: null };
   var live = null;
-  var ORDER_BY_SOURCE_TYPE = { 'home-movies-all': function() { return HOME_MOVIES_ALL_IDS; } };
+  var ORDER_BY_SOURCE_TYPE = {
+    'home-movies-all': function() { return HOME_MOVIES_ALL_IDS; },
+    'home-movies-by-person': function() { return HOME_MOVIES_BY_PERSON_IDS[state.sourceId] || []; }
+  };
   function order() { return (ORDER_BY_SOURCE_TYPE[state.sourceType] || function() { return seriesOrderIds(state.sourceId); })(); }
   function resolve(id) {
     var v = VIDEOS[id] || { id: id };

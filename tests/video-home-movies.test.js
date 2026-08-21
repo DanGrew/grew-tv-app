@@ -44,6 +44,19 @@ test('breadcrumb degrades to Home > leaf — no source page', async ({ page }) =
   await expect(page.locator('#breadcrumb .crumb-current')).toHaveText('Millie Walk');
 });
 
+// TASK-486 — the Play All rail's per-kid tile: SERVER-authoritative exactly
+// like home-movies-all above, the video engine's own home-movies-by-person
+// source, source_id the tapped tile's own `people` tag value.
+test('a Play All rail kid tile fires play-source for home-movies-by-person, scoped to that kid', async ({ page }) => {
+  const playSource = page.waitForRequest(function(req) {
+    return req.url().includes('/api/video-playback/play-source') && req.method() === 'POST';
+  });
+  await page.goto('/app/homeview/video.html?homeMoviesPerson=millie&from=browse');
+  const req = await playSource;
+  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movies-by-person', source_id: 'millie' });
+  await expect(page.locator('#video')).toHaveAttribute('src', /millie-walk/);
+});
+
 // TASK-446 (owner correction) — Shuffle is a live Queue View toggle for Home
 // Movies, matching every other media source's shuffle UX, not a second
 // pre-entry "Shuffle All" button.
@@ -56,6 +69,14 @@ test.describe('Shuffle — a live Queue View toggle', () => {
 
   test('the Shuffle pill is offered for home-movies-all', async ({ page }) => {
     await openQueue(page);
+    await expect(page.locator('.np-pill[data-action="toggle-shuffle"]')).toBeVisible();
+  });
+
+  // TASK-486 — the per-kid source shares the same shuffle gate as All.
+  test('the Shuffle pill is offered for a home-movies-by-person entry too', async ({ page }) => {
+    await page.goto('/app/homeview/video.html?homeMoviesPerson=millie&from=browse');
+    await page.locator('#btn-queue').click();
+    await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
     await expect(page.locator('.np-pill[data-action="toggle-shuffle"]')).toBeVisible();
   });
 

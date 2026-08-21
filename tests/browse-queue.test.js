@@ -156,20 +156,40 @@ test('Play All is hidden on Films, shown on Music Videos, and navigates to the w
   await expect(page).toHaveURL(/video\.html\?.*musicVideoAll=1/);
 });
 
-// TASK-446 — Home Movies gets ONE Play All entry, always unshuffled; shuffle
-// is a live toggle inside the player's Queue View (tests/video-home-movies.
-// test.js), not a second browse-page button. Home Movies is in the default
-// BROWSE fixture (unlike Music Videos above), so no route override is needed.
-test('Play All is hidden on Films, shown on Home Movies, and navigates to the home-movies-all entry unshuffled', async ({ page }) => {
+// TASK-486 — Home Movies no longer gets the header Play All button (TASK-446):
+// its whole-catalog entry point is now the Play All rail's own "All" tile,
+// always unshuffled; shuffle is a live toggle inside the player's Queue View
+// (tests/video-home-movies.test.js). Home Movies is in the default BROWSE
+// fixture (unlike Music Videos above), so no route override is needed.
+test('Play All header button stays hidden on Home Movies (TASK-486 replaces it with the rail)', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
   await openFilms(page);
   await expect(page.locator('#btn-play-all')).toBeHidden();
   await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
-  await expect(page.locator('#btn-play-all')).toBeVisible();
-  await page.locator('#btn-play-all').click();
+  await expect(page.locator('#btn-play-all')).toBeHidden();
+});
+
+// TASK-486 — the Play All rail: All tile navigates to the same home-movies-all
+// entry TASK-446's button used to, a kid tile (both fixture clips are tagged
+// 'millie') navigates to the new per-kid entry.
+test('Play All rail All tile navigates to the home-movies-all entry unshuffled', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
+  await page.locator('.film-tile[data-id="play-all:All"]').click();
   await expect(page).toHaveURL(/video\.html\?.*homeMoviesAll=1/);
   await expect(page).not.toHaveURL(/shuffle=/);
+});
+
+test('Play All rail kid tile navigates to the home-movies-by-person entry for that kid', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
+  await page.locator('.film-tile[data-id="play-all:Millie"]').click();
+  await expect(page).toHaveURL(/video\.html\?.*homeMoviesPerson=millie/);
 });
 
 test('rail-grid film tiles also carry the ＋ badge and queue', async ({ page }) => {

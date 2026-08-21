@@ -53,11 +53,13 @@ test('Films tab switches the rail on a focus-less click (Safari/iOS WebKit)', as
   await expect(page.locator('.rail-row[data-rail="genre:comedy"] .film-tile[data-id="toy-story-main"]')).toHaveCount(1);
 });
 
-test('Home Movies tab shows one rail per tagged kid (TASK-444)', async ({ page }) => {
+test('Home Movies tab shows a Play All rail then one rail per tagged kid (TASK-444/486)', async ({ page }) => {
   await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
-  // millie-walk is tagged people:['millie'] in the fixture -> a single Millie rail.
-  await expect(page.locator('.rail-title')).toHaveText(['Millie']);
+  // millie-walk is tagged people:['millie'] in the fixture -> Play All (TASK-486) + a single Millie rail.
+  await expect(page.locator('.rail-title')).toHaveText(['Play All', 'Millie']);
+  await expect(page.locator('.rail-row[data-rail="home-movies-play-all"] .film-tile[data-id="play-all:All"]')).toHaveCount(1);
+  await expect(page.locator('.rail-row[data-rail="home-movies-play-all"] .film-tile[data-id="play-all:Millie"]')).toHaveCount(1);
   await expect(page.locator('.rail-row[data-rail="person:millie"] .film-tile[data-id="millie-walk"]')).toHaveCount(1);
   await expect(page.locator('.rail-row[data-rail="collections"]')).toHaveCount(0);
   await expect(page.locator('.rail-row[data-rail="videos"]')).toHaveCount(0);

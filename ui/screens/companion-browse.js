@@ -218,7 +218,10 @@ export function initPage() {
   // other companion action uses — so it greys out while desynced too. TASK-446
   // (owner correction): ONE entry point, always unshuffled — shuffle is a live
   // toggle inside the player's Queue View, matching every other media source.
-  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 }, 'home-movies': { homeMoviesAll: 1 } };
+  // TASK-486 drops 'home-movies' — its whole-catalog entry point is now the
+  // Play All rail's own "All" tile (a plain grid tile, no header-button twin
+  // needed here), mirroring the TV side.
+  var PLAY_ALL_PARAMS = { 'music-videos': { musicVideoAll: 1 } };
   function onPlayAll() {
     [PLAY_ALL_PARAMS[state.section]].filter(Boolean)
       .forEach(function(params) { api.sendIntent('navigate', { page: 'video.html', params: Object.assign({ from: 'browse' }, params) }); });
