@@ -29,12 +29,19 @@ describe('entryMode', () => {
     expect(entryMode({ homeMoviesAll: true, homeMoviesPerson: 'Alice' })).toBe('homeMoviesAll');
     expect(entryMode({ mvAll: true, homeMoviesPerson: 'Alice' })).toBe('mvAll');
   });
+  it('is "homeMoviesMonth" when a TASK-491 Play All by month tile is tapped (and no All/person/mv* param)', () => {
+    expect(entryMode({ homeMoviesMonth: '2026-08' })).toBe('homeMoviesMonth');
+    expect(entryMode({ homeMoviesPerson: 'Alice', homeMoviesMonth: '2026-08' })).toBe('homeMoviesPerson');
+    expect(entryMode({ homeMoviesAll: true, homeMoviesMonth: '2026-08' })).toBe('homeMoviesAll');
+    expect(entryMode({ mvAll: true, homeMoviesMonth: '2026-08' })).toBe('mvAll');
+  });
   it('is "series" when a series id is flagged (and no music-video/home-movies param)', () => {
     expect(entryMode({ isSeries: true })).toBe('series');
     expect(entryMode({ mvItem: 'mv1', isSeries: true })).toBe('mvItem');
     expect(entryMode({ mvAll: true, isSeries: true })).toBe('mvAll');
     expect(entryMode({ homeMoviesAll: true, isSeries: true })).toBe('homeMoviesAll');
     expect(entryMode({ homeMoviesPerson: 'Alice', isSeries: true })).toBe('homeMoviesPerson');
+    expect(entryMode({ homeMoviesMonth: '2026-08', isSeries: true })).toBe('homeMoviesMonth');
   });
   it('is "single" for a standalone film — the default with nothing set', () => {
     expect(entryMode({})).toBe('single');

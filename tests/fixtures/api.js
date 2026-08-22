@@ -207,8 +207,10 @@ const BROWSE = {
       { kind: 'video',  id: 'toy-story-main',    title: 'Toy Story',    poster: 'toy-story.jpg', duration: 4860, type: 'animation', section: 'films',       genres: ['animation', 'comedy'], people: null },
       { kind: 'video',  id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg',      duration: 6000, type: 'animation', section: 'films',       genres: null,                    people: null },
       { kind: 'series', id: 'bluey',             title: 'Bluey',        poster: 'bluey.jpg',                     type: 'animation', section: 'series',      genres: ['animation'],           people: null },
-      { kind: 'video',  id: 'millie-walk',       title: 'Millie Walk',  poster: 'millie.jpg',    duration: 30,   type: 'home',      section: 'home-movies', genres: null,                    people: ['millie'] },
-      { kind: 'video',  id: 'beach-day',         title: 'Beach Day',    poster: 'beach.jpg',     duration: 45,   type: 'home',      section: 'home-movies', genres: null,                    people: ['millie'] }
+      // TASK-491: tags.date mirrors the VIDEOS entries above (millie-walk/beach-day)
+      // so the month rail (core/home-rails.js monthOf) can group these into 'Jan 2026'.
+      { kind: 'video',  id: 'millie-walk',       title: 'Millie Walk',  poster: 'millie.jpg',    duration: 30,   type: 'home',      section: 'home-movies', genres: null,                    people: ['millie'], tags: { date: '2026-01-06' } },
+      { kind: 'video',  id: 'beach-day',         title: 'Beach Day',    poster: 'beach.jpg',     duration: 45,   type: 'home',      section: 'home-movies', genres: null,                    people: ['millie'], tags: { date: '2026-01-07' } }
     ]
   },
   adults: {
@@ -716,12 +718,18 @@ var HOME_MOVIES_ALL_IDS = ['millie-walk', 'beach-day'];
 // that tag resolves the same two-item order as the whole-catalog source.
 var HOME_MOVIES_BY_PERSON_IDS = { millie: HOME_MOVIES_ALL_IDS };
 
+// TASK-491 — the home-movie-month Play All rail source: both fixture clips
+// are captured in January 2026 (see VIDEOS above), so a request for that
+// month resolves the same two-item order as the whole-catalog source.
+var HOME_MOVIES_BY_MONTH_IDS = { '2026-01': HOME_MOVIES_ALL_IDS };
+
 async function installVideoPlaybackBackend(page) {
   var state = { sourceType: null, sourceId: null, idx: 0, repeat: false, shuffle: false, queue: [], current: null };
   var live = null;
   var ORDER_BY_SOURCE_TYPE = {
     'home-movies-all': function() { return HOME_MOVIES_ALL_IDS; },
-    'home-movies-by-person': function() { return HOME_MOVIES_BY_PERSON_IDS[state.sourceId] || []; }
+    'home-movies-by-person': function() { return HOME_MOVIES_BY_PERSON_IDS[state.sourceId] || []; },
+    'home-movie-month': function() { return HOME_MOVIES_BY_MONTH_IDS[state.sourceId] || []; }
   };
   function order() { return (ORDER_BY_SOURCE_TYPE[state.sourceType] || function() { return seriesOrderIds(state.sourceId); })(); }
   function resolve(id) {

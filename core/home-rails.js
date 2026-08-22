@@ -188,6 +188,25 @@ function captureDateOf(card) {
   return tags.date || '';
 }
 
+// TASK-491 — a home-movie clip's capture year-month ('YYYY-MM'), or '' when
+// its capture date is absent. captureDateOf's own 'YYYY-MM-DD' is always
+// month-prefixed, so slicing is enough — no separate parse.
+function monthOf(card) {
+  return captureDateOf(card).slice(0, 7);
+}
+
+var MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// TASK-491 — a year-month's display label ('2026-08' -> 'Aug 2026'), the
+// month tile rail's own title. Every value reaching this is one monthOf
+// itself derived from a real capture date (every clip gets one at ingest),
+// so no fallback for an unparseable value is needed.
+function monthLabel(yearMonth) {
+  var parts = String(yearMonth).split('-');
+  return MONTH_NAMES[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
+}
+
 // TASK-444 — Home Movies rail item order: newest capture date first. Ties
 // (including two clips with no readable date) fall back to title, same
 // tie-break shape as albumsByArtist's year comparator.
@@ -464,11 +483,37 @@ export function homeMoviesPlayAllRail(personRails) {
   return rails.length ? [rail] : [];
 }
 
+// TASK-491 — "Play All by month" rail: one tile per populated Year-Month,
+// newest first (a plain string sort works — 'YYYY-MM' sorts lexicographically
+// in calendar order), mirroring homeMoviesPlayAllRail's own tile shape (a tap
+// opens the SAME scoped clip-list screen, via playAllTile's navParams — here
+// `homeMoviesMonth`). `homeMovieCards` is already scoped to the Home Movies
+// tab (buildTabRails' own `inTab`) — no month tile for an unpopulated month
+// (months is built only from months that actually appear on a clip); omitted
+// entirely when there are no home-movie clips at all, same as
+// homeMoviesPlayAllRail.
+export function homeMoviesMonthRail(homeMovieCards) {
+  if (!homeMovieCards) return [];
+  var months = new Set();
+  homeMovieCards.forEach(function(c) {
+    var ym = monthOf(c);
+    if (ym) months.add(ym);
+  });
+  var yms = Array.from(months).sort().reverse();
+  var tiles = yms.map(function(ym) { return playAllTile(monthLabel(ym), { homeMoviesMonth: ym }); });
+  var rail = { id: 'home-movies-play-all-month', title: 'Play All by month', items: tiles };
+  return tiles.length ? [rail] : [];
+}
+
 // TASK-486 (revision) — the Play All list screen's title: 'All' for the
-// whole-catalog scope (person null/undefined), else the tapped kid's display
-// name, title-cased the SAME way the person rail itself is (titleCase above)
-// so the two screens never name one kid two different ways.
-export function homeMoviesListTitle(person) {
+// whole-catalog scope (person/month null/undefined), else the tapped kid's
+// display name, title-cased the SAME way the person rail itself is
+// (titleCase above) so the two screens never name one kid two different
+// ways. TASK-491 — a month scope (mutually exclusive with person, exactly
+// one Play All tile sets exactly one param) names the tile's own
+// monthLabel instead.
+export function homeMoviesListTitle(person, month) {
+  if (month) return monthLabel(month);
   return person ? titleCase(person) : 'All';
 }
 
@@ -485,18 +530,25 @@ export function homeMoviesListTitle(person) {
 // undefined for the header Play All button — navTo drops an undefined value,
 // so the entry starts at its own fresh index 0, exactly as it did before this
 // revision). Kept in core (no DOM) so the ui/** screen stays a plain call.
-export function homeMoviesListPlayParams(person, id) {
-  var sourceParam = { 'true': { homeMoviesPerson: person }, 'false': { homeMoviesAll: 1 } }[!!person + ''];
+// TASK-491 — a month scope carries `homeMoviesMonth` instead, same shape.
+export function homeMoviesListPlayParams(person, id, month) {
+  var sourceParam = month ? { homeMoviesMonth: month }
+    : { 'true': { homeMoviesPerson: person }, 'false': { homeMoviesAll: 1 } }[!!person + ''];
   return Object.assign({ from: 'home-movies-list' }, sourceParam, { video: id });
 }
 
-export function homeMoviesListItems(cards, person) {
+// TASK-491 — `month` scopes the list to one Year-Month (monthOf, mutually
+// exclusive with `person` — exactly one Play All tile sets exactly one
+// scope param) on the SAME terms as the person scope below.
+export function homeMoviesListItems(cards, person, month) {
   if (!cards) return [];
   var inTab = cards.filter(function(c) { return sectionOf(c) === 'home-movies'; });
-  var scoped = person ? inTab.filter(function(c) { return peopleOf(c).indexOf(person) > -1; }) : inTab;
-  // scoped is always a FRESH array (both branches above come from .filter()),
-  // never the caller's own `cards` — sorting it in place is safe, same
-  // reasoning sortItems (above) already relies on to skip its own copy.
+  var scoped = inTab;
+  if (person) scoped = scoped.filter(function(c) { return peopleOf(c).indexOf(person) > -1; });
+  if (month) scoped = scoped.filter(function(c) { return monthOf(c) === month; });
+  // scoped is always a FRESH array (every branch above comes from .filter(),
+  // and the no-scope fallthrough is inTab itself, also a .filter() result) —
+  // sorting it in place is safe, same reasoning sortItems (above) relies on.
   return scoped.sort(cmpDateDesc).map(function(c) { return { video: c }; });
 }
 
@@ -523,6 +575,7 @@ export function buildTabRails(sectionId, cards, cwRows, genreLabels, recents) {
     var personRails = groupRails(inTab, peopleOf, titleCase, 'person:', cmpDateDesc);
     return continueRail(sectionId, cwRows, byId)
       .concat(homeMoviesPlayAllRail(personRails))
+      .concat(homeMoviesMonthRail(inTab))
       .concat(personRails);
   }
   var boxsets = inTab.filter(isBoxset);

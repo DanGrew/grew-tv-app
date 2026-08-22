@@ -1,4 +1,4 @@
-import { buildRails, buildTabs, buildTabRails, railsForSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail, homeMoviesPlayAllRail, homeMoviesListItems, homeMoviesListTitle, homeMoviesListPlayParams } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, railsForSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail, homeMoviesPlayAllRail, homeMoviesMonthRail, homeMoviesListItems, homeMoviesListTitle, homeMoviesListPlayParams } from '../../core/home-rails.js';
 
 // TASK-235 — the create affordance is the Playlists rail-heading ＋ button (in the
 // browse screen), not a synthetic card. withPlaylistsRail just GUARANTEES the rail
@@ -178,10 +178,10 @@ describe('buildTabRails', () => {
 
   it('Home Movies -> Play All rail then one rail per people tag, A-Z by label, item in each matching rail (TASK-444/486)', () => {
     const rails = buildTabRails('home-movies', TYPED, [], {});
-    expect(rails.map(r => r.title)).toEqual(['Play All', 'Millie', 'Ollie', 'Other']); // Play All leads, then A-Z
-    expect(rails[1].items.map(c => c.id)).toEqual(['m-walk', 'm-park']);  // both tagged Millie, newest capture date first
-    expect(rails[2].items.map(c => c.id)).toEqual(['m-walk']);            // m-walk also tagged Ollie
-    expect(rails[3].items.map(c => c.id)).toEqual(['orphan']);            // untagged -> Other
+    expect(rails.map(r => r.title)).toEqual(['Play All', 'Play All by month', 'Millie', 'Ollie', 'Other']); // Play All leads, then the month rail (TASK-491), then A-Z
+    expect(rails[2].items.map(c => c.id)).toEqual(['m-walk', 'm-park']);  // both tagged Millie, newest capture date first
+    expect(rails[3].items.map(c => c.id)).toEqual(['m-walk']);            // m-walk also tagged Ollie
+    expect(rails[4].items.map(c => c.id)).toEqual(['orphan']);            // untagged -> Other
   });
 
   it('does not mutate input cards', () => {
@@ -649,10 +649,10 @@ describe('Home Movies person rails (TASK-444)', () => {
     { kind: 'video', id: 'plain',  title: 'Plain Clip',  section: 'home-movies' }
   ];
 
-  it('adds one rail per kid, title-cased slug, A-Z by rail title, after the TASK-486 Play All rail', () => {
+  it('adds one rail per kid, title-cased slug, A-Z by rail title, after the TASK-486 Play All rail (and the TASK-491 month rail)', () => {
     const rails = buildTabRails('home-movies', HOME, [], {});
-    expect(rails.map(r => r.title)).toEqual(['Play All', 'Millie', 'Ollie', 'Other']);
-    expect(rails.map(r => r.id)).toEqual(['home-movies-play-all', 'person:millie', 'person:ollie', 'person:other']);
+    expect(rails.map(r => r.title)).toEqual(['Play All', 'Play All by month', 'Millie', 'Ollie', 'Other']);
+    expect(rails.map(r => r.id)).toEqual(['home-movies-play-all', 'home-movies-play-all-month', 'person:millie', 'person:ollie', 'person:other']);
   });
 
   it("sorts a rail's items newest-first by capture date, not A-Z by title", () => {
@@ -675,10 +675,10 @@ describe('Home Movies person rails (TASK-444)', () => {
     expect(other.items.map(c => c.id)).toEqual(['plain']);
   });
 
-  it('orders rails Continue → Play All (TASK-486) → person rails', () => {
+  it('orders rails Continue → Play All (TASK-486) → Play All by month (TASK-491) → person rails', () => {
     const cw = [{ item_id: 'm-walk', title: 'Millie Walk', poster: 'm.jpg', position_secs: 5, duration_secs: 30, collection_id: null, collection_title: null }];
     const ids = buildTabRails('home-movies', HOME, cw, {}).map(r => r.id);
-    expect(ids).toEqual(['continue', 'home-movies-play-all', 'person:millie', 'person:ollie', 'person:other']);
+    expect(ids).toEqual(['continue', 'home-movies-play-all', 'home-movies-play-all-month', 'person:millie', 'person:ollie', 'person:other']);
   });
 
   it('omits a person rail with no clips (no rail for a kid nobody has tagged)', () => {
@@ -777,6 +777,59 @@ describe('homeMoviesPlayAllRail (TASK-486)', () => {
   });
 });
 
+// TASK-491 — the "Play All by month" tile rail: one tile per populated
+// Year-Month, newest first, mirroring homeMoviesPlayAllRail's own tile shape
+// (kind:'play-all', a homeMoviesMonth navParam instead of homeMoviesPerson).
+describe('homeMoviesMonthRail (TASK-491)', () => {
+  const HOME = [
+    { kind: 'video', id: 'aug-2', title: 'Aug Clip 2', section: 'home-movies', tags: { date: '2026-08-15' } },
+    { kind: 'video', id: 'aug-1', title: 'Aug Clip 1', section: 'home-movies', tags: { date: '2026-08-02' } },
+    { kind: 'video', id: 'jul-1', title: 'Jul Clip',   section: 'home-movies', tags: { date: '2026-07-20' } }
+  ];
+
+  it('one tile per populated month, newest first, labelled "Mon YYYY"', () => {
+    const rail = homeMoviesMonthRail(HOME)[0];
+    expect(rail.id).toBe('home-movies-play-all-month');
+    expect(rail.title).toBe('Play All by month');
+    expect(rail.items.map(t => t.title)).toEqual(['Aug 2026', 'Jul 2026']);
+  });
+
+  it('a month tile carries the YYYY-MM value as homeMoviesMonth and its own prefixed id', () => {
+    const rail = homeMoviesMonthRail(HOME)[0];
+    const aug = rail.items.find(t => t.title === 'Aug 2026');
+    expect(aug.kind).toBe('play-all');
+    expect(aug.id).toBe('play-all:Aug 2026');
+    expect(aug.navParams).toEqual({ homeMoviesMonth: '2026-08' });
+  });
+
+  it('never splits one month into more than one tile — two clips in the same month share a tile', () => {
+    const rail = homeMoviesMonthRail(HOME)[0];
+    expect(rail.items.length).toBe(2); // Aug + Jul, not one per clip
+  });
+
+  it('is omitted entirely when there are no home movies at all', () => {
+    expect(homeMoviesMonthRail([])).toEqual([]);
+    expect(homeMoviesMonthRail(null)).toEqual([]);
+    expect(homeMoviesMonthRail(undefined)).toEqual([]);
+  });
+
+  it('a clip with no capture date gets no month tile (never a bogus/blank one)', () => {
+    const undated = HOME.concat([{ kind: 'video', id: 'no-date', title: 'No Date', section: 'home-movies' }]);
+    const rail = homeMoviesMonthRail(undated)[0];
+    expect(rail.items.length).toBe(2); // still just Aug + Jul
+  });
+
+  it('labels every calendar month correctly, not just the two exercised above', () => {
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const oneOfEach = MONTHS.map((name, i) => {
+      const mm = String(i + 1).padStart(2, '0');
+      return { kind: 'video', id: 'clip-' + mm, title: name, section: 'home-movies', tags: { date: '2026-' + mm + '-01' } };
+    });
+    const rail = homeMoviesMonthRail(oneOfEach)[0];
+    expect(rail.items.map(t => t.title)).toEqual(MONTHS.slice().reverse().map(name => name + ' 2026'));
+  });
+});
+
 // TASK-486 (revision) — the Play All LIST screen's own data, shared verbatim
 // by the TV screen and its companion mirror (screen-home-movies-list-page.js /
 // companion-home-movies-list.js), so the two can never disagree on scope.
@@ -794,6 +847,11 @@ describe('homeMoviesListTitle / homeMoviesListItems (TASK-486 revision)', () => 
     expect(homeMoviesListTitle(null)).toBe('All');
     expect(homeMoviesListTitle(undefined)).toBe('All');
     expect(homeMoviesListTitle('millie')).toBe('Millie');
+  });
+
+  it('homeMoviesListTitle names a month scope by its own label, taking priority over a person (TASK-491)', () => {
+    expect(homeMoviesListTitle(null, '2026-08')).toBe('Aug 2026');
+    expect(homeMoviesListTitle('millie', '2026-08')).toBe('Aug 2026');
   });
 
   it('homeMoviesListItems with no person returns every home-movie clip, newest first, wrapped as {video}', () => {
@@ -820,10 +878,25 @@ describe('homeMoviesListTitle / homeMoviesListItems (TASK-486 revision)', () => 
     expect(homeMoviesListItems(undefined, null)).toEqual([]);
   });
 
+  it('homeMoviesListItems scoped to a month returns only that month\'s clips, newest first, undated clips excluded (TASK-491)', () => {
+    const withFeb = HOME.concat([{ kind: 'video', id: 'feb-clip', title: 'Feb Clip', section: 'home-movies', tags: { date: '2026-02-01' } }]);
+    const items = homeMoviesListItems(withFeb, null, '2026-01');
+    expect(items.map(i => i.video.id)).toEqual(['m-park', 'both', 'o-swim', 'm-walk']);
+  });
+
+  it('homeMoviesListItems scoped to a month with no clips is empty', () => {
+    expect(homeMoviesListItems(HOME, null, '2026-12')).toEqual([]);
+  });
+
   it('homeMoviesListPlayParams carries the scope + an optional tapped-row video id', () => {
     expect(homeMoviesListPlayParams(null, undefined)).toEqual({ from: 'home-movies-list', homeMoviesAll: 1, video: undefined });
     expect(homeMoviesListPlayParams('millie', undefined)).toEqual({ from: 'home-movies-list', homeMoviesPerson: 'millie', video: undefined });
     expect(homeMoviesListPlayParams('millie', 'm-walk')).toEqual({ from: 'home-movies-list', homeMoviesPerson: 'millie', video: 'm-walk' });
+  });
+
+  it('homeMoviesListPlayParams carries a month scope instead, taking priority over a person (TASK-491)', () => {
+    expect(homeMoviesListPlayParams(null, undefined, '2026-08')).toEqual({ from: 'home-movies-list', homeMoviesMonth: '2026-08', video: undefined });
+    expect(homeMoviesListPlayParams('millie', 'm-walk', '2026-08')).toEqual({ from: 'home-movies-list', homeMoviesMonth: '2026-08', video: 'm-walk' });
   });
 });
 

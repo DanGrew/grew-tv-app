@@ -91,6 +91,30 @@ test('a tapped list row plays that specific clip via item_id', async ({ page }) 
   expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movies-by-person', source_id: 'millie', item_id: 'millie-walk' });
 });
 
+// TASK-491 — the Play All by month rail's tile: SERVER-authoritative exactly
+// like home-movies-all/-by-person above, the video engine's own
+// home-movie-month source, source_id the tapped tile's own 'YYYY-MM' value.
+test('a Play All rail month tile fires play-source for home-movie-month, scoped to that month', async ({ page }) => {
+  const playSource = page.waitForRequest(function(req) {
+    return req.url().includes('/api/video-playback/play-source') && req.method() === 'POST';
+  });
+  await page.goto('/app/homeview/video.html?homeMoviesMonth=2026-01&from=browse');
+  const req = await playSource;
+  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movie-month', source_id: '2026-01', item_id: null });
+  await expect(page.locator('#video')).toHaveAttribute('src', /millie-walk/);
+});
+
+// TASK-491 — a tapped row in the month-scoped list screen carries `video`
+// through as item_id too, same as the person-scoped list above.
+test('a tapped list row in a month-scoped list plays that specific clip via item_id', async ({ page }) => {
+  const playSource = page.waitForRequest(function(req) {
+    return req.url().includes('/api/video-playback/play-source') && req.method() === 'POST';
+  });
+  await page.goto('/app/homeview/video.html?homeMoviesMonth=2026-01&video=beach-day&from=home-movies-list');
+  const req = await playSource;
+  expect(JSON.parse(req.postData())).toEqual({ source_type: 'home-movie-month', source_id: '2026-01', item_id: 'beach-day' });
+});
+
 // TASK-446 (owner correction) — Shuffle is a live Queue View toggle for Home
 // Movies, matching every other media source's shuffle UX, not a second
 // pre-entry "Shuffle All" button.
@@ -109,6 +133,14 @@ test.describe('Shuffle — a live Queue View toggle', () => {
   // TASK-486 — the per-kid source shares the same shuffle gate as All.
   test('the Shuffle pill is offered for a home-movies-by-person entry too', async ({ page }) => {
     await page.goto('/app/homeview/video.html?homeMoviesPerson=millie&from=browse');
+    await page.locator('#btn-queue').click();
+    await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
+    await expect(page.locator('.np-pill[data-action="toggle-shuffle"]')).toBeVisible();
+  });
+
+  // TASK-491 — the month source shares the same shuffle gate as All/by-person.
+  test('the Shuffle pill is offered for a home-movie-month entry too', async ({ page }) => {
+    await page.goto('/app/homeview/video.html?homeMoviesMonth=2026-01&from=browse');
     await page.locator('#btn-queue').click();
     await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
     await expect(page.locator('.np-pill[data-action="toggle-shuffle"]')).toBeVisible();

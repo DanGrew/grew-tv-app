@@ -13,9 +13,10 @@ import { mountSyncBar } from './companion-sync-bar.js';
 import { mountStatusMenu } from './companion-status-menu.js';
 import { mountRowStep } from './companion-row-step.js';
 
-// TASK-486 (revision) — the companion mirror of screen-home-movies-list-page.js
-// (FEAT-017/028 mirror invariant): the same scoped clip list (All or a kid),
-// built off the SAME core/home-rails.js homeMoviesListItems/homeMoviesListTitle
+// TASK-486 (revision) / TASK-491 — the companion mirror of
+// screen-home-movies-list-page.js (FEAT-017/028 mirror invariant): the same
+// scoped clip list (All, a kid, or a month), built off the SAME
+// core/home-rails.js homeMoviesListItems/homeMoviesListTitle
 // the TV screen uses, so the two can never disagree about which clips are in
 // scope. A "▶ Play All" header button (mirrors companion-detail's Play-next)
 // plus one row per clip with a ＋ Queue control (mirrors companion-detail's
@@ -30,10 +31,13 @@ export function initPage() {
     ctxTitle: document.getElementById('ctx-title'),
     actionsEl: document.getElementById('actions')
   };
-  // homeMoviesPerson starts undefined (never null) so the FIRST context/URL
-  // capture of the 'All' scope (a legitimate null) still counts as a change —
-  // captureScope's own dedupe below only drops a REPEAT of the same value.
-  var state = { homeMoviesPerson: undefined, profile: null, person: null, model: { title: '', items: [] } };
+  // homeMoviesPerson/homeMoviesMonth start undefined (never null) so the
+  // FIRST context/URL capture of the 'All' scope (a legitimate null for
+  // both) still counts as a change — captureScope's own dedupe below only
+  // drops a REPEAT of the same value, per field. scopeCaptured is a plain
+  // flag (not `person !== undefined || month !== undefined`, which would be
+  // cyclomatic-2 here) set by either capture block below.
+  var state = { homeMoviesPerson: undefined, homeMoviesMonth: undefined, scopeCaptured: false, profile: null, person: null, model: { title: '', items: [] } };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -128,25 +132,37 @@ export function initPage() {
   function render() { els.actionsEl.innerHTML = ''; RENDER[(state.model.items.length > 0) + ''](); }
 
   // Home Movies cards need BOTH the scope (context) and the profile (app_state,
-  // picks the catalog); they can arrive in either order, so load only once both
-  // are set and re-load if the profile changes.
+  // picks the catalog); they can arrive in either order, so load only once
+  // a scope field has been captured (person and month are mutually exclusive
+  // — exactly one Play All tile sets one — so only one field ever leaves its
+  // undefined sentinel for a given entry) and re-load if the profile changes.
   function loadClips() {
-    [state.profile].filter(Boolean).filter(function() { return state.homeMoviesPerson !== undefined; }).forEach(function(profile) {
+    [state.profile].filter(Boolean).filter(function() { return state.scopeCaptured; }).forEach(function(profile) {
       loadBrowse(server, profile)
         .then(function(b) {
           var cards = [b.content].filter(Boolean).concat([[]])[0];
-          state.model = { title: homeMoviesListTitle(state.homeMoviesPerson), items: homeMoviesListItems(cards, state.homeMoviesPerson) };
+          state.model = { title: homeMoviesListTitle(state.homeMoviesPerson, state.homeMoviesMonth), items: homeMoviesListItems(cards, state.homeMoviesPerson, state.homeMoviesMonth) };
           els.ctxTitle.textContent = state.model.title;
           mountCrumbs(state.model.title);
           render();
         })
-        .catch(function() { state.model = { title: homeMoviesListTitle(state.homeMoviesPerson), items: [] }; render(); });
+        .catch(function() { state.model = { title: homeMoviesListTitle(state.homeMoviesPerson, state.homeMoviesMonth), items: [] }; render(); });
     });
   }
 
+  // TASK-491 — payload now always carries BOTH home_movies_person and
+  // home_movies_month (mirroring the TV screen's own sendContext), so each
+  // field is captured/deduped independently, same terms as the pre-existing
+  // person-only capture.
   function captureScope(payload) {
     [payload.home_movies_person].filter(function(p) { return p !== undefined; }).filter(function(p) { return p !== state.homeMoviesPerson; }).forEach(function(p) {
       state.homeMoviesPerson = p;
+      state.scopeCaptured = true;
+      loadClips();
+    });
+    [payload.home_movies_month].filter(function(m) { return m !== undefined; }).filter(function(m) { return m !== state.homeMoviesMonth; }).forEach(function(m) {
+      state.homeMoviesMonth = m;
+      state.scopeCaptured = true;
       loadClips();
     });
   }
@@ -183,11 +199,15 @@ export function initPage() {
   mountSyncBar(mode, onToggle);
   applySwitchProfile();
   // Desynced entry: browse linked here with the tile's own navParams
-  // (?homeMoviesAll=1 or ?homeMoviesPerson=<slug> — companion-browse.js
-  // openItemLocal), so seed the scope ourselves rather than waiting for the
-  // TV's context echo (which won't come while desynced).
-  [new URLSearchParams(window.location.search).get('homeMoviesPerson')].filter(Boolean).forEach(function(p) { captureScope({ home_movies_person: p }); });
-  [new URLSearchParams(window.location.search).get('homeMoviesAll')].filter(Boolean).forEach(function() { captureScope({ home_movies_person: null }); });
+  // (?homeMoviesAll=1, ?homeMoviesPerson=<slug>, or ?homeMoviesMonth=<yearMonth>
+  // — companion-browse.js openItemLocal), so seed the scope ourselves rather
+  // than waiting for the TV's context echo (which won't come while
+  // desynced). Both scope fields are always passed together (mirroring the
+  // TV screen's own sendContext shape) so state.homeMoviesPerson/Month never
+  // stay at their undefined sentinel for a desynced entry.
+  [new URLSearchParams(window.location.search).get('homeMoviesPerson')].filter(Boolean).forEach(function(p) { captureScope({ home_movies_person: p, home_movies_month: null }); });
+  [new URLSearchParams(window.location.search).get('homeMoviesMonth')].filter(Boolean).forEach(function(m) { captureScope({ home_movies_person: null, home_movies_month: m }); });
+  [new URLSearchParams(window.location.search).get('homeMoviesAll')].filter(Boolean).forEach(function() { captureScope({ home_movies_person: null, home_movies_month: null }); });
   api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode });
   updateBar = mountScreenBar(getApi, noop);
 }

@@ -13,15 +13,18 @@ function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
 let sentIntents;
 
-function mockApp(page, homeMoviesPerson) {
+// TASK-491 — homeMoviesMonth mirrors homeMoviesPerson: the TV screen's own
+// sendContext/sendAppState now carry both scope fields together, one real
+// (a string, or null for All) and the other null/absent per entry.
+function mockApp(page, homeMoviesPerson, homeMoviesMonth) {
   let version = 1;
   let ctx = 'home-movies-list';
-  const st = { screen: 'home-movies-list', homeMoviesPerson: homeMoviesPerson, profile: 'kids', person: 'kids' };
+  const st = { screen: 'home-movies-list', homeMoviesPerson: homeMoviesPerson, homeMoviesMonth: homeMoviesMonth, profile: 'kids', person: 'kids' };
   return page.routeWebSocket(/:8766/, (ws) => {
     function pushState() { ws.send(msg('app_state', st)); }
     function pushCtx() {
       version += 1;
-      ws.send(msg('context', { version: version, context_id: ctx, home_movies_person: homeMoviesPerson }));
+      ws.send(msg('context', { version: version, context_id: ctx, home_movies_person: homeMoviesPerson, home_movies_month: homeMoviesMonth }));
       pushState();
     }
     ws.onMessage(function(raw) {
@@ -99,6 +102,31 @@ test.describe('the All scope', () => {
   });
 });
 
+// TASK-491 — a month scope, mirroring the synced kid-scope block above. Both
+// fixture clips are captured in January 2026 (tests/fixtures/api.js).
+test.describe('the month scope (synced, drives the TV)', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockApp(page, null, '2026-01');
+    await page.goto('/companion/home-movies-list.html');
+  });
+
+  test('renders the month label from the live context', async ({ page }) => {
+    await expect(page.locator('#ctx-title')).toHaveText('Jan 2026');
+  });
+
+  test('lists the scoped clips with a leading Play All button', async ({ page }) => {
+    await expect(page.locator('.tile-btn').first()).toBeVisible();
+    await expect(page.locator('.play-next-btn')).toHaveText('▶ Play All');
+    await expect(page.locator('.tile-btn')).toHaveCount(2);
+  });
+
+  test('tapping the header Play All button sends play_next (drives the TV)', async ({ page }) => {
+    await expect(page.locator('.tile-btn').first()).toBeVisible();
+    await page.locator('.play-next-btn').click();
+    await expect.poll(() => sentIntents.some(p => p.intent === 'play_next')).toBe(true);
+  });
+});
+
 // FEAT-038 (DSYNC-2c): opening the list while Browsing. The page self-loads
 // from ?homeMoviesPerson (companion-browse.js openItemLocal's own navParams,
 // not the generic ?id= other desync pages read); the rows grey out (play-only).
@@ -133,5 +161,35 @@ test.describe('desync mode (Browse)', () => {
     await expect(page.locator('.tile-btn').first()).toBeVisible();
     await page.locator('.tile-btn').first().click({ force: true });
     expect(sentIntents.filter(p => p.intent === 'play')).toHaveLength(0);
+  });
+});
+
+// TASK-491 — the same desync entry, but via ?homeMoviesMonth (companion-browse.js
+// openItemLocal's own navParams for a month tile) instead of ?homeMoviesPerson.
+test.describe('desync mode (Browse), month scope', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => { sessionStorage.setItem('grew-tv:companion-mode', 'desynced'); });
+    let version = 1;
+    await page.routeWebSocket(/:8766/, (ws) => {
+      function push() {
+        version += 1;
+        ws.send(msg('context', { version: version, context_id: 'browse' }));
+        ws.send(msg('app_state', { screen: 'home', profile: 'kids', person: 'kids' }));
+      }
+      ws.onMessage(function(raw) {
+        const m = JSON.parse(raw);
+        if (m.type === 'intent') sentIntents.push(m.payload);
+        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
+        if (m.type === 'snapshot_request') push();
+      });
+    });
+    await page.goto('/companion/home-movies-list.html?homeMoviesMonth=2026-01');
+  });
+
+  test('self-loads the scoped clips from ?homeMoviesMonth (no TV echo); rows grey out', async ({ page }) => {
+    await expect(page.locator('#ctx-title')).toHaveText('Jan 2026');
+    await expect(page.locator('.tile-btn')).toHaveCount(2);
+    await expect(page.locator('.tile-btn').first()).toHaveClass(/desync-off/);
+    await expect(page.locator('.play-next-btn')).toHaveClass(/desync-off/);
   });
 });

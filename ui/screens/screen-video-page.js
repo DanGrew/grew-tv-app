@@ -69,11 +69,12 @@ export function initVideoPage() {
   var mvAll      = getParam('musicVideoAll');
   var homeMoviesAll = getParam('homeMoviesAll');
   var homeMoviesPerson = getParam('homeMoviesPerson');
+  var homeMoviesMonth = getParam('homeMoviesMonth');
   var from     = [getParam('from')].filter(Boolean).concat(['browse'])[0];
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
   var person   = getPerson();
   var isSeries = !!seriesId;
-  var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson, isSeries: isSeries });
+  var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson, homeMoviesMonth: homeMoviesMonth, isSeries: isSeries });
   var MV_MODE = { mvItem: true, mvPlaylist: true, mvArtist: true, mvAll: true };
   var isMusicVideo = !!MV_MODE[mode];
   var wsApp = null;
@@ -401,7 +402,7 @@ export function initVideoPage() {
       // mirroring `detail` returning to its series — never a bare browse drop.
       var STOP_NAV = {
         detail: function() { navTo('detail.html', { series: seriesId }); },
-        'home-movies-list': function() { navTo('home-movies-list.html', { homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson }); },
+        'home-movies-list': function() { navTo('home-movies-list.html', { homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson, homeMoviesMonth: homeMoviesMonth }); },
         browse: function() { navTo('browse.html'); }
       };
       [STOP_NAV[from]].filter(Boolean).concat([function() { navTo('browse.html'); }])[0]();
@@ -527,6 +528,17 @@ export function initVideoPage() {
       .then(function() { sendAction('play-source', { source_type: 'home-movies-by-person', source_id: homeMoviesPerson, item_id: videoId }); })
       .catch(function() {});
   }
+  // TASK-491 — a Play All rail month tile: SERVER-authoritative exactly like
+  // startHomeMoviesByPerson above, the video engine's own `home-movie-month`
+  // source, source_id the tapped tile's 'YYYYMM' value (see
+  // startHomeMoviesAll above for item_id).
+  function startHomeMoviesByMonth() {
+    mountCrumbs();
+    armEngineTimeout();
+    initCaptions(SERVER)
+      .then(function() { sendAction('play-source', { source_type: 'home-movie-month', source_id: homeMoviesMonth, item_id: videoId }); })
+      .catch(function() {});
+  }
   // FEAT-040 (Play Queue): entered with ?playQueue (no video/series) — fire
   // play-queue (the server pops + plays the queue head) and render from the
   // snapshot like the others. Lets you START the queue without opening a random
@@ -583,6 +595,7 @@ export function initVideoPage() {
     mvAll: startMvAll,
     homeMoviesAll: startHomeMoviesAll,
     homeMoviesPerson: startHomeMoviesByPerson,
+    homeMoviesMonth: startHomeMoviesByMonth,
     series: startSeries,
     single: startSingle
   };
