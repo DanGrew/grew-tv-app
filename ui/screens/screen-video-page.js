@@ -292,10 +292,12 @@ export function initVideoPage() {
   function renderNowPlaying(np) { SWAP[isSwap(loadedId, snapshot) + ''](np); }
 
   function applySnapshot(snap) {
-    snapshot = snap;
-    player.setSeriesMode(seriesMode(snap));
-    queue.applySnapshot(snap);
-    [snap.now_playing].filter(Boolean).forEach(renderNowPlaying);
+    [engineMode === 'video'].filter(Boolean).forEach(function() {
+      snapshot = snap;
+      player.setSeriesMode(seriesMode(snap));
+      queue.applySnapshot(snap);
+      [snap.now_playing].filter(Boolean).forEach(renderNowPlaying);
+    });
   }
 
   // Auto-advance at true 100% end ('video'/legacy queue mode ONLY — TASK-499
@@ -377,12 +379,14 @@ export function initVideoPage() {
   var MV_SWAP = { 'true': function(np) { mvSwap(np); }, 'false': function() { renderMvUpNextLine(); } };
   function renderMvNowPlaying(np) { MV_SWAP[mvRouter.isSwap(loadedId, mvSnapshot) + ''](np); }
   function applyMvSnapshot(snap) {
-    mvSnapshot = snap;
-    mvApplyMulti(mvRouter.isMulti(snap));
-    mvSetTransportOn(snap);
-    queue.applySnapshot(snap);
-    [snap.now_playing].filter(Boolean).forEach(renderMvNowPlaying);
-    sendVideoContext();
+    [engineMode === 'mv'].filter(Boolean).forEach(function() {
+      mvSnapshot = snap;
+      mvApplyMulti(mvRouter.isMulti(snap));
+      mvSetTransportOn(snap);
+      queue.applySnapshot(snap);
+      [snap.now_playing].filter(Boolean).forEach(renderMvNowPlaying);
+      sendVideoContext();
+    });
   }
 
   // ── home-movie queue (TASK-499, FEAT-497): server-authoritative over the
@@ -431,12 +435,14 @@ export function initVideoPage() {
   var HM_SWAP = { 'true': function(np) { hmSwapVideo(np); }, 'false': function() { renderHmUpNextLine(); } };
   function renderHmNowPlaying(np) { HM_SWAP[qRouter.isSwap(loadedId, hmSnapshot) + ''](np); }
   function applyHmSnapshot(snap) {
-    hmSnapshot = snap;
-    player.setSeriesMode(true);
-    hmSetTransportOn(snap);
-    queue.applySnapshot(snap);
-    [snap.now_playing].filter(Boolean).forEach(renderHmNowPlaying);
-    sendVideoContext();
+    [engineMode === 'hm'].filter(Boolean).forEach(function() {
+      hmSnapshot = snap;
+      player.setSeriesMode(true);
+      hmSetTransportOn(snap);
+      queue.applySnapshot(snap);
+      [snap.now_playing].filter(Boolean).forEach(renderHmNowPlaying);
+      sendVideoContext();
+    });
   }
 
   // ── film queue (TASK-503, FEAT-497): server-authoritative over the
@@ -500,12 +506,14 @@ export function initVideoPage() {
   var FM_SWAP = { 'true': function(np) { fmSwapVideo(np); }, 'false': function() { renderFmUpNextLine(); } };
   function renderFmNowPlaying(np) { FM_SWAP[qRouter.isSwap(loadedId, fmSnapshot) + ''](np); }
   function applyFmSnapshot(snap) {
-    fmSnapshot = snap;
-    player.setSeriesMode(!!snap.source_type);
-    fmSetTransportOn(snap);
-    queue.applySnapshot(snap);
-    [snap.now_playing].filter(Boolean).forEach(renderFmNowPlaying);
-    sendVideoContext();
+    [engineMode === 'film'].filter(Boolean).forEach(function() {
+      fmSnapshot = snap;
+      player.setSeriesMode(!!snap.source_type);
+      fmSetTransportOn(snap);
+      queue.applySnapshot(snap);
+      [snap.now_playing].filter(Boolean).forEach(renderFmNowPlaying);
+      sendVideoContext();
+    });
   }
 
   // The music-video/home-movie/film context push (also fired on every new
