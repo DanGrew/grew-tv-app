@@ -77,13 +77,18 @@ test.describe('synced (drives the TV)', () => {
     await expect.poll(() => sentIntents.some(p => p.intent === 'play' && p.params.id === 'beach-day')).toBe(true);
   });
 
-  test('＋ Queue POSTs queue-video for the clip', async ({ page }) => {
-    const queued = page.waitForRequest(r => r.url().includes('/api/video-playback/queue-video') && r.method() === 'POST');
+  // TASK-516 — the clip lands on the SAME unified engine the home-movie
+  // player reads (/api/queue/home-movie/queue-item). It used to post to the
+  // old video-playback queue, which nothing has read since TASK-499, so a
+  // ＋Queue here silently queued to nothing.
+  test('＋ Queue appends the clip to the unified home-movie queue', async ({ page }) => {
+    await page.route('**/api/queue/home-movie/queue-item**', route => route.fulfill({ status: 204, body: '' }));
+    const queued = page.waitForRequest(r => r.url().includes('/api/queue/home-movie/queue-item') && r.method() === 'POST');
     await page.locator('.detail-track-row:has(.tile-btn[data-id="beach-day"]) .detail-queue-btn').click();
     const req = await queued;
     expect(req.url()).toContain('person=kids');
-    expect(JSON.parse(req.postData())).toEqual({ video_id: 'beach-day' });
-    await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+    expect(JSON.parse(req.postData())).toEqual({ item_id: 'beach-day' });
+    await expect(page.locator('#add-status')).toHaveText('Added to Queue');
   });
 
   test('the Home Movies breadcrumb crumb teleports the TV back to that tab', async ({ page }) => {

@@ -3,7 +3,8 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { setupVideoQueue } from './screen-video-queue.js';
 import { setupMusicVideoQueue } from './screen-music-video-queue.js';
-import { setupHomeMoviesQueue } from './screen-home-movies-queue.js';
+import { setupQueueShell } from './screen-queue-shell.js';
+import { HOME_MOVIE } from '../../core/queue-shell-config.js';
 import { setupFilmQueue } from './screen-film-queue.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadSeries, loadProgress, loadPlaylist, loadBrowse, loadVideoPlayback, loadMusicVideoPlayback, loadQueuePlayback, videoPlaybackAction, musicVideoPlaybackAction, queuePlaybackAction, addToPlaylist } from '../../core/app-api.js';
@@ -661,7 +662,15 @@ export function initVideoPage() {
   // own WS `toggle` intent; the other two setup fns simply never read it.
   // getSourceTitle is film's own hero-subtitle read (screen-film-queue.js);
   // every other setup fn ignores it the same way they already ignore onToggle.
-  var SETUP_QUEUE = { mv: setupMusicVideoQueue, hm: setupHomeMoviesQueue, film: setupFilmQueue, video: setupVideoQueue };
+  //
+  // TASK-516: hm is the first mode on THE shared shell
+  // (ui/screens/screen-queue-shell.js) — the same controller every media type
+  // ends up on, told which type it is by `config.media` rather than by having
+  // its own copy. Every other setup fn ignores that field the way they already
+  // ignore onToggle/getSourceTitle. Home movies' hero source line derives from
+  // the snapshot's own person/month slugs, so getSourceTitle is unread here.
+  var SETUP_QUEUE = { mv: setupMusicVideoQueue, hm: setupQueueShell, film: setupFilmQueue, video: setupVideoQueue };
+  var QUEUE_MEDIA = { hm: HOME_MOVIE };
   var SEND_QUEUE_ACTION = { mv: sendMvAction, hm: sendHmAction, film: sendFmAction, video: sendAction };
   queue = SETUP_QUEUE[engineMode]({
     root: document.getElementById('queue-overlay'),
@@ -670,7 +679,8 @@ export function initVideoPage() {
     onAction: function(action, body) { SEND_QUEUE_ACTION[engineMode](action, body); },
     onToggle: function() { player.remote.toggle(); },
     onClose: function() { document.getElementById('btn-queue').focus(); },
-    getSourceTitle: function() { return seriesTitle; }
+    getSourceTitle: function() { return seriesTitle; },
+    media: QUEUE_MEDIA[engineMode]
   });
   document.getElementById('btn-queue').addEventListener('click', function() { queue.open(); });
   document.getElementById('btn-add-playlist').addEventListener('click', openAddSheet);

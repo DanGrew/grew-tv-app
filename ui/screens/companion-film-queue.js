@@ -10,8 +10,10 @@ import { mountScreenBar } from './companion-screen-bar.js';
 import { mountStatusMenu } from './companion-status-menu.js';
 
 // TASK-503 (FEAT-497) companion Film Queue View — the phone mirror of the TV
-// Queue View (screen-film-queue.js), the same shape as
-// companion-home-movies-queue.js. It renders the server `queue_playback`
+// Queue View (screen-film-queue.js). ⚠️ Superseded by
+// companion-queue-shell.js, which home movies already run on (TASK-516);
+// TASK-517 points films there too and deletes this file.
+// It renders the server `queue_playback`
 // snapshot (companion-ws onQueuePlayback, filtered to media_type 'film') and
 // DRIVES the queue by POSTing the TASK-498 unified queue engine's actions
 // straight to /api/queue/film for the target device's active person —

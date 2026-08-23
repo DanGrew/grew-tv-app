@@ -590,6 +590,29 @@ test.describe('companion Home Movies Play All', () => {
       return sel && sel.params.id;
     }).toBe('play-all:Millie');
   });
+
+  // TASK-516 — the phone's own clip ＋ Queue, the fifth affordance a clip has.
+  // It posted to the old video-playback queue, which the home-movie player has
+  // not read since TASK-499, so the clip never arrived anywhere.
+  test('＋ Queue on a clip tile appends it to the unified home-movie queue', async ({ page }) => {
+    let oldEngineHit = false;
+    await page.route('**/api/video-playback/queue-video**', route => { oldEngineHit = true; return route.fulfill({ status: 204, body: '' }); });
+    await page.route('**/api/queue/home-movie/queue-item**', route => route.fulfill({ status: 204, body: '' }));
+    await page.locator('.dock-tab[data-section="home-movies"]').click();
+    await page.locator('#pager-next').click();               // Play All -> the month rail
+    await page.locator('#pager-next').click();               // month -> Millie's own clip rail
+    await expect(page.locator('#pager-name')).toHaveText('Millie');
+    const queued = page.waitForRequest(req =>
+      req.url().includes('/api/queue/home-movie/queue-item') && req.method() === 'POST');
+    await page.locator('.ph-cell-queue[data-queue="beach-day"]').click();
+    const req = await queued;
+    // This describe's mock app_state carries no person (the dedicated
+    // queue-button mock below is the one that does), so the per-person POST is
+    // asserted on the TV browse tile and the companion clip list instead.
+    expect(JSON.parse(req.postData())).toEqual({ item_id: 'beach-day' });
+    await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
+    expect(oldEngineHit).toBe(false);
+  });
 });
 
 // TASK-258 (2): the VIDEO queue button reads a compact "🎬 (N)" — media icon +

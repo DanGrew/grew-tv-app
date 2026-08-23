@@ -2,7 +2,8 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, videoPlaybackAction } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
+import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { collectionMetaLine } from '../../core/detail-view.js';
 import { homeMoviesListItems, homeMoviesListTitle, homeMoviesListPlayParams } from '../../core/home-rails.js';
@@ -42,9 +43,11 @@ export function initHomeMoviesListPage() {
     navTo('browse.html', { tab: 'home-movies' });
   }
 
-  // FEAT-040/TASK-249 shape — the per-clip "＋ Queue" control (queue-video,
-  // the home-movies domain queue via catalog.is_home_movie), same as a
-  // series episode row already gets on the boxset detail screen.
+  // FEAT-040/TASK-249 shape — the per-clip "＋ Queue" control. TASK-516 moves
+  // it onto the TASK-498 unified engine via queue-shell-config.js's single
+  // routing map: it posted to the old video-playback queue, which the home
+  // movie player has not read since TASK-499, so queueing a clip here did
+  // nothing at all.
   var statusTimer = null;
   function hideStatus() { document.getElementById('queue-status').style.display = 'none'; }
   function showStatus(text) {
@@ -55,8 +58,8 @@ export function initHomeMoviesListPage() {
     statusTimer = setTimeout(hideStatus, 2500);
   }
   function queueVideo(item) {
-    videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: item.video.id })
-      .then(function() { showStatus('Queued to Play Next'); })
+    queueAdd(SERVER, 'home-movie', getPerson(), item.video.id)
+      .then(function() { showStatus(queueAddStatus('home-movie')); })
       .catch(function() { showStatus('Could not queue.'); });
   }
 

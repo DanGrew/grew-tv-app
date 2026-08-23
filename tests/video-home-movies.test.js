@@ -16,9 +16,13 @@ const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js')
 // client-side queue math of its own to re-test against a hand-authored JS
 // mock.
 
+// TASK-516 — the backend handle is kept so a test can seed engine state
+// (repeat off, sitting on the last clip, a clip queued) BEFORE the page loads,
+// which is how the transport rule's own states are reached.
+let queueBackend = null;
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installQueuePlaybackBackend(page, 'home-movie');
+  queueBackend = await installQueuePlaybackBackend(page, 'home-movie');
 });
 
 // TASK-487 (preserved unchanged by this cutover): a home movie is a short
@@ -174,6 +178,65 @@ test.describe('Queue UX shell — hero + tabs', () => {
     const panel = page.locator('.qs-panel[data-tab="coming-up"]');
     await expect(panel.locator('.qs-row').first()).toHaveClass(/qs-readonly/);
     expect(await panel.locator('.qs-actions').count()).toBe(0);
+  });
+
+  // TASK-516 — every row reads as a title over a muted second line
+  // (QUEUE-UX-SHELL.md's Rows section), replacing the right-aligned duration
+  // column the first cutover shipped. The phone mirrors this exactly
+  // (tests/companion-home-movies-queue.test.js).
+  test('every row is a title over a muted sub line', async ({ page }) => {
+    await openQueue(page);
+    await page.locator('.qs-tab[data-tab="next"]').click();
+    const row = page.locator('.qs-panel[data-tab="next"] .qs-select').first();
+    await expect(row.locator('.qs-name')).toHaveText('Beach Day');
+    await expect(row.locator('.qs-sub')).toHaveText('0:45');
+    expect(await page.locator('.qs-dur').count()).toBe(0);
+  });
+});
+
+// TASK-516 — ONE transport rule, shared by every media type
+// (core/queue-shell-view.js transportState): ⏭ is live whenever ANYTHING is
+// ahead and dead only when there is genuinely nothing next, while
+// ⏮/Shuffle/Repeat go disabled-but-visible rather than disappearing. Home
+// movies had no such rule at all — every control read live at all times.
+test.describe('Queue UX shell — the transport rule', () => {
+  test('⏭ stays live while the source still has clips ahead', async ({ page }) => {
+    await page.goto('/app/homeview/video.html?homeMoviesAll=1&from=browse');
+    await page.locator('#btn-queue').click();
+    await expect(page.locator('.qs-transport button[aria-label="Next"]')).toBeEnabled();
+  });
+
+  // Repeat off, sitting on the last clip, nothing queued: no override queue,
+  // no rest-of-cycle, no repeat wrap — the one state where ⏭ has nowhere to go.
+  test('⏭ goes disabled-but-visible on the last clip with repeat off and nothing queued', async ({ page }) => {
+    queueBackend.seed('play-source', { source_type: 'home-movies-all', source_id: null });
+    queueBackend.seed('toggle-repeat');                  // repeat off — no wrap preview
+    queueBackend.seed('next');                           // advance to the last clip
+    await page.goto('/app/homeview/video.html?homeMoviesAll=1&from=browse');
+    await page.locator('#btn-queue').click();
+    // A disabled control drops data-act/data-action (inert on tap, and out of
+    // the d-pad grid) but keeps its glyph, its place and its aria-label.
+    const next = page.locator('.qs-transport button[aria-label="Next"]');
+    await expect(next).toBeVisible();                    // never hidden
+    await expect(next).toBeDisabled();
+    await expect(next).toHaveClass(/is-disabled/);
+    // A home movie always plays from a source, so the other three stay live.
+    await expect(page.locator('.qs-transport button[aria-label="Previous"]')).toBeEnabled();
+    await expect(page.locator('.qs-transport button[aria-label="Shuffle"]')).toBeEnabled();
+    await expect(page.locator('.qs-transport button[aria-label="Repeat"]')).toBeEnabled();
+  });
+
+  // The gap story 1 names: a clip queued while another plays is something to
+  // advance to, so ⏭ must come back to life — the override queue counts, the
+  // same way the engine's own advance() pops it first.
+  test('a queued clip revives ⏭ even with the source exhausted', async ({ page }) => {
+    queueBackend.seed('play-source', { source_type: 'home-movies-all', source_id: null });
+    queueBackend.seed('toggle-repeat');
+    queueBackend.seed('next');
+    queueBackend.seed('queue-item', { item_id: 'millie-walk' });
+    await page.goto('/app/homeview/video.html?homeMoviesAll=1&from=browse');
+    await page.locator('#btn-queue').click();
+    await expect(page.locator('.qs-transport button[aria-label="Next"]')).toBeEnabled();
   });
 });
 

@@ -55,7 +55,10 @@ test('＋ Queue POSTs queue-item to the film engine for the active person and co
   const req = await queued;
   expect(req.url()).toContain('person=mom');
   expect(JSON.parse(req.postData())).toEqual({ item_id: 'toy-story-main' });
-  await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
+  // TASK-516 — the confirmation is now the media type's own wording from
+  // core/queue-shell-config.js. A film is APPENDED to the unified queue, so
+  // "Added to Queue"; a music video still means play-next, and still says so.
+  await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
 });
 
 test('the film play tile still opens — ＋ Queue does not hijack it', async ({ page }) => {

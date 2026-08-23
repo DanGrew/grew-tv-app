@@ -71,6 +71,51 @@ test('toggling shuffle POSTs the action and reflects the snapshot', async ({ pag
   await expect(page.locator('.qs-tbtn[data-action="toggle-shuffle"]')).toHaveClass(/on/);
 });
 
+// TASK-516 — the phone now reads the way docs/QUEUE-UX-SHELL.md specifies,
+// out of the same renderer the TV uses (core/queue-shell-view.js), so the two
+// surfaces cannot drift apart again. Each of these was missing on the phone.
+test('the crumb reads "‹ Now Playing › Queue", not a bare back button', async ({ page }) => {
+  await setup(page);
+  await expect(page.locator('.ph-crumb #btn-back')).toHaveText('‹ Now Playing');
+  await expect(page.locator('.ph-crumb .ph-crumb-current')).toHaveText('Queue');
+});
+
+test('every row is a title over a muted sub line, like the TV', async ({ page }) => {
+  await setup(page);
+  const row = activeRows(page).locator('.ph-qname').first();
+  await expect(row.locator('.qs-name')).toHaveText('Beach Day');
+  await expect(row.locator('.qs-sub')).toHaveText('0:45');
+});
+
+test('Coming Up rows carry the read-only class the phone can dim', async ({ page }) => {
+  await setup(page);
+  const panel = page.locator('.ph-qtab-panel[data-tab="coming-up"]');
+  await expect(panel.locator('.ph-qrow').first()).toHaveClass(/ph-readonly/);
+  expect(await panel.locator('.acts').count()).toBe(0);
+});
+
+// The same one transport rule the TV renders — ⏭ live while anything is
+// ahead, the rest visible-but-dimmed rather than gone.
+test('⏭ goes disabled-but-visible with the source exhausted, and a queued clip revives it', async ({ page }) => {
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'home-movie');
+  backend.seed('play-source', { source_type: 'home-movies-by-person', source_id: 'millie' });
+  backend.seed('toggle-repeat');                         // repeat off — no wrap preview
+  backend.seed('next');                                  // advance to the last clip
+  await page.goto('/companion/home-movies-queue.html');
+  // A disabled control drops data-act/data-action (inert on tap) but keeps its
+  // glyph, its place and its aria-label — so it is addressed by label here.
+  const next = page.locator('.qs-tbtn[aria-label="Next"]');
+  await expect(next).toBeVisible();                      // never hidden
+  await expect(next).toBeDisabled();
+  await expect(next).toHaveClass(/is-disabled/);
+  await expect(page.locator('.qs-tbtn[aria-label="Shuffle"]')).toBeVisible();
+  await expect(page.locator('.qs-tbtn[aria-label="Repeat"]')).toBeVisible();
+  backend.seed('queue-item', { item_id: 'millie-walk' });
+  await page.reload();
+  await expect(page.locator('.qs-tbtn[aria-label="Next"]')).toBeEnabled();
+});
+
 test('back returns to the companion video player', async ({ page }) => {
   await setup(page);
   await page.locator('#btn-back').click();

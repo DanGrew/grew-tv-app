@@ -1,5 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadContinueWatching, videoPlaybackAction, musicVideoPlaybackAction, queuePlaybackAction, loadVideoPlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadVideoPlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { queueAdd, queueAddStatus, SECTION_MEDIA_TYPE } from '../../core/queue-shell-config.js';
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { queueCount } from '../../core/video-player-router.js';
 import { playNextCount } from '../../core/queue-view.js';
@@ -151,36 +152,19 @@ export function initPage() {
     state.queueTimer = setTimeout(hideQueueStatus, 2500);
   }
 
-  // TASK-503 — the film ＋ Queue producer: films now run on their own TASK-498
-  // unified queue engine (/api/queue/film), which the old video-playback engine
-  // (queueVideo, below — home movies only now) is never read by, so posting a
-  // film there silently queued to nothing. Server-authoritative — POST
-  // queue-item per person; per-person POST ⇒ works in BOTH modes (the play tile
-  // may grey in Browse, this stays live), and the film shows up on the film
-  // Queue View + TV. No pill to refresh here (mirrors queueMusicVideo below).
-  function queueFilm(id) {
-    queuePlaybackAction(server, 'film', 'queue-item', state.person, { item_id: id })
-      .then(function() { showQueueStatus('Queued to Play Next'); })
-      .catch(noop);
-  }
-
-  // FEAT-040 (TASK-250) home-movie ＋ Queue producer: queue a standalone home
-  // movie clip to the SEPARATE video queue (Play Next). Server-authoritative —
-  // POST queue-video per person; per-person POST ⇒ works in BOTH modes (the
-  // play tile may grey in Browse, this stays live), and the clip shows up on
-  // the Video Queue View + TV.
-  function queueVideo(id) {
-    videoPlaybackAction(server, 'queue-video', state.person, { video_id: id })
-      .then(function() { showQueueStatus('Queued to Play Next'); refreshQueue(); })
-      .catch(noop);
-  }
-
-  // TASK-421 — the music-video twin of queueVideo: POSTs to the SEPARATE
-  // music-video engine (FEAT-418), never the film queue or the audio engine's
-  // own Play Next list (story 3). No pill to refresh (this section has none).
-  function queueMusicVideo(id) {
-    musicVideoPlaybackAction(server, 'queue-video', state.person, { video_id: id })
-      .then(function() { showQueueStatus('Queued to Play Next'); })
+  // THE ＋ Queue producer for every section (TASK-516): one call into
+  // queue-shell-config.js's routing map, replacing the three near-identical
+  // per-section functions this page used to keep. Server-authoritative — POST
+  // per person, which works in BOTH modes (the play tile may grey in Browse,
+  // this stays live), and the item shows up on that type's Queue page + the
+  // TV. A home movie now reaches the TASK-498 unified engine its own player
+  // reads, instead of the old video-playback queue nothing has read since
+  // TASK-499 — queueing a clip from here did nothing at all. The confirmation
+  // is the config's own per-type wording. The 🎬 pill counts that old video
+  // queue, which no ＋ here feeds any more, so there is nothing to refresh.
+  function queueCard(mediaType, id) {
+    queueAdd(server, mediaType, state.person, id)
+      .then(function() { showQueueStatus(queueAddStatus(mediaType)); })
       .catch(noop);
   }
 
@@ -271,15 +255,14 @@ export function initPage() {
   // control stays live in Browse (per-person POST), unlike the play tile.
   // Keyed by sectionOf() (TASK-503), not cardRoute() — cardRoute() collapses a
   // film and a home-movie card to the same 'video' nav route, which isn't
-  // fine-grained enough to pick a queue engine.
-  var QUEUE_FN = { films: queueFilm, 'home-movies': queueVideo, 'music-videos': queueMusicVideo };
+  // fine-grained enough to name a media type.
   function filmQueueBtn(card) {
     var b = document.createElement('button');
     b.className = 'ph-cell-queue';
     b.setAttribute('data-queue', card.id);
     b.setAttribute('aria-label', 'Queue');
     b.textContent = '＋';
-    b.addEventListener('click', function() { QUEUE_FN[sectionOf(card)](card.id); });
+    b.addEventListener('click', function() { queueCard(SECTION_MEDIA_TYPE[sectionOf(card)], card.id); });
     return b;
   }
   function filmCell(card) {
