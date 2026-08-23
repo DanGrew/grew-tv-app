@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installVideoPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-048 (TASK-324) — the TV app search overlay. A 🔍 button in the topbar opens
@@ -37,7 +37,7 @@ async function openBrowse(page) {
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
 });
 
 test('Story 6 — 🔍 opens the panel with the on-screen keyboard + Videos|Music toggle', async ({ page }) => {

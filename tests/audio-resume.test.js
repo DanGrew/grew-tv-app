@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installPlaybackBackend, installVideoPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { installApi, installPlaybackBackend, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
 // TASK-276 — the audio player no longer resumes mid-song. A track always loads at
@@ -170,7 +170,7 @@ test('a stall clearing before the threshold does not reload (BUG-423)', async ({
 // Video twin (screen-video-player.js shares the same element-lifecycle fix —
 // the same Bluetooth speaker sits in front of both screens).
 test('devicechange while playing remounts the video element and resumes at the same position (video twin, BUG-061)', async ({ page }) => {
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
   await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
   await expect(page.locator('#screen-video')).toBeVisible();
 
@@ -195,7 +195,7 @@ test('devicechange while playing remounts the video element and resumes at the s
 // wedges screen-video-player.js just like the audio player. Mirrors the
 // BUG-423 stall tests above, on the video element/route instead.
 test('a stall outlasting the threshold reloads the video element at the same position (BUG-429)', async ({ page }) => {
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
   await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
   await expect(page.locator('#screen-video')).toBeVisible();
 
@@ -218,7 +218,7 @@ test('a stall outlasting the threshold reloads the video element at the same pos
 });
 
 test('a stall clearing before the threshold does not reload the video element (BUG-429)', async ({ page }) => {
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
   await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
   await expect(page.locator('#screen-video')).toBeVisible();
 

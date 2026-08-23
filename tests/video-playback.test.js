@@ -1,14 +1,14 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js');
 
 // FEAT-037 (TASK-222): the PERSISTENT video player. A series episode plays in a
 // single <video> that LIVES across advances — Next / Previous / auto-advance swap
-// media in place, driven by the server `video_playback` snapshot (TASK-221), with
-// NO per-item page reload (the old video.html-per-episode flow is gone).
+// media in place, driven by the server `queue_playback` snapshot (TASK-498/503),
+// with NO per-item page reload (the old video.html-per-episode flow is gone).
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
   await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
   await expect(page.locator('#screen-video')).toBeVisible();
   // The up-next line is the page's last async signal (set after the first snapshot

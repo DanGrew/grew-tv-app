@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
 // TASK-483 — mirrors tests/atlas-door.test.js for the Ark destination
@@ -16,7 +16,7 @@ const ARK_TV_URL = /192\.168\.1\.242:8095\/tank\.html/;
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
   await page.route(ARK_HOST, route => route.fulfill({
     status: 200, contentType: 'text/html', body: '<!doctype html><title>ark</title>ARK'
   }));

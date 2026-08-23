@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
 // Host-agnostic: the app derives its backend from the page origin (BUG-009).
@@ -11,7 +11,7 @@ const VIDEO_TILE = '.film-tile[data-id="toy-story-main"]';
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
   await page.goto('/app/homeview/profile.html');
   await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
