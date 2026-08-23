@@ -1,5 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadSeries, videoPlaybackAction, musicVideoPlaybackAction, loadBrowse, addToPlaylist } from '../../core/app-api.js';
+import { loadSeries, videoPlaybackAction, musicVideoPlaybackAction, queuePlaybackAction, loadBrowse, addToPlaylist } from '../../core/app-api.js';
 import { screenPage, displayTitle, seriesIdFromSnap, queryString } from '../../core/companion-utils.js';
 import { nowPlaying, upNextLine, seriesMode } from '../../core/video-player-router.js';
 import { mvTransportVisibility } from '../../core/music-video-playthrough.js';
@@ -60,7 +60,7 @@ export function initPage() {
     queue: document.getElementById('c-queue'),
     addPlaylist: document.getElementById('c-add-playlist')
   };
-  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '', mvSource: null } };
+  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, homeMovie: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '', mvSource: null } };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -163,23 +163,35 @@ export function initPage() {
   }
 
   // PLANE B transport: each fires the same server action the TV player fires
-  // (TASK-222 for film/series, FEAT-418/BUG-485 for a music video), keyed to
-  // the active person — the server advances the engine and broadcasts the
-  // resolved snapshot, which repaints BOTH surfaces. A music video posts to
-  // its OWN engine (/api/music-video-playback), never the video-playback one —
-  // the two channels stay apart the same way the TV player's own ON_NEXT/
-  // ON_PREV dispatch does.
+  // (TASK-222 for film/series, FEAT-418/BUG-485 for a music video, TASK-499
+  // for a home movie), keyed to the active person — the server advances the
+  // engine and broadcasts the resolved snapshot, which repaints BOTH
+  // surfaces. A music video / home movie posts to its OWN engine
+  // (/api/music-video-playback, /api/queue/home-movie), never the
+  // video-playback one — the three channels stay apart the same way the TV
+  // player's own ON_NEXT/ON_PREV dispatch does.
   function sendVideoAction(action) { videoPlaybackAction(server, action, state.person).catch(noop); }
   function sendMvAction(action) { musicVideoPlaybackAction(server, action, state.person).catch(noop); }
-  var PREV_ACTION = { 'true': function() { sendMvAction('previous'); }, 'false': function() { sendVideoAction('previous'); } };
-  var NEXT_ACTION = { 'true': function() { sendMvAction('next'); }, 'false': function() { sendVideoAction('next'); } };
-  // TASK-407 — Repeat rides the same Plane B split as prev/next above. Shuffle
-  // is mv-only — its button is hidden outright for a film/series
-  // (applyMusicVideoMode), so the 'false' branch here is unreachable in
-  // practice; kept as a safe no-op rather than an assumption a stray tap
-  // can't happen.
-  var REPEAT_ACTION = { 'true': function() { sendMvAction('toggle-repeat'); }, 'false': function() { sendVideoAction('toggle-repeat'); } };
-  var SHUFFLE_ACTION = { 'true': function() { sendMvAction('toggle-shuffle'); }, 'false': function() {} };
+  function sendHmAction(action) { queuePlaybackAction(server, 'home-movie', action, state.person).catch(noop); }
+  // The three engines this page can be driving are mutually exclusive for a
+  // whole page load (a full navigate per mode, never a live switch) —
+  // resolved off the two mode flags the context push sets, keyed for every
+  // dispatch table below so none of them need a second musicVideo/homeMovie
+  // branch of their own.
+  function engineMode() {
+    return [state.musicVideo].filter(Boolean).map(function() { return 'mv'; })
+      .concat([state.homeMovie].filter(Boolean).map(function() { return 'hm'; }))
+      .concat(['film'])[0];
+  }
+  var PREV_ACTION = { mv: function() { sendMvAction('previous'); }, hm: function() { sendHmAction('previous'); }, film: function() { sendVideoAction('previous'); } };
+  var NEXT_ACTION = { mv: function() { sendMvAction('next'); }, hm: function() { sendHmAction('next'); }, film: function() { sendVideoAction('next'); } };
+  // TASK-407/TASK-499 — Repeat rides the same Plane B split as prev/next
+  // above. Shuffle is mv/hm-only — its button is hidden outright for a
+  // film/series (applyMusicVideoMode), so the `film` branch here is
+  // unreachable in practice; kept as a safe no-op rather than an assumption a
+  // stray tap can't happen.
+  var REPEAT_ACTION = { mv: function() { sendMvAction('toggle-repeat'); }, hm: function() { sendHmAction('toggle-repeat'); }, film: function() { sendVideoAction('toggle-repeat'); } };
+  var SHUFFLE_ACTION = { mv: function() { sendMvAction('toggle-shuffle'); }, hm: function() { sendHmAction('toggle-shuffle'); }, film: function() {} };
 
   // ── server `video_playback` snapshot -> companion (the now-playing source of
   // truth, mirroring the TV). Now-playing + the breadcrumb leaf, the inline up-next
@@ -210,14 +222,15 @@ export function initPage() {
     renderRepeat(snap);
     applySeriesMode(seriesMode(snap));
   }
-  // A music video (TASK-374) never broadcasts a video_playback snapshot, so a
-  // push that arrives while one is playing (e.g. a reconnect replay) can only be
-  // stale film/series state — ignore it entirely rather than let it clobber the
-  // music-video title/up-next/repeat this companion is correctly showing.
-  var ON_VIDEO_PLAYBACK = { 'true': function() {}, 'false': applyVideoPlaybackSnap };
+  // A music video (TASK-374) or a home movie (TASK-499) never broadcasts a
+  // video_playback snapshot, so a push that arrives while one is playing
+  // (e.g. a reconnect replay) can only be stale film/series state — ignore it
+  // entirely rather than let it clobber the title/up-next/repeat this
+  // companion is correctly showing for its own engine.
+  var ON_VIDEO_PLAYBACK = { mv: function() {}, hm: function() {}, film: applyVideoPlaybackSnap };
   function onVideoPlayback(snap) {
     state.vsnap = snap;
-    ON_VIDEO_PLAYBACK[state.musicVideo + ''](snap);
+    ON_VIDEO_PLAYBACK[engineMode()](snap);
   }
 
   // The active person rides the app_state (TASK-158); the Plane B POSTs key per
@@ -286,14 +299,38 @@ export function initPage() {
     },
     'false': function() {}
   };
+  // TASK-499 — Shuffle/Repeat are ALWAYS shown for a home movie (never hidden
+  // or dimmed the way film's single-item source is, QUEUE-UX-SHELL.md's Hero
+  // section), unconditionally un-hidden on the one context push that flips
+  // this page into home-movie mode. Their on/off state rides the SAME
+  // per-source flags the TV hero reads (sendVideoContext's homeMovieShuffle/
+  // homeMovieRepeat), mirroring SET_MV_ON above.
+  function applyHomeMovieMode(on) {
+    [on].filter(Boolean).forEach(function() {
+      els.repeat.classList.remove('hidden');
+      els.repeat.classList.remove('single');
+      els.shuffle.classList.remove('hidden');
+      els.shuffle.classList.remove('single');
+    });
+  }
+  var SET_HM_ON = {
+    'true': function(payload) {
+      els.repeat.classList.toggle('on', !!payload.homeMovieRepeat);
+      els.shuffle.classList.toggle('on', !!payload.homeMovieShuffle);
+    },
+    'false': function() {}
+  };
   function onVideoContext(payload) {
     els.ctxLabel.textContent = 'Now playing';
     els.title.textContent = displayTitle(payload);
     state.crumb.videoTitle = displayTitle(payload);
     state.musicVideo = !!payload.musicVideo;
+    state.homeMovie = !!payload.homeMovie;
     state.crumb.mvSource = [payload.musicVideoSource].filter(Boolean).concat([null])[0];
     applyMusicVideoMode(state.musicVideo, !!payload.musicVideoMulti);
+    applyHomeMovieMode(state.homeMovie);
     SET_MV_ON[state.musicVideo + ''](payload);
+    SET_HM_ON[state.homeMovie + ''](payload);
     mountVideoCrumbs();
   }
 
@@ -380,18 +417,17 @@ export function initPage() {
 
   els.toggle.addEventListener('click', function() { api.sendIntent('toggle'); });
   els.cc.addEventListener('click', function() { api.toggleCaptions(); });
-  els.prev.addEventListener('click', function() { PREV_ACTION[state.musicVideo + ''](); });
-  els.next.addEventListener('click', function() { NEXT_ACTION[state.musicVideo + ''](); });
-  els.repeat.addEventListener('click', function() { REPEAT_ACTION[state.musicVideo + ''](); });
-  els.shuffle.addEventListener('click', function() { SHUFFLE_ACTION[state.musicVideo + ''](); });
+  els.prev.addEventListener('click', function() { PREV_ACTION[engineMode()](); });
+  els.next.addEventListener('click', function() { NEXT_ACTION[engineMode()](); });
+  els.repeat.addEventListener('click', function() { REPEAT_ACTION[engineMode()](); });
+  els.shuffle.addEventListener('click', function() { SHUFFLE_ACTION[engineMode()](); });
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);
-  // FEAT-418 (TASK-420): the queue link now goes to whichever queue matches the
-  // current mode — the music-video Queue View for a music video, the film/
-  // series Video Queue View otherwise.
-  var QUEUE_HREF = { 'true': 'music-video-queue.html', 'false': 'video-queue.html' };
-  document.getElementById('c-queue').addEventListener('click', function() { window.location.href = QUEUE_HREF[state.musicVideo + '']; });
+  // FEAT-418 (TASK-420) / TASK-499: the queue link goes to whichever queue
+  // matches the current mode.
+  var QUEUE_HREF = { mv: 'music-video-queue.html', hm: 'home-movies-queue.html', film: 'video-queue.html' };
+  document.getElementById('c-queue').addEventListener('click', function() { window.location.href = QUEUE_HREF[engineMode()]; });
   document.getElementById('c-quickpause').addEventListener('click', function() { localStorage.setItem(QP_SOURCE_KEY, 'video'); window.location.href = 'quick-pause.html'; });
   els.addPlaylist.addEventListener('click', openAddSheet);
   document.getElementById('btn-add-create').addEventListener('click', createNewPlaylist);

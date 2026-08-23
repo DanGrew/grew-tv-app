@@ -517,6 +517,19 @@ export function homeMoviesListTitle(person, month) {
   return person ? titleCase(person) : 'All';
 }
 
+// TASK-499 — the Queue UX shell hero's "person-or-month" subtitle: the same
+// label homeMoviesListTitle already gives the scoped list screen, derived
+// instead from the TASK-498 unified queue engine's own source_type/source_id
+// (the two mutually-exclusive scope shapes it registers for home movies).
+// Reuses homeMoviesListTitle rather than re-deriving person/month labelling a
+// second time, so the Play All list screen and the Queue hero can never name
+// the same source two different ways.
+export function homeMoviesSourceLabel(sourceType, sourceId) {
+  if (sourceType === 'home-movie-month') return homeMoviesListTitle(null, sourceId);
+  if (sourceType === 'home-movies-by-person') return homeMoviesListTitle(sourceId, null);
+  return homeMoviesListTitle(null, null);
+}
+
 // TASK-486 (revision) — the Play All list screen's own clip list: every
 // available Home Movies card when person is null/undefined ('All'), else only
 // the clips tagged with that person (peopleOf — the SAME tag test the browse

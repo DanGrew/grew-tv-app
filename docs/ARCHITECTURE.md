@@ -62,9 +62,11 @@ module or a screen** — this index rots otherwise (it did).
 - `queue-view.js` / `queue-tabs.js` / `queue-crumb.js` — music Queue View (FEAT-031/039)
 - `video-queue-view.js` — video Queue View model + markup (FEAT-040)
 - `music-video-queue-view.js` — music-video Queue View model + markup, mirroring `queue-view.js`'s every-row-editable bucketing (FEAT-418/TASK-420) against its own `music_video_playback` snapshot (TASK-419), with poster art and no now-playing position
+- `home-movies-queue-view.js` — the FEAT-497 Queue UX shell's first cutover (TASK-499): hero + Queue/Next/Coming-Up model + markup (TV `.qs-*` classes, companion reusing the existing `.ph-*` row/tab classes) over the TASK-498 unified queue engine's own `queue_playback` snapshot; every row plays via `play-item` on tap (never mutates queue/source), Coming Up rows are read-only (the engine itself refuses edits against `next_permutation`)
 - `video-player-router.js` — persistent video-player view-router (FEAT-037)
 - `music-video-playback-router.js` — the mv twin of `video-player-router.js`, over the music-video engine's own `music_video_playback` snapshot (video_id-keyed now_playing, `play_next`/`from_source`/`then` lookahead lists, `item_count` for isMulti) — BUG-485, replacing the retired client-owned `seq` playthrough as what actually drives the `<video>` element for a music video
-- `music-video-playthrough.js` — music-video routing only now (BUG-485 retired its order/index/Shuffle-Repeat half): `entryMode` is the one shared video.html dispatch table screen-video-page.js reads — TASK-446's `homeMoviesAll` mode routes through it too, SERVER-authoritative on the video engine's own source, same as every mv* mode now is on its own engine (`music-video-playback-router.js` above) — plus `playlistTrackTarget`/`playlistQueueKey` (TASK-374/376/421) and `mvTransportVisibility` (TASK-407)
+- `queue-playback-router.js` — the hm twin of `video-player-router.js`/`music-video-playback-router.js` (TASK-499), over the TASK-498 unified queue engine's own `queue_playback` snapshot (item_id-keyed now_playing, `queue`/`next`/`coming_up` lookahead lists) — the FIRST media type on this engine; TASK-503/504/505 cut the other three over onto it the same way
+- `music-video-playthrough.js` — music-video routing only now (BUG-485 retired its order/index/Shuffle-Repeat half): `entryMode` is the one shared video.html dispatch table screen-video-page.js reads (home-movie modes route through it too, but TASK-499 moved their actual playback off the video engine onto the unified queue engine, `queue-playback-router.js` above) — plus `playlistTrackTarget`/`playlistQueueKey` (TASK-374/376/421) and `mvTransportVisibility` (TASK-407)
 - `player-math.js` — pure video-player render arithmetic: `progressPct` / `clampTime` / `wrapIndex` / `frameDrop` (TASK-305)
 - `lrc.js` — LRC parse + rolling-frame lyric selection (FEAT-018)
 - `cover-mosaic.js` — playlist cover-mosaic markup (FEAT-039)
@@ -96,6 +98,7 @@ module or a screen** — this index rots otherwise (it did).
 - `screen-audio-player.js` — audio transport (FEAT-018)
 - `screen-queue.js` / `screen-video-queue.js` — Queue View overlays (FEAT-031/040)
 - `screen-music-video-queue.js` — music-video Queue View overlay (FEAT-418/TASK-420), sharing `screen-video-page.js`'s `#queue-overlay` DOM + `#btn-queue` trigger with `screen-video-queue.js` (mode-selected, never both live)
+- `screen-home-movies-queue.js` — home-movies Queue UX shell overlay (TASK-499/FEAT-497), sharing the same `#queue-overlay` DOM + `#btn-queue` trigger (mode-selected via `screen-video-page.js`'s `engineMode`); `config.onToggle` is its one device-local control (the hero's Play/Pause toggles the mounted `<video>` directly, never a server action)
 - `screen-search.js` — TV search overlay (🔍): reuses the create-playlist on-screen keyboard, ranked results via `core/search-rank` (TASK-324; companion mirror lives in `companion-browse.js`)
 - `screen-error.js` — error screen · `breadcrumb.js` / `device-badge.js` — trail + badge mounts
 
@@ -103,6 +106,7 @@ module or a screen** — this index rots otherwise (it did).
 - `companion-profile.js` · `companion-browse.js` · `companion-detail.js`
 - `companion-artist.js` · `companion-audio.js` · `companion-video.js`
 - `companion-queue.js` · `companion-video-queue.js` · `companion-music-video-queue.js` — the music-video Queue View mirror (FEAT-418/TASK-420); ships `mountScreenBar` from the start (TASK-417's gap, not repeated here)
+- `companion-home-movies-queue.js` — the home-movies Queue UX shell mirror (TASK-499/FEAT-497), the same shape as `companion-music-video-queue.js` above over `queue_playback` (filtered to `media_type: 'home-movie'`)
 - `companion-playlist.js` · `companion-playlist-create.js`
 - `companion-breadcrumb.js` · `companion-screen-bar.js` · `companion-sync-bar.js` · `companion-error.js`
 - `companion-status-menu.js` — the header popout menu (TASK-412, rolled out to every companion page by TASK-415): opens/closes `#status-menu` off a single `#btn-status` icon, never on an outside tap. Consolidates whichever of Mode (`companion-sync-bar.js`), Screen (`companion-screen-bar.js`), Profile (`#switch-profile`), Atlas (`#door`) and Row (`companion-row-step.js`, `#row-step`) a page names into one menu by building each row's empty mount `<div>` itself — that row's own mount function then fills it, unchanged. `browse.html` is the only page carrying all five; the rest show the subset they already had (e.g. `profile.html` shows Screen only — no Mode, since picking a profile precedes any TV context there is to desync from).

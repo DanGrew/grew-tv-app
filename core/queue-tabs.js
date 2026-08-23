@@ -46,3 +46,14 @@ export function tabShellHtml(headerHtml, panels) {
 export function phTabShellHtml(headerHtml, panels) {
   return shell(headerHtml, panels, 'ph-qtab-bar', 'ph-qtab', 'ph-qtab-panel');
 }
+
+// FEAT-497 (docs/QUEUE-UX-SHELL.md) TV Queue UX shell tab bar (.qs-tabbar /
+// .qs-tab / .qs-panel) — full-width equal tabs, mirroring the companion's own
+// .ph-qtab flex:1 behaviour instead of the older TV .qtab's padding-only,
+// non-stretched style. A NEW class set rather than restyling .qtab/.qtab-bar/
+// .qtab-panel in place: those stay live for every media type not yet cut over
+// onto this shell (TASK-503/504/505), so changing their look here would leak
+// into screens this task never touches.
+export function qsTabShellHtml(headerHtml, panels) {
+  return shell(headerHtml, panels, 'qs-tabbar', 'qs-tab', 'qs-panel');
+}
