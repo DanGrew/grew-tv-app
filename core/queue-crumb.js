@@ -22,3 +22,21 @@ export function queueCrumbHtml() {
     '<span class="crumb crumb-current">' + LEAF_LABEL + '</span>' +
     '</nav>';
 }
+
+// TASK-515 (FEAT-497) — the companion's own crumb for the same page. Every
+// companion Queue page hardcodes a bare back button with no leaf, so the
+// phone shows "‹ Now Playing" where docs/QUEUE-UX-SHELL.md specifies
+// "‹ Now Playing › Queue" — the TV's crumb above can't just be reused, since
+// the phone has none of the `.breadcrumb`/`.crumb` styling. It keeps the
+// existing `#btn-back`/`.back` button the companion controllers already wire,
+// so mounting this is the only change a page makes.
+var PH_BACK_ID = 'btn-back';
+var PH_SEP = '<span class="ph-crumb-sep" aria-hidden="true">›</span>';
+
+export function companionQueueCrumbHtml() {
+  return '<nav class="ph-crumb" aria-label="Breadcrumb">' +
+    '<button type="button" class="back" id="' + PH_BACK_ID + '" aria-label="Back to player">' + BACK_LABEL + '</button>' +
+    PH_SEP +
+    '<span class="ph-crumb-current">' + LEAF_LABEL + '</span>' +
+    '</nav>';
+}
