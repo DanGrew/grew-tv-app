@@ -2,10 +2,10 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { gridArrow, renderGrid, focusFirstGridTile } from './screen-rail-grid.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, videoPlaybackAction, musicVideoPlaybackAction } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, videoPlaybackAction, musicVideoPlaybackAction, queuePlaybackAction } from '../../core/app-api.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
-import { buildTabs, buildTabRails, cardRoute } from '../../core/home-rails.js';
+import { buildTabs, buildTabRails, cardRoute, sectionOf } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 
 // Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
@@ -51,9 +51,13 @@ export function initRailGridPage() {
     [SELECT[cardRoute(card)]].filter(Boolean).forEach(function(fn) { fn(card); });
   }
 
-  // FEAT-040/TASK-421: tile ＋Queue (mirrors the browse page) — POST queue-video
-  // per person to the card's own engine (video for a film, the SEPARATE
-  // music-video engine for a music video, FEAT-418) + a transient toast.
+  // FEAT-040/TASK-421: tile ＋Queue (mirrors the browse page) — POST per person
+  // to the card's own MEDIA TYPE, keyed by sectionOf() rather than cardRoute()
+  // (TASK-503): cardRoute() collapses a film and a home-movie card to the same
+  // 'video' nav route, which isn't fine-grained enough to pick a queue engine —
+  // a film now reaches its own TASK-498 unified engine (/api/queue/film), a
+  // home movie stays on the old engine (TASK-499's own equivalent gap, out of
+  // scope here), a music video the SEPARATE music-video engine (FEAT-418).
   var statusTimer = null;
   function hideStatus() { document.getElementById('queue-status').style.display = 'none'; }
   function showStatus(text) {
@@ -64,11 +68,12 @@ export function initRailGridPage() {
     statusTimer = setTimeout(hideStatus, 2500);
   }
   var QUEUE_ACTION = {
-    video: function(id) { return videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); },
-    'music-video': function(id) { return musicVideoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); }
+    films: function(id) { return queuePlaybackAction(SERVER, 'film', 'queue-item', getPerson(), { item_id: id }); },
+    'home-movies': function(id) { return videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); },
+    'music-videos': function(id) { return musicVideoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); }
   };
   function onQueue(card) {
-    QUEUE_ACTION[cardRoute(card)](card.id)
+    QUEUE_ACTION[sectionOf(card)](card.id)
       .then(function() { showStatus('Queued to Play Next'); })
       .catch(function() {});
   }

@@ -2,11 +2,11 @@ import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, videoPlaybackAction, musicVideoPlaybackAction, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, videoPlaybackAction, musicVideoPlaybackAction, queuePlaybackAction, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
-import { cardRoute, artistTiles } from '../../core/home-rails.js';
+import { cardRoute, sectionOf, artistTiles } from '../../core/home-rails.js';
 import { mountSearch } from './screen-search.js';
 import { queueCount } from '../../core/video-player-router.js';
 import { playNextCount } from '../../core/queue-view.js';
@@ -78,19 +78,24 @@ export function initBrowsePage() {
     clearTimeout(statusTimer);
     statusTimer = setTimeout(hideStatus, 2500);
   }
-  // ＋Queue producer (TASK-421 added the music-video branch): POST queue-video
-  // per person to whichever engine the card's own route names — the video
-  // engine for a film, the SEPARATE music-video engine (FEAT-418) for a music
-  // video, never the audio engine's own Play Next (story 3). Only the film
-  // queue has a header pill to refresh.
+  // ＋Queue producer (TASK-421 added the music-video branch): POST per person to
+  // whichever engine the card's own MEDIA TYPE owns. cardRoute() collapses a
+  // film and a home-movie card to the same 'video' nav route, so this keys off
+  // sectionOf() instead (TASK-503) — a film now reaches its own TASK-498
+  // unified engine (/api/queue/film) rather than the old video-playback engine,
+  // which the film player no longer reads at all once queued (BUG report: a
+  // film ＋Queue silently did nothing). Home movies stay on the old engine
+  // (TASK-499's own equivalent gap, out of scope here); only the film queue
+  // has a header pill to refresh.
   var QUEUE_ACTION = {
-    video: function(id) { return videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); },
-    'music-video': function(id) { return musicVideoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); }
+    films: function(id) { return queuePlaybackAction(SERVER, 'film', 'queue-item', getPerson(), { item_id: id }); },
+    'home-movies': function(id) { return videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); },
+    'music-videos': function(id) { return musicVideoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); }
   };
-  var QUEUE_REFRESH = { video: refreshQueue, 'music-video': function() {} };
+  var QUEUE_REFRESH = { films: function() {}, 'home-movies': refreshQueue, 'music-videos': function() {} };
   function onQueue(card) {
-    QUEUE_ACTION[cardRoute(card)](card.id)
-      .then(function() { showStatus('Queued to Play Next'); QUEUE_REFRESH[cardRoute(card)](); })
+    QUEUE_ACTION[sectionOf(card)](card.id)
+      .then(function() { showStatus('Queued to Play Next'); QUEUE_REFRESH[sectionOf(card)](); })
       .catch(function() {});
   }
 

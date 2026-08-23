@@ -651,7 +651,7 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
 
   test('＋ Queue POSTs to the music-video engine, not the film queue, and confirms with a toast', async ({ page }) => {
     let filmQueued = false;
-    await page.route('**/api/video-playback/queue-video**', route => { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
+    await page.route('**/api/queue/film/queue-item**', route => { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
     await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
     const queued = page.waitForRequest(req =>
       req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');

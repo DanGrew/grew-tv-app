@@ -3,9 +3,11 @@ const { installApi, SERIES, BROWSE } = require('./fixtures/api.js');
 
 // FEAT-040 (TASK-249) — the companion mirror of the video series-detail "＋ Queue"
 // (Play Next). Each episode row carries a ＋ Queue control; tapping it POSTs
-// queue-video per person to the SEPARATE video queue (/api/video-playback). A
-// per-person POST (not a WS intent), so it works in BOTH modes — in Browse the
-// play tile greys but ＋ Queue stays live. Absorbs FEAT-038 TASK-231 (video half).
+// queue-item per person to the TASK-498 unified queue engine (/api/queue/film
+// — TASK-503: this series/boxset detail list is always driven by that engine
+// now). A per-person POST (not a WS intent), so it works in BOTH modes — in
+// Browse the play tile greys but ＋ Queue stays live. Absorbs FEAT-038
+// TASK-231 (video half).
 
 function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
@@ -35,7 +37,7 @@ async function mockSeries(page) {
   await page.route('**/api/series/bluey', route => route.fulfill({
     status: 200, contentType: 'application/json', body: JSON.stringify(SERIES.bluey)
   }));
-  await page.route('**/api/video-playback/queue-video**',
+  await page.route('**/api/queue/film/queue-item**',
     route => route.fulfill({ status: 204, body: '' }));
 }
 
@@ -72,14 +74,14 @@ test('every episode row carries a ＋ Queue control (and no ＋ Playlist — vid
   await expect(page.locator('.detail-queue-btn[data-queue="bluey-s1e01"]')).toHaveText('＋ Queue');
 });
 
-test('Control mode: ＋ Queue POSTs queue-video for the active person', async ({ page }) => {
+test('Control mode: ＋ Queue POSTs queue-item to the film engine for the active person', async ({ page }) => {
   await openSynced(page, []);
   const queued = page.waitForRequest(req =>
-    req.url().includes('/api/video-playback/queue-video') && req.method() === 'POST');
+    req.url().includes('/api/queue/film/queue-item') && req.method() === 'POST');
   await page.locator('.detail-queue-btn[data-queue="bluey-s1e02"]').click();
   const req = await queued;
   expect(req.url()).toContain('person=mom');
-  expect(JSON.parse(req.postData())).toEqual({ video_id: 'bluey-s1e02' });
+  expect(JSON.parse(req.postData())).toEqual({ item_id: 'bluey-s1e02' });
   await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
 });
 
@@ -88,9 +90,9 @@ test('Browse mode: the play tile greys but ＋ Queue stays live and still POSTs'
   await expect(page.locator('.tile-btn[data-id="bluey-s1e02"]')).toHaveClass(/desync-off/);
   await expect(page.locator('.detail-queue-btn[data-queue="bluey-s1e02"]')).not.toHaveClass(/desync-off/);
   const queued = page.waitForRequest(req =>
-    req.url().includes('/api/video-playback/queue-video') && req.method() === 'POST');
+    req.url().includes('/api/queue/film/queue-item') && req.method() === 'POST');
   await page.locator('.detail-queue-btn[data-queue="bluey-s1e02"]').click();
-  expect(JSON.parse((await queued).postData())).toEqual({ video_id: 'bluey-s1e02' });
+  expect(JSON.parse((await queued).postData())).toEqual({ item_id: 'bluey-s1e02' });
   await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
 });
 
