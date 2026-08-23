@@ -1040,13 +1040,14 @@ async function installMusicVideoPlaybackBackend(page) {
 // TASK-498/FEAT-497 — a fixture simulation of the UNIFIED queue engine
 // (media-manager/db/queue_engine.py + api/queue_playback.py), the twin of
 // installVideoPlaybackBackend's ENGINE table above but over THAT engine's own
-// action/snapshot shape: play-source / play-item / queue-item / next /
-// previous / toggle-shuffle / toggle-repeat / remove-queue-entry /
-// move-queue-entry, and a snapshot of { now_playing, queue, next, coming_up,
-// shuffle, repeat, source_type, source_id }. Parameterized by `mediaType` —
-// TASK-499 only ever installs it for 'home-movie', the first cutover; a
-// later media type's own cutover reuses this unchanged. Deliberately does
-// NOT reproduce the real engine's fair shuffle (mirrors
+// action/snapshot shape: play-source / play-item / play-standalone /
+// queue-item / next / previous / toggle-shuffle / toggle-repeat /
+// remove-queue-entry / move-queue-entry, and a snapshot of { now_playing,
+// queue, next, coming_up, shuffle, repeat, source_type, source_id }.
+// Parameterized by `mediaType` — TASK-499 installed it for 'home-movie'
+// (the first cutover), TASK-503 for 'film' (series/boxset/standalone, the
+// second); a later media type's own cutover reuses this unchanged.
+// Deliberately does NOT reproduce the real engine's fair shuffle (mirrors
 // installMusicVideoPlaybackBackend's own `state.shuffle` simplification
 // above) — real shuffle order is proven server-side (grew-tv's own pytest
 // suite), not re-proven here.
@@ -1061,7 +1062,13 @@ async function installQueuePlaybackBackend(page, mediaType) {
   var ORDER_BY_SOURCE_TYPE = {
     'home-movies-all': function() { return HOME_MOVIES_ALL_IDS; },
     'home-movies-by-person': function() { return HOME_MOVIES_BY_PERSON_IDS[state.sourceId] || []; },
-    'home-movie-month': function() { return HOME_MOVIES_BY_MONTH_IDS[state.sourceId] || []; }
+    'home-movie-month': function() { return HOME_MOVIES_BY_MONTH_IDS[state.sourceId] || []; },
+    // TASK-503 — 'series' and 'boxset' both resolve through the SAME catalog
+    // lookup (queue_catalog_source.py's series_items/boxset_items are
+    // identical), mirroring the OLD engine fixture's own seriesOrderIds
+    // fallback (installVideoPlaybackBackend's order() above).
+    'series': function() { return seriesOrderIds(state.sourceId); },
+    'boxset': function() { return seriesOrderIds(state.sourceId); }
   };
   function order() { return (ORDER_BY_SOURCE_TYPE[state.sourceType] || function() { return []; })(); }
   function resolve(id) {
@@ -1142,6 +1149,13 @@ async function installQueuePlaybackBackend(page, mediaType) {
       // client, like the real app, sends neither on play-source.
       state.shuffle = false;
       state.repeat = true;
+      // TASK-503 — mirrors api/queue_playback.py's own play-source handling: an
+      // optional item_id starts on that member (a tapped episode), a non-member
+      // id leaves the fresh index (0) untouched — the SAME follow-up play_item
+      // call the real _apply makes.
+      var i = -1;
+      state.currentPermutation.forEach(function(e, idx) { if (e.item_id === b.item_id) i = idx; });
+      if (i > -1) { state.sourcePosition = i; state.currentItemId = b.item_id; }
     },
     'play-item': function(b) {
       state.currentItemId = b.item_id;
@@ -1149,6 +1163,19 @@ async function installQueuePlaybackBackend(page, mediaType) {
       var idx = -1;
       state.currentPermutation.forEach(function(e, i) { if (e.item_id === b.item_id) idx = i; });
       if (idx > -1) state.sourcePosition = idx;
+    },
+    // TASK-503 — a standalone film (no source at all): clears source_type/
+    // source_id and both permutations (mirrors engine.play_standalone), so
+    // Next/Coming Up read empty and Shuffle/Repeat render disabled. The
+    // override queue survives (durable across this too).
+    'play-standalone': function(b) {
+      state.sourceType = null;
+      state.sourceId = null;
+      state.sourcePosition = 0;
+      state.currentPermutation = [];
+      state.nextPermutation = [];
+      state.currentItemId = b.item_id;
+      state.currentEntryId = null;
     },
     'queue-item': function(b) {
       state.overrideQueue = state.overrideQueue.concat([{ entry_id: 'e' + (maxSeq() + 1), item_id: b.item_id }]);

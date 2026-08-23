@@ -42,9 +42,25 @@ export function upNextItem(snapshot) {
   return (snap(snapshot).coming_up || [])[0] || null;
 }
 
-// Inline "Up next: <title>" line, or null when there is nothing up next.
+// Inline up-next line parts (mirrors video-player-router.upNextLine): a real
+// next item -> "Up next: " + its title; the wrapping end of a repeating
+// source -> "Start again" (TASK-503 — films keep this wording moving onto
+// this engine; queue and next both empty means the only candidate left is
+// the repeat-wrap preview, coming_up). null when there is no up-next.
 export function upNextLine(snapshot) {
   var next = upNextItem(snapshot);
   if (!next) return null;
+  var wrapping = (snap(snapshot).queue || []).length === 0 && (snap(snapshot).next || []).length === 0;
+  if (wrapping) return { prefix: '', label: 'Start again' };
   return { prefix: 'Up next: ', label: next.title };
+}
+
+// The active source's id, or null when there is no source at all
+// (source_type unset — a standalone film/single item). TASK-503 — a
+// companion Queue View page (screen-film-queue.js's own hero) uses this to
+// know WHICH source id its own title lookup needs, without duplicating the
+// "no source_type -> no source_id" rule inline (a pure fn, so it belongs
+// here, not in the ui/** consumer).
+export function sourceId(snapshot) {
+  return snap(snapshot).source_type ? snap(snapshot).source_id : null;
 }

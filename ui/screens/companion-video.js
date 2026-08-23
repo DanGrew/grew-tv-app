@@ -17,18 +17,22 @@ import { mountStatusMenu } from './companion-status-menu.js';
 
 // Companion player transport (FEAT-017 + FEAT-037/TASK-223). Two planes, by
 // design. PLANE B — server-authoritative engine: prev/next/repeat/shuffle POST
-// straight to the active person's engine (film/series -> /api/video-playback,
-// a music video -> /api/music-video-playback, BUG-485) — the server advances
-// it and broadcasts the resolved snapshot, which repaints BOTH surfaces, so a
-// media change the companion drives swaps the TV in place, no forced reload.
-// Now-playing / up-next / the pills' on/off state still ride the TV's own
-// `context` push (onVideoContext below), not a direct snapshot read here —
-// unchanged plumbing, now reflecting the engine's truth for a music video too
-// instead of the retired client-owned seq. PLANE A — the legacy WS intent
-// rail still carries play/pause, graduated skip, captions, volume and reset
-// (the <video>'s own transport has no server action); the progress bar is
-// interpolated locally between 1 Hz app_state snapshots. No scrub — seek is a
-// relative skip(deltaSec).
+// straight to the active person's engine (series/single film -> TASK-503's
+// /api/queue/film, the browse "Play Queue" entry only -> the OLD
+// /api/video-playback, a home movie -> /api/queue/home-movie, a music video ->
+// /api/music-video-playback, BUG-485) — the server advances it and broadcasts
+// the resolved snapshot, which repaints BOTH surfaces, so a media change the
+// companion drives swaps the TV in place, no forced reload. Now-playing /
+// up-next / the pills' on/off state still ride the TV's own `context` push
+// (onVideoContext below), not a direct snapshot read here, for every mode
+// except 'video'/legacy-queue (the one mode still reading the old engine's
+// own broadcast, onVideoPlayback below) — unchanged plumbing, now reflecting
+// the engine's truth for a film too instead of a second read of a snapshot
+// this page no longer drives that engine to produce. PLANE A — the legacy WS
+// intent rail still carries play/pause, graduated skip, captions, volume and
+// reset (the <video>'s own transport has no server action); the progress bar
+// is interpolated locally between 1 Hz app_state snapshots. No scrub — seek
+// is a relative skip(deltaSec).
 var JUMP = [
   { d: -10, label: '-10s' }, { d: -30, label: '-30s' }, { d: -120, label: '-2m' }, { d: -600, label: '-10m' }, { d: -1800, label: '-30m' },
   { d: 10, label: '+10s' }, { d: 30, label: '+30s' }, { d: 120, label: '+2m' }, { d: 600, label: '+10m' }, { d: 1800, label: '+30m' }
@@ -60,7 +64,7 @@ export function initPage() {
     queue: document.getElementById('c-queue'),
     addPlaylist: document.getElementById('c-add-playlist')
   };
-  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, homeMovie: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '', mvSource: null } };
+  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, homeMovie: false, film: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '', mvSource: null } };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -163,35 +167,43 @@ export function initPage() {
   }
 
   // PLANE B transport: each fires the same server action the TV player fires
-  // (TASK-222 for film/series, FEAT-418/BUG-485 for a music video, TASK-499
-  // for a home movie), keyed to the active person — the server advances the
-  // engine and broadcasts the resolved snapshot, which repaints BOTH
-  // surfaces. A music video / home movie posts to its OWN engine
-  // (/api/music-video-playback, /api/queue/home-movie), never the
-  // video-playback one — the three channels stay apart the same way the TV
-  // player's own ON_NEXT/ON_PREV dispatch does.
+  // (TASK-222 for 'video'/legacy queue mode, FEAT-418/BUG-485 for a music
+  // video, TASK-499 for a home movie, TASK-503 for series/single film), keyed
+  // to the active person — the server advances the engine and broadcasts the
+  // resolved snapshot, which repaints BOTH surfaces. A music video / home
+  // movie / film posts to its OWN engine (/api/music-video-playback,
+  // /api/queue/home-movie, /api/queue/film), never the video-playback one —
+  // the channels stay apart the same way the TV player's own ON_NEXT/ON_PREV
+  // dispatch does.
   function sendVideoAction(action) { videoPlaybackAction(server, action, state.person).catch(noop); }
   function sendMvAction(action) { musicVideoPlaybackAction(server, action, state.person).catch(noop); }
   function sendHmAction(action) { queuePlaybackAction(server, 'home-movie', action, state.person).catch(noop); }
-  // The three engines this page can be driving are mutually exclusive for a
+  function sendFilmAction(action) { queuePlaybackAction(server, 'film', action, state.person).catch(noop); }
+  // The four engines this page can be driving are mutually exclusive for a
   // whole page load (a full navigate per mode, never a live switch) —
-  // resolved off the two mode flags the context push sets, keyed for every
-  // dispatch table below so none of them need a second musicVideo/homeMovie
-  // branch of their own.
+  // resolved off the mode flags the context push sets, keyed for every
+  // dispatch table below so none of them need a second musicVideo/homeMovie/
+  // film branch of their own. 'video' (the OLD engine, TASK-221/251) is the
+  // fallback: TASK-503 moved series/single onto 'film' — only the browse
+  // "Play Queue" entry is left on it (screen-video-page.js's own
+  // MODE_ENGINE comment), which the TV signals by leaving `film` false on
+  // the context push.
   function engineMode() {
     return [state.musicVideo].filter(Boolean).map(function() { return 'mv'; })
       .concat([state.homeMovie].filter(Boolean).map(function() { return 'hm'; }))
-      .concat(['film'])[0];
+      .concat([state.film].filter(Boolean).map(function() { return 'film'; }))
+      .concat(['video'])[0];
   }
-  var PREV_ACTION = { mv: function() { sendMvAction('previous'); }, hm: function() { sendHmAction('previous'); }, film: function() { sendVideoAction('previous'); } };
-  var NEXT_ACTION = { mv: function() { sendMvAction('next'); }, hm: function() { sendHmAction('next'); }, film: function() { sendVideoAction('next'); } };
-  // TASK-407/TASK-499 — Repeat rides the same Plane B split as prev/next
-  // above. Shuffle is mv/hm-only — its button is hidden outright for a
-  // film/series (applyMusicVideoMode), so the `film` branch here is
+  var PREV_ACTION = { mv: function() { sendMvAction('previous'); }, hm: function() { sendHmAction('previous'); }, film: function() { sendFilmAction('previous'); }, video: function() { sendVideoAction('previous'); } };
+  var NEXT_ACTION = { mv: function() { sendMvAction('next'); }, hm: function() { sendHmAction('next'); }, film: function() { sendFilmAction('next'); }, video: function() { sendVideoAction('next'); } };
+  // TASK-407/TASK-499/TASK-503 — Repeat rides the same Plane B split as
+  // prev/next above. Shuffle is mv/hm/film-only — its button is hidden
+  // outright for 'video'/legacy queue mode (applyMusicVideoMode /
+  // applyFilmMode never unhide it there), so the `video` branch here is
   // unreachable in practice; kept as a safe no-op rather than an assumption a
   // stray tap can't happen.
-  var REPEAT_ACTION = { mv: function() { sendMvAction('toggle-repeat'); }, hm: function() { sendHmAction('toggle-repeat'); }, film: function() { sendVideoAction('toggle-repeat'); } };
-  var SHUFFLE_ACTION = { mv: function() { sendMvAction('toggle-shuffle'); }, hm: function() { sendHmAction('toggle-shuffle'); }, film: function() {} };
+  var REPEAT_ACTION = { mv: function() { sendMvAction('toggle-repeat'); }, hm: function() { sendHmAction('toggle-repeat'); }, film: function() { sendFilmAction('toggle-repeat'); }, video: function() { sendVideoAction('toggle-repeat'); } };
+  var SHUFFLE_ACTION = { mv: function() { sendMvAction('toggle-shuffle'); }, hm: function() { sendHmAction('toggle-shuffle'); }, film: function() { sendFilmAction('toggle-shuffle'); }, video: function() {} };
 
   // ── server `video_playback` snapshot -> companion (the now-playing source of
   // truth, mirroring the TV). Now-playing + the breadcrumb leaf, the inline up-next
@@ -222,12 +234,16 @@ export function initPage() {
     renderRepeat(snap);
     applySeriesMode(seriesMode(snap));
   }
-  // A music video (TASK-374) or a home movie (TASK-499) never broadcasts a
-  // video_playback snapshot, so a push that arrives while one is playing
-  // (e.g. a reconnect replay) can only be stale film/series state — ignore it
-  // entirely rather than let it clobber the title/up-next/repeat this
-  // companion is correctly showing for its own engine.
-  var ON_VIDEO_PLAYBACK = { mv: function() {}, hm: function() {}, film: applyVideoPlaybackSnap };
+  // A music video (TASK-374), a home movie (TASK-499) or a film (TASK-503)
+  // never broadcasts a video_playback snapshot, so a push that arrives while
+  // one is playing (e.g. a reconnect replay) can only be stale 'video'/
+  // legacy-queue-mode state — ignore it entirely rather than let it clobber
+  // the title/up-next/repeat this companion is correctly showing for its own
+  // engine. TASK-503: film's own title/repeat/shuffle ride the context push
+  // instead (onVideoContext below) — this companion mirror accepts the same
+  // "Up next" gap TASK-499 already shipped for home movies (no queue_playback
+  // subscription here), not a new one.
+  var ON_VIDEO_PLAYBACK = { mv: function() {}, hm: function() {}, film: function() {}, video: applyVideoPlaybackSnap };
   function onVideoPlayback(snap) {
     state.vsnap = snap;
     ON_VIDEO_PLAYBACK[engineMode()](snap);
@@ -262,9 +278,10 @@ export function initPage() {
     els.next.classList.toggle('single', hide);
   }
   // OFF music-video mode, ⏮/⏭ go BACK to the engine snapshot rather than being
-  // cleared — applySeriesMode owns `single` for a film/series, and a standalone
-  // film (a one-item source) must stay greyed. Clearing it here instead used to
-  // re-arm ⏮/⏭ on every film, because the TV's context push lands AFTER the
+  // cleared — applySeriesMode owns `single` for 'video'/legacy-queue mode
+  // (applyFilmMode owns it for TASK-503's own film mode instead), and a
+  // standalone film (a one-item/no source) must stay greyed. Clearing it here
+  // instead used to re-arm ⏮/⏭ on every film, because the TV's context push lands AFTER the
   // snapshot in production (onIntent('play'/'video') only fire once the player
   // has swapped the snapshot in). Before the first snapshot there is
   // nothing to restore, so that branch is a no-op.
@@ -320,17 +337,45 @@ export function initPage() {
     },
     'false': function() {}
   };
+  // TASK-503 — Shuffle/Repeat are ALWAYS shown for a film too (never hidden,
+  // QUEUE-UX-SHELL.md's Hero section) but, unlike home movies, disabled-but-
+  // visible when there is nothing to shuffle/repeat: a standalone film has no
+  // source at all (payload.filmHasSource false), unlike a series/boxset. ⏮/⏭
+  // gate on the SAME signal — mirrors the TV's own fmSetTransportOn/
+  // player.setSeriesMode(!!snap.source_type) so neither surface can disagree.
+  // Reuses the EXISTING `.single` opacity-dim class (applySeriesMode's own,
+  // above) rather than a new one — the same "disabled but visible" look.
+  function applyFilmMode(on, hasSource) {
+    [on].filter(Boolean).forEach(function() {
+      els.repeat.classList.remove('hidden');
+      els.shuffle.classList.remove('hidden');
+      els.repeat.classList.toggle('single', !hasSource);
+      els.shuffle.classList.toggle('single', !hasSource);
+      els.prev.classList.toggle('single', !hasSource);
+      els.next.classList.toggle('single', !hasSource);
+    });
+  }
+  var SET_FILM_ON = {
+    'true': function(payload) {
+      els.repeat.classList.toggle('on', !!payload.filmRepeat);
+      els.shuffle.classList.toggle('on', !!payload.filmShuffle);
+    },
+    'false': function() {}
+  };
   function onVideoContext(payload) {
     els.ctxLabel.textContent = 'Now playing';
     els.title.textContent = displayTitle(payload);
     state.crumb.videoTitle = displayTitle(payload);
     state.musicVideo = !!payload.musicVideo;
     state.homeMovie = !!payload.homeMovie;
+    state.film = !!payload.film;
     state.crumb.mvSource = [payload.musicVideoSource].filter(Boolean).concat([null])[0];
     applyMusicVideoMode(state.musicVideo, !!payload.musicVideoMulti);
     applyHomeMovieMode(state.homeMovie);
+    applyFilmMode(state.film, !!payload.filmHasSource);
     SET_MV_ON[state.musicVideo + ''](payload);
     SET_HM_ON[state.homeMovie + ''](payload);
+    SET_FILM_ON[state.film + ''](payload);
     mountVideoCrumbs();
   }
 
@@ -424,9 +469,9 @@ export function initPage() {
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);
-  // FEAT-418 (TASK-420) / TASK-499: the queue link goes to whichever queue
-  // matches the current mode.
-  var QUEUE_HREF = { mv: 'music-video-queue.html', hm: 'home-movies-queue.html', film: 'video-queue.html' };
+  // FEAT-418 (TASK-420) / TASK-499/503: the queue link goes to whichever
+  // queue matches the current mode.
+  var QUEUE_HREF = { mv: 'music-video-queue.html', hm: 'home-movies-queue.html', film: 'film-queue.html', video: 'video-queue.html' };
   document.getElementById('c-queue').addEventListener('click', function() { window.location.href = QUEUE_HREF[engineMode()]; });
   document.getElementById('c-quickpause').addEventListener('click', function() { localStorage.setItem(QP_SOURCE_KEY, 'video'); window.location.href = 'quick-pause.html'; });
   els.addPlaylist.addEventListener('click', openAddSheet);

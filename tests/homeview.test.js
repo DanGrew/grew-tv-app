@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js');
 const { pickPerson, enterBrowse } = require('./fixtures/nav.js');
 
 // Host-agnostic: the app derives its backend from the page origin (BUG-009), so
@@ -8,7 +8,7 @@ const BROWSE_URL = '**/api/browse**';
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
   await page.goto('/app/homeview/profile.html');
 });
 
@@ -465,10 +465,21 @@ test('Next loops last->first at the end of the series (BUG-005)', async ({ page 
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/);
 });
 
-test('series Prev button steps back in order (wraps)', async ({ page }) => {
+test('series Prev button steps back in order', async ({ page }) => {
+  await goToEpisode(page, 'bluey-s1e02', 'Up next: Hammerbarn');
+  await page.locator('#btn-prev').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/);
+});
+
+// TASK-503 (FEAT-497/TASK-498) — Previous on the unified queue engine does NOT
+// wrap backward at the start of a source (db/queue_engine.py previous():
+// "already at the start -> no-op, nothing earlier to return to"), unlike the
+// OLD video engine it replaces for series/single. A deliberate engine-level
+// difference, not a bug to route around here.
+test('Prev at the first episode is a no-op (the unified queue engine does not wrap backward)', async ({ page }) => {
   await goToSeriesEpisode(page);
   await page.locator('#btn-prev').click();
-  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e03/);
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/);
 });
 
 test('standalone film hides prev / next (no episodes)', async ({ page }) => {

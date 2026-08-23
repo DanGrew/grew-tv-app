@@ -2,7 +2,7 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadSeries, loadContinueWatching, videoPlaybackAction } from '../../core/app-api.js';
+import { loadSeries, loadContinueWatching, queuePlaybackAction } from '../../core/app-api.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { primaryAction, playNextLabel } from '../../core/series-detail.js';
 import { collectionMetaLine } from '../../core/detail-view.js';
@@ -35,10 +35,15 @@ export function initDetailPage() {
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
 
-  // FEAT-040/TASK-249 — per-episode "＋ Queue" (Play Next) on a video series. POSTs
-  // queue-video for the active person to the SEPARATE video queue (distinct from
-  // the music queue); the durable queue (TASK-247) keeps it across source swaps and
-  // the persistent player shows it as Up next. A transient toast confirms.
+  // FEAT-040/TASK-249 — per-episode "＋ Queue" (Play Next) on a video series
+  // (TV or a film boxset — detail.html/loadSeries serve both identically).
+  // TASK-503: this series/boxset detail list is ALWAYS driven by the TASK-498
+  // unified queue engine now (screen-video-page's MODE_ENGINE.series/single ->
+  // 'film', matching queue_catalog_source.py's series/boxset/standalone catalog
+  // sources) — POSTs queue-item to /api/queue/film, never the old video engine,
+  // which that player no longer reads at all (queueing there silently queued to
+  // nothing). The durable queue (TASK-247) keeps it across source swaps and the
+  // persistent player shows it as Up next. A transient toast confirms.
   var statusTimer = null;
   function hideStatus() { document.getElementById('queue-status').style.display = 'none'; }
   function showStatus(text) {
@@ -49,7 +54,7 @@ export function initDetailPage() {
     statusTimer = setTimeout(hideStatus, 2500);
   }
   function queueVideo(item) {
-    videoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: item.video.id })
+    queuePlaybackAction(SERVER, 'film', 'queue-item', getPerson(), { item_id: item.video.id })
       .then(function() { showStatus('Queued to Play Next'); })
       .catch(function() { showStatus('Could not queue.'); });
   }

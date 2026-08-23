@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installVideoPlaybackBackend, installMusicVideoPlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend, installMusicVideoPlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
 
 // TASK-378 — "Add to playlist" for the CURRENTLY PLAYING music video, on the TV
 // player itself (screen-video-page.js) — there is no music-video detail page to
@@ -102,7 +102,7 @@ test('Escape closes the add sheet', async ({ page }) => {
 });
 
 test('a standalone film never offers Add to playlist (the existing engine Queue button lives there instead)', async ({ page }) => {
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
   await page.goto('/app/homeview/video.html?video=toy-story-main&from=browse');
   await expect(page.locator('#btn-add-playlist')).toBeHidden();
   await expect(page.locator('#btn-queue')).toBeVisible();

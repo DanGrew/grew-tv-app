@@ -3,9 +3,11 @@ const { installApi } = require('./fixtures/api.js');
 
 // FEAT-040 (TASK-250) — film ＋ Queue gap. A standalone film has no episode-row
 // list (series get ＋ Queue per row in TASK-249), so the companion browse GRID
-// film tile gains its own ＋ Queue control: it POSTs queue-video per person to the
-// SEPARATE video queue. Per-person POST ⇒ works in both modes; series/album tiles
-// do NOT get the control (they route to their own pages / queue per episode).
+// film tile gains its own ＋ Queue control: it POSTs queue-item per person to
+// the TASK-498 unified queue engine (/api/queue/film — TASK-503; the old
+// video-playback engine's queue-video is never read by a film once queued
+// there). Per-person POST ⇒ works in both modes; series/album tiles do NOT get
+// the control (they route to their own pages / queue per episode).
 
 function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
@@ -29,7 +31,7 @@ function mockApp(page) {
 test.beforeEach(async ({ page }) => {
   await installApi(page);
   await mockApp(page);
-  await page.route('**/api/video-playback/queue-video**',
+  await page.route('**/api/queue/film/queue-item**',
     route => route.fulfill({ status: 204, body: '' }));
   await page.goto('/companion/browse.html');
   await expect(page.locator('#section-dock .dock-tab-label')).toHaveText(['TV Series', 'Films', 'Home Movies']);
@@ -45,14 +47,14 @@ test('a film grid tile carries a ＋ Queue control', async ({ page }) => {
   await expect(page.locator('.ph-txt-cell .ph-cell-queue[data-queue="toy-story-main"]')).toHaveText('＋');
 });
 
-test('＋ Queue POSTs queue-video for the active person and confirms with a toast', async ({ page }) => {
+test('＋ Queue POSTs queue-item to the film engine for the active person and confirms with a toast', async ({ page }) => {
   await openFilmsGrid(page);
   const queued = page.waitForRequest(req =>
-    req.url().includes('/api/video-playback/queue-video') && req.method() === 'POST');
+    req.url().includes('/api/queue/film/queue-item') && req.method() === 'POST');
   await page.locator('.ph-cell-queue[data-queue="toy-story-main"]').click();
   const req = await queued;
   expect(req.url()).toContain('person=mom');
-  expect(JSON.parse(req.postData())).toEqual({ video_id: 'toy-story-main' });
+  expect(JSON.parse(req.postData())).toEqual({ item_id: 'toy-story-main' });
   await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
 });
 

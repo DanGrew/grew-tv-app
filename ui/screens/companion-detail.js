@@ -1,5 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, videoPlaybackAction } from '../../core/app-api.js';
+import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, queuePlaybackAction } from '../../core/app-api.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, rowMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
@@ -155,12 +155,15 @@ export function initPage() {
       .catch(function() { showStatus('Could not queue track.'); });
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
-  // FEAT-040/TASK-249 — the VIDEO ＋ Queue: a series episode queues to the separate
-  // video queue (queue-video, distinct from the music queue-track above). Same
-  // per-person POST ⇒ works in BOTH modes (the play tile greys in Browse, this
-  // stays live); the durable queue (TASK-247) keeps it across source swaps.
+  // FEAT-040/TASK-249 — the VIDEO ＋ Queue: a series episode (TV or a film
+  // boxset) queues to the TASK-498 unified queue engine (TASK-503) — this
+  // series/boxset detail list is ALWAYS driven by /api/queue/film now
+  // (mirrors screen-detail-page's queueVideo), distinct from the music
+  // queue-track above. Same per-person POST ⇒ works in BOTH modes (the play
+  // tile greys in Browse, this stays live); the durable queue (TASK-247)
+  // keeps it across source swaps.
   function queueVideo(item) {
-    videoPlaybackAction(server, 'queue-video', state.person, { video_id: item.video.id })
+    queuePlaybackAction(server, 'film', 'queue-item', state.person, { item_id: item.video.id })
       .then(function() { showStatus('Queued to Play Next'); })
       .catch(function() { showStatus('Could not queue.'); });
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nowPlaying, isSwap, upNextItem, upNextLine } from '../../core/queue-playback-router.js';
+import { nowPlaying, isSwap, upNextItem, upNextLine, sourceId } from '../../core/queue-playback-router.js';
 
 function item(id, title) { return { item_id: id, title: title }; }
 function snap(fields) {
@@ -49,7 +49,33 @@ describe('upNextLine', () => {
   it('is "Up next: <title>" for the resolved up-next item', () => {
     expect(upNextLine(snap({ next: [item('n', 'Next Clip')] }))).toEqual({ prefix: 'Up next: ', label: 'Next Clip' });
   });
+  it('is "Up next: <title>" for a queued pick, even at the end of the source (queue wins over the wrap label)', () => {
+    expect(upNextLine(snap({ queue: [item('q', 'Queued Clip')] }))).toEqual({ prefix: 'Up next: ', label: 'Queued Clip' });
+  });
+  // TASK-503 — films keep this wording moving onto the unified engine: queue
+  // and next both empty means the only candidate left is the repeat-wrap
+  // preview (coming_up), so this is the "Start again" case, not a plain
+  // "Up next" line.
+  it('is "Start again" when queue and next are both empty and coming_up holds the repeat wrap', () => {
+    expect(upNextLine(snap({ coming_up: [item('c', 'First Clip')] }))).toEqual({ prefix: '', label: 'Start again' });
+  });
+  it('is still "Start again" when queue/next are genuinely absent from the snapshot, not just empty', () => {
+    expect(upNextLine({ coming_up: [item('c', 'First Clip')] })).toEqual({ prefix: '', label: 'Start again' });
+  });
   it('is null when there is no up-next item', () => {
     expect(upNextLine(snap({}))).toBe(null);
+  });
+});
+
+describe('sourceId', () => {
+  it('is the snapshot\'s source_id when a source_type is set', () => {
+    expect(sourceId(snap({ source_type: 'series', source_id: 'bluey' }))).toBe('bluey');
+  });
+  it('is null when there is no source_type (a standalone film has none)', () => {
+    expect(sourceId(snap({ source_type: null, source_id: 'stray' }))).toBe(null);
+  });
+  it('is null for an empty/absent snapshot', () => {
+    expect(sourceId(snap({}))).toBe(null);
+    expect(sourceId(null)).toBe(null);
   });
 });

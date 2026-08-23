@@ -1,5 +1,5 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadContinueWatching, videoPlaybackAction, musicVideoPlaybackAction, loadVideoPlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, videoPlaybackAction, musicVideoPlaybackAction, queuePlaybackAction, loadVideoPlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { queueCount } from '../../core/video-player-router.js';
 import { playNextCount } from '../../core/queue-view.js';
@@ -9,7 +9,7 @@ import { buildTabs, railsForSection } from '../../core/home-rails.js';
 import { firstRailId, pageOffset, settleIndex, stepIndex, arrowDisabled, shouldActivateDrag, isRealDrag, isTapRelease } from '../../core/rail-pager.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
-import { cardRoute } from '../../core/home-rails.js';
+import { cardRoute, sectionOf } from '../../core/home-rails.js';
 import { externalDestinations, launchExternalParams, destinationUrls } from '../../core/external-destinations.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { desyncOpenPage, tileOffDesynced } from '../../core/companion-button-modes.js';
@@ -151,10 +151,24 @@ export function initPage() {
     state.queueTimer = setTimeout(hideQueueStatus, 2500);
   }
 
-  // FEAT-040 (TASK-250) film ＋ Queue producer: queue a standalone film to the
-  // SEPARATE video queue (Play Next). Server-authoritative — POST queue-video per
-  // person; per-person POST ⇒ works in BOTH modes (the play tile may grey in
-  // Browse, this stays live), and the film shows up on the Video Queue View + TV.
+  // TASK-503 — the film ＋ Queue producer: films now run on their own TASK-498
+  // unified queue engine (/api/queue/film), which the old video-playback engine
+  // (queueVideo, below — home movies only now) is never read by, so posting a
+  // film there silently queued to nothing. Server-authoritative — POST
+  // queue-item per person; per-person POST ⇒ works in BOTH modes (the play tile
+  // may grey in Browse, this stays live), and the film shows up on the film
+  // Queue View + TV. No pill to refresh here (mirrors queueMusicVideo below).
+  function queueFilm(id) {
+    queuePlaybackAction(server, 'film', 'queue-item', state.person, { item_id: id })
+      .then(function() { showQueueStatus('Queued to Play Next'); })
+      .catch(noop);
+  }
+
+  // FEAT-040 (TASK-250) home-movie ＋ Queue producer: queue a standalone home
+  // movie clip to the SEPARATE video queue (Play Next). Server-authoritative —
+  // POST queue-video per person; per-person POST ⇒ works in BOTH modes (the
+  // play tile may grey in Browse, this stays live), and the clip shows up on
+  // the Video Queue View + TV.
   function queueVideo(id) {
     videoPlaybackAction(server, 'queue-video', state.person, { video_id: id })
       .then(function() { showQueueStatus('Queued to Play Next'); refreshQueue(); })
@@ -255,14 +269,17 @@ export function initPage() {
   // gap: a standalone film has no detail-row list, so this is its only queue
   // affordance; TASK-421 extends it to music videos — same gap, own rail). The
   // control stays live in Browse (per-person POST), unlike the play tile.
-  var QUEUE_FN = { video: queueVideo, 'music-video': queueMusicVideo };
+  // Keyed by sectionOf() (TASK-503), not cardRoute() — cardRoute() collapses a
+  // film and a home-movie card to the same 'video' nav route, which isn't
+  // fine-grained enough to pick a queue engine.
+  var QUEUE_FN = { films: queueFilm, 'home-movies': queueVideo, 'music-videos': queueMusicVideo };
   function filmQueueBtn(card) {
     var b = document.createElement('button');
     b.className = 'ph-cell-queue';
     b.setAttribute('data-queue', card.id);
     b.setAttribute('aria-label', 'Queue');
     b.textContent = '＋';
-    b.addEventListener('click', function() { QUEUE_FN[cardRoute(card)](card.id); });
+    b.addEventListener('click', function() { QUEUE_FN[sectionOf(card)](card.id); });
     return b;
   }
   function filmCell(card) {

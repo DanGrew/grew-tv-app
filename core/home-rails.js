@@ -67,7 +67,11 @@ var SECTION_ORDER = ['series', 'films', 'home-movies', 'music', 'music-videos'];
 
 // A card's section. The backend stamps it on every browse card; fall back to
 // Films so an unstamped (legacy/typo) card is shown rather than silently dropped.
-function sectionOf(card) { return card.section || 'films'; }
+// Exported (TASK-503) so a ＋Queue dispatch table can route by media type
+// without re-deriving this fallback itself — cardRoute() collapses film and
+// home-movie cards to the same 'video' route (both are the shared "standalone
+// video" nav target), which isn't fine-grained enough to pick a queue engine.
+export function sectionOf(card) { return card.section || 'films'; }
 
 // Where selecting a browse card navigates: an artist tile (FEAT-029, synthesised
 // for the Music tab's Artists rail) opens the artist drill-down; a playlist card

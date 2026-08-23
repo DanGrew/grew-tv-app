@@ -29,16 +29,21 @@ test('film tiles carry a ＋ Queue badge; series tiles do not', async ({ page })
   await expect(page.locator('.film-tile[data-id="bluey"] .tile-queue')).toHaveCount(0);
 });
 
-test('tapping ＋ queues the film (POST queue-video) without opening the player', async ({ page }) => {
+// TASK-503: a film ＋Queue POSTs to the TASK-498 unified queue engine
+// (/api/queue/film/queue-item), not the old video-playback engine — a film
+// player never reads that old engine's queue once cut over, so queueing there
+// silently queued to nothing.
+test('tapping ＋ queues the film (POST /api/queue/film/queue-item) without opening the player', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
+  await page.route('**/api/queue/film/queue-item**', route => route.fulfill({ status: 204, body: '' }));
   await openFilms(page);
   const queued = page.waitForRequest(req =>
-    req.url().includes('/api/video-playback/queue-video') && req.method() === 'POST');
+    req.url().includes('/api/queue/film/queue-item') && req.method() === 'POST');
   await page.locator('.film-tile[data-id="finding-nemo-main"] .tile-queue').click();
   const req = await queued;
   expect(req.url()).toContain('person=kids');
-  expect(JSON.parse(req.postData())).toEqual({ video_id: 'finding-nemo-main' });
+  expect(JSON.parse(req.postData())).toEqual({ item_id: 'finding-nemo-main' });
   await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
   await expect(page).toHaveURL(/browse\.html/);          // did NOT open the player
 });
@@ -115,7 +120,7 @@ test('a music-video tile carries a ＋ Queue badge that POSTs to its own engine'
   await installApi(page);
   await installVideoPlaybackBackend(page);
   var filmQueued = false;
-  await page.route('**/api/video-playback/queue-video*', function(route) { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
+  await page.route('**/api/queue/film/queue-item*', function(route) { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
   await page.route('**/api/browse**', function(route) {
     return route.fulfill({
       status: 200, contentType: 'application/json',
@@ -193,15 +198,16 @@ test('Play All rail kid tile opens that kid\'s scoped clip list', async ({ page 
   await expect(page).toHaveURL(/home-movies-list\.html\?.*homeMoviesPerson=millie/);
 });
 
-test('rail-grid film tiles also carry the ＋ badge and queue', async ({ page }) => {
+test('rail-grid film tiles also carry the ＋ badge and queue to the film engine', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
+  await page.route('**/api/queue/film/queue-item**', route => route.fulfill({ status: 204, body: '' }));
   await page.goto('/app/homeview/rail-grid.html?section=films&rail=genre:animation&profile=kids&person=kids');
   await expect(page.locator('.film-tile[data-id="finding-nemo-main"] .tile-queue')).toBeVisible();
   const queued = page.waitForRequest(req =>
-    req.url().includes('/api/video-playback/queue-video') && req.method() === 'POST');
+    req.url().includes('/api/queue/film/queue-item') && req.method() === 'POST');
   await page.locator('.film-tile[data-id="finding-nemo-main"] .tile-queue').click();
-  expect(JSON.parse((await queued).postData())).toEqual({ video_id: 'finding-nemo-main' });
+  expect(JSON.parse((await queued).postData())).toEqual({ item_id: 'finding-nemo-main' });
   await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
 });
 
@@ -212,7 +218,7 @@ test('rail-grid music-video tiles carry the ＋ badge and queue to their OWN eng
   await installApi(page);
   await installVideoPlaybackBackend(page);
   let filmQueued = false;
-  await page.route('**/api/video-playback/queue-video*', function(route) { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
+  await page.route('**/api/queue/film/queue-item*', function(route) { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
   await page.route('**/api/browse**', function(route) {
     return route.fulfill({
       status: 200, contentType: 'application/json',

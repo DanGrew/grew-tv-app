@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installVideoPlaybackBackend } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
 // TASK-330 — the TV half of the external-destination "Atlas" door. The TV has NO
@@ -18,7 +18,7 @@ const ATLAS_TV_URL = /192\.168\.1\.242:8090\/app\/tv\.html/;
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
   await page.route(ATLAS_HOST, route => route.fulfill({
     status: 200, contentType: 'text/html', body: '<!doctype html><title>atlas</title>ATLAS'
   }));

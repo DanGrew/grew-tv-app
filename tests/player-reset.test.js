@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installPlaybackBackend, installVideoPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { installApi, installPlaybackBackend, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
 // TASK-142: a single Reset control in the player clears this item's backend
@@ -55,7 +55,7 @@ test('video player shows a Reset control', async ({ page }) => {
 });
 
 test('video Reset needs two presses, DELETEs progress, then exits the player', async ({ page }) => {
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator(`.film-tile[data-id="${FILM}"]`).first().click();
@@ -89,7 +89,7 @@ test('video Reset needs two presses, DELETEs progress, then exits the player', a
 });
 
 test('blurring an armed video Reset disarms it', async ({ page }) => {
-  await installVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'film');
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator(`.film-tile[data-id="${FILM}"]`).first().click();
