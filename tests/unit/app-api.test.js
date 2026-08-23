@@ -4,7 +4,7 @@ import {
   mediaUrl, loadLyrics, resetProgress, playbackAction, videoPlaybackAction, musicVideoPlaybackAction,
   loadVideoPlayback, loadMusicVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
   addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
-  deletePlaylist, renamePlaylist
+  deletePlaylist, renamePlaylist, queuePlaybackAction, loadQueuePlayback
 } from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
@@ -316,6 +316,37 @@ describe('musicVideoPlaybackAction', () => {
     await musicVideoPlaybackAction('http://s', 'next');
     expect(calls[0].url).toBe('http://s/api/music-video-playback/next?person=');
     expect(JSON.parse(calls[0].opts.body)).toEqual({});
+  });
+});
+
+describe('queuePlaybackAction', () => {
+  it('POSTs /api/queue/{mediaType}/{action} with the person and body', async () => {
+    var calls = fakeFetch({});
+    await queuePlaybackAction('http://s', 'home-movie', 'play-source', 'dad', { source_type: 'home-movies-by-person', source_id: 'millie' });
+    expect(calls[0].url).toBe('http://s/api/queue/home-movie/play-source?person=dad');
+    expect(calls[0].opts.method).toBe('POST');
+    expect(calls[0].opts.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ source_type: 'home-movies-by-person', source_id: 'millie' });
+  });
+  it('defaults an absent person and body', async () => {
+    var calls = fakeFetch({});
+    await queuePlaybackAction('http://s', 'home-movie', 'next');
+    expect(calls[0].url).toBe('http://s/api/queue/home-movie/next?person=');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({});
+  });
+});
+
+describe('loadQueuePlayback', () => {
+  it('GETs /api/queue/{mediaType} keyed by person', async () => {
+    var calls = fakeFetch({ queue: [] });
+    await loadQueuePlayback('http://s', 'home-movie', 'mom');
+    expect(calls[0].url).toBe('http://s/api/queue/home-movie?person=mom');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('defaults an absent person', async () => {
+    var calls = fakeFetch({});
+    await loadQueuePlayback('http://s', 'home-movie');
+    expect(calls[0].url).toBe('http://s/api/queue/home-movie?person=');
   });
 });
 

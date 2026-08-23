@@ -55,6 +55,16 @@ describe('queueModel', () => {
     expect(queueModel(snap).hero.subtitle).toBe('All');
   });
 
+  // A stray source_id on the whole-catalog source must still be IGNORED (the
+  // default branch never reads source_id) — pins the by-person check as a
+  // real `===` gate rather than an always-true fallthrough.
+  it('ignores a stray source_id on the whole-catalog source (default branch never reads it)', () => {
+    var snap = personSnap();
+    snap.source_type = 'home-movies-all';
+    snap.source_id = 'millie';
+    expect(queueModel(snap).hero.subtitle).toBe('All');
+  });
+
   it('is null hero for an empty/absent snapshot', () => {
     expect(queueModel(null).hero).toBe(null);
     expect(queueModel({}).hero).toBe(null);
@@ -150,6 +160,18 @@ describe('homeMoviesQueueViewHtml — TV', () => {
     expect(homeMoviesQueueViewHtml(snap)).toContain('&#127916;');
   });
 
+  it('falls back to the video-camera glyph for the hero art when now_playing has no poster', () => {
+    var snap = personSnap();
+    snap.now_playing.poster = null;
+    expect(homeMoviesQueueViewHtml(snap)).toContain('<div class="qs-art">&#127916;</div>');
+  });
+
+  it('joins Coming Up rows back-to-back with no separator', () => {
+    var snap = personSnap();
+    snap.coming_up.push(entry('park-visit', 'Park Visit', 't2', 61));
+    expect(homeMoviesQueueViewHtml(snap)).toContain('</div><div class="qs-row qs-readonly">');
+  });
+
   it('escapes clip titles', () => {
     var snap = personSnap();
     snap.next[0].title = 'Tom & <Jerry>';
@@ -211,6 +233,27 @@ describe('companionHomeMoviesQueueHtml — phone mirror', () => {
     expect(companionHomeMoviesQueueHtml(monthOrderedSnap())).toContain('Source ends');
   });
 
+  it('falls back to the video-camera glyph for the hero art when now_playing has no poster', () => {
+    var snap = personSnap();
+    snap.now_playing.poster = null;
+    expect(companionHomeMoviesQueueHtml(snap)).toContain('<div class="qs-art">&#127916;</div>');
+  });
+
+  it('falls back to the video-camera glyph in a row grip with no poster', () => {
+    var snap = personSnap();
+    snap.queue[0].poster = null;
+    expect(companionHomeMoviesQueueHtml(snap)).toContain('<span class="grip">&#127916;</span>');
+  });
+
+  it('joins Coming Up rows back-to-back with no separator', () => {
+    var snap = personSnap();
+    snap.coming_up.push(entry('park-visit', 'Park Visit', 't2', 61));
+    // read-only rows carry no <span class="acts"> — this boundary (button's
+    // close immediately followed by the next row's open) only occurs between
+    // two read-only rows, so it can't false-pass off the editable Next section.
+    expect(companionHomeMoviesQueueHtml(snap)).toContain('</button></div><div class="ph-qrow">');
+  });
+
   it('Coming Up rows carry no actions', () => {
     var html = companionHomeMoviesQueueHtml(personSnap());
     expect(html).not.toMatch(/data-item="millie-walk"[^]*?data-act="remove" data-entry="t1"/);
@@ -226,6 +269,39 @@ describe('companionHomeMoviesQueueHtml — phone mirror', () => {
     var html = companionHomeMoviesQueueHtml(null);
     expect(html).toContain('Source ends');
     expect(html).not.toContain('qs-ph-hero');
+  });
+});
+
+// Full-string equality on representative snapshots — every literal, join
+// separator, disabled/enabled class, and conditional branch (empty vs.
+// populated Queue/Next, ends-marker vs. rows under Coming Up, shuffle/repeat
+// on vs. off, first/last-row shift-disabling) appears in one of these six
+// outputs, so this pins the exact markup mutation testing needs (a stray
+// StringLiteral/BooleanLiteral/ConditionalExpression flip anywhere in the
+// row/hero/tab-panel builders breaks one of these `toBe`s).
+describe('exact markup — mutation coverage', () => {
+  it('TV: person source, 1 queued + 2 next + 1 coming up, shuffle+repeat on', () => {
+    expect(homeMoviesQueueViewHtml(personSnap())).toBe("<div class=\"qs-hero\"><div class=\"qs-hero-top\"><div class=\"qs-art\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/millie-walk.jpg\" onerror=\"this.style.display='none'\"></div><div class=\"qs-hero-body\"><div class=\"qs-hero-title\">Millie Walk</div><div class=\"qs-hero-sub\">Millie</div></div></div><div class=\"qs-transport\"><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"previous\" aria-label=\"Previous\">&#9198;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-lg\" data-act=\"toggle\" aria-label=\"Play / pause\">&#9199;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"next\" aria-label=\"Next\">&#9197;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm on\" data-act=\"transport\" data-action=\"toggle-shuffle\" aria-label=\"Shuffle\">&#128256;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm on\" data-act=\"transport\" data-action=\"toggle-repeat\" aria-label=\"Repeat\">&#128257;</button></div></div><div class=\"qs-tabbar\" role=\"tablist\"><button type=\"button\" class=\"qs-tab active\" data-act=\"tab\" data-tab=\"queue\" role=\"tab\">Queue 1</button><button type=\"button\" class=\"qs-tab\" data-act=\"tab\" data-tab=\"next\" role=\"tab\">Next 2</button><button type=\"button\" class=\"qs-tab\" data-act=\"tab\" data-tab=\"coming-up\" role=\"tab\">Coming Up 1</button></div><div class=\"qs-panel active\" data-tab=\"queue\" role=\"tabpanel\"><div class=\"qs-row\"><button type=\"button\" class=\"qs-select\" data-act=\"select\" data-item=\"beach-day\"><span class=\"qs-thumb\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/clip.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"qs-name\">Beach Day</span><span class=\"qs-dur\">0:55</span></button><div class=\"qs-actions\"><button type=\"button\" class=\"qs-act is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"up\" title=\"Shift up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"qs-act is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"down\" title=\"Shift down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"qs-act danger\" data-act=\"remove\" data-entry=\"q1\" title=\"Remove\" aria-label=\"Remove\">&#10005;</button></div></div></div><div class=\"qs-panel\" data-tab=\"next\" role=\"tabpanel\"><div class=\"qs-row\"><button type=\"button\" class=\"qs-select\" data-act=\"select\" data-item=\"park-visit\"><span class=\"qs-thumb\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/clip.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"qs-name\">Park Visit</span><span class=\"qs-dur\">1:01</span></button><div class=\"qs-actions\"><button type=\"button\" class=\"qs-act is-disabled\" disabled data-act=\"move\" data-entry=\"s1\" data-dir=\"up\" title=\"Shift up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"qs-act\" data-act=\"move\" data-entry=\"s1\" data-dir=\"down\" title=\"Shift down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"qs-act danger\" data-act=\"remove\" data-entry=\"s1\" title=\"Remove\" aria-label=\"Remove\">&#10005;</button></div></div><div class=\"qs-row\"><button type=\"button\" class=\"qs-select\" data-act=\"select\" data-item=\"bath-time\"><span class=\"qs-thumb\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/clip.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"qs-name\">Bath Time</span><span class=\"qs-dur\">0:30</span></button><div class=\"qs-actions\"><button type=\"button\" class=\"qs-act\" data-act=\"move\" data-entry=\"s2\" data-dir=\"up\" title=\"Shift up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"qs-act is-disabled\" disabled data-act=\"move\" data-entry=\"s2\" data-dir=\"down\" title=\"Shift down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"qs-act danger\" data-act=\"remove\" data-entry=\"s2\" title=\"Remove\" aria-label=\"Remove\">&#10005;</button></div></div></div><div class=\"qs-panel\" data-tab=\"coming-up\" role=\"tabpanel\"><div class=\"qs-row qs-readonly\"><button type=\"button\" class=\"qs-select\" data-act=\"select\" data-item=\"millie-walk\"><span class=\"qs-thumb\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/clip.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"qs-name\">Millie Walk</span><span class=\"qs-dur\">0:42</span></button></div></div>");
+  });
+
+  it('TV: month source, empty queue + 1 next + no coming up (ordered, repeat off)', () => {
+    expect(homeMoviesQueueViewHtml(monthOrderedSnap())).toBe("<div class=\"qs-hero\"><div class=\"qs-hero-top\"><div class=\"qs-art\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/park.jpg\" onerror=\"this.style.display='none'\"></div><div class=\"qs-hero-body\"><div class=\"qs-hero-title\">Park Visit</div><div class=\"qs-hero-sub\">Jan 2026</div></div></div><div class=\"qs-transport\"><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"previous\" aria-label=\"Previous\">&#9198;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-lg\" data-act=\"toggle\" aria-label=\"Play / pause\">&#9199;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"next\" aria-label=\"Next\">&#9197;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"toggle-shuffle\" aria-label=\"Shuffle\">&#128256;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"toggle-repeat\" aria-label=\"Repeat\">&#128257;</button></div></div><div class=\"qs-tabbar\" role=\"tablist\"><button type=\"button\" class=\"qs-tab\" data-act=\"tab\" data-tab=\"queue\" role=\"tab\">Queue 0</button><button type=\"button\" class=\"qs-tab active\" data-act=\"tab\" data-tab=\"next\" role=\"tab\">Next 1</button><button type=\"button\" class=\"qs-tab\" data-act=\"tab\" data-tab=\"coming-up\" role=\"tab\">Coming Up 0</button></div><div class=\"qs-panel\" data-tab=\"queue\" role=\"tabpanel\"><div class=\"qs-empty\">Nothing queued — add clips with ＋</div></div><div class=\"qs-panel active\" data-tab=\"next\" role=\"tabpanel\"><div class=\"qs-row\"><button type=\"button\" class=\"qs-select\" data-act=\"select\" data-item=\"bath-time\"><span class=\"qs-thumb\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/clip.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"qs-name\">Bath Time</span><span class=\"qs-dur\">0:30</span></button><div class=\"qs-actions\"><button type=\"button\" class=\"qs-act is-disabled\" disabled data-act=\"move\" data-entry=\"s1\" data-dir=\"up\" title=\"Shift up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"qs-act is-disabled\" disabled data-act=\"move\" data-entry=\"s1\" data-dir=\"down\" title=\"Shift down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"qs-act danger\" data-act=\"remove\" data-entry=\"s1\" title=\"Remove\" aria-label=\"Remove\">&#10005;</button></div></div></div><div class=\"qs-panel\" data-tab=\"coming-up\" role=\"tabpanel\"><div class=\"qs-ends\">&#9209; Source ends — nothing plays after the last clip (repeat is off)</div></div>");
+  });
+
+  it('TV: empty/absent snapshot renders a stable all-empty shell', () => {
+    expect(homeMoviesQueueViewHtml(null)).toBe("<div class=\"qs-tabbar\" role=\"tablist\"><button type=\"button\" class=\"qs-tab active\" data-act=\"tab\" data-tab=\"queue\" role=\"tab\">Queue 0</button><button type=\"button\" class=\"qs-tab\" data-act=\"tab\" data-tab=\"next\" role=\"tab\">Next 0</button><button type=\"button\" class=\"qs-tab\" data-act=\"tab\" data-tab=\"coming-up\" role=\"tab\">Coming Up 0</button></div><div class=\"qs-panel active\" data-tab=\"queue\" role=\"tabpanel\"><div class=\"qs-empty\">Nothing queued — add clips with ＋</div></div><div class=\"qs-panel\" data-tab=\"next\" role=\"tabpanel\"><div class=\"qs-empty\">Nothing up next</div></div><div class=\"qs-panel\" data-tab=\"coming-up\" role=\"tabpanel\"><div class=\"qs-ends\">&#9209; Source ends — nothing plays after the last clip (repeat is off)</div></div>");
+  });
+
+  it('companion: person source, 1 queued + 2 next + 1 coming up, shuffle+repeat on', () => {
+    expect(companionHomeMoviesQueueHtml(personSnap())).toBe("<div class=\"qs-ph-hero\"><div class=\"qs-ph-top\"><div class=\"qs-art\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/millie-walk.jpg\" onerror=\"this.style.display='none'\"></div><div class=\"qs-ph-body\"><div class=\"qs-ph-title\">Millie Walk</div><div class=\"qs-ph-sub\">Millie</div></div></div><div class=\"qs-transport\"><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"previous\" aria-label=\"Previous\">&#9198;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-lg\" data-act=\"toggle\" aria-label=\"Play / pause\">&#9199;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"next\" aria-label=\"Next\">&#9197;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm on\" data-act=\"transport\" data-action=\"toggle-shuffle\" aria-label=\"Shuffle\">&#128256;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm on\" data-act=\"transport\" data-action=\"toggle-repeat\" aria-label=\"Repeat\">&#128257;</button></div></div><div class=\"ph-qtab-bar\" role=\"tablist\"><button type=\"button\" class=\"ph-qtab active\" data-act=\"tab\" data-tab=\"queue\" role=\"tab\">Queue 1</button><button type=\"button\" class=\"ph-qtab\" data-act=\"tab\" data-tab=\"next\" role=\"tab\">Next 2</button><button type=\"button\" class=\"ph-qtab\" data-act=\"tab\" data-tab=\"coming-up\" role=\"tab\">Coming Up 1</button></div><div class=\"ph-qtab-panel active\" data-tab=\"queue\" role=\"tabpanel\"><div class=\"ph-qrow\"><button type=\"button\" class=\"ph-qname\" data-act=\"select\" data-item=\"beach-day\"><span class=\"grip\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/clip.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"nm\">Beach Day</span></button><span class=\"acts\"><button type=\"button\" class=\"ph-ract is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"ph-ract is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"ph-ract x\" data-act=\"remove\" data-entry=\"q1\" aria-label=\"Remove\">&#10005;</button></span></div></div><div class=\"ph-qtab-panel\" data-tab=\"next\" role=\"tabpanel\"><div class=\"ph-qrow\"><button type=\"button\" class=\"ph-qname\" data-act=\"select\" data-item=\"park-visit\"><span class=\"grip\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/clip.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"nm\">Park Visit</span></button><span class=\"acts\"><button type=\"button\" class=\"ph-ract is-disabled\" disabled data-act=\"move\" data-entry=\"s1\" data-dir=\"up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"ph-ract\" data-act=\"move\" data-entry=\"s1\" data-dir=\"down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"ph-ract x\" data-act=\"remove\" data-entry=\"s1\" aria-label=\"Remove\">&#10005;</button></span></div><div class=\"ph-qrow\"><button type=\"button\" class=\"ph-qname\" data-act=\"select\" data-item=\"bath-time\"><span class=\"grip\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/clip.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"nm\">Bath Time</span></button><span class=\"acts\"><button type=\"button\" class=\"ph-ract\" data-act=\"move\" data-entry=\"s2\" data-dir=\"up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"ph-ract is-disabled\" disabled data-act=\"move\" data-entry=\"s2\" data-dir=\"down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"ph-ract x\" data-act=\"remove\" data-entry=\"s2\" aria-label=\"Remove\">&#10005;</button></span></div></div><div class=\"ph-qtab-panel\" data-tab=\"coming-up\" role=\"tabpanel\"><div class=\"ph-qrow\"><button type=\"button\" class=\"ph-qname\" data-act=\"select\" data-item=\"millie-walk\"><span class=\"grip\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/clip.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"nm\">Millie Walk</span></button></div></div>");
+  });
+
+  it('companion: month source, empty queue + 1 next + no coming up (ordered, repeat off)', () => {
+    expect(companionHomeMoviesQueueHtml(monthOrderedSnap())).toBe("<div class=\"qs-ph-hero\"><div class=\"qs-ph-top\"><div class=\"qs-art\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/park.jpg\" onerror=\"this.style.display='none'\"></div><div class=\"qs-ph-body\"><div class=\"qs-ph-title\">Park Visit</div><div class=\"qs-ph-sub\">Jan 2026</div></div></div><div class=\"qs-transport\"><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"previous\" aria-label=\"Previous\">&#9198;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-lg\" data-act=\"toggle\" aria-label=\"Play / pause\">&#9199;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"next\" aria-label=\"Next\">&#9197;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"toggle-shuffle\" aria-label=\"Shuffle\">&#128256;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"toggle-repeat\" aria-label=\"Repeat\">&#128257;</button></div></div><div class=\"ph-qtab-bar\" role=\"tablist\"><button type=\"button\" class=\"ph-qtab\" data-act=\"tab\" data-tab=\"queue\" role=\"tab\">Queue 0</button><button type=\"button\" class=\"ph-qtab active\" data-act=\"tab\" data-tab=\"next\" role=\"tab\">Next 1</button><button type=\"button\" class=\"ph-qtab\" data-act=\"tab\" data-tab=\"coming-up\" role=\"tab\">Coming Up 0</button></div><div class=\"ph-qtab-panel\" data-tab=\"queue\" role=\"tabpanel\"><div class=\"ph-qempty\">Nothing queued — add clips with ＋</div></div><div class=\"ph-qtab-panel active\" data-tab=\"next\" role=\"tabpanel\"><div class=\"ph-qrow\"><button type=\"button\" class=\"ph-qname\" data-act=\"select\" data-item=\"bath-time\"><span class=\"grip\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/clip.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"nm\">Bath Time</span></button><span class=\"acts\"><button type=\"button\" class=\"ph-ract is-disabled\" disabled data-act=\"move\" data-entry=\"s1\" data-dir=\"up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"ph-ract is-disabled\" disabled data-act=\"move\" data-entry=\"s1\" data-dir=\"down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"ph-ract x\" data-act=\"remove\" data-entry=\"s1\" aria-label=\"Remove\">&#10005;</button></span></div></div><div class=\"ph-qtab-panel\" data-tab=\"coming-up\" role=\"tabpanel\"><div class=\"ph-ends\">&#9209; Source ends — nothing plays after the last clip (repeat is off)</div></div>");
+  });
+
+  it('companion: empty/absent snapshot renders a stable all-empty shell', () => {
+    expect(companionHomeMoviesQueueHtml(null)).toBe("<div class=\"ph-qtab-bar\" role=\"tablist\"><button type=\"button\" class=\"ph-qtab active\" data-act=\"tab\" data-tab=\"queue\" role=\"tab\">Queue 0</button><button type=\"button\" class=\"ph-qtab\" data-act=\"tab\" data-tab=\"next\" role=\"tab\">Next 0</button><button type=\"button\" class=\"ph-qtab\" data-act=\"tab\" data-tab=\"coming-up\" role=\"tab\">Coming Up 0</button></div><div class=\"ph-qtab-panel active\" data-tab=\"queue\" role=\"tabpanel\"><div class=\"ph-qempty\">Nothing queued — add clips with ＋</div></div><div class=\"ph-qtab-panel\" data-tab=\"next\" role=\"tabpanel\"><div class=\"ph-qempty\">Nothing up next</div></div><div class=\"ph-qtab-panel\" data-tab=\"coming-up\" role=\"tabpanel\"><div class=\"ph-ends\">&#9209; Source ends — nothing plays after the last clip (repeat is off)</div></div>");
   });
 });
 
