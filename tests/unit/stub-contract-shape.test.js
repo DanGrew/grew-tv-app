@@ -111,7 +111,8 @@ describe.skipIf(!HAS_CONTRACT)('stub ⇄ backend contract shape (SYS-017 / TASK-
         contractOnly: {
           artist: 'backend sends artist:null on video cards; stub omits it',
           itemType: 'backend classifier; app is type-agnostic, never reads itemType',
-          subtitles: 'backend echoes subtitles on the card; stub keeps it on the video record only'
+          subtitles: 'backend echoes subtitles on the card; stub keeps it on the video record only',
+          tags: 'backend tags map; stub films-section video card omits it (home-movie video cards already carry it)'
         }
       });
     });
