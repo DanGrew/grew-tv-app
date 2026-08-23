@@ -1037,9 +1037,255 @@ async function installMusicVideoPlaybackBackend(page) {
   return { seed: seed, snapshot: snapshot };
 }
 
+// TASK-498/FEAT-497 — a fixture simulation of the UNIFIED queue engine
+// (media-manager/db/queue_engine.py + api/queue_playback.py), the twin of
+// installVideoPlaybackBackend's ENGINE table above but over THAT engine's own
+// action/snapshot shape: play-source / play-item / queue-item / next /
+// previous / toggle-shuffle / toggle-repeat / remove-queue-entry /
+// move-queue-entry, and a snapshot of { now_playing, queue, next, coming_up,
+// shuffle, repeat, source_type, source_id }. Parameterized by `mediaType` —
+// TASK-499 only ever installs it for 'home-movie', the first cutover; a
+// later media type's own cutover reuses this unchanged. Deliberately does
+// NOT reproduce the real engine's fair shuffle (mirrors
+// installMusicVideoPlaybackBackend's own `state.shuffle` simplification
+// above) — real shuffle order is proven server-side (grew-tv's own pytest
+// suite), not re-proven here.
+async function installQueuePlaybackBackend(page, mediaType) {
+  var state = {
+    sourceType: null, sourceId: null,
+    currentPermutation: [], nextPermutation: [], sourcePosition: 0,
+    currentItemId: null, currentEntryId: null,
+    overrideQueue: [], shuffle: false, repeat: true
+  };
+  var live = null;
+  var ORDER_BY_SOURCE_TYPE = {
+    'home-movies-all': function() { return HOME_MOVIES_ALL_IDS; },
+    'home-movies-by-person': function() { return HOME_MOVIES_BY_PERSON_IDS[state.sourceId] || []; },
+    'home-movie-month': function() { return HOME_MOVIES_BY_MONTH_IDS[state.sourceId] || []; }
+  };
+  function order() { return (ORDER_BY_SOURCE_TYPE[state.sourceType] || function() { return []; })(); }
+  function resolve(id) {
+    var v = VIDEOS[id] || { id: id };
+    return { item_id: id, title: v.title, poster: v.poster, duration: v.duration, subtitles: v.subtitles, ext: v.ext, type: v.type, itemType: v.itemType };
+  }
+  function resolveEntries(entries) {
+    return entries.map(function(e) { var m = resolve(e.item_id); m.entry_id = e.entry_id; return m; });
+  }
+  function maxSeq() {
+    var m = 0;
+    [state.overrideQueue, state.currentPermutation, state.nextPermutation].forEach(function(list) {
+      list.forEach(function(e) {
+        var n = parseInt(String(e.entry_id).slice(1), 10);
+        if (n > m) m = n;
+      });
+    });
+    return m;
+  }
+  function materialize(itemIds, startSeq) {
+    var seq = startSeq;
+    return itemIds.map(function(iid) { seq += 1; return { entry_id: 'e' + seq, item_id: iid }; });
+  }
+  function findIndexByEntry(list, entryId) {
+    for (var i = 0; i < list.length; i++) { if (list[i].entry_id === entryId) return i; }
+    return -1;
+  }
+
+  function snapshot() {
+    var nowId = state.currentItemId;
+    var cur = state.currentPermutation;
+    var pos = state.sourcePosition;
+    var pending = state.overrideQueue.slice();
+    if (pending.length && state.currentEntryId && pending[0].entry_id === state.currentEntryId) pending = pending.slice(1);
+    return {
+      person_id: 'kids', media_type: mediaType,
+      now_playing: nowId ? resolve(nowId) : null,
+      queue: resolveEntries(pending),
+      next: resolveEntries(cur.slice(pos + 1)),
+      coming_up: state.repeat ? resolveEntries(state.nextPermutation) : [],
+      shuffle: state.shuffle, repeat: state.repeat,
+      source_type: state.sourceType, source_id: state.sourceId
+    };
+  }
+  function push() {
+    [live].filter(Boolean).forEach(function(ws) { ws.send(JSON.stringify({ type: 'queue_playback', payload: snapshot() })); });
+  }
+
+  // remove/move share the same two-list search (override queue, then the
+  // current permutation) and the same reanchor-on-edit-of-current rule —
+  // mirrors queue_engine.py's remove_queue_entry/move_queue_entry closely
+  // enough to exercise the app's own d-pad grid + repaint, not to re-prove
+  // the engine's own reanchoring math (grew-tv's pytest suite does that).
+  function reanchorAfterEdit(oldEntryId) {
+    var idx = findIndexByEntry(state.currentPermutation, oldEntryId);
+    if (idx > -1) { state.sourcePosition = idx; return; }
+    state.sourcePosition = state.currentPermutation.length ? Math.min(state.sourcePosition, state.currentPermutation.length - 1) : 0;
+  }
+  function currentSourceEntryId() {
+    var e = state.currentPermutation[state.sourcePosition];
+    return e ? e.entry_id : null;
+  }
+
+  var ENGINE = {
+    'play-source': function(b) {
+      if (state.sourceType === b.source_type && state.sourceId === b.source_id && state.currentPermutation.length) return;
+      state.sourceType = b.source_type;
+      state.sourceId = b.source_id === undefined ? null : b.source_id;
+      var startSeq = maxSeq();
+      var newBase = order();
+      state.currentPermutation = materialize(newBase, startSeq);
+      state.nextPermutation = materialize(newBase, startSeq + newBase.length);
+      state.sourcePosition = 0;
+      state.currentItemId = state.currentPermutation.length ? state.currentPermutation[0].item_id : null;
+      state.currentEntryId = null;
+      // The API layer resolves shuffle/repeat from the per-source pref before
+      // calling play-source (default shuffle off, repeat on) — this fixture's
+      // client, like the real app, sends neither on play-source.
+      state.shuffle = false;
+      state.repeat = true;
+    },
+    'play-item': function(b) {
+      state.currentItemId = b.item_id;
+      state.currentEntryId = null;
+      var idx = -1;
+      state.currentPermutation.forEach(function(e, i) { if (e.item_id === b.item_id) idx = i; });
+      if (idx > -1) state.sourcePosition = idx;
+    },
+    'queue-item': function(b) {
+      state.overrideQueue = state.overrideQueue.concat([{ entry_id: 'e' + (maxSeq() + 1), item_id: b.item_id }]);
+    },
+    'next': function() {
+      var oq = state.overrideQueue;
+      if (oq.length && state.currentEntryId && oq[0].entry_id === state.currentEntryId) oq = oq.slice(1);
+      state.overrideQueue = oq;
+      if (oq.length) {
+        state.currentItemId = oq[0].item_id;
+        state.currentEntryId = oq[0].entry_id;
+        return;
+      }
+      var cur = state.currentPermutation;
+      var pos = state.sourcePosition + 1;
+      if (pos < cur.length) {
+        state.sourcePosition = pos;
+        state.currentItemId = cur[pos].item_id;
+        state.currentEntryId = null;
+        return;
+      }
+      if (!state.repeat) {
+        state.sourcePosition = pos;
+        state.currentItemId = null;
+        state.currentEntryId = null;
+        return;
+      }
+      var promoted = state.nextPermutation;
+      state.currentPermutation = promoted;
+      state.nextPermutation = materialize(order(), maxSeq());
+      state.sourcePosition = 0;
+      state.currentItemId = promoted.length ? promoted[0].item_id : null;
+      state.currentEntryId = null;
+    },
+    'previous': function() {
+      var cur = state.currentPermutation;
+      if (state.currentEntryId) {
+        state.currentEntryId = null;
+        var pos = cur.length ? Math.min(state.sourcePosition, cur.length - 1) : state.sourcePosition;
+        state.sourcePosition = pos;
+        state.currentItemId = (pos >= 0 && pos < cur.length) ? cur[pos].item_id : null;
+        return;
+      }
+      if (state.sourcePosition <= 0) return;
+      state.sourcePosition -= 1;
+      state.currentItemId = cur[state.sourcePosition].item_id;
+      state.currentEntryId = null;
+    },
+    'toggle-shuffle': function() {
+      state.shuffle = !state.shuffle;
+      var base = order();
+      state.currentPermutation = materialize(base, 0);
+      state.nextPermutation = materialize(base, base.length);
+      if (state.shuffle) {
+        state.sourcePosition = -1;
+      } else {
+        var idx = -1;
+        state.currentPermutation.forEach(function(e, i) { if (e.item_id === state.currentItemId) idx = i; });
+        state.sourcePosition = idx > -1 ? idx : 0;
+      }
+      state.currentEntryId = null;
+    },
+    'toggle-repeat': function() { state.repeat = !state.repeat; },
+    'remove-queue-entry': function(b) {
+      if (state.currentEntryId === b.entry_id) state.currentEntryId = null;
+      var oqIdx = findIndexByEntry(state.overrideQueue, b.entry_id);
+      if (oqIdx > -1) { state.overrideQueue = state.overrideQueue.filter(function(e) { return e.entry_id !== b.entry_id; }); return; }
+      var curIdx = findIndexByEntry(state.currentPermutation, b.entry_id);
+      if (curIdx > -1) {
+        var was = currentSourceEntryId();
+        state.currentPermutation = state.currentPermutation.filter(function(e) { return e.entry_id !== b.entry_id; });
+        reanchorAfterEdit(was);
+      }
+    },
+    'move-queue-entry': function(b) {
+      var delta = b.direction === 'up' ? -1 : 1;
+      var oqIdx = findIndexByEntry(state.overrideQueue, b.entry_id);
+      if (oqIdx > -1) {
+        var j = oqIdx + delta;
+        if (j >= 0 && j < state.overrideQueue.length) {
+          var tmp = state.overrideQueue[oqIdx]; state.overrideQueue[oqIdx] = state.overrideQueue[j]; state.overrideQueue[j] = tmp;
+        }
+        return;
+      }
+      var curIdx = findIndexByEntry(state.currentPermutation, b.entry_id);
+      if (curIdx > -1) {
+        var k = curIdx + delta;
+        if (k >= 0 && k < state.currentPermutation.length) {
+          var was = currentSourceEntryId();
+          var t = state.currentPermutation[curIdx]; state.currentPermutation[curIdx] = state.currentPermutation[k]; state.currentPermutation[k] = t;
+          reanchorAfterEdit(was);
+        }
+      }
+    }
+  };
+
+  var routeAction = '/api/queue/' + mediaType + '/';
+  var routeGet = new RegExp('/api/queue/' + mediaType + '\\?');
+
+  await page.routeWebSocket(/:8766/, function(ws) {
+    live = ws;
+    [state.sourceType].filter(Boolean).forEach(push);
+    ws.onMessage(function(raw) {
+      var m = JSON.parse(raw);
+      var REPLY = {
+        list_devices: function() { ws.send(JSON.stringify({ type: 'devices', payload: { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] } })); },
+        activate_person: function() {
+          [m.payload.person_id].filter(Boolean).forEach(function(pid) {
+            ws.send(JSON.stringify({ type: 'person_active', payload: { person_id: pid, device_id: m.payload.device_id } }));
+          });
+        },
+        register_companion: function() {},
+        snapshot_request: function() {
+          ws.send(JSON.stringify({ type: 'app_state', payload: { person: 'kids', profile: 'kids', screen: 'player' } }));
+          push();
+        }
+      };
+      [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
+    });
+  });
+  await page.route(routeGet, function(route) {
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(snapshot()) });
+  });
+  await page.route('**' + routeAction + '*', function(route) {
+    var action = decodeURIComponent(route.request().url().split(routeAction)[1].split('?')[0]);
+    var body = JSON.parse(route.request().postData() || '{}');
+    [ENGINE[action]].filter(Boolean).forEach(function(fn) { fn(body); });
+    route.fulfill({ status: 204, body: '' });
+    push();
+  });
+  function seed(action, body) { [ENGINE[action]].filter(Boolean).forEach(function(fn) { fn(body || {}); }); }
+  return { seed: seed, snapshot: snapshot };
+}
+
 module.exports = {
   VIDEOS, SERIES, ALBUMS, TRACKS, EPISODES, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, MUSIC_VIDEO_CARDS, BROWSE, CONFIG, nextOf,
-  installApi, installPlaybackBackend, installVideoPlaybackBackend, installMusicVideoPlaybackBackend,
+  installApi, installPlaybackBackend, installVideoPlaybackBackend, installMusicVideoPlaybackBackend, installQueuePlaybackBackend,
   // TASK-326: pure response builders + the CW row builder, so the stub<->contract
   // shape test can exercise the exact objects the routes above emit.
   browseResponse, videoResponse, albumResponse, playlistResponse, continueWatchingResponse, midWatchRows

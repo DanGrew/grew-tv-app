@@ -17,9 +17,10 @@ var UPNEXT_SECS  = 5;            // autoplay "Up next" countdown
 var BACKEND_SAVE_MS = 5000;
 var STALL_RECOVERY_MS = 6000;   // BUG-429: waiting -> canplay/playing longer than this reloads
 
-// Transport focus order; CC/mv-shuffle/mv-repeat are skipped while hidden (no
-// .vtt for this video / not a multi-item music-video playthrough, TASK-407).
-var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-mv-shuffle', 'btn-mv-repeat', 'btn-jump', 'btn-cc', 'btn-queue', 'btn-reset'];
+// Transport focus order; CC/mv-shuffle/mv-repeat/hm-shuffle/hm-repeat are
+// skipped while hidden (no .vtt for this video / not a multi-item
+// music-video playthrough, TASK-407 / not home-movie mode, TASK-499).
+var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-mv-shuffle', 'btn-mv-repeat', 'btn-hm-shuffle', 'btn-hm-repeat', 'btn-jump', 'btn-cc', 'btn-queue', 'btn-reset'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 var CC_MODE       = { 'true': 'showing', 'false': 'hidden' };
 // App-side log (TASK-213): a fresh start logs `play`, a start from a saved

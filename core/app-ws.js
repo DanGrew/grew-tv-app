@@ -97,6 +97,13 @@ export function connectApp(serverOrigin, onIntent, opts) {
       music_video_playback: function() {
         [o.onMusicVideoPlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
       },
+      // TASK-498/FEAT-497: the server-authoritative UNIFIED queue `playback`
+      // snapshot, on its OWN channel — covers every media type cut over onto
+      // it (TASK-499 on), tagged with `media_type` so a client filters to
+      // what it is displaying. Replayed on reconnect like the other three.
+      queue_playback: function() {
+        [o.onQueuePlayback].filter(Boolean).forEach(function(fn) { fn(msg.payload); });
+      },
       deactivated: function() {
         [o.onDeactivated].filter(Boolean).concat([defaultDeactivated])[0](msg.payload);
       },

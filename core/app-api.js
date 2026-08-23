@@ -99,6 +99,33 @@ export function loadVideoPlayback(serverUrl, person) {
   return getJson(serverUrl + '/api/video-playback?person=' + encodeURIComponent(person || ''));
 }
 
+// TASK-498/FEAT-497: server-authoritative UNIFIED queue playback, the shared
+// twin of playbackAction/videoPlaybackAction/musicVideoPlaybackAction —
+// covers all four media types ('film'/'music'/'music-video'/'home-movie')
+// through ONE endpoint family instead of one per type. Posts an action to
+// /api/queue/{media_type}/{action} (play-source / play-item / play-standalone /
+// queue-item / next / previous / toggle-shuffle / toggle-repeat /
+// remove-queue-entry / move-queue-entry); the server applies the pure queue
+// engine transition, persists the per-(person, media_type) state, and
+// broadcasts the resolved snapshot over its own `queue_playback` relay
+// channel (tagged with `media_type` so a client can tell its media types
+// apart). Contract: 204 accept / 400 bad input / never 500.
+export function queuePlaybackAction(serverUrl, mediaType, action, person, body) {
+  return fetch(serverUrl + '/api/queue/' + encodeURIComponent(mediaType) + '/' + encodeURIComponent(action) + '?person=' + encodeURIComponent(person || ''), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
+  });
+}
+
+// Read-only UNIFIED queue snapshot for a person + media type — the twin of
+// loadVideoPlayback/loadMusicVideoPlayback, backed by queue_playback.py's GET
+// route. Lets a non-player screen read the queue, and backs the BUG-439
+// activate-person resync the same way the other three engines' own GETs do.
+export function loadQueuePlayback(serverUrl, mediaType, person) {
+  return getJson(serverUrl + '/api/queue/' + encodeURIComponent(mediaType) + '?person=' + encodeURIComponent(person || ''));
+}
+
 // FEAT-040/TASK-255 (music Play Queue): read-only MUSIC playback snapshot for a
 // person — the twin of loadVideoPlayback, backed by the TASK-254 GET route. Lets a
 // non-player screen (browse) read the music override ("Play Next") queue to offer a
