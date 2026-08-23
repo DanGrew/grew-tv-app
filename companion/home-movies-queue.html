@@ -27,6 +27,14 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .back { align-self: flex-start; flex-shrink: 0; background: none; border: 2px solid transparent; border-radius: var(--radius-sm); color: var(--text); font-size: 16px; line-height: 1.4; font-family: inherit; padding: 6px 8px; cursor: pointer; touch-action: manipulation; }
 .back:active { color: var(--focus); }
 .back:focus { outline: 1px solid var(--focus); }
+/* TASK-516 — the crumb the shell renders (core/queue-crumb.js): the existing
+   back button, then an inert "› Queue" leaf, so the phone reads
+   "‹ Now Playing › Queue" as docs/QUEUE-UX-SHELL.md specifies. The leaf is
+   muted, the way the TV's own .crumb-current already is. */
+.ph-crumb { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.ph-crumb .back { align-self: auto; }
+.ph-crumb-sep { color: var(--text-muted); font-size: 16px; }
+.ph-crumb-current { color: var(--text-muted); font-size: 16px; line-height: 1.4; padding: 6px 8px; }
 #queue-body { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
 
 .qs-ph-hero { display: flex; flex-direction: column; gap: 10px; }
@@ -40,6 +48,9 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .qs-tbtn { border-radius: 50%; border: 2px solid var(--border); background: var(--surface); color: var(--text); display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .qs-tbtn:active, .qs-tbtn:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .qs-tbtn.on { border-color: var(--focus); background: var(--focus); color: #16213e; }
+/* TASK-516 — a transport control with nothing to act on stays VISIBLE and
+   dimmed, never hidden (docs/QUEUE-UX-SHELL.md's Hero section). */
+.qs-tbtn.is-disabled { opacity: 0.32; pointer-events: none; }
 .qs-tbtn-sm { width: 36px; height: 36px; }
 .qs-tbtn-lg { width: 44px; height: 44px; font-size: 20px; }
 
@@ -48,7 +59,15 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .ph-qname:active, .ph-qname:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 .ph-qname .grip { width: 48px; height: 48px; border-radius: var(--radius-sm); background: var(--surface-hi); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 22px; flex-shrink: 0; overflow: hidden; }
 .ph-qname .grip .poster-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
-.ph-qname .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* TASK-516 — a row is a title over a muted second line on BOTH surfaces
+   (docs/QUEUE-UX-SHELL.md's Rows section); the phone carried only a title. */
+.ph-qname .nm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ph-qname .nm .qs-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-qname .nm .qs-sub { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Coming Up is read-only, and now reads that way — the phone emitted no
+   read-only class at all, so its rows looked editable but simply had no
+   buttons. Matches the TV's own .qs-row.qs-readonly dimming. */
+.ph-qrow.ph-readonly { opacity: 0.6; }
 .acts { display: flex; gap: 6px; flex-shrink: 0; }
 .ph-ract { width: 34px; height: 34px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 14px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .ph-ract:active, .ph-ract:focus { outline: none; border-color: var(--focus); color: var(--focus); }
@@ -94,11 +113,12 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 <div id="topbar-actions">
   <div id="status-menu-mount"></div>
 </div>
-<button id="btn-back" class="back" aria-label="Back to player">‹ Now Playing</button>
+<div id="queue-crumb"></div>
 <div id="queue-body"></div>
 <script type="module">
-import { initPage } from '../ui/screens/companion-home-movies-queue.js';
-initPage();
+import { initQueueShellPage } from '../ui/screens/companion-queue-shell.js';
+import { HOME_MOVIE } from '../core/queue-shell-config.js';
+initQueueShellPage({ media: HOME_MOVIE, contextPage: 'video' });
 </script>
 </body>
 </html>

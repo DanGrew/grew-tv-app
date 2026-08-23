@@ -1,9 +1,11 @@
 // TASK-503 (FEAT-497) — Films (standalone film / boxset / series) cut over
 // onto the docs/QUEUE-UX-SHELL.md shell, the second media type on the
-// TASK-498 unified queue engine (TASK-499 was the first, home movies). Same
-// shape as core/home-movies-queue-view.js: PURE, turns the `queue_playback`
-// snapshot into the hero + Queue/Next/Coming-Up markup both surfaces mount —
-// no client-side queue math.
+// TASK-498 unified queue engine (TASK-499 was the first, home movies). PURE:
+// turns the `queue_playback` snapshot into the hero + Queue/Next/Coming-Up
+// markup both surfaces mount — no client-side queue math.
+//
+// ⚠️ Superseded by core/queue-shell-view.js, which home movies already run on
+// (TASK-516); TASK-517 points films there too and deletes this file.
 //
 // Differs from home movies in two ways the engine snapshot alone can't
 // resolve:
@@ -37,7 +39,7 @@ function durationText(secs) {
 }
 
 // Poster artwork: a bare content name served same-origin by media-manager's
-// /media/ route (mirrors core/home-movies-queue-view.js's artHtml). A
+// /media/ route (mirrors core/queue-shell-view.js's artHtml). A
 // missing/abortive poster hides the <img> (onerror), falling back to the glyph.
 function artHtml(poster, cls, glyph) {
   return [poster].filter(Boolean)

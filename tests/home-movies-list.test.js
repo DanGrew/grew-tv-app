@@ -92,6 +92,22 @@ test('tapping a row in a month-scoped list plays that specific clip via item_id'
   expect(JSON.parse((await playItem).postData())).toEqual({ item_id: 'beach-day' });
 });
 
+// TASK-516 — the per-clip ＋ Queue control, on the SAME unified engine the
+// player reads. It posted to the old video-playback queue, which nothing has
+// read since TASK-499, so queueing a clip from here did nothing at all.
+test('＋ Queue appends the clip to the unified home-movie queue', async ({ page }) => {
+  await enterList(page, 'play-all:All');
+  const queued = page.waitForRequest(function(req) {
+    return req.url().includes('/api/queue/home-movie/queue-item') && req.method() === 'POST';
+  });
+  await page.locator('.detail-row[data-id="beach-day"] .detail-queue').click();
+  const req = await queued;
+  expect(req.url()).toContain('person=kids');
+  expect(JSON.parse(req.postData())).toEqual({ item_id: 'beach-day' });
+  await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
+  await expect(page).toHaveURL(/home-movies-list\.html/);   // did NOT open the player
+});
+
 test('Back from the list returns to the Home Movies tab', async ({ page }) => {
   await enterList(page, 'play-all:All');
   await page.keyboard.press('Backspace');

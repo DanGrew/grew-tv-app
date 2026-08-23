@@ -32,7 +32,10 @@ test('film tiles carry a ＋ Queue badge; series tiles do not', async ({ page })
 // TASK-503: a film ＋Queue POSTs to the TASK-498 unified queue engine
 // (/api/queue/film/queue-item), not the old video-playback engine — a film
 // player never reads that old engine's queue once cut over, so queueing there
-// silently queued to nothing.
+// silently queued to nothing. TASK-516 — the confirmation is the media type's
+// own wording from core/queue-shell-config.js: a film is APPENDED to the
+// unified queue, so "Added to Queue"; a music video still means play-next on
+// its own engine, and still says so.
 test('tapping ＋ queues the film (POST /api/queue/film/queue-item) without opening the player', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
@@ -44,8 +47,33 @@ test('tapping ＋ queues the film (POST /api/queue/film/queue-item) without open
   const req = await queued;
   expect(req.url()).toContain('person=kids');
   expect(JSON.parse(req.postData())).toEqual({ item_id: 'finding-nemo-main' });
-  await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
+  await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
   await expect(page).toHaveURL(/browse\.html/);          // did NOT open the player
+});
+
+// TASK-516 — the home-movie twin of the film test above, and the gap the
+// whole task exists to close: a clip's ＋ posted to the old video-playback
+// queue, which the home-movie player has not read since TASK-499, so nothing
+// arrived anywhere. It now appends to the same unified engine the player
+// reads, and says so.
+test('tapping ＋ on a home-movie tile appends the clip to the unified home-movie queue', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  let oldEngineHit = false;
+  await page.route('**/api/video-playback/queue-video*', function(route) { oldEngineHit = true; return route.fulfill({ status: 204, body: '' }); });
+  await page.route('**/api/queue/home-movie/queue-item**', route => route.fulfill({ status: 204, body: '' }));
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
+  await expect(page.locator('.film-tile[data-id="beach-day"] .tile-queue')).toBeVisible();
+  const queued = page.waitForRequest(req =>
+    req.url().includes('/api/queue/home-movie/queue-item') && req.method() === 'POST');
+  await page.locator('.film-tile[data-id="beach-day"] .tile-queue').click();
+  const req = await queued;
+  expect(req.url()).toContain('person=kids');
+  expect(JSON.parse(req.postData())).toEqual({ item_id: 'beach-day' });
+  await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
+  await expect(page).toHaveURL(/browse\.html/);          // did NOT open the player
+  expect(oldEngineHit).toBe(false);
 });
 
 test('tapping the film tile body (not the ＋) opens the player', async ({ page }) => {
@@ -208,7 +236,22 @@ test('rail-grid film tiles also carry the ＋ badge and queue to the film engine
     req.url().includes('/api/queue/film/queue-item') && req.method() === 'POST');
   await page.locator('.film-tile[data-id="finding-nemo-main"] .tile-queue').click();
   expect(JSON.parse((await queued).postData())).toEqual({ item_id: 'finding-nemo-main' });
-  await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
+  await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
+});
+
+// TASK-516 — the drill-down badge is the fifth ＋Queue affordance a clip has,
+// and it reaches the same engine as the other four.
+test('rail-grid home-movie tiles also carry the ＋ badge and queue to the unified engine', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await page.route('**/api/queue/home-movie/queue-item**', route => route.fulfill({ status: 204, body: '' }));
+  await page.goto('/app/homeview/rail-grid.html?section=home-movies&rail=person:millie&profile=kids&person=kids');
+  await expect(page.locator('.film-tile[data-id="beach-day"] .tile-queue')).toBeVisible();
+  const queued = page.waitForRequest(req =>
+    req.url().includes('/api/queue/home-movie/queue-item') && req.method() === 'POST');
+  await page.locator('.film-tile[data-id="beach-day"] .tile-queue').click();
+  expect(JSON.parse((await queued).postData())).toEqual({ item_id: 'beach-day' });
+  await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
 });
 
 // TASK-421 — an artist's music-video rail-grid ("See all" on the QOTSA rail)

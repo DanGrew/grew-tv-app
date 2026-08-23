@@ -22,9 +22,11 @@ import { queueCrumbHtml } from '../../core/queue-crumb.js';
 // shows correctly once screen-video-page.js re-applies the snapshot.
 //
 // d-pad focus is a 2-D grid over the rows: Up/Down between rows, Left/Right
-// between a row's cells; Enter fires the focused cell; Back closes. Mirrors
-// screen-home-movies-queue.js exactly; every fn stays cyclomatic-1 per the
-// UI gate.
+// between a row's cells; Enter fires the focused cell; Back closes. Every fn
+// stays cyclomatic-1 per the UI gate.
+//
+// ⚠️ Superseded by screen-queue-shell.js, which home movies already run on
+// (TASK-516); TASK-517 points films there too and deletes this file.
 export function setupFilmQueue(config) {
   var root     = config.root;          // #queue-overlay (display toggled by .open)
   var body     = config.body;          // inner container we own the innerHTML of
