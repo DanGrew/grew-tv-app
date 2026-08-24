@@ -67,7 +67,7 @@ export function queueCount(snapshot) {
 
 // The active source's id, or null when there is no source at all
 // (source_type unset — a standalone film/single item). TASK-503 — a
-// companion Queue View page (screen-film-queue.js's own hero) uses this to
+// companion Queue View page (the shell's hero) uses this to
 // know WHICH source id its own title lookup needs, without duplicating the
 // "no source_type -> no source_id" rule inline (a pure fn, so it belongs
 // here, not in the ui/** consumer).
