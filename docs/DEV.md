@@ -85,14 +85,15 @@ draft-PR / never-merge / commit-push-PR-autonomously, wait-for-merge,
 present-PRs — live in **claude-workflow** → `docs/WAYS.md` (via the grew-tv
 entry `CLAUDE.md`, `claude-config/grew-product-dir grew-tv`). grew-tv-app specifics:
 
-- **Fresh worktree has no `node_modules`** — run `npm ci` in the worktree before
-  any gate run. A symlink to the primary's looks cheaper but has bitten twice
-  (TASK-517): worktrees live in `grew-tv-app-worktrees/<name>/`, NOT beside the
-  primary, so the `../grew-tv-app/node_modules` relative path silently resolves
-  to nothing, and the primary's own `node_modules` is often empty (it never runs
-  the gates — worktrees do). Symlink only after checking the target exists and is
-  populated, at an absolute path. `.gitignore` lists `node_modules` (NO trailing
-  slash) so either shape is ignored and `git add -A` won't commit it — no manual
+- **Fresh worktree has no `node_modules`** — run `npm ci` in the worktree for
+  gate runs. Symlinking the primary's
+  (`ln -s /Users/dan/dan-grew-repos/grew-tv-app/node_modules node_modules`)
+  works only while the primary actually has one installed — it often does not,
+  since the primary never runs the gates and worktrees do — and the path must be
+  absolute: a worktree under `grew-tv-app-worktrees/` sits a level deeper, so a
+  `../grew-tv-app/...` relative link dangles. Both halves have now bitten a
+  session (TASK-502, TASK-517). `.gitignore` lists `node_modules` (NO trailing
+  slash) so either form is ignored and `git add -A` won't commit it — no manual
   `rm` step needed.
 - **Deploy:** no GitHub Pages. The app ships by updating the clone media-manager
   serves from (`--app-dir`, `~/grew-tv/repos/grew-tv-app` on the Mini) — pull
