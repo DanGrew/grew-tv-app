@@ -29,6 +29,33 @@ export function isSwap(loadedId, snapshot) {
   return np.item_id !== loadedId;
 }
 
+// BUG-521 — true when the entry-time RESYNC answer must be discarded.
+//
+// video.html runs two independent async chains on entry: the play POST for the
+// item in ?video=, and the BUG-439 recovery GET fired once activate_person
+// confirms. That GET exists for ONE job — recover a push the server dropped
+// while this person was still unbound — so it is a fallback, never an override.
+// Its answer is untrustworthy in a way a WS push never is: issued before the
+// server applied our POST, it describes the PREVIOUS item, and applied on top
+// of the correct one it swaps the player back to whatever was selected last
+// time. Both orderings of that race are covered here:
+//
+//   * something is already loaded -> a push DID land, so the recovery has
+//     nothing to recover; a disagreeing answer is simply the older one.
+//   * nothing loaded yet, but the answer names an item other than the one this
+//     page was opened for -> it predates our POST.
+//
+// `pendingId` null (Play All, ?playQueue — the engine picks the item, we did
+// not) means only the first rule applies. A snapshot with no now_playing is
+// never stale: it carries queue and transport state the page still wants.
+export function isStaleResync(pendingId, loadedId, snapshot) {
+  var np = nowPlaying(snapshot);
+  if (loadedId) return true;
+  if (!pendingId) return false;
+  if (!np) return false;
+  return np.item_id !== pendingId;
+}
+
 // The item that plays after the current one: the Queue's front wins (an
 // explicit pick plays ahead of the source), else the next item still ahead
 // in the current cycle (`next`), else the repeat-wrap preview (`coming_up`,
