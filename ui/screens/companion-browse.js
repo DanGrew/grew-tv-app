@@ -1,8 +1,8 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadContinueWatching, loadVideoPlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadQueuePlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
 import { queueAdd, queueAddStatus, SECTION_MEDIA_TYPE } from '../../core/queue-shell-config.js';
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
-import { queueCount } from '../../core/video-player-router.js';
+import { queueCount } from '../../core/queue-playback-router.js';
 import { playNextCount } from '../../core/queue-view.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
@@ -160,11 +160,12 @@ export function initPage() {
   // TV. A home movie now reaches the TASK-498 unified engine its own player
   // reads, instead of the old video-playback queue nothing has read since
   // TASK-499 — queueing a clip from here did nothing at all. The confirmation
-  // is the config's own per-type wording. The 🎬 pill counts that old video
-  // queue, which no ＋ here feeds any more, so there is nothing to refresh.
+  // is the config's own per-type wording. TASK-517 — the 🎬 pill counts the
+  // film queue this feeds again, so a press refreshes it (the TV mirror does
+  // the same); another media type just re-reads an unmoved count.
   function queueCard(mediaType, id) {
     queueAdd(server, mediaType, state.person, id)
-      .then(function() { showQueueStatus(queueAddStatus(mediaType)); })
+      .then(function() { showQueueStatus(queueAddStatus(mediaType)); refreshQueue(); })
       .catch(noop);
   }
 
@@ -174,6 +175,9 @@ export function initPage() {
   // don't have to open a random video to reach the queue. The
   // count is read from the read-only GET snapshot (refreshed on person-load + after
   // queueing here). It drives the TV, so it greys while desynced (Browse).
+  // TASK-517 — that snapshot is the FILM queue on the unified engine now (the
+  // TV mirror's own move): the same queue every ＋ here fills, instead of the
+  // old video engine's, which nothing has added to since TASK-503.
   function showPlayQueue(count) {
     var btn = document.getElementById('btn-play-queue');
     btn.textContent = '🎬 (' + count + ')';
@@ -181,7 +185,7 @@ export function initPage() {
   }
   function refreshQueue() {
     [state.person].filter(Boolean).forEach(function(p) {
-      loadVideoPlayback(server, p).then(function(snap) { showPlayQueue(queueCount(snap)); }).catch(noop);
+      loadQueuePlayback(server, 'film', p).then(function(snap) { showPlayQueue(queueCount(snap)); }).catch(noop);
     });
   }
   function onPlayQueue() {

@@ -339,20 +339,26 @@ export function initPage() {
   };
   // TASK-503 — Shuffle/Repeat are ALWAYS shown for a film too (never hidden,
   // QUEUE-UX-SHELL.md's Hero section) but, unlike home movies, disabled-but-
-  // visible when there is nothing to shuffle/repeat: a standalone film has no
-  // source at all (payload.filmHasSource false), unlike a series/boxset. ⏮/⏭
-  // gate on the SAME signal — mirrors the TV's own fmSetTransportOn/
-  // player.setSeriesMode(!!snap.source_type) so neither surface can disagree.
+  // visible when there is nothing to act on. TASK-517 — WHICH controls are
+  // live is no longer re-derived here from a raw `filmHasSource`: the TV
+  // pushes the resolved `filmTransport` straight off the one rule both
+  // surfaces share (core/queue-shell-view.js transportState), so ⏭ lights up
+  // for a queued film behind a standalone one here exactly as it does on the
+  // TV row and in the Queue hero (BUG-510/512 — the three used to disagree).
   // Reuses the EXISTING `.single` opacity-dim class (applySeriesMode's own,
   // above) rather than a new one — the same "disabled but visible" look.
-  function applyFilmMode(on, hasSource) {
+  var FILM_TRANSPORT_DEFAULT = { previous: false, next: false, shuffle: false, repeat: false };
+  function applyFilmControl(el, enabled) {
+    el.classList.remove('hidden');
+    el.classList.toggle('single', !enabled);
+  }
+  function applyFilmMode(on, transport) {
+    var t = [transport].filter(Boolean).concat([FILM_TRANSPORT_DEFAULT])[0];
     [on].filter(Boolean).forEach(function() {
-      els.repeat.classList.remove('hidden');
-      els.shuffle.classList.remove('hidden');
-      els.repeat.classList.toggle('single', !hasSource);
-      els.shuffle.classList.toggle('single', !hasSource);
-      els.prev.classList.toggle('single', !hasSource);
-      els.next.classList.toggle('single', !hasSource);
+      applyFilmControl(els.repeat, t.repeat);
+      applyFilmControl(els.shuffle, t.shuffle);
+      applyFilmControl(els.prev, t.previous);
+      applyFilmControl(els.next, t.next);
     });
   }
   var SET_FILM_ON = {
@@ -372,7 +378,7 @@ export function initPage() {
     state.crumb.mvSource = [payload.musicVideoSource].filter(Boolean).concat([null])[0];
     applyMusicVideoMode(state.musicVideo, !!payload.musicVideoMulti);
     applyHomeMovieMode(state.homeMovie);
-    applyFilmMode(state.film, !!payload.filmHasSource);
+    applyFilmMode(state.film, payload.filmTransport);
     SET_MV_ON[state.musicVideo + ''](payload);
     SET_HM_ON[state.homeMovie + ''](payload);
     SET_FILM_ON[state.film + ''](payload);

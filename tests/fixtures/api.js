@@ -1180,6 +1180,15 @@ async function installQueuePlaybackBackend(page, mediaType) {
     'queue-item': function(b) {
       state.overrideQueue = state.overrideQueue.concat([{ entry_id: 'e' + (maxSeq() + 1), item_id: b.item_id }]);
     },
+    // TASK-517 — the browse "Play Queue" entry: the queue's front becomes the
+    // playing item as the DURABLE head (it stays queued, so re-entering the
+    // player replays it rather than consuming it), source untouched. Mirrors
+    // queue_engine.play_queue.
+    'play-queue': function() {
+      if (!state.overrideQueue.length) return;
+      state.currentItemId = state.overrideQueue[0].item_id;
+      state.currentEntryId = state.overrideQueue[0].entry_id;
+    },
     'next': function() {
       var oq = state.overrideQueue;
       if (oq.length && state.currentEntryId && oq[0].entry_id === state.currentEntryId) oq = oq.slice(1);

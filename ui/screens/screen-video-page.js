@@ -4,8 +4,8 @@ import { setup as setupPlayer } from './screen-video-player.js';
 import { setupVideoQueue } from './screen-video-queue.js';
 import { setupMusicVideoQueue } from './screen-music-video-queue.js';
 import { setupQueueShell } from './screen-queue-shell.js';
-import { HOME_MOVIE } from '../../core/queue-shell-config.js';
-import { setupFilmQueue } from './screen-film-queue.js';
+import { HOME_MOVIE, FILM } from '../../core/queue-shell-config.js';
+import { transportState } from '../../core/queue-shell-view.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadSeries, loadProgress, loadPlaylist, loadBrowse, loadVideoPlayback, loadMusicVideoPlayback, loadQueuePlayback, videoPlaybackAction, musicVideoPlaybackAction, queuePlaybackAction, addToPlaylist } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
@@ -29,21 +29,21 @@ import { mountBreadcrumb } from './breadcrumb.js';
 // FOUR server-authoritative rails share this page, picked once per load off
 // `engineMode` (mutually exclusive, never a live switch) and never crossed —
 // a rail's own actions, snapshot and Queue View stay entirely its own:
-//   'film'  — TASK-503: a SERIES/BOXSET/STANDALONE FILM, on the TASK-498
-//             unified queue engine (/api/queue/film) — the fm* functions
-//             below fire play-source/play-standalone/next/previous and
-//             render the `queue_playback` snapshot the backend pushes
+//   'film'  — TASK-503/517: a SERIES/BOXSET/STANDALONE FILM, and (TASK-517)
+//             the browse "Play Queue" entry too, on the TASK-498 unified
+//             queue engine (/api/queue/film) — the fm* functions below fire
+//             play-source/play-standalone/play-queue/next/previous and render
+//             the `queue_playback` snapshot the backend pushes
 //             (core/queue-playback-router.js, aliased qRouter, turns it into
 //             the view-model). A standalone film has no source at all
 //             (play-standalone clears it); a series/boxset always does.
-//   'video' — the OLD video engine (/api/video-playback, TASK-221/251) —
-//             now ONLY the browse "Play Queue" entry (`?playQueue`, no
-//             video/series param): the unified engine has no equivalent
-//             "pop the queue and play" action, so this one mode stays on the
-//             original engine (see the MODE_ENGINE comment below). The
-//             applySnapshot/swapVideo/advanceAuto functions below are this
-//             rail's own; core/video-player-router turns its snapshot into
-//             the view-model.
+//   'video' — the OLD video engine (/api/video-playback, TASK-221/251).
+//             TASK-517 moved its LAST mode (the browse "Play Queue" entry)
+//             onto the unified engine, so no `mode` resolves here any more:
+//             this rail — applySnapshot/swapVideo/advanceAuto,
+//             core/video-player-router.js, ui/screens/screen-video-queue.js —
+//             is unread, kept only until the old engines are retired
+//             wholesale (that waits on music + music videos, TASK-504/505).
 //   'hm'    — TASK-499: home movies, on the SAME TASK-498 unified queue
 //             engine as 'film' but its own media_type (/api/queue/home-movie).
 //   'mv'    — a MUSIC VIDEO (single pick, a music-video playlist, an
@@ -111,15 +111,15 @@ export function initVideoPage() {
   // TASK-503 (FEAT-497) — series/single (a standalone film, boxset or TV
   // series) are the SECOND media type cut over onto the TASK-498 unified
   // queue engine (/api/queue/film) — the video engine's own play-video/
-  // play-source stop being called for them. `queue` mode (the browse "Play
-  // Queue" tile, `?playQueue`) is EXPLICITLY left on the original video
-  // engine: it has no equivalent action there (queue_playback.py's action set
-  // has no "pop the queue and start playing" — only play-source/play-item/
-  // play-standalone), and the same gap already stands for browse/detail's own
-  // "＋ Queue" button on every media type cut over so far (TASK-499 left home
-  // movies' own list-page ＋ Queue on the old engine too) — a follow-up task's
-  // scope, not this one's. `queue` mode keeps engineMode 'video' so it is
-  // wired to the pre-TASK-503 code path below unchanged.
+  // play-source stop being called for them.
+  //
+  // TASK-517 — `queue` mode (the browse "Play Queue" tile, `?playQueue`) is
+  // the LAST film route to move: TASK-503 left it on the old video engine
+  // because the unified engine had no "pop the queue and start playing"
+  // action, so a film reached that way still showed the pre-FEAT-497 Queue.
+  // The engine has one now (queue_engine.play_queue — the co-deployed
+  // grew-tv half of this task), so `queue` resolves to engineMode 'film' like
+  // every other film route, and the Queue it opens is the same shell.
   //
   // Which rail this page load drives — resolved once off `mode` (mutually
   // exclusive per page load, never a live switch) and used to key every
@@ -128,7 +128,7 @@ export function initVideoPage() {
   var MODE_ENGINE = {
     mvPlaylist: 'mv', mvArtist: 'mv', mvItem: 'mv', mvAll: 'mv',
     homeMoviesAll: 'hm', homeMoviesPerson: 'hm', homeMoviesMonth: 'hm',
-    series: 'film', single: 'film', queue: 'video'
+    series: 'film', single: 'film', queue: 'film'
   };
   var engineMode = MODE_ENGINE[mode];
   var wsApp = null;
@@ -138,6 +138,7 @@ export function initVideoPage() {
   var loadedId = null;     // which item id is currently loaded in <video>
   var currentTitle = '';   // current item's title (for the breadcrumb leaf)
   var seriesTitle = null;  // cached series/boxset title — the top crumb AND (TASK-503) the film Queue View hero subtitle
+  var loadedSourceId = null;  // which source id seriesTitle was fetched for (TASK-517)
   var mvSnapshot = {};     // latest music_video_playback snapshot (music-video mode only)
   var hmSnapshot = {};     // latest queue_playback snapshot (home-movie mode only, TASK-499)
   var fmSnapshot = {};     // latest queue_playback snapshot (film mode only, TASK-503)
@@ -215,18 +216,32 @@ export function initVideoPage() {
   function mountCrumbs() {
     mountBreadcrumb('breadcrumb', CRUMBS_FOR[isMusicVideo + '']());
   }
-  // TASK-503 — seriesTitle also feeds the film Queue View hero's subtitle
-  // (core/film-queue-view.js); a re-render past the overlay's first paint
-  // picks up a title that resolves after that paint (screen-film-queue.js's
-  // own getSourceTitle() reads this same var live, but only on ITS next
-  // render — this nudges one the moment the fetch lands).
+  // TASK-503 — seriesTitle also feeds the Queue shell hero's source line; a
+  // re-render past the overlay's first paint picks up a title that resolves
+  // after that paint (screen-queue-shell.js's own getSourceTitle() reads this
+  // same var live, but only on ITS next render — this nudges one the moment
+  // the fetch lands).
   function refreshFilmQueueTitle() {
     [engineMode === 'film'].filter(Boolean).forEach(function() { queue.refreshSourceTitle(); });
   }
-  function ensureSeriesTitle() {
-    loadSeries(SERVER, seriesId)
+  function applySourceTitle(id) {
+    loadSeries(SERVER, id)
       .then(function(s) { seriesTitle = s.title; mountCrumbs(); refreshFilmQueueTitle(); })
       .catch(function() {});
+  }
+  // TASK-517 — keyed on the SOURCE the engine says is loaded, not on this
+  // page's own `series` param, so the "Play Queue" entry (which has no param
+  // at all, but can land on a person whose film source is still loaded) names
+  // its source in the hero like every other route. Fetched once per distinct
+  // id — series mode primes it eagerly at entry, and the snapshot's own
+  // source_id confirms or replaces it. A source-less standalone film clears
+  // it rather than fetching, mirroring the companion page's own resolution.
+  function ensureSourceTitle(id) {
+    [id !== loadedSourceId].filter(Boolean).forEach(function() {
+      loadedSourceId = id;
+      seriesTitle = null;
+      [id].filter(Boolean).forEach(applySourceTitle);
+    });
   }
 
   // ── OLD server `video_playback` snapshot -> UI ('video'/legacy queue mode
@@ -484,33 +499,40 @@ export function initVideoPage() {
   }
   function fmToggleShuffle() { sendFmAction('toggle-shuffle', {}); }
   function fmToggleRepeat() { sendFmAction('toggle-repeat', {}); }
-  // Shuffle/Repeat are ALWAYS shown for a film (QUEUE-UX-SHELL.md's Hero
-  // section — TASK-493 row 21, the Films-hides-Shuffle finding this fixes)
-  // but disabled-but-visible when there is nothing to shuffle/repeat: a
-  // standalone film has no source at all (play_standalone clears
-  // source_type), unlike a series/boxset, which always has one — gated on
-  // that alone, the same "has a source" signal the ⏮/⏭ transport row below
-  // already needs.
+  // The film transport, at the player screen's own control row — ONE rule
+  // with the Queue hero, which is the whole of BUG-510/512: both sites gated
+  // on `source_type` alone, so ⏭ read dead on a standalone film even with a
+  // film queued behind it, while the engine's own advance() would happily
+  // have played it. core/queue-shell-view.js's transportState IS that rule
+  // (⏭ live whenever anything is ahead, from the override queue or the
+  // source; ⏮/Shuffle/Repeat need a source) and the Queue hero already
+  // renders from it — reading it here too is what keeps the two surfaces from
+  // disagreeing again. Every control stays VISIBLE and dims when it has
+  // nothing to act on, never hidden (QUEUE-UX-SHELL.md's Hero section;
+  // TASK-493 row 21, the Films-hides-Shuffle finding).
+  function fmSetControlOn(id, on, enabled) {
+    var btn = document.getElementById(id);
+    btn.classList.remove('hidden');
+    btn.classList.toggle('on', on);
+    btn.classList.toggle('is-disabled', !enabled);
+    btn.disabled = !enabled;
+  }
   function fmSetTransportOn(snap) {
-    var hasSource = !!snap.source_type;
-    var shuffleBtn = document.getElementById('btn-film-shuffle');
-    var repeatBtn = document.getElementById('btn-film-repeat');
-    shuffleBtn.classList.remove('hidden');
-    repeatBtn.classList.remove('hidden');
-    shuffleBtn.classList.toggle('on', !!snap.shuffle);
-    repeatBtn.classList.toggle('on', !!snap.repeat);
-    shuffleBtn.classList.toggle('is-disabled', !hasSource);
-    repeatBtn.classList.toggle('is-disabled', !hasSource);
-    shuffleBtn.disabled = !hasSource;
-    repeatBtn.disabled = !hasSource;
+    var t = transportState(snap);
+    fmSetControlOn('btn-film-shuffle', !!snap.shuffle, t.shuffle);
+    fmSetControlOn('btn-film-repeat', !!snap.repeat, t.repeat);
+    fmSetControlOn('btn-prev', false, t.previous);
+    fmSetControlOn('btn-next', false, t.next);
   }
   var FM_SWAP = { 'true': function(np) { fmSwapVideo(np); }, 'false': function() { renderFmUpNextLine(); } };
   function renderFmNowPlaying(np) { FM_SWAP[qRouter.isSwap(loadedId, fmSnapshot) + ''](np); }
   function applyFmSnapshot(snap) {
     [engineMode === 'film'].filter(Boolean).forEach(function() {
       fmSnapshot = snap;
-      player.setSeriesMode(!!snap.source_type);
+      // No setSeriesMode here (TASK-517): ⏮/⏭ are the transport rule's now,
+      // dimmed rather than hidden — fmSetTransportOn owns both buttons.
       fmSetTransportOn(snap);
+      ensureSourceTitle(qRouter.sourceId(snap));
       queue.applySnapshot(snap);
       [snap.now_playing].filter(Boolean).forEach(renderFmNowPlaying);
       sendVideoContext();
@@ -537,7 +559,11 @@ export function initVideoPage() {
         film: engineMode === 'film',
         filmShuffle: !!fmSnapshot.shuffle,
         filmRepeat: !!fmSnapshot.repeat,
-        filmHasSource: !!fmSnapshot.source_type
+        // TASK-517 — the phone's film controls read the SAME transportState
+        // the TV row and the Queue hero do, pushed as resolved booleans
+        // rather than the raw `filmHasSource` it used to re-derive the rule
+        // from (which is how BUG-512 left the two surfaces disagreeing).
+        filmTransport: transportState(fmSnapshot)
       });
     });
   }
@@ -660,17 +686,19 @@ export function initVideoPage() {
   // hm/film hero's device-local Play/Pause (QUEUE-UX-SHELL.md) — it toggles
   // the already-mounted <video> directly, same as the companion Queue Views'
   // own WS `toggle` intent; the other two setup fns simply never read it.
-  // getSourceTitle is film's own hero-subtitle read (screen-film-queue.js);
-  // every other setup fn ignores it the same way they already ignore onToggle.
+  // getSourceTitle is film's own hero source line — the series/boxset title
+  // this page already fetches for its breadcrumb; every other setup fn
+  // ignores it the same way they already ignore onToggle.
   //
-  // TASK-516: hm is the first mode on THE shared shell
-  // (ui/screens/screen-queue-shell.js) — the same controller every media type
-  // ends up on, told which type it is by `config.media` rather than by having
-  // its own copy. Every other setup fn ignores that field the way they already
-  // ignore onToggle/getSourceTitle. Home movies' hero source line derives from
-  // the snapshot's own person/month slugs, so getSourceTitle is unread here.
-  var SETUP_QUEUE = { mv: setupMusicVideoQueue, hm: setupQueueShell, film: setupFilmQueue, video: setupVideoQueue };
-  var QUEUE_MEDIA = { hm: HOME_MOVIE };
+  // TASK-516/517: hm and film both run on THE shared shell
+  // (ui/screens/screen-queue-shell.js) — one controller, told which media
+  // type it is by `config.media` rather than each keeping its own copy, so
+  // the two can no longer drift apart. Home movies' hero source line derives
+  // from the snapshot's own person/month slugs (getSourceTitle unread there);
+  // a film's is an opaque series/boxset id, so it reads this page's own
+  // lookup. Music + music videos join them in TASK-504/505.
+  var SETUP_QUEUE = { mv: setupMusicVideoQueue, hm: setupQueueShell, film: setupQueueShell, video: setupVideoQueue };
+  var QUEUE_MEDIA = { hm: HOME_MOVIE, film: FILM };
   var SEND_QUEUE_ACTION = { mv: sendMvAction, hm: sendHmAction, film: sendFmAction, video: sendAction };
   queue = SETUP_QUEUE[engineMode]({
     root: document.getElementById('queue-overlay'),
@@ -743,7 +771,7 @@ export function initVideoPage() {
   // nav params for a purely cosmetic tag.
   function startSeries() {
     mountCrumbs();
-    ensureSeriesTitle();
+    ensureSourceTitle(seriesId);
     armEngineTimeout();
     initCaptions(SERVER)
       .then(function() { sendFmAction('play-source', { source_type: 'series', source_id: seriesId, item_id: videoId }); })
@@ -783,18 +811,18 @@ export function initVideoPage() {
     hmBegin(videoId);
   }
   // FEAT-040 (Play Queue): entered with ?playQueue (no video/series) — fire
-  // play-queue (the server pops + plays the queue head) and render from the
-  // snapshot like the others. Lets you START the queue without opening a random
-  // video first. TASK-503: stays on the OLD video engine ('video' engineMode)
-  // — queue_playback.py has no 'play-queue'-shaped action (only play-source/
-  // play-item/play-standalone), the same gap that already leaves browse's
-  // own "＋ Queue" button on the old engine for every media type cut over so
-  // far (see the MODE_ENGINE comment above).
+  // play-queue (the server makes the queue head current, without consuming
+  // it) and render from the snapshot like the others. Lets you START the
+  // queue without opening a random video first. TASK-517: on the UNIFIED
+  // engine now (/api/queue/film), the same rail every other film route uses —
+  // so the queue this plays is the one every ＋Queue press has been filling
+  // since TASK-503, and the Queue it opens is the shell, not the pre-FEAT-497
+  // screen this route showed until now.
   function startQueue() {
     mountCrumbs();
     armEngineTimeout();
     initCaptions(SERVER)
-      .then(function() { sendAction('play-queue', {}); })
+      .then(function() { sendFmAction('play-queue', {}); })
       .catch(function() {});
   }
   // TASK-422: the mv source crumb's own { label, page, params } targets, one per

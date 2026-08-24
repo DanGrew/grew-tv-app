@@ -172,10 +172,17 @@ export function setup(config) {
     return Array.prototype.slice.call(document.querySelectorAll('#breadcrumb .crumb-link'));
   }
 
+  // TASK-517 — a control the transport rule rendered disabled-but-visible
+  // (⏮/⏭/Shuffle/Repeat with nothing to act on) carries the real `disabled`
+  // attribute, so it drops OUT of the d-pad cycle exactly as a hidden one
+  // does — the same `button:not([disabled])` convention the Queue shell's own
+  // grid already follows. Dimmed and skipped, never a focus stop that does
+  // nothing.
   function focusList() {
     return crumbStops()
       .concat(FOCUS_ORDER.map(function(id) { return document.getElementById(id); }))
-      .filter(function(el) { return !el.classList.contains('hidden'); });
+      .filter(function(el) { return !el.classList.contains('hidden'); })
+      .filter(function(el) { return !el.disabled; });
   }
 
   function moveFocus(delta) {

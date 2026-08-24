@@ -1,17 +1,20 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installVideoPlaybackBackend, installQueuePlaybackBackend } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js');
 
-// FEAT-040 (TASK-250) / FEAT-497 (TASK-503) — the film Queue View overlay. It
-// hangs off the persistent video player (the <video> stays mounted) and draws
-// the server `queue_playback` snapshot: the hero (art/title/source subtitle +
-// icon-only transport) over Queue/Next/Coming-Up tabs (core/film-queue-view.js
-// `.qs-*` classes) — TASK-503's cutover of series/single/boxset onto the
-// TASK-498 unified queue engine, the same shell TASK-499 shipped for home
-// movies. Row controls fire /api/queue/film actions; the overlay repaints
-// from the next snapshot the backend pushes. `?playQueue` mode is untouched —
-// it stays on the OLD /api/video-playback engine (no equivalent "pop the
-// queue and play" action on the new one, screen-video-page.js's own
-// MODE_ENGINE comment), so those two tests keep installVideoPlaybackBackend.
+// FEAT-040 (TASK-250) / FEAT-497 (TASK-503/517) — the film Queue View overlay.
+// It hangs off the persistent video player (the <video> stays mounted) and
+// draws the server `queue_playback` snapshot: the hero (art/title/source
+// subtitle + icon-only transport) over Queue/Next/Coming-Up tabs — TASK-503's
+// cutover of series/single/boxset onto the TASK-498 unified queue engine, and
+// TASK-517's move of the whole thing onto THE shared shell
+// (core/queue-shell-view.js `.qs-*` markup, ui/screens/screen-queue-shell.js),
+// which home movies already ran on. Row controls fire /api/queue/film actions;
+// the overlay repaints from the next snapshot the backend pushes.
+//
+// TASK-517 also moved `?playQueue` — the browse "Play Queue" tile's own entry
+// — off the OLD /api/video-playback engine onto this one (the unified engine
+// gained the "pop the queue and start playing" action it lacked), so every
+// film route in this suite now speaks to /api/queue/film.
 
 async function openPlayer(page) {
   await installApi(page);
@@ -30,15 +33,16 @@ async function openQueue(page) {
   await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
 }
 
-test('?playQueue entry starts the queue head (play-queue) and plays it', async ({ page }) => {
-  // FEAT-040 Play Queue: enter the player with no video, just the queue.
-  // Stays on the OLD engine — the browse "Play Queue" tile's own entry point.
+// TASK-517 story 6 — the one route no cutover had touched. It fires
+// play-queue on the UNIFIED engine now, so the queue it starts is the one
+// every ＋Queue press has filled since TASK-503.
+test('?playQueue entry starts the queue head (play-queue) on the unified engine', async ({ page }) => {
   await installApi(page);
-  const vb = await installVideoPlaybackBackend(page);
-  vb.seed('queue-video', { video_id: 'bluey-s1e02' });
-  vb.seed('queue-video', { video_id: 'bluey-s1e03' });
+  const backend = await installQueuePlaybackBackend(page, 'film');
+  backend.seed('queue-item', { item_id: 'bluey-s1e02' });
+  backend.seed('queue-item', { item_id: 'bluey-s1e03' });
   const played = page.waitForRequest(req =>
-    req.url().includes('/api/video-playback/play-queue') && req.method() === 'POST');
+    req.url().includes('/api/queue/film/play-queue') && req.method() === 'POST');
   await page.goto('/app/homeview/video.html?playQueue=1&from=browse');
   await expect(page.locator('#screen-video')).toBeVisible();
   await played;
@@ -48,14 +52,33 @@ test('?playQueue entry starts the queue head (play-queue) and plays it', async (
 test('re-entering ?playQueue resumes the SAME head — going in/out does not consume it', async ({ page }) => {
   // Owner bug: hitting back then Play Queue again skipped to the next item.
   await installApi(page);
-  const vb = await installVideoPlaybackBackend(page);
-  vb.seed('queue-video', { video_id: 'bluey-s1e02' });
-  vb.seed('queue-video', { video_id: 'bluey-s1e03' });
+  const backend = await installQueuePlaybackBackend(page, 'film');
+  backend.seed('queue-item', { item_id: 'bluey-s1e02' });
+  backend.seed('queue-item', { item_id: 'bluey-s1e03' });
   await page.goto('/app/homeview/video.html?playQueue=1&from=browse');
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
   await page.goto('about:blank');                                   // leave the player
   await page.goto('/app/homeview/video.html?playQueue=1&from=browse');   // re-enter
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);   // same head, NOT e03
+});
+
+// TASK-517 story 6 — reached that way, the Queue is the SHELL, not the tabs
+// and rows the pre-FEAT-497 screen still drew on this one route.
+test('?playQueue opens the same shell Queue as every other film route', async ({ page }) => {
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'film');
+  backend.seed('queue-item', { item_id: 'bluey-s1e02' });
+  backend.seed('queue-item', { item_id: 'bluey-s1e03' });
+  await page.goto('/app/homeview/video.html?playQueue=1&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
+  await openQueue(page);
+  // The shell's own hero + crumb + icon-only transport row (the old screen
+  // had none of these), and the playing head is not listed as pending.
+  await expect(page.locator('.qs-hero-title')).toHaveText('The Weekend');
+  await expect(page.locator('#queue-crumb-back')).toBeVisible();
+  await expect(page.locator('.qs-tbtn[aria-label="Play / pause"]')).toBeVisible();
+  await expect(page.locator('.qs-panel[data-tab="queue"] .qs-row')).toHaveCount(1);
+  await expect(page.locator('.qs-panel[data-tab="queue"] .qs-name')).toHaveText('Hammerbarn');
 });
 
 test('Queue button opens the overlay with the durable Queue', async ({ page }) => {
@@ -188,7 +211,7 @@ test('a standalone film renders Shuffle/Repeat disabled-but-visible on the hero 
   await page.locator('#btn-queue').click();
   await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
   // data-act/data-action are omitted on a disabled hero button (core/
-  // film-queue-view.js heroBtn — inert on tap, matches every other disabled
+  // queue-shell-view.js heroBtn — inert on tap, matches every other disabled
   // control in this app), so the locator keys off aria-label instead.
   const shuffle = page.locator('.qs-tbtn[aria-label="Shuffle"]');
   const repeat = page.locator('.qs-tbtn[aria-label="Repeat"]');
@@ -198,4 +221,71 @@ test('a standalone film renders Shuffle/Repeat disabled-but-visible on the hero 
   await expect(repeat).toHaveClass(/is-disabled/);
   await expect(shuffle).toBeDisabled();
   await expect(repeat).toBeDisabled();
+});
+
+// TASK-517 story 2 — ⏮ joins them: dimmed but visible, never hidden, on the
+// player's own control row as well as the hero. It gated on `source_type`
+// alone at both sites, which hid it outright on the player row.
+test('a standalone film dims ⏮ on BOTH the player row and the hero, rather than hiding it', async ({ page }) => {
+  await installApi(page);
+  await installQueuePlaybackBackend(page, 'film');
+  await page.goto('/app/homeview/video.html?video=finding-nemo-main&from=browse');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#btn-prev')).toBeVisible();
+  await expect(page.locator('#btn-prev')).toHaveClass(/is-disabled/);
+  await page.locator('#btn-queue').click();
+  await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
+  const previous = page.locator('.qs-tbtn[aria-label="Previous"]');
+  await expect(previous).toBeVisible();
+  await expect(previous).toHaveClass(/is-disabled/);
+});
+
+// TASK-517 story 1 (BUG-510 + BUG-512 as ONE fix) — a standalone film with a
+// second film queued behind it. Both sites used to gate ⏭ on `source_type`,
+// so both read dead while the engine's own advance() would have played the
+// queued film. One rule now, so both light up — and either one plays it.
+test('a queued film lights ⏭ on the player row AND the Queue hero, and either plays it', async ({ page }) => {
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'film');
+  backend.seed('queue-item', { item_id: 'bluey-s1e02' });
+  await page.goto('/app/homeview/video.html?video=finding-nemo-main&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /finding-nemo-main/);
+  // the player's own transport row
+  await expect(page.locator('#btn-next')).toBeVisible();
+  await expect(page.locator('#btn-next')).not.toHaveClass(/is-disabled/);
+  await expect(page.locator('#btn-next')).toBeEnabled();
+  // and the hero's
+  await page.locator('#btn-queue').click();
+  await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
+  const heroNext = page.locator('.qs-tbtn[aria-label="Next"]');
+  await expect(heroNext).not.toHaveClass(/is-disabled/);
+  const advanced = page.waitForRequest(req =>
+    req.url().includes('/api/queue/film/next') && req.method() === 'POST');
+  await heroNext.click();
+  await advanced;
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
+});
+
+test('the player row\'s own ⏭ plays the queued film too', async ({ page }) => {
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'film');
+  backend.seed('queue-item', { item_id: 'bluey-s1e02' });
+  await page.goto('/app/homeview/video.html?video=finding-nemo-main&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /finding-nemo-main/);
+  await page.locator('#btn-next').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
+});
+
+// TASK-517 story 5 — one screen for both media types. The film Queue and the
+// home-movie Queue differ only where the media genuinely does (the noun in
+// the empty-Queue line, and the source name), never in shape.
+test('the film Queue and the home-movie Queue are the same screen, differing only in the media noun', async ({ page }) => {
+  await installApi(page);
+  await installQueuePlaybackBackend(page, 'film');
+  await page.goto('/app/homeview/video.html?video=finding-nemo-main&from=browse');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await page.locator('#btn-queue').click();
+  await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
+  await expect(page.locator('.qs-panel[data-tab="queue"] .qs-empty'))
+    .toHaveText('Nothing queued — add titles with ＋');
 });

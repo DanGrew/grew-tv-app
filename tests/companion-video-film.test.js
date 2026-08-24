@@ -12,6 +12,17 @@ const { installApi } = require('./fixtures/api.js');
 // no session there any more) and never the WS intent rail for prev/next/
 // shuffle/repeat.
 
+// TASK-517 — the TV pushes the RESOLVED transport state (the one
+// core/queue-shell-view.js transportState rule, shared with the TV row and
+// the Queue hero) rather than a raw `filmHasSource` for this page to
+// re-derive it from. A test that cares only about "has a source" leaves it to
+// this default; one about a queued film passes its own.
+function transportFor(o) {
+  if (o.transport) return o.transport;
+  var hasSource = o.hasSource === undefined ? true : !!o.hasSource;
+  return { previous: hasSource, next: hasSource, shuffle: hasSource, repeat: hasSource };
+}
+
 async function installFilmBackend(page, opts) {
   var o = opts || {};
   var intents = [];
@@ -40,7 +51,7 @@ async function installFilmBackend(page, opts) {
             payload: {
               context_id: 'video', version: 1, display: { id: o.id, title: o.title },
               film: true, filmShuffle: !!o.shuffle, filmRepeat: o.repeat === undefined ? true : !!o.repeat,
-              filmHasSource: o.hasSource === undefined ? true : !!o.hasSource
+              filmTransport: transportFor(o)
             }
           }));
           ws.send(JSON.stringify({ type: 'app_state', payload: { person: 'kids', profile: 'kids', screen: 'player' } }));
@@ -147,4 +158,23 @@ test('Shuffle/Repeat and ⏮/⏭ render disabled-but-visible for a standalone fi
   await expect(page.locator('#c-shuffle')).toHaveClass(/single/);
   await expect(page.locator('#c-prev')).toHaveClass(/single/);
   await expect(page.locator('#c-next')).toHaveClass(/single/);
+});
+
+// TASK-517 story 1 (BUG-512) — the phone is the third surface that used to
+// read ⏭ off `source_type` alone: a standalone film with a second film queued
+// showed a greyed ⏭ here while the TV played on. ⏮ stays greyed (there is
+// still nothing behind it), which is the point of pushing the resolved rule
+// rather than one has-a-source flag for all four controls.
+test('⏭ lights on the companion for a queued film behind a standalone one, while ⏮ stays greyed', async ({ page }) => {
+  await installApi(page);
+  const backend = await installFilmBackend(page, {
+    id: 'toy-story-main', title: 'Toy Story',
+    transport: { previous: false, next: true, shuffle: false, repeat: false }
+  });
+  await page.goto('/companion/video.html');
+  await expect(page.locator('#now-title')).toHaveText('Toy Story');
+  await expect(page.locator('#c-next')).not.toHaveClass(/single/);
+  await expect(page.locator('#c-prev')).toHaveClass(/single/);
+  await page.locator('#c-next').click();
+  expect(backend.queuePlaybackPosts.some(function(u) { return u.includes('/next'); })).toBe(true);
 });

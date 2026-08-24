@@ -55,6 +55,16 @@ export function upNextLine(snapshot) {
   return { prefix: 'Up next: ', label: next.title };
 }
 
+// How many items are WAITING in the override queue — what browse's 🎬 pill
+// counts, and whether it shows at all (TASK-517; the twin of
+// video-player-router.queueCount over this engine's snapshot). `queue` is
+// already the pending list — the API drops a durable head that is currently
+// playing, since it is playing rather than waiting — so this is a plain
+// length, no filtering of its own.
+export function queueCount(snapshot) {
+  return (snap(snapshot).queue || []).length;
+}
+
 // The active source's id, or null when there is no source at all
 // (source_type unset — a standalone film/single item). TASK-503 — a
 // companion Queue View page (screen-film-queue.js's own hero) uses this to

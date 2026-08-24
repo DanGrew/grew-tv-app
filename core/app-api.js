@@ -206,6 +206,15 @@ export function loadSeries(serverUrl, id) {
   return getJson(serverUrl + '/api/series/' + encodeURIComponent(id));
 }
 
+// TASK-517 — just the collection's title, for a caller that needs the NAME of
+// a source rather than its items: the Queue shell's hero source line, whose
+// film source (a series or boxset) is an opaque id the snapshot can't resolve
+// on its own. Same route, one field — so the page passes this straight in as
+// its `loadSourceName` instead of unwrapping the record itself.
+export function loadSeriesTitle(serverUrl, id) {
+  return loadSeries(serverUrl, id).then(function(s) { return s.title; });
+}
+
 // Album detail (FEAT-018): same resolved-items shape as /api/series, with each
 // track carrying artist / lyrics / ext. Distinct route so music has an explicit
 // entry point and the two can diverge later (TASK-129).
