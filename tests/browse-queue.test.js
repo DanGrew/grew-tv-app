@@ -51,30 +51,13 @@ test('tapping ＋ queues the film (POST /api/queue/film/queue-item) without open
   await expect(page).toHaveURL(/browse\.html/);          // did NOT open the player
 });
 
-// TASK-516 — the home-movie twin of the film test above, and the gap the
-// whole task exists to close: a clip's ＋ posted to the old video-playback
-// queue, which the home-movie player has not read since TASK-499, so nothing
-// arrived anywhere. It now appends to the same unified engine the player
-// reads, and says so.
-test('tapping ＋ on a home-movie tile appends the clip to the unified home-movie queue', async ({ page }) => {
-  await installApi(page);
-  await installVideoPlaybackBackend(page);
-  let oldEngineHit = false;
-  await page.route('**/api/video-playback/queue-video*', function(route) { oldEngineHit = true; return route.fulfill({ status: 204, body: '' }); });
-  await page.route('**/api/queue/home-movie/queue-item**', route => route.fulfill({ status: 204, body: '' }));
-  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
-  await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
-  await expect(page.locator('.film-tile[data-id="beach-day"] .tile-queue')).toBeVisible();
-  const queued = page.waitForRequest(req =>
-    req.url().includes('/api/queue/home-movie/queue-item') && req.method() === 'POST');
-  await page.locator('.film-tile[data-id="beach-day"] .tile-queue').click();
-  const req = await queued;
-  expect(req.url()).toContain('person=kids');
-  expect(JSON.parse(req.postData())).toEqual({ item_id: 'beach-day' });
-  await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
-  await expect(page).toHaveURL(/browse\.html/);          // did NOT open the player
-  expect(oldEngineHit).toBe(false);
-});
+// TASK-516's home-movie twin of the film test above used to live here, tapping
+// ＋ on a clip tile in the Home Movies browse rails. TASK-502 removed those
+// rails, so Home Movies browse holds only Play All / Play All by month action
+// tiles and there is no clip tile to tap. The same ＋, on the same unified
+// engine, is covered where a clip tile now lives: the Play All clip list
+// (`home-movies-list.test.js`, "＋ Queue appends the clip to the unified
+// home-movie queue"), which also holds the old-engine-untouched assertion.
 
 test('tapping the film tile body (not the ＋) opens the player', async ({ page }) => {
   await installApi(page);
@@ -256,21 +239,13 @@ test('rail-grid film tiles also carry the ＋ badge and queue to the film engine
   await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
 });
 
-// TASK-516 — the drill-down badge is the fifth ＋Queue affordance a clip has,
-// and it reaches the same engine as the other four.
-test('rail-grid home-movie tiles also carry the ＋ badge and queue to the unified engine', async ({ page }) => {
-  await installApi(page);
-  await installVideoPlaybackBackend(page);
-  await page.route('**/api/queue/home-movie/queue-item**', route => route.fulfill({ status: 204, body: '' }));
-  await page.goto('/app/homeview/rail-grid.html?section=home-movies&rail=person:millie&profile=kids&person=kids');
-  await expect(page.locator('.film-tile[data-id="beach-day"] .tile-queue')).toBeVisible();
-  const queued = page.waitForRequest(req =>
-    req.url().includes('/api/queue/home-movie/queue-item') && req.method() === 'POST');
-  await page.locator('.film-tile[data-id="beach-day"] .tile-queue').click();
-  expect(JSON.parse((await queued).postData())).toEqual({ item_id: 'beach-day' });
-  await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
-});
-
+// TASK-516's home-movie rail-grid ＋ badge was asserted here, drilling into a
+// person rail. TASK-502 removed those rails, and Home Movies has no other
+// rail-grid holding a clip tile: Play All / Play All by month hold action
+// tiles, and Continue Watching's tiles are CW rows carrying no `section`, so
+// the drill-down ＋ has no home-movie route left to assert. The film and
+// music-video rail-grid ＋ tests above and below still cover the badge itself,
+// and the home-movie engine is covered from the clip list.
 // TASK-421 — an artist's music-video rail-grid ("See all" on the QOTSA rail)
 // carries the same ＋ badge, POSTing to the SEPARATE music-video engine
 // (FEAT-418), never the film queue (story 3).

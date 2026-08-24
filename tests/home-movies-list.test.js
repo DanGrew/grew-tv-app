@@ -97,6 +97,10 @@ test('tapping a row in a month-scoped list plays that specific clip via item_id'
 // read since TASK-499, so queueing a clip from here did nothing at all.
 test('＋ Queue appends the clip to the unified home-movie queue', async ({ page }) => {
   await enterList(page, 'play-all:All');
+  // TASK-502 made this the only clip tile a viewer can ＋ from, so the
+  // old-engine assertion the browse-rail twin carried moves here with it.
+  let oldEngineHit = false;
+  await page.route('**/api/video-playback/queue-video*', function(route) { oldEngineHit = true; return route.fulfill({ status: 204, body: '' }); });
   const queued = page.waitForRequest(function(req) {
     return req.url().includes('/api/queue/home-movie/queue-item') && req.method() === 'POST';
   });
@@ -106,6 +110,7 @@ test('＋ Queue appends the clip to the unified home-movie queue', async ({ page
   expect(JSON.parse(req.postData())).toEqual({ item_id: 'beach-day' });
   await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
   await expect(page).toHaveURL(/home-movies-list\.html/);   // did NOT open the player
+  expect(oldEngineHit).toBe(false);
 });
 
 test('Back from the list returns to the Home Movies tab', async ({ page }) => {
