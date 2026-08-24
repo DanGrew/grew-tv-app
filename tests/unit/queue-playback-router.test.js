@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nowPlaying, isSwap, upNextItem, upNextLine, sourceId, queueCount } from '../../core/queue-playback-router.js';
+import { nowPlaying, isSwap, isStaleResync, upNextItem, upNextLine, sourceId, queueCount } from '../../core/queue-playback-router.js';
 
 function item(id, title) { return { item_id: id, title: title }; }
 function snap(fields) {
@@ -26,6 +26,27 @@ describe('isSwap', () => {
   it('is false when there is no now_playing', () => {
     expect(isSwap('a', snap({}))).toBe(false);
     expect(isSwap(null, snap({}))).toBe(false);
+  });
+});
+
+// BUG-518 — the entry-time recovery GET is a fallback, never an override.
+describe('isStaleResync', () => {
+  it('is stale once something is loaded — a push landed, so there is nothing to recover', () => {
+    expect(isStaleResync('a', 'a', snap({ now_playing: item('a', 'A') }))).toBe(true);
+    expect(isStaleResync('a', 'b', snap({ now_playing: item('b', 'B') }))).toBe(true);
+  });
+  it('is stale when nothing is loaded but the answer names another item — it predates our POST', () => {
+    expect(isStaleResync('a', null, snap({ now_playing: item('b', 'B') }))).toBe(true);
+  });
+  it('is fresh when nothing is loaded and the answer names the pending pick', () => {
+    expect(isStaleResync('a', null, snap({ now_playing: item('a', 'A') }))).toBe(false);
+  });
+  it('is fresh with no pending pick — Play All / ?playQueue let the engine choose', () => {
+    expect(isStaleResync(null, null, snap({ now_playing: item('b', 'B') }))).toBe(false);
+  });
+  it('is fresh when there is no now_playing — queue and transport state still apply', () => {
+    expect(isStaleResync('a', null, snap({}))).toBe(false);
+    expect(isStaleResync(null, null, snap({}))).toBe(false);
   });
 });
 
