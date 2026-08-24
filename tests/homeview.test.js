@@ -483,10 +483,18 @@ test('Prev at the first episode is a no-op (the unified queue engine does not wr
   await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/);
 });
 
-test('standalone film hides prev / next (no episodes)', async ({ page }) => {
+// TASK-517 story 2 — ⏮/⏭ used to HIDE on a standalone film. They now dim and
+// stay put, the same disabled-but-visible treatment Shuffle/Repeat already
+// had (docs/QUEUE-UX-SHELL.md's Hero section): the controls a film has never
+// move around under you, they just tell you what they can do right now.
+test('standalone film dims prev / next rather than hiding them (no episodes)', async ({ page }) => {
   await goToVideoScreen(page);
-  await expect(page.locator('#btn-prev')).toHaveClass(/hidden/);
-  await expect(page.locator('#btn-next')).toHaveClass(/hidden/);
+  await expect(page.locator('#btn-prev')).toBeVisible();
+  await expect(page.locator('#btn-next')).toBeVisible();
+  await expect(page.locator('#btn-prev')).toHaveClass(/is-disabled/);
+  await expect(page.locator('#btn-next')).toHaveClass(/is-disabled/);
+  await expect(page.locator('#btn-prev')).toBeDisabled();
+  await expect(page.locator('#btn-next')).toBeDisabled();
   await expect(page.locator('#btn-jump')).toBeVisible();
 });
 

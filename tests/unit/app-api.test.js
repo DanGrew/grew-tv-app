@@ -1,5 +1,5 @@
 import {
-  loadBrowse, loadVideo, loadSeries, loadNext, loadProgress, saveProgress,
+  loadBrowse, loadVideo, loadSeries, loadSeriesTitle, loadNext, loadProgress, saveProgress,
   loadContinueWatching, loadConfig, loadSettings, saveSettings, scanDevices,
   mediaUrl, loadLyrics, resetProgress, playbackAction, videoPlaybackAction, musicVideoPlaybackAction,
   loadVideoPlayback, loadMusicVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
@@ -85,6 +85,18 @@ describe('loadSeries', () => {
     var calls = fakeFetch({ id: 'bluey', items: [] });
     await loadSeries('http://s', 'bluey');
     expect(calls[0].url).toBe('http://s/api/series/bluey');
+  });
+});
+
+describe('loadSeriesTitle', () => {
+  it('GETs the same /api/series/{id} route and resolves just the title', async () => {
+    var calls = fakeFetch({ id: 'bluey', title: 'Bluey', items: [] });
+    expect(await loadSeriesTitle('http://s', 'bluey')).toBe('Bluey');
+    expect(calls[0].url).toBe('http://s/api/series/bluey');
+  });
+  it('rejects on non-ok response rather than resolving undefined', async () => {
+    fakeFetch({}, false);
+    await expect(loadSeriesTitle('http://s', 'bluey')).rejects.toBe(500);
   });
 });
 

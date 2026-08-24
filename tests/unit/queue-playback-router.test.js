@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nowPlaying, isSwap, upNextItem, upNextLine, sourceId } from '../../core/queue-playback-router.js';
+import { nowPlaying, isSwap, upNextItem, upNextLine, sourceId, queueCount } from '../../core/queue-playback-router.js';
 
 function item(id, title) { return { item_id: id, title: title }; }
 function snap(fields) {
@@ -64,6 +64,19 @@ describe('upNextLine', () => {
   });
   it('is null when there is no up-next item', () => {
     expect(upNextLine(snap({}))).toBe(null);
+  });
+});
+
+describe('queueCount', () => {
+  it('counts what is waiting in the override queue', () => {
+    expect(queueCount(snap({ queue: [item('a', 'A'), item('b', 'B')] }))).toBe(2);
+  });
+  it('ignores the source lists — only the queue counts', () => {
+    expect(queueCount(snap({ queue: [], next: [item('a', 'A')], coming_up: [item('b', 'B')] }))).toBe(0);
+  });
+  it('is 0 for an empty/absent snapshot', () => {
+    expect(queueCount(snap({}))).toBe(0);
+    expect(queueCount(null)).toBe(0);
   });
 });
 

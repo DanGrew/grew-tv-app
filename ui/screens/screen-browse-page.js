@@ -2,14 +2,14 @@ import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, loadConfig, loadVideoPlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadConfig, loadQueuePlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
 import { queueAdd, queueAddStatus, SECTION_MEDIA_TYPE } from '../../core/queue-shell-config.js';
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute, sectionOf, artistTiles } from '../../core/home-rails.js';
 import { mountSearch } from './screen-search.js';
-import { queueCount } from '../../core/video-player-router.js';
+import { queueCount } from '../../core/queue-playback-router.js';
 import { playNextCount } from '../../core/queue-view.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
@@ -26,13 +26,18 @@ export function initBrowsePage() {
   // (?playQueue). The icon+`(N)` style matches the companion (TASK-258). Counts read
   // from the read-only playback snapshots, refreshed on load (+ the video one after
   // queueing a film here). Before this the music queue was unreachable from browse.
+  //
+  // TASK-517 — 🎬 counts the FILM queue on the unified engine, which is the
+  // queue every ＋ here has actually filled since TASK-503. It read the old
+  // video engine's queue until now, so the pill sat hidden on an empty count
+  // while films piled up in the queue it wasn't looking at.
   function showPlayQueue(count) {
     var btn = document.getElementById('btn-play-queue');
     btn.textContent = '🎬 (' + count + ')';
     btn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[(count > 0) + ''];
   }
   function refreshQueue() {
-    loadVideoPlayback(SERVER, getPerson()).then(function(snap) { showPlayQueue(queueCount(snap)); }).catch(function() {});
+    loadQueuePlayback(SERVER, 'film', getPerson()).then(function(snap) { showPlayQueue(queueCount(snap)); }).catch(function() {});
   }
   function onPlayQueue() { navTo('video.html', { playQueue: 1, from: 'browse' }); }
 
@@ -88,12 +93,15 @@ export function initBrowsePage() {
   // nothing has read since TASK-499 — a home-movie ＋Queue silently queued to
   // nothing. The confirmation is the config's own wording, so it stays honest
   // per type: appended to a queue, or queued to play next.
-  // The 🎬 pill counts the OLD video queue, which no ＋ here feeds any more,
-  // so there is nothing to refresh after a queue press.
+  // TASK-517 — the 🎬 pill counts the same film queue this ＋ feeds again, so
+  // a queue press refreshes it: queue a film and the pill appears (or its
+  // count climbs) without a page reload, as it did before TASK-503 split the
+  // two apart. A press on another media type re-reads a count that has not
+  // moved, which is cheaper than a branch to decide it.
   function onQueue(card) {
     var mediaType = SECTION_MEDIA_TYPE[sectionOf(card)];
     queueAdd(SERVER, mediaType, getPerson(), card.id)
-      .then(function() { showStatus(queueAddStatus(mediaType)); })
+      .then(function() { showStatus(queueAddStatus(mediaType)); refreshQueue(); })
       .catch(function() {});
   }
 

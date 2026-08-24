@@ -609,7 +609,9 @@ test.describe('companion Home Movies Play All', () => {
 // TASK-258 (2): the VIDEO queue button reads a compact "🎬 (N)" — media icon +
 // bracketed count, no "Video" word or list icon (mirrors the music button). A
 // dedicated mock carries a `person` in app_state (the top-level mock omits it, so
-// the queue is never fetched) + routes the GET video-playback snapshot's queue.
+// the queue is never fetched) + routes the GET queue snapshot.
+// TASK-517 — that snapshot is the FILM queue on the unified engine now (the
+// TV mirror moved the same way), not the old video-playback engine's.
 test.describe('video Play Queue button label (TASK-258)', () => {
   function videoMock(page, queue) {
     return page.routeWebSocket(/:8766/, (ws) => {
@@ -618,8 +620,8 @@ test.describe('video Play Queue button label (TASK-258)', () => {
         if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
         if (m.type === 'snapshot_request') { ws.send(msg('context', { version: 2, context_id: 'browse' })); ws.send(msg('app_state', { screen: 'home', profile: 'kids', person: 'kids' })); }
       });
-    }).then(() => page.route(/\/api\/video-playback\?/, (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', override_queue: queue }) })));
+    }).then(() => page.route(/\/api\/queue\/film\?/, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', media_type: 'film', queue: queue }) })));
   }
 
   test('shows just the icon and bracketed count — no "Video" word', async ({ page }) => {

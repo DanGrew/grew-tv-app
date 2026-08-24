@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installVideoPlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS } = require('./fixtures/api.js');
+const { installApi, installVideoPlaybackBackend, installQueuePlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS } = require('./fixtures/api.js');
 
 // FEAT-040 (TV browse queue affordances): film tiles carry a ＋ badge (queue the
 // film to Play Next). TASK-259 replaced the single "▶ Play Queue (N)" pill with TWO
@@ -75,15 +75,32 @@ test('video queue button is hidden when the video queue is empty', async ({ page
   await expect(page.locator('#btn-play-queue')).toBeHidden();
 });
 
+// TASK-517 — the count comes off the FILM queue on the unified engine now: the
+// same queue the ＋ badges above fill. It read the old video engine's until
+// now, which nothing has added to since TASK-503, so the pill stayed hidden
+// however many films you queued.
 test('video queue button 🎬 (N) shows the count and opens the video player at the queue head', async ({ page }) => {
   await installApi(page);
-  const vb = await installVideoPlaybackBackend(page);
-  vb.seed('queue-video', { video_id: 'finding-nemo-main' });
-  vb.seed('queue-video', { video_id: 'toy-story-main' });
+  const backend = await installQueuePlaybackBackend(page, 'film');
+  backend.seed('queue-item', { item_id: 'finding-nemo-main' });
+  backend.seed('queue-item', { item_id: 'toy-story-main' });
   await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
   await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (2)');
   await page.locator('#btn-play-queue').click();
   await expect(page).toHaveURL(/video\.html\?.*playQueue=1/);
+});
+
+// TASK-517 — and it climbs as you queue, without a reload: the ＋ press and
+// the pill finally read the same queue.
+test('queueing a film from browse makes the 🎬 pill appear straight away', async ({ page }) => {
+  await installApi(page);
+  await installQueuePlaybackBackend(page, 'film');
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await expect(page.locator('.sidebar-tab[data-tab="films"]')).toBeVisible();   // settled
+  await expect(page.locator('#btn-play-queue')).toBeHidden();
+  await openFilms(page);
+  await page.locator('.film-tile[data-id="finding-nemo-main"] .tile-queue').click();
+  await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (1)');
 });
 
 // TASK-259: the MUSIC twin beside the video button — shown only when the music
@@ -116,8 +133,8 @@ test('music queue button 🎵 (N) shows the count and opens the audio player at 
 
 test('the two queue buttons show independently — video queued, music empty', async ({ page }) => {
   await installApi(page);
-  const vb = await installVideoPlaybackBackend(page);
-  vb.seed('queue-video', { video_id: 'finding-nemo-main' });
+  const backend = await installQueuePlaybackBackend(page, 'film');
+  backend.seed('queue-item', { item_id: 'finding-nemo-main' });
   await routeMusicQueue(page, []);
   await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
   await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (1)');

@@ -3,7 +3,9 @@ const { installApi } = require('./fixtures/api.js');
 
 // FEAT-040 (Play Queue) — the companion browse "🎬 (N)" video queue button (TASK-258
 // compact label: media icon + bracketed count, no "Video" word). When the
-// video override queue is non-empty (read from GET /api/video-playback), the
+// film queue is non-empty (read from GET /api/queue/film — TASK-517 moved it
+// off the old video engine's snapshot onto the unified one, the queue the ＋
+// badges actually fill), the
 // button appears; tapping it drives the TV player to start the queue head via a
 // `navigate` intent to video.html?playQueue=1. Solves: "to reach the queue you had
 // to start something random first." It drives the TV, so it greys while desynced.
@@ -27,12 +29,12 @@ function mockApp(page, intents) {
   });
 }
 
-// A GET snapshot with `count` queued videos.
+// A GET snapshot with `count` queued films.
 async function mockQueue(page, count) {
   const queue = Array.from({ length: count }, (_, i) => ({ entry_id: 'e' + (i + 1), item_id: 'f' + i, title: 'Film ' + i }));
-  await page.route(/\/api\/video-playback\?/, route => route.fulfill({
+  await page.route(/\/api\/queue\/film\?/, route => route.fulfill({
     status: 200, contentType: 'application/json',
-    body: JSON.stringify({ now_playing: null, items: [], override_queue: queue, current_item_index: 0, source_type: null, source_id: null, repeat: false, shuffle: false })
+    body: JSON.stringify({ person_id: 'mom', media_type: 'film', now_playing: null, queue: queue, next: [], coming_up: [], source_type: null, source_id: null, repeat: false, shuffle: false })
   }));
 }
 
