@@ -142,7 +142,7 @@ export function initVideoPage() {
   var mvSnapshot = {};     // latest music_video_playback snapshot (music-video mode only)
   var hmSnapshot = {};     // latest queue_playback snapshot (home-movie mode only, TASK-499)
   var fmSnapshot = {};     // latest queue_playback snapshot (film mode only, TASK-503)
-  var fmPendingId = null;  // BUG-518: the item this page was opened for, until a snapshot confirms it
+  var fmPendingId = null;  // BUG-521: the item this page was opened for, until a snapshot confirms it
   var enginePending = null;  // ENGINE_TIMEOUT_MS watchdog, armed per engine action, cleared on first swap
   // TASK-422: the music-video playback source's own crumb — { label, page, params }
   // linking to its playlist/artist page, mirroring BUG-044's audio sourceCrumb.
@@ -539,7 +539,7 @@ export function initVideoPage() {
       sendVideoContext();
     });
   }
-  // BUG-518 — the recovery GET is a fallback, never an override: discard an
+  // BUG-521 — the recovery GET is a fallback, never an override: discard an
   // answer that predates this page's own play POST, or the player swaps back to
   // the previously selected film. A WS push needs no such guard — it is always
   // the server's current state. armEngineTimeout still covers a pick that never
@@ -783,7 +783,7 @@ export function initVideoPage() {
   function startSeries() {
     mountCrumbs();
     ensureSourceTitle(seriesId);
-    fmPendingId = videoId;   // BUG-518 — null for Play All, which picks no item
+    fmPendingId = videoId;   // BUG-521 — null for Play All, which picks no item
     armEngineTimeout();
     initCaptions(SERVER)
       .then(function() { sendFmAction('play-source', { source_type: 'series', source_id: seriesId, item_id: videoId }); })
@@ -797,7 +797,7 @@ export function initVideoPage() {
   // watch_progress. The durable queue plays after it.
   function startSingle() {
     mountCrumbs();
-    fmPendingId = videoId;   // BUG-518 — always set here; a single IS the pick
+    fmPendingId = videoId;   // BUG-521 — always set here; a single IS the pick
     armEngineTimeout();
     initCaptions(SERVER)
       .then(function() { sendFmAction('play-standalone', { item_id: videoId }); })

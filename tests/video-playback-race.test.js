@@ -76,7 +76,7 @@ test('recovers a dropped play-standalone snapshot once activate_person confirms 
   expect(order.indexOf('GET queue/film')).toBeGreaterThan(order.indexOf('person_active'));
 });
 
-// BUG-518 (owner-reported during TASK-517 review: "sometimes when I select a
+// BUG-521 (owner-reported during TASK-517 review: "sometimes when I select a
 // film, it's playing the previous one I selected") — the OTHER ordering of the
 // same two chains, which the recovery above cannot distinguish from a real one.
 //

@@ -29,7 +29,7 @@ export function isSwap(loadedId, snapshot) {
   return np.item_id !== loadedId;
 }
 
-// BUG-518 — true when the entry-time RESYNC answer must be discarded.
+// BUG-521 — true when the entry-time RESYNC answer must be discarded.
 //
 // video.html runs two independent async chains on entry: the play POST for the
 // item in ?video=, and the BUG-439 recovery GET fired once activate_person

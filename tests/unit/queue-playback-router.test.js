@@ -29,7 +29,7 @@ describe('isSwap', () => {
   });
 });
 
-// BUG-518 — the entry-time recovery GET is a fallback, never an override.
+// BUG-521 — the entry-time recovery GET is a fallback, never an override.
 describe('isStaleResync', () => {
   it('is stale once something is loaded — a push landed, so there is nothing to recover', () => {
     expect(isStaleResync('a', 'a', snap({ now_playing: item('a', 'A') }))).toBe(true);
