@@ -53,16 +53,17 @@ test('Films tab switches the rail on a focus-less click (Safari/iOS WebKit)', as
   await expect(page.locator('.rail-row[data-rail="genre:comedy"] .film-tile[data-id="toy-story-main"]')).toHaveCount(1);
 });
 
-test('Home Movies tab shows a Play All rail, then Play All by month, then one rail per tagged kid (TASK-444/486/491)', async ({ page }) => {
+test('Home Movies tab shows a Play All rail and Play All by month, and no rail per kid (TASK-486/491/502)', async ({ page }) => {
   await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
   // millie-walk/beach-day are both tagged people:['millie'] and captured in Jan 2026
-  // in the fixture -> Play All (TASK-486) + Play All by month (TASK-491) + a single Millie rail.
-  await expect(page.locator('.rail-title')).toHaveText(['Play All', 'Play All by month', 'Millie']);
+  // in the fixture -> Play All (TASK-486) + Play All by month (TASK-491), and since
+  // TASK-502 nothing after them: Millie is a tile on Play All, not a rail of her own.
+  await expect(page.locator('.rail-title')).toHaveText(['Play All', 'Play All by month']);
   await expect(page.locator('.rail-row[data-rail="home-movies-play-all"] .film-tile[data-id="play-all:All"]')).toHaveCount(1);
   await expect(page.locator('.rail-row[data-rail="home-movies-play-all"] .film-tile[data-id="play-all:Millie"]')).toHaveCount(1);
   await expect(page.locator('.rail-row[data-rail="home-movies-play-all-month"] .film-tile[data-id="play-all:Jan 2026"]')).toHaveCount(1);
-  await expect(page.locator('.rail-row[data-rail="person:millie"] .film-tile[data-id="millie-walk"]')).toHaveCount(1);
+  await expect(page.locator('.rail-row[data-rail="person:millie"]')).toHaveCount(0);
   await expect(page.locator('.rail-row[data-rail="collections"]')).toHaveCount(0);
   await expect(page.locator('.rail-row[data-rail="videos"]')).toHaveCount(0);
 });

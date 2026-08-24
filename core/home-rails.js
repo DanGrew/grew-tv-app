@@ -220,10 +220,13 @@ function cmpDateDesc(a, b) {
   return cmpStr(db, da);
 }
 
-// Group cards into rails keyed by a slug list, A-Z by rail label then tile
-// title (or itemCmp when given — TASK-444's Home Movies rails sort by capture
-// date instead). keyer(card) -> [slug]; labeler(slug) -> display title.
-function groupRails(cards, keyer, labeler, prefix, itemCmp) {
+// Group cards by a slug list, A-Z by group label then item title.
+// keyer(card) -> [slug]; labeler(slug) -> display title.
+//
+// TASK-502 dropped the itemCmp override this took: its one caller was the
+// Home Movies person rails, and with those rails gone their items are never
+// rendered, so a second item order had no consumer left.
+function groupBySlug(cards, keyer, labeler) {
   var groups = {};
   cards.forEach(function(card) {
     keyer(card).forEach(function(slug) {
@@ -231,12 +234,23 @@ function groupRails(cards, keyer, labeler, prefix, itemCmp) {
       groups[slug].push(card);
     });
   });
-  var cmp = itemCmp || function(a, b) { return cmpStr(titleOf(a), titleOf(b)); };
+  var cmp = function(a, b) { return cmpStr(titleOf(a), titleOf(b)); };
   return Object.keys(groups)
     .map(function(slug) {
-      return { id: prefix + slug, slug: slug, title: labeler(slug), items: groups[slug].sort(cmp) };
+      return { slug: slug, title: labeler(slug), items: groups[slug].sort(cmp) };
     })
     .sort(function(a, b) { return cmpStr(a.title, b.title); });
+}
+
+// The same grouping turned into RAILS — each group given the prefixed rail id
+// the browse grid renders and the See All drilldown routes on. TASK-502: Home
+// Movies groups its clips by kid WITHOUT those groups becoming rails, so the
+// id is minted here rather than in groupBySlug, and no caller is left
+// fabricating an id nothing reads.
+function groupRails(cards, keyer, labeler, prefix) {
+  return groupBySlug(cards, keyer, labeler).map(function(g) {
+    return { id: prefix + g.slug, slug: g.slug, title: g.title, items: g.items };
+  });
 }
 
 // A CW row -> a video tile card. The label prefixes the owning collection when
@@ -459,8 +473,10 @@ export function buildTabs(cards) {
 //
 // TASK-486 — one ACTION tile (kind:'play-all', never a browse card) for the
 // Home Movies "Play All" rail: All (TASK-446's whole-catalog source) first,
-// then one per kid, in the SAME tag set + order as the person rails just
-// built (personRails) — no separate tagging concept. `navParams` carries the
+// then one per kid, in the SAME tag set + order as the personRails grouping
+// buildTabRails just built — no separate tagging concept. Since TASK-502 that
+// grouping is data only (no browse rail renders it), and these tiles are the
+// one way into a kid's clips. `navParams` carries the
 // exact home-movies-list.html query params the tile's own onSelect handler
 // needs (the `homeMoviesAll` param for All, the `homeMoviesPerson` param
 // keyed by tag value for a kid) — kept data-only so the ui/** consumer stays
@@ -472,19 +488,19 @@ function playAllTile(title, navParams) {
   return { kind: 'play-all', id: 'play-all:' + title, title: title, navParams: navParams };
 }
 
-// The 'other' rail (peopleOf's untagged fallback, TASK-444) gets no tile here
+// The 'other' group (peopleOf's untagged fallback, TASK-444) gets no tile here
 // — "All" already covers untagged clips, so there is no separate tile for
 // them (owner, 2026-08-20). Omitted entirely (mirrors simpleRail's own
-// omit-if-empty) when personRails is empty — Home Movies has no clips at
+// omit-if-empty) when personGroups is empty — Home Movies has no clips at
 // all, so there is nothing for even the All tile to play.
-export function homeMoviesPlayAllRail(personRails) {
-  var rails = personRails || [];
-  var kidTiles = rails
-    .filter(function(r) { return r.slug !== 'other'; })
-    .map(function(r) { return playAllTile(r.title, { homeMoviesPerson: r.slug }); });
+export function homeMoviesPlayAllRail(personGroups) {
+  var groups = personGroups || [];
+  var kidTiles = groups
+    .filter(function(g) { return g.slug !== 'other'; })
+    .map(function(g) { return playAllTile(g.title, { homeMoviesPerson: g.slug }); });
   var allTile = playAllTile('All', { homeMoviesAll: 1 });
   var rail = { id: 'home-movies-play-all', title: 'Play All', items: [allTile].concat(kidTiles) };
-  return rails.length ? [rail] : [];
+  return groups.length ? [rail] : [];
 }
 
 // TASK-491 — "Play All by month" rail: one tile per populated Year-Month,
@@ -537,9 +553,9 @@ export function homeMoviesSourceLabel(sourceType, sourceId) {
 // TASK-486 (revision) — the Play All list screen's own clip list: every
 // available Home Movies card when person is null/undefined ('All'), else only
 // the clips tagged with that person (peopleOf — the SAME tag test the browse
-// rails use), newest capture date first (cmpDateDesc — the SAME order the
-// person rails already show, so the list reads consistently with the rail
-// below it). Wrapped as `{video: card}` — buildDetailList's own row shape
+// rails use), newest capture date first (cmpDateDesc). Since TASK-502 removed
+// the person browse rails this order once mirrored, this function is the sole
+// definition of a kid's clip order. Wrapped as `{video: card}` — buildDetailList's own row shape
 // (core/detail-view.js episodeLabel &c. all read item.video).
 // TASK-486 (revision) — the exact video.html query params a hand-off from the
 // list screen carries: the source scope (homeMoviesAll/homeMoviesPerson,
@@ -569,19 +585,27 @@ export function homeMoviesListItems(cards, person, month) {
   return scoped.sort(cmpDateDesc).map(function(c) { return { video: c }; });
 }
 
-// Home Movies (TASK-444, reinstating the FEAT-025/TASK-183 person rails this
-// time with real tags) is Continue Watching -> Play All (TASK-486) -> one
-// rail per `people` tag value, through the SAME groupRails path Series/Films
-// use for genre rails — keyed on peopleOf instead of genresOf, with no
-// genreLabels-style override (title-cased slug only) since people have no
-// display-name map. A clip tagged with more than one kid appears in each of
-// those kids' rails (groupRails' keyer already fans a card out to every slug
-// it returns, same as genres). An untagged clip lands in a single "Other"
-// rail (peopleOf's fallback) rather than disappearing. Sort differs from
-// genre rails: newest-first by capture date (cmpDateDesc) instead of A-Z by
-// title. The Play All rail (TASK-486) replaces TASK-446's single header
-// button — it reuses this SAME tag set (personRails, minus 'other') for its
-// per-kid tiles, so it can never drift from what the browse rails below it show.
+// Home Movies is Continue Watching -> Play All (TASK-486) -> Play All by
+// month: three rails, and no rail per kid. TASK-502 dropped the per-person
+// browse rails TASK-444 added, because the Play All rail's per-kid tiles
+// already open the same clip list (as a list screen rather than inline), so
+// the rails were a second route to the one place.
+//
+// The per-kid grouping survives as internal data only — never returned, never
+// rendered as rails. It is the tag set homeMoviesPlayAllRail builds its
+// per-kid tiles and their homeMoviesPerson nav params from: one entry per
+// `people` tag value via the SAME grouping Series/Films reach through
+// groupRails for their genre rails, keyed on peopleOf instead of genresOf,
+// with no genreLabels-style override (title-cased slug only) since people have
+// no display-name map. It calls groupBySlug rather than groupRails precisely
+// because these groups are not rails: with nothing rendering them, a rail id
+// would be minted for nobody. A clip tagged with more than one kid appears
+// under each of those kids (the keyer already fans a card out to every slug it
+// returns, same as genres); an untagged clip lands under "Other" (peopleOf's
+// fallback) rather than disappearing, and the Play All rail drops that one
+// itself. Only each group's slug and title are read — the clips a kid's tile
+// opens are re-derived by homeMoviesListItems, which owns their newest-first
+// order.
 export function buildTabRails(sectionId, cards, cwRows, genreLabels, recents) {
   var all = (cards || []).map(withDurationSec);
   var byId = cardIndex(all);
@@ -589,11 +613,10 @@ export function buildTabRails(sectionId, cards, cwRows, genreLabels, recents) {
   if (sectionId === 'music-videos') return musicVideoRails(all);
   var inTab = all.filter(function(c) { return sectionOf(c) === sectionId; });
   if (sectionId === 'home-movies') {
-    var personRails = groupRails(inTab, peopleOf, titleCase, 'person:', cmpDateDesc);
+    var personGroups = groupBySlug(inTab, peopleOf, titleCase);
     return continueRail(sectionId, cwRows, byId)
-      .concat(homeMoviesPlayAllRail(personRails))
-      .concat(homeMoviesMonthRail(inTab))
-      .concat(personRails);
+      .concat(homeMoviesPlayAllRail(personGroups))
+      .concat(homeMoviesMonthRail(inTab));
   }
   var boxsets = inTab.filter(isBoxset);
   var rest = inTab.filter(function(c) { return !isBoxset(c); });

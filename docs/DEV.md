@@ -85,10 +85,14 @@ draft-PR / never-merge / commit-push-PR-autonomously, wait-for-merge,
 present-PRs — live in **claude-workflow** → `docs/WAYS.md` (via the grew-tv
 entry `CLAUDE.md`, `claude-config/grew-product-dir grew-tv`). grew-tv-app specifics:
 
-- **Fresh worktree has no `node_modules`** — symlink the primary's for gate runs
-  (`ln -s ../grew-tv-app/node_modules node_modules`); `.gitignore` lists
-  `node_modules` (NO trailing slash) so the symlink is ignored and `git add -A`
-  won't commit it — no manual `rm` step needed.
+- **Fresh worktree has no `node_modules`** — run `npm ci` in the worktree for
+  gate runs. Symlinking the primary's
+  (`ln -s /Users/dan/dan-grew-repos/grew-tv-app/node_modules node_modules`)
+  works only while the primary actually has one installed, and the path must be
+  absolute — a worktree under `grew-tv-app-worktrees/` sits a level deeper, so a
+  `../grew-tv-app/...` relative link dangles. `.gitignore` lists `node_modules`
+  (NO trailing slash) so either form is ignored and `git add -A` won't commit
+  it — no manual `rm` step needed.
 - **Deploy:** no GitHub Pages. The app ships by updating the clone media-manager
   serves from (`--app-dir`, `~/grew-tv/repos/grew-tv-app` on the Mini) — pull
   `main` there + restart/reload. `setup-mac-mini.sh` clones it.

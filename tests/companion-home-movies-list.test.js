@@ -82,6 +82,10 @@ test.describe('synced (drives the TV)', () => {
   // old video-playback queue, which nothing has read since TASK-499, so a
   // ＋Queue here silently queued to nothing.
   test('＋ Queue appends the clip to the unified home-movie queue', async ({ page }) => {
+    // TASK-502 made this the phone's only clip tile, so the old-engine
+    // assertion the companion browse-rail twin carried moves here with it.
+    let oldEngineHit = false;
+    await page.route('**/api/video-playback/queue-video**', route => { oldEngineHit = true; return route.fulfill({ status: 204, body: '' }); });
     await page.route('**/api/queue/home-movie/queue-item**', route => route.fulfill({ status: 204, body: '' }));
     const queued = page.waitForRequest(r => r.url().includes('/api/queue/home-movie/queue-item') && r.method() === 'POST');
     await page.locator('.detail-track-row:has(.tile-btn[data-id="beach-day"]) .detail-queue-btn').click();
@@ -89,6 +93,7 @@ test.describe('synced (drives the TV)', () => {
     expect(req.url()).toContain('person=kids');
     expect(JSON.parse(req.postData())).toEqual({ item_id: 'beach-day' });
     await expect(page.locator('#add-status')).toHaveText('Added to Queue');
+    expect(oldEngineHit).toBe(false);
   });
 
   test('the Home Movies breadcrumb crumb teleports the TV back to that tab', async ({ page }) => {

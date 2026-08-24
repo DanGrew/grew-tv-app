@@ -1,4 +1,4 @@
-import { buildRails, buildTabs, buildTabRails, railsForSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail, homeMoviesPlayAllRail, homeMoviesMonthRail, homeMoviesListItems, homeMoviesListTitle, homeMoviesListPlayParams } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, railsForSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail, homeMoviesPlayAllRail, homeMoviesMonthRail, homeMoviesListItems, homeMoviesListTitle, homeMoviesSourceLabel, homeMoviesListPlayParams } from '../../core/home-rails.js';
 
 // TASK-235 — the create affordance is the Playlists rail-heading ＋ button (in the
 // browse screen), not a synthetic card. withPlaylistsRail just GUARANTEES the rail
@@ -176,12 +176,12 @@ describe('buildTabRails', () => {
     expect(rails[0].items.map(c => c.id)).toEqual(['bluey']);
   });
 
-  it('Home Movies -> Play All rail then one rail per people tag, A-Z by label, item in each matching rail (TASK-444/486)', () => {
+  it('Home Movies -> Play All rail then the month rail, one tile per people tag, A-Z by label (TASK-486/491/502)', () => {
     const rails = buildTabRails('home-movies', TYPED, [], {});
-    expect(rails.map(r => r.title)).toEqual(['Play All', 'Play All by month', 'Millie', 'Ollie', 'Other']); // Play All leads, then the month rail (TASK-491), then A-Z
-    expect(rails[2].items.map(c => c.id)).toEqual(['m-walk', 'm-park']);  // both tagged Millie, newest capture date first
-    expect(rails[3].items.map(c => c.id)).toEqual(['m-walk']);            // m-walk also tagged Ollie
-    expect(rails[4].items.map(c => c.id)).toEqual(['orphan']);            // untagged -> Other
+    expect(rails.map(r => r.title)).toEqual(['Play All', 'Play All by month']); // TASK-502: no rail per kid after these two
+    // The `people` tags now surface only as Play All tiles: A-Z, and 'other'
+    // (the untagged `orphan` clip) earns none of its own — All covers it.
+    expect(rails[0].items.map(t => t.title)).toEqual(['All', 'Millie', 'Ollie']);
   });
 
   it('does not mutate input cards', () => {
@@ -635,12 +635,12 @@ describe('CARD_ROUTES', () => {
   });
 });
 
-// TASK-444 — the Home Movies tab's person rails: one rail per `people` tag
-// value, through the same groupRails path genre rails use, sorted newest-first
-// by capture date rather than A-Z by title. Untagged clips share one "Other"
-// rail. Reinstates the FEAT-025/TASK-183 person rails (dropped 2026-06-12 when
-// home content carried no people tags) now that TASK-443/447 populate them.
-describe('Home Movies person rails (TASK-444)', () => {
+// TASK-502 — the Home Movies tab no longer renders a browse rail per kid.
+// TASK-444 added those rails; TASK-486's Play All tiles now open the same clip
+// list, so the rails were a second route to one place. The `people` grouping
+// itself survives as data feeding those tiles — asserted here through the
+// tiles, since that is the only place it is now observable.
+describe('Home Movies person rails removed (TASK-502)', () => {
   // Three kid clips (two of Millie's, mixed capture dates) plus one untagged.
   const HOME = [
     { kind: 'video', id: 'm-walk', title: 'Millie Walk', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-05' } },
@@ -649,41 +649,49 @@ describe('Home Movies person rails (TASK-444)', () => {
     { kind: 'video', id: 'plain',  title: 'Plain Clip',  section: 'home-movies' }
   ];
 
-  it('adds one rail per kid, title-cased slug, A-Z by rail title, after the TASK-486 Play All rail (and the TASK-491 month rail)', () => {
+  it('renders Play All and Play All by month only — no rail per kid', () => {
     const rails = buildTabRails('home-movies', HOME, [], {});
-    expect(rails.map(r => r.title)).toEqual(['Play All', 'Play All by month', 'Millie', 'Ollie', 'Other']);
-    expect(rails.map(r => r.id)).toEqual(['home-movies-play-all', 'home-movies-play-all-month', 'person:millie', 'person:ollie', 'person:other']);
+    expect(rails.map(r => r.title)).toEqual(['Play All', 'Play All by month']);
+    expect(rails.map(r => r.id)).toEqual(['home-movies-play-all', 'home-movies-play-all-month']);
   });
 
-  it("sorts a rail's items newest-first by capture date, not A-Z by title", () => {
+  it('returns no person: rail for any kid, tagged or untagged', () => {
     const rails = buildTabRails('home-movies', HOME, [], {});
-    const millie = rails.find(r => r.id === 'person:millie');
-    expect(millie.items.map(c => c.id)).toEqual(['m-park', 'm-walk']); // 01-10 before 01-05
+    expect(rails.filter(r => r.id.startsWith('person:'))).toEqual([]);
   });
 
-  it('a clip tagged with more than one kid appears in each of those kids\' rails', () => {
-    const both = HOME.concat([{ kind: 'video', id: 'both', title: 'Both Kids', section: 'home-movies', people: ['millie', 'ollie'], tags: { date: '2026-01-08' } }]);
-    const rails = buildTabRails('home-movies', both, [], {});
-    expect(rails.find(r => r.id === 'person:millie').items.map(c => c.id)).toContain('both');
-    expect(rails.find(r => r.id === 'person:ollie').items.map(c => c.id)).toContain('both');
-  });
-
-  it('an untagged clip lands in one Other rail rather than disappearing', () => {
-    const rails = buildTabRails('home-movies', HOME, [], {});
-    const other = rails.find(r => r.id === 'person:other');
-    expect(other).toBeTruthy();
-    expect(other.items.map(c => c.id)).toEqual(['plain']);
-  });
-
-  it('orders rails Continue → Play All (TASK-486) → Play All by month (TASK-491) → person rails', () => {
+  it('orders rails Continue → Play All (TASK-486) → Play All by month (TASK-491), and stops there', () => {
     const cw = [{ item_id: 'm-walk', title: 'Millie Walk', poster: 'm.jpg', position_secs: 5, duration_secs: 30, collection_id: null, collection_title: null }];
     const ids = buildTabRails('home-movies', HOME, cw, {}).map(r => r.id);
-    expect(ids).toEqual(['continue', 'home-movies-play-all', 'home-movies-play-all-month', 'person:millie', 'person:ollie', 'person:other']);
+    expect(ids).toEqual(['continue', 'home-movies-play-all', 'home-movies-play-all-month']);
   });
 
-  it('omits a person rail with no clips (no rail for a kid nobody has tagged)', () => {
+  it('still builds one Play All tile per kid, title-cased slug, A-Z — the grouping outlived its rail', () => {
+    const rails = buildTabRails('home-movies', HOME, [], {});
+    const playAll = rails.find(r => r.id === 'home-movies-play-all');
+    expect(playAll.items.map(t => t.title)).toEqual(['All', 'Millie', 'Ollie']);
+    expect(playAll.items.map(t => t.navParams)).toEqual([
+      { homeMoviesAll: 1 }, { homeMoviesPerson: 'millie' }, { homeMoviesPerson: 'ollie' }
+    ]);
+  });
+
+  it('a clip tagged with more than one kid still yields a tile for each of them', () => {
+    const both = HOME.concat([{ kind: 'video', id: 'both', title: 'Both Kids', section: 'home-movies', people: ['millie', 'ollie'], tags: { date: '2026-01-08' } }]);
+    const onlyBoth = both.filter(c => c.id === 'both');
+    const playAll = buildTabRails('home-movies', onlyBoth, [], {}).find(r => r.id === 'home-movies-play-all');
+    expect(playAll.items.map(t => t.title)).toEqual(['All', 'Millie', 'Ollie']);
+  });
+
+  it('an untagged clip still keeps the rail alive without earning a tile of its own', () => {
+    const onlyUntagged = HOME.filter(c => c.id === 'plain');
+    const playAll = buildTabRails('home-movies', onlyUntagged, [], {}).find(r => r.id === 'home-movies-play-all');
+    expect(playAll.items.map(t => t.title)).toEqual(['All']);
+  });
+
+  it('gives no tile to a kid nobody has tagged', () => {
     const noOllie = HOME.filter(c => c.id !== 'o-swim');
-    expect(buildTabRails('home-movies', noOllie, [], {}).some(r => r.id === 'person:ollie')).toBe(false);
+    const playAll = buildTabRails('home-movies', noOllie, [], {}).find(r => r.id === 'home-movies-play-all');
+    expect(playAll.items.map(t => t.title)).toEqual(['All', 'Millie']);
   });
 
   it('drops the old Collections/Videos structural split (TASK-183 -> TASK-444)', () => {
@@ -694,36 +702,19 @@ describe('Home Movies person rails (TASK-444)', () => {
 
   it('a kind:series home-movie card is grouped by people like any other, no special-casing', () => {
     const withCollection = [
-      { kind: 'series', id: 'holidays', title: 'Holidays', section: 'home-movies', people: ['millie'], tags: { date: '2026-02-01' } },
-      { kind: 'video', id: 'm-walk', title: 'Millie Walk', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-01' } }
+      { kind: 'series', id: 'holidays', title: 'Holidays', section: 'home-movies', people: ['sadie'], tags: { date: '2026-02-01' } }
     ];
-    const millie = buildTabRails('home-movies', withCollection, [], {}).find(r => r.id === 'person:millie');
-    expect(millie.items.map(c => c.id)).toEqual(['holidays', 'm-walk']); // newest (02-01) first, regardless of kind
-  });
-
-  it('two clips with equal capture dates tie-break A-Z by title', () => {
-    const sameDate = [
-      { kind: 'video', id: 'b', title: 'B Clip', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-01' } },
-      { kind: 'video', id: 'a', title: 'A Clip', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-01' } }
-    ];
-    const millie = buildTabRails('home-movies', sameDate, [], {}).find(r => r.id === 'person:millie');
-    expect(millie.items.map(c => c.id)).toEqual(['a', 'b']);
-  });
-
-  it('a clip missing tags.date sorts after every dated clip in its rail', () => {
-    const mixed = [
-      { kind: 'video', id: 'dated', title: 'Dated', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-01' } },
-      { kind: 'video', id: 'undated', title: 'Undated', section: 'home-movies', people: ['millie'] }
-    ];
-    const millie = buildTabRails('home-movies', mixed, [], {}).find(r => r.id === 'person:millie');
-    expect(millie.items.map(c => c.id)).toEqual(['dated', 'undated']);
+    const playAll = buildTabRails('home-movies', withCollection, [], {}).find(r => r.id === 'home-movies-play-all');
+    expect(playAll.items.map(t => t.title)).toEqual(['All', 'Sadie']);
   });
 });
 
 // TASK-486 — the Home Movies "Play All" tile rail: All + one tile per kid,
 // replacing TASK-446's single header button. Kid tiles reuse EXACTLY the
-// person rails' own tag set (personRails, TASK-444) — no separate tagging
-// concept — and drop 'other' since "All" already covers untagged clips.
+// `people` tag set (personRails, TASK-444) — no separate tagging concept —
+// and drop 'other' since "All" already covers untagged clips. Since TASK-502
+// removed the browse rails that tag set also fed, these tiles are the only
+// way into a single kid's clips.
 describe('homeMoviesPlayAllRail (TASK-486)', () => {
   const PERSON_RAILS = [
     { id: 'person:millie', slug: 'millie', title: 'Millie', items: [{ id: 'm-walk' }] },
@@ -854,6 +845,14 @@ describe('homeMoviesListTitle / homeMoviesListItems (TASK-486 revision)', () => 
     expect(homeMoviesListTitle('millie', '2026-08')).toBe('Aug 2026');
   });
 
+  it('homeMoviesSourceLabel names the Queue hero by the source scope: a month, a kid, or "All" (TASK-499)', () => {
+    expect(homeMoviesSourceLabel('home-movie-month', '2026-08')).toBe('Aug 2026');
+    expect(homeMoviesSourceLabel('home-movies-by-person', 'millie')).toBe('Millie');
+    // The whole-catalog Play All source: "All", NOT its own source id
+    // title-cased — the id is a scope name, never something a viewer reads.
+    expect(homeMoviesSourceLabel('home-movies-all', 'home-movies-all')).toBe('All');
+  });
+
   it('homeMoviesListItems with no person returns every home-movie clip, newest first, wrapped as {video}', () => {
     const items = homeMoviesListItems(HOME, null);
     expect(items.map(i => i.video.id)).toEqual(['m-park', 'both', 'o-swim', 'm-walk', 'plain']);
@@ -871,6 +870,27 @@ describe('homeMoviesListTitle / homeMoviesListItems (TASK-486 revision)', () => 
 
   it('homeMoviesListItems scoped to a person with no clips is empty', () => {
     expect(homeMoviesListItems(HOME, 'nemo')).toEqual([]);
+  });
+
+  // The capture-date tie-break (TASK-444, once shared with the person browse
+  // rails TASK-502 removed): two clips captured on the same day fall back to
+  // A-Z by title, and two undated clips tie the same way rather than keeping
+  // catalog order.
+  it('homeMoviesListItems tie-breaks two clips captured on the same date A-Z by title', () => {
+    const sameDate = [
+      { kind: 'video', id: 'b', title: 'B Clip', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-01' } },
+      { kind: 'video', id: 'a', title: 'A Clip', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-01' } }
+    ];
+    expect(homeMoviesListItems(sameDate, 'millie').map(i => i.video.id)).toEqual(['a', 'b']);
+  });
+
+  it('homeMoviesListItems tie-breaks two undated clips A-Z by title, after every dated one', () => {
+    const mixed = [
+      { kind: 'video', id: 'z-undated', title: 'Z Undated', section: 'home-movies', people: ['millie'] },
+      { kind: 'video', id: 'a-undated', title: 'A Undated', section: 'home-movies', people: ['millie'] },
+      { kind: 'video', id: 'dated', title: 'Dated', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-01' } }
+    ];
+    expect(homeMoviesListItems(mixed, 'millie').map(i => i.video.id)).toEqual(['dated', 'a-undated', 'z-undated']);
   });
 
   it('homeMoviesListItems tolerates null/undefined cards', () => {
@@ -967,8 +987,11 @@ describe('home-rails edge-case fallbacks (TASK-315)', () => {
 
   it('Home Movies groups by people regardless of `kind` (TASK-444 drops the kind split)', () => {
     var cards = [{ id: 'no-kind', title: 'No Kind', section: 'home-movies' }]; // kind absent, no people -> Other
-    var other = buildTabRails('home-movies', cards, [], {}).find(r => r.id === 'person:other');
-    expect(other.items.map(c => c.id)).toEqual(['no-kind']);
+    // Since TASK-502 that grouping renders no rail of its own; the Other group
+    // shows up as the Play All rail existing at all (it is omitted when the
+    // grouping is empty), with no tile of its own.
+    var playAll = buildTabRails('home-movies', cards, [], {}).find(r => r.id === 'home-movies-play-all');
+    expect(playAll.items.map(t => t.title)).toEqual(['All']);
   });
 
   it('albumsByArtist ignores non-music and other-artist cards (filter short-circuits)', () => {
