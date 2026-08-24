@@ -580,8 +580,8 @@ test.describe('companion Home Movies Play All', () => {
 
   test('a kid tile drives the TV to the home-movies-by-person entry for that kid', async ({ page }) => {
     // Millie's tile sits in the SAME Play All rail/grid as All (both fixture
-    // clips are tagged 'millie') — no pager-next needed, unlike the person
-    // browse rail (a separate rail this Play All rail sits ahead of).
+    // clips are tagged 'millie') — no pager-next needed, and since TASK-502
+    // this tile is the only way into one kid's clips.
     await page.locator('.dock-tab[data-section="home-movies"]').click();
     await expect(page.locator('#pager-name')).toHaveText('Play All');
     await page.locator('#txtgrid .ph-txt[data-id="play-all:Millie"]').click();
@@ -591,28 +591,19 @@ test.describe('companion Home Movies Play All', () => {
     }).toBe('play-all:Millie');
   });
 
-  // TASK-516 — the phone's own clip ＋ Queue, the fifth affordance a clip has.
-  // It posted to the old video-playback queue, which the home-movie player has
-  // not read since TASK-499, so the clip never arrived anywhere.
-  test('＋ Queue on a clip tile appends it to the unified home-movie queue', async ({ page }) => {
-    let oldEngineHit = false;
-    await page.route('**/api/video-playback/queue-video**', route => { oldEngineHit = true; return route.fulfill({ status: 204, body: '' }); });
-    await page.route('**/api/queue/home-movie/queue-item**', route => route.fulfill({ status: 204, body: '' }));
+  // TASK-502 — Home Movies pages Play All then Play All by month, and stops:
+  // the person rails a third pager-next used to reach are gone, so the phone's
+  // browse rails hold only action tiles.
+  test('the Home Movies pager stops after Play All by month — no rail per kid', async ({ page }) => {
     await page.locator('.dock-tab[data-section="home-movies"]').click();
-    await page.locator('#pager-next').click();               // Play All -> the month rail
-    await page.locator('#pager-next').click();               // month -> Millie's own clip rail
-    await expect(page.locator('#pager-name')).toHaveText('Millie');
-    const queued = page.waitForRequest(req =>
-      req.url().includes('/api/queue/home-movie/queue-item') && req.method() === 'POST');
-    await page.locator('.ph-cell-queue[data-queue="beach-day"]').click();
-    const req = await queued;
-    // This describe's mock app_state carries no person (the dedicated
-    // queue-button mock below is the one that does), so the per-person POST is
-    // asserted on the TV browse tile and the companion clip list instead.
-    expect(JSON.parse(req.postData())).toEqual({ item_id: 'beach-day' });
-    await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
-    expect(oldEngineHit).toBe(false);
+    await expect(page.locator('#pager-name')).toHaveText('Play All');
+    await page.locator('#pager-next').click();
+    await expect(page.locator('#pager-name')).toHaveText('Play All by month');
+    await expect(page.locator('#pager-next')).toBeDisabled();   // no third rail to page to
   });
+  // TASK-516's ＋ Queue on a companion clip tile used to be asserted here, on a
+  // person rail. Its clip tile now lives on the companion clip list, where
+  // `companion-home-movies-list.test.js` covers the same ＋ on the same engine.
 });
 
 // TASK-258 (2): the VIDEO queue button reads a compact "🎬 (N)" — media icon +
