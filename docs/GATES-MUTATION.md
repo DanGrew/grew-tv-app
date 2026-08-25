@@ -116,7 +116,9 @@ The run takes ~50s locally.
 
 The new `core/player-math.js` (the extracted residue) is at **100%**. Survivors
 concentrate in the modules the TASK-315 coverage backlog also flags — the two
-Queue-View models `video-queue-view.js` (211) and `queue-view.js` (165) dominate,
+Queue-View models `video-queue-view.js` (211) and `queue-view.js` (165) dominate
+— the latter deleted by TASK-504's music cutover, so that share of the backlog
+is gone rather than paid down —
 then `home-rails.js` (37), `companion-ws.js` (25), `ws-protocol.js` (18),
 `nav-trail.js` (17), `device-colour.js` (17), `profile-config.js` (16),
 `progress.js`/`state.js` (12–15). Several files already clear 100%
