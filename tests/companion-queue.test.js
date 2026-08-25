@@ -1,88 +1,148 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installPlaybackBackend } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js');
 
-// FEAT-031 (TASK-189) — the companion Queue View mirror. The phone renders the
-// SAME server `playback` snapshot the TV gets (per-person relay, TASK-157) into
-// the four sections, and DRIVES the queue by POSTing the TASK-186 actions
-// straight to /api/playback (server-authoritative — the resolved snapshot comes
-// back over the relay and repaints). installPlaybackBackend is the faithful mini
-// backend shared with the TV Queue View (TASK-188); we seed a playing album +
-// one queued track, then assert the mirror and the edits round-trip.
+// FEAT-031 (TASK-189) → FEAT-497 (TASK-504) — the companion MUSIC Queue page.
+// It used to be music's own page (companion/queue.html over
+// ui/screens/companion-queue.js, four sections off the old /api/playback
+// snapshot). TASK-504 moved it to companion/music-queue.html on THE shared
+// shell (ui/screens/companion-queue-shell.js + core/queue-shell-view.js) that
+// films (TASK-517) and home movies (TASK-516) already run on.
+//
+// This suite is deliberately the twin of tests/companion-film-queue-page.test.js:
+// the phone renders the SAME `queue_playback` snapshot the TV gets (per-person
+// relay, filtered to media_type 'music') and DRIVES the queue by POSTing to
+// /api/queue/music for the active person.
 
-async function setup(page) {
+async function setup(page, seedActions) {
   await installApi(page);
-  const pb = await installPlaybackBackend(page);
-  // ordered album, repeat off -> THEN is "Source ends"; one user-queued track.
-  pb.seed('play-source', { source_type: 'album', source_id: 'ootb', shuffle: false });
-  pb.seed('queue-track', { track_id: 'ootb-03' });
-  await page.goto('/companion/queue.html');
-  return pb;
+  const backend = await installQueuePlaybackBackend(page, 'music');
+  backend.seed('play-source', { source_type: 'album', source_id: 'ootb' });
+  (seedActions || [{ action: 'queue-item', body: { item_id: 'dancing-queen' } }])
+    .forEach(function(s) { backend.seed(s.action, s.body); });
+  await page.goto('/companion/music-queue.html');
+  await expect(page.locator('.qs-ph-title')).toHaveText('Turn to Stone');   // settle signal
+  return backend;
 }
 
-test('mirrors the four sections from the server snapshot', async ({ page }) => {
+function expectPersonOnPost(page, fragment) {
+  return page.waitForRequest(req =>
+    req.url().includes('/api/queue/music/' + fragment) && req.method() === 'POST'
+    && req.url().includes('person=kids'));
+}
+
+function activeRows(page) { return page.locator('.ph-qtab-panel.active .ph-qrow'); }
+
+test('mirrors the hero + sections from the server snapshot', async ({ page }) => {
   await setup(page);
-  // Now Playing = the source's first track (ootb-01).
-  await expect(page.locator('.ph-np .nm')).toHaveText('Turn to Stone');
-  // PLAY NEXT holds the user-queued track, flagged queued.
-  const playNext = page.locator('.ph-qrow.queued');
-  await expect(playNext).toHaveCount(1);
-  await expect(playNext.locator('.nm')).toContainText('Sweet Talkin Woman');
-  // Next (FROM SOURCE) holds the rest of the permutation (ootb-02, ootb-03).
-  await page.locator('.ph-qtab[data-tab="next"]').click();   // TASK-238: source rows live under the Next tab
-  await expect(page.locator('.ph-qname[data-track="ootb-02"]')).toBeVisible();
-  // Coming Up (THEN): ordered + repeat off -> end-of-source marker, not rows.
-  await expect(page.locator('.ph-ends')).toContainText('Source ends');
+  await expect(activeRows(page)).toHaveCount(1);
+  await expect(activeRows(page).locator('.nm')).toContainText('Dancing Queen');
+});
+
+// Music's source id is opaque AND spans three kinds, so the page fetches the
+// album/playlist/artist title — the one thing it does that the home-movie page
+// doesn't, and it must pick the right lookup per source_type.
+test('the hero names the album behind the track, fetched by source id', async ({ page }) => {
+  await setup(page);
+  await expect(page.locator('.qs-ph-sub')).toHaveText('Out of the Blue');
+});
+
+test('tapping a row plays it now (play-item) for the active person', async ({ page }) => {
+  await setup(page);
+  const played = expectPersonOnPost(page, 'play-item');
+  await activeRows(page).locator('.ph-qname[data-act="select"]').first().click();
+  expect(JSON.parse((await played).postData())).toEqual({ item_id: 'dancing-queen' });
+  await expect(page.locator('.qs-ph-title')).toHaveText('Dancing Queen');
 });
 
 test('removing the queued row POSTs remove-queue-entry and repaints without it', async ({ page }) => {
   await setup(page);
-  await expect(page.locator('.ph-qrow.queued')).toHaveCount(1);
-  await page.locator('.ph-qrow.queued .ph-ract.x').click();
-  // server drops the override entry, broadcasts the new snapshot -> PLAY NEXT empties.
-  await expect(page.locator('.ph-qrow.queued')).toHaveCount(0);
+  const removed = expectPersonOnPost(page, 'remove-queue-entry');
+  await activeRows(page).locator('.ph-ract.x').first().click();
+  expect(JSON.parse((await removed).postData())).toHaveProperty('entry_id');
+  await expect(page.locator('.ph-qtab-panel[data-tab="queue"] .ph-qrow')).toHaveCount(0);
 });
 
-test('toggling repeat POSTs the action and THEN gains the next permutation', async ({ page }) => {
+test('toggling shuffle POSTs the action and reflects the snapshot', async ({ page }) => {
   await setup(page);
-  await expect(page.locator('.ph-ends')).toContainText('Source ends');
-  await page.locator('.ph-tbtn[data-action="toggle-repeat"]').click();
-  // BUG-015: repeat (not shuffle) gates THEN — repeat on -> the source wraps, so
-  // THEN now lists the next permutation (no "Source ends").
-  await expect(page.locator('.ph-ends')).toHaveCount(0);
-  await expect(page.locator('.ph-tbtn[data-action="toggle-repeat"]')).toHaveClass(/on/);
+  await expect(page.locator('.qs-tbtn[data-action="toggle-shuffle"]')).not.toHaveClass(/on/);
+  await page.locator('.qs-tbtn[data-action="toggle-shuffle"]').click();
+  await expect(page.locator('.qs-tbtn[data-action="toggle-shuffle"]')).toHaveClass(/on/);
 });
 
-// BUG-041 (companion mirror): the ON (`.on`) transport pill must be a solid fill,
-// not the old near-transparent surface-hi tint that collapsed into the focus look.
-test('BUG-041: the ON (shuffled) pill is a solid fill, distinct from an OFF pill', async ({ page }) => {
+test('toggling repeat POSTs the action and reflects the snapshot', async ({ page }) => {
   await setup(page);
-  const shuffle = page.locator('.ph-tbtn[data-action="toggle-shuffle"]');
-  await expect(shuffle).not.toHaveClass(/on/);
-  const offBg = await shuffle.evaluate(el => getComputedStyle(el).backgroundColor);
-  await shuffle.click();
-  await expect(shuffle).toHaveClass(/on/);
-  const onBg = await shuffle.evaluate(el => getComputedStyle(el).backgroundColor);
-  expect(onBg).toBe('rgb(255, 255, 255)');   // solid --focus fill (fails on the old surface-hi tint)
-  expect(onBg).not.toBe(offBg);
+  await expect(page.locator('.qs-tbtn[data-action="toggle-repeat"]')).toHaveClass(/on/);
+  await page.locator('.qs-tbtn[data-action="toggle-repeat"]').click();
+  await expect(page.locator('.qs-tbtn[data-action="toggle-repeat"]')).not.toHaveClass(/on/);
 });
 
-test('tapping a queue row POSTs play-track — now-playing advances to it', async ({ page }) => {
+test('the crumb reads "‹ Now Playing › Queue", not a bare back button', async ({ page }) => {
   await setup(page);
-  await expect(page.locator('.ph-np .nm')).toHaveText('Turn to Stone');
-  await page.locator('.ph-qtab[data-tab="next"]').click();   // TASK-238: the source track lives under the Next tab
-  await page.locator('.ph-qname[data-track="ootb-02"]').click();
-  await expect(page.locator('.ph-np .nm')).toHaveText('Mr. Blue Sky');
+  await expect(page.locator('.ph-crumb #btn-back')).toHaveText('‹ Now Playing');
+  await expect(page.locator('.ph-crumb .ph-crumb-current')).toHaveText('Queue');
 });
 
-test('back returns to the now-playing companion screen', async ({ page }) => {
+// Music's row sub-line is the ARTIST where a film's is a duration — the one
+// place the shared row builder is told the media differs (MUSIC.rowSub).
+test('every row is a title over a muted artist line, like the TV', async ({ page }) => {
+  await setup(page);
+  const row = activeRows(page).locator('.ph-qname').first();
+  await expect(row.locator('.qs-name')).toHaveText('Dancing Queen');
+  await expect(row.locator('.qs-sub')).toHaveText('ABBA');
+});
+
+test('Coming Up rows carry the read-only class the phone can dim', async ({ page }) => {
+  await setup(page);
+  const panel = page.locator('.ph-qtab-panel[data-tab="coming-up"]');
+  await expect(panel.locator('.ph-qrow').first()).toHaveClass(/ph-readonly/);
+  expect(await panel.locator('.acts').count()).toBe(0);
+});
+
+// Story 1 — the same screen as the film Queue, down to the wording, with only
+// the media noun changing.
+test('the empty Queue line names tracks, in the shared wording', async ({ page }) => {
+  await setup(page, []);
+  await expect(page.locator('.ph-qtab-panel[data-tab="queue"] .ph-qempty'))
+    .toHaveText('Nothing queued — add tracks with ＋');
+});
+
+// A lone track has no source: everything but ⏯ dims, and nothing disappears —
+// music's own setQueueMode used to hide ⏮/⏭ outright instead.
+test('a lone track dims ⏮/Shuffle/Repeat rather than hiding them', async ({ page }) => {
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'music');
+  backend.seed('play-standalone', { item_id: 'ootb-01' });
+  await page.goto('/companion/music-queue.html');
+  await expect(page.locator('.qs-ph-title')).toHaveText('Turn to Stone');
+  const previous = page.locator('.qs-tbtn[aria-label="Previous"]');
+  const shuffle = page.locator('.qs-tbtn[aria-label="Shuffle"]');
+  await expect(previous).toBeVisible();
+  await expect(previous).toBeDisabled();
+  await expect(shuffle).toBeVisible();
+  await expect(shuffle).toBeDisabled();
+  await expect(page.locator('.qs-tbtn[aria-label="Repeat"]')).toBeDisabled();
+  await expect(page.locator('.qs-ph-sub')).toHaveText('');   // no source to name
+});
+
+test('a queued track revives ⏭ on a lone track', async ({ page }) => {
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'music');
+  backend.seed('play-standalone', { item_id: 'ootb-01' });
+  await page.goto('/companion/music-queue.html');
+  await expect(page.locator('.qs-tbtn[aria-label="Next"]')).toBeDisabled();
+  backend.seed('queue-item', { item_id: 'dancing-queen' });
+  await page.reload();
+  await expect(page.locator('.qs-tbtn[aria-label="Next"]')).toBeEnabled();
+});
+
+test('back returns to the companion audio player', async ({ page }) => {
   await setup(page);
   await page.locator('#btn-back').click();
   await expect(page).toHaveURL(/companion\/audio\.html$/);
 });
 
-// TASK-415 — the popout menu's Switch profile, ported from companion-browse.js.
-// The wiring only needs the WS connected (installPlaybackBackend's snapshot loop
-// is unrelated), so this records raw intents over a minimal socket instead.
+// TASK-415 — the popout menu's Switch profile. The wiring only needs the WS
+// connected, so this records raw intents over a minimal socket.
 test('Switch profile sends the navigate intent to the picker (BUG-007)', async ({ page }) => {
   const intents = [];
   await installApi(page);
@@ -92,16 +152,14 @@ test('Switch profile sends the navigate intent to the picker (BUG-007)', async (
       if (m.type === 'intent') intents.push(m.payload);
     });
   });
-  await page.goto('/companion/queue.html');
+  await page.goto('/companion/music-queue.html');
   await page.locator('#btn-status').click();
   await page.locator('#switch-profile').click();
   await expect.poll(() => intents.filter(i => i.intent === 'navigate' && i.params.page === 'profile.html').length).toBeGreaterThan(0);
 });
 
-// TASK-417 — the Screen row (mountScreenBar), the one status-menu piece TASK-415
-// never reached on this page. Two devices so the bar surfaces its "Pick a
-// screen" picker (a lone device auto-targets silently, per companion-screen-bar
-// TASK-179 coverage) — picking one re-targets exactly as it does on browse.html.
+// TASK-417 — the Screen row (mountScreenBar). Two devices so the bar surfaces
+// its "Pick a screen" picker (a lone device auto-targets silently).
 test('the Screen row lists both screens and picking one re-targets (TASK-417)', async ({ page }) => {
   const received = [];
   await installApi(page);
@@ -117,7 +175,7 @@ test('the Screen row lists both screens and picking one re-targets (TASK-417)', 
       }
     });
   });
-  await page.goto('/companion/queue.html');
+  await page.goto('/companion/music-queue.html');
   await page.locator('#btn-status').click();
   await expect(page.locator('#screen-bar .screen-btn')).toHaveCount(2);
 

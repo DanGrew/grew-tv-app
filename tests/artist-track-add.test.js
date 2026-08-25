@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
 // TASK-440 — the artist page's song rows gain the same single ＋ "Add to playlist"
@@ -9,7 +9,7 @@ const { pickPerson } = require('./fixtures/nav.js');
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'music');
   await page.route('**/api/browse**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS).concat(PLAYLIST_CARDS) })
@@ -43,14 +43,14 @@ test('the ＋ opens a sheet with Play Next on top, then the profile\'s playlists
   await expect(page.locator('#btn-add-cancel')).toBeVisible();
 });
 
-test('Play Next queues the track and confirms, then closes the sheet', async ({ page }) => {
+test('the queue option queues the track and confirms, then closes the sheet', async ({ page }) => {
   await enterArtist(page);
   await page.locator('.detail-row[data-id="ootb-01"] .detail-add').click();
   const queue = page.waitForRequest(req =>
-    req.url().includes('/api/playback/queue-track') && req.method() === 'POST');
+    req.url().includes('/api/queue/music/queue-item') && req.method() === 'POST');
   await page.locator('#add-sheet-list .add-queue').click();
-  expect(JSON.parse((await queue).postData())).toEqual({ track_id: 'ootb-01' });
-  await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+  expect(JSON.parse((await queue).postData())).toEqual({ item_id: 'ootb-01' });
+  await expect(page.locator('#add-status')).toHaveText('Added to Queue');
   await expect(page.locator('#add-sheet')).toBeHidden();
 });
 

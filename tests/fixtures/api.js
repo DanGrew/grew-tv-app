@@ -1051,7 +1051,7 @@ async function installMusicVideoPlaybackBackend(page) {
 // installMusicVideoPlaybackBackend's own `state.shuffle` simplification
 // above) — real shuffle order is proven server-side (grew-tv's own pytest
 // suite), not re-proven here.
-async function installQueuePlaybackBackend(page, mediaType) {
+async function installQueuePlaybackBackend(page, mediaType, contextId) {
   var state = {
     sourceType: null, sourceId: null,
     currentPermutation: [], nextPermutation: [], sourcePosition: 0,
@@ -1306,6 +1306,14 @@ async function installQueuePlaybackBackend(page, mediaType) {
         },
         register_companion: function() {},
         snapshot_request: function() {
+          // TASK-504 — a companion page that lives INSIDE a device context
+          // (companion/audio.html mounts off `context_id`, unlike the
+          // standalone Queue pages) needs that push replayed too, exactly as
+          // the real relay replays the cached context. Opt-in per caller, so a
+          // page that reads no context is left exactly as it was.
+          [contextId].filter(Boolean).forEach(function(cid) {
+            ws.send(JSON.stringify({ type: 'context', payload: { context_id: cid, version: 1 } }));
+          });
           ws.send(JSON.stringify({ type: 'app_state', payload: { person: 'kids', profile: 'kids', screen: 'player' } }));
           push();
         }

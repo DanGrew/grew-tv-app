@@ -1,20 +1,22 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installPlaybackBackend } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js');
 
-// FEAT-018 (TASK-132) + FEAT-037 (TASK-245) — the companion audio context. The
-// music mirror of the persistent TV player: it drives prev / next /
-// play-track over the per-person /api/playback engine (PLANE B) and repaints
-// now-playing, the current-track highlight and the track list's
-// source from the `playback` snapshot the server pushes — the SAME snapshot the TV
-// audio page renders (applySnapshot), so a track change the companion drives swaps
-// the TV in place. play/pause / graduated skip / volume / reset stay on the legacy
-// WS intent rail (PLANE A): the <audio>'s own transport has no server action.
+// FEAT-018 (TASK-132) + FEAT-037 (TASK-245) + FEAT-497 (TASK-504) — the
+// companion audio context. The music mirror of the persistent TV player: it
+// drives prev / next / play-item over the per-person TASK-498 UNIFIED queue
+// engine (/api/queue/music, PLANE B) and repaints now-playing, the
+// current-track highlight and the track list's source from the `queue_playback`
+// snapshot the server pushes, filtered to media_type 'music' — the SAME
+// snapshot the TV audio page renders (applySnapshot), so a track change the
+// companion drives swaps the TV in place. play/pause / graduated skip / volume /
+// reset stay on the legacy WS intent rail (PLANE A): the <audio>'s own
+// transport has no server action.
 //
-// The backend is the installPlaybackBackend fixture (the HTTP-action -> WS-snapshot
-// loop the real server runs); the companion handshake (list/register/snapshot_
-// request) is answered there. An album source is seeded so the first snapshot has
-// content. The nav/breadcrumb tests use a lightweight WS-only mock that echoes the
-// `navigate` intent (those paths don't touch the playback engine).
+// The backend is the installQueuePlaybackBackend fixture (the HTTP-action ->
+// WS-snapshot loop the real server runs); the companion handshake (list/register/
+// snapshot_request) is answered there. An album source is seeded so the first
+// snapshot has content. The nav/breadcrumb tests use a lightweight WS-only mock
+// that echoes the `navigate` intent (those paths don't touch the queue engine).
 
 function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
@@ -22,14 +24,14 @@ function msg(type, payload) { return JSON.stringify({ type, payload }); }
 // artist.html echoes its own 'artist' context.
 const CTX_FOR = { 'album-detail': 'detail' };
 
-// Spy on the per-person playback engine POSTs while letting the backend still
-// process them (route.fallback -> installPlaybackBackend), so an action is both
-// observed AND repaints the snapshot. Mirrors companion-video's spyVideoActions.
+// Spy on the per-person queue engine POSTs while letting the backend still
+// process them (route.fallback -> installQueuePlaybackBackend), so an action is
+// both observed AND repaints the snapshot. Mirrors companion-video's spyVideoActions.
 function spyActions(page) {
   const posts = [];
-  page.route('**/api/playback/*', function(route) {
+  page.route('**/api/queue/music/*', function(route) {
     posts.push({
-      action: decodeURIComponent(route.request().url().split('/api/playback/')[1].split('?')[0]),
+      action: decodeURIComponent(route.request().url().split('/api/queue/music/')[1].split('?')[0]),
       url: route.request().url(),
       body: JSON.parse(route.request().postData() || '{}')
     });
@@ -42,10 +44,10 @@ function spyActions(page) {
 test.describe('album source (Plane B)', () => {
   test.beforeEach(async ({ page }) => {
     await installApi(page);
-    const backend = await installPlaybackBackend(page);
+    const backend = await installQueuePlaybackBackend(page, 'music', 'audio');
     // An album-sourced player parked on track 2 ('Mr. Blue Sky').
     backend.seed('play-source', { source_type: 'album', source_id: 'ootb' });
-    backend.seed('play-track', { track_id: 'ootb-02' });
+    backend.seed('play-item', { item_id: 'ootb-02' });
     await page.goto('/companion/audio.html');
     await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
   });
@@ -55,7 +57,7 @@ test.describe('album source (Plane B)', () => {
     await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
     await expect(page.locator('.track-btn')).toHaveCount(3);
     await expect(page.locator('.track-btn[data-id="ootb-01"] .t-name')).toHaveText('Turn to Stone');
-    // now_playing.track_id === ootb-02 -> that row is the current one.
+    // now_playing.item_id === ootb-02 -> that row is the current one.
     await expect(page.locator('.track-btn[data-id="ootb-02"]')).toHaveClass(/cur/);
     await expect(page.locator('.track-btn[data-id="ootb-01"]')).not.toHaveClass(/cur/);
   });
@@ -82,35 +84,36 @@ test.describe('album source (Plane B)', () => {
     await expect(page.locator('#c-shuffle')).toHaveCount(0);
   });
 
-  test('tapping a track plays it via play-track (Plane B) and the highlight follows the snapshot', async ({ page }) => {
+  test('tapping a track plays it via play-item (Plane B) and the highlight follows the snapshot', async ({ page }) => {
     const posts = spyActions(page);
     await expect(page.locator('.track-btn[data-id="ootb-02"]')).toHaveClass(/cur/);
     await page.locator('.track-btn[data-id="ootb-03"]').click();
     await expect(page.locator('.track-btn[data-id="ootb-03"]')).toHaveClass(/cur/);
     await expect(page.locator('.track-btn[data-id="ootb-02"]')).not.toHaveClass(/cur/);
-    const play = posts.find((p) => p.action === 'play-track');
+    const play = posts.find((p) => p.action === 'play-item');
     expect(play.url).toContain('person=kids');
-    expect(play.body.track_id).toBe('ootb-03');
+    expect(play.body.item_id).toBe('ootb-03');
   });
 
-  test('+ Queue on a track POSTs queue-track for the active person (FEAT-031 producer)', async ({ page }) => {
+  test('+ Queue on a track POSTs queue-item for the active person (FEAT-031 producer)', async ({ page }) => {
     const posts = spyActions(page);
     // One ＋ producer control per track row, alongside the tap-to-play button.
     await expect(page.locator('.queue-btn')).toHaveCount(3);
     await page.locator('.queue-btn[data-queue="ootb-03"]').click();
-    await expect.poll(() => posts.filter((p) => p.action === 'queue-track').length).toBeGreaterThan(0);
-    const q = posts.find((p) => p.action === 'queue-track');
+    await expect.poll(() => posts.filter((p) => p.action === 'queue-item').length).toBeGreaterThan(0);
+    const q = posts.find((p) => p.action === 'queue-item');
     expect(q.url).toContain('person=kids');
-    expect(q.body.track_id).toBe('ootb-03');
+    expect(q.body.item_id).toBe('ootb-03');
   });
 
   // BUG-030: the ＋ queued silently — no toast, no highlight — so it read as broken.
-  // Tapping ＋ must flash a "Queued to Play Next" confirmation (mirrors the add-sheet).
-  test('+ Queue flashes a "Queued to Play Next" confirmation toast (BUG-030)', async ({ page }) => {
+  // TASK-504: the press APPENDS now, so the confirmation is the shared table's
+  // "Added to Queue" — the same words films and home movies flash.
+  test('+ Queue flashes an "Added to Queue" confirmation toast (BUG-030)', async ({ page }) => {
     await expect(page.locator('#add-status')).toBeHidden();
     await page.locator('.queue-btn[data-queue="ootb-03"]').click();
     await expect(page.locator('#add-status')).toBeVisible();
-    await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+    await expect(page.locator('#add-status')).toHaveText('Added to Queue');
   });
 
   // play/pause / skip / volume have no server action — they ride the legacy WS
@@ -127,9 +130,11 @@ test.describe('album source (Plane B)', () => {
     await expect(page.locator('.jump-btn')).toHaveText(['-30s', '-10s', '+10s', '+30s']);
   });
 
+  // TASK-504: music's companion Queue page is music-queue.html on the shared
+  // shell now — companion/queue.html (music's own copy) is gone.
   test('a Queue button opens the companion Queue View', async ({ page }) => {
     await page.locator('#c-queue').click();
-    await expect(page).toHaveURL(/companion\/queue\.html$/);
+    await expect(page).toHaveURL(/companion\/music-queue\.html$/);
   });
 });
 
@@ -196,9 +201,9 @@ test.describe('lyrics toggle (TASK-239)', () => {
 test.describe('artist source (BUG-018)', () => {
   test.beforeEach(async ({ page }) => {
     await installApi(page);
-    const backend = await installPlaybackBackend(page);
+    const backend = await installQueuePlaybackBackend(page, 'music', 'audio');
     backend.seed('play-source', { source_type: 'artist', source_id: 'ELO' });
-    backend.seed('play-track', { track_id: 'ootb-02' });
+    backend.seed('play-item', { item_id: 'ootb-02' });
   });
 
   test('an artist source loads no track list and never mistakes the artist id for an album', async ({ page }) => {
@@ -217,7 +222,7 @@ test.describe('artist source (BUG-018)', () => {
 test.describe('playlist source (TASK-205)', () => {
   test.beforeEach(async ({ page }) => {
     await installApi(page);
-    const backend = await installPlaybackBackend(page);
+    const backend = await installQueuePlaybackBackend(page, 'music', 'audio');
     backend.seed('play-source', { source_type: 'playlist', source_id: 'pl-roadtrip' });
   });
 
@@ -361,7 +366,7 @@ test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () =
         if (m.type === 'snapshot_request') {
           ws.send(msg('context', { version: 2, context_id: 'audio', series_id: st.itemId, display: { id: st.episodeId, title: 'Mr. Blue Sky' } }));
           ws.send(msg('app_state', st));
-          ws.send(msg('playback', { now_playing: { track_id: st.episodeId, title: 'Mr. Blue Sky' }, source_type: 'artist', source_id: st.itemId }));
+          ws.send(msg('queue_playback', { media_type: 'music', now_playing: { item_id: st.episodeId, title: 'Mr. Blue Sky' }, source_type: 'artist', source_id: st.itemId }));
         }
       });
     });
@@ -397,13 +402,13 @@ test.describe('breadcrumb ancestor click trims the trail (stale-Back fix)', () =
 // artist you launched) between the recorded browse rail and the now-playing leaf, so
 // the source you're listening to is ALWAYS a crumb that returns to its own page —
 // Home › [browse rail] › [Source] › Now Playing. The source rides the real playback
-// snapshot (source_type/source_id), so these use installPlaybackBackend.
+// snapshot (source_type/source_id), so these use installQueuePlaybackBackend.
 test.describe('source crumb (BUG-044)', () => {
   test('an album source shows Home › Out of the Blue › <track>, the source crumb linking album-detail', async ({ page }) => {
     await installApi(page);
-    const backend = await installPlaybackBackend(page);
+    const backend = await installQueuePlaybackBackend(page, 'music', 'audio');
     backend.seed('play-source', { source_type: 'album', source_id: 'ootb' });
-    backend.seed('play-track', { track_id: 'ootb-02' });
+    backend.seed('play-item', { item_id: 'ootb-02' });
     await page.goto('/companion/audio.html');
     await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
     // Home + the album source (no recorded browse rail here); the track is the leaf.
@@ -416,9 +421,9 @@ test.describe('source crumb (BUG-044)', () => {
 
   test('keeps the recorded browse rail AND inserts the source — Home › Albums › Out of the Blue › <track>', async ({ page }) => {
     await installApi(page);
-    const backend = await installPlaybackBackend(page);
+    const backend = await installQueuePlaybackBackend(page, 'music', 'audio');
     backend.seed('play-source', { source_type: 'album', source_id: 'ootb' });
-    backend.seed('play-track', { track_id: 'ootb-02' });
+    backend.seed('play-item', { item_id: 'ootb-02' });
     await page.addInitScript(() => {
       sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([{ page: 'browse.html', params: { tab: 'music', rail: 'albums' }, label: 'Albums' }]));
     });
@@ -431,9 +436,9 @@ test.describe('source crumb (BUG-044)', () => {
 
   test('an artist source labels the crumb with the artist name, linking artist.html', async ({ page }) => {
     await installApi(page);
-    const backend = await installPlaybackBackend(page);
+    const backend = await installQueuePlaybackBackend(page, 'music', 'audio');
     backend.seed('play-source', { source_type: 'artist', source_id: 'ELO' });
-    backend.seed('play-track', { track_id: 'ootb-02' });
+    backend.seed('play-item', { item_id: 'ootb-02' });
     await page.goto('/companion/audio.html');
     await expect(page.locator('#now-title')).toHaveText('Mr. Blue Sky');
     const src = page.locator('#breadcrumb .crumb-link', { hasText: 'ELO' });
@@ -450,9 +455,9 @@ test.describe('source crumb (BUG-044)', () => {
   // skipping to the true browse.html rail entry.
   test('artist flow: no duplicate artist crumb, the Music rail crumb is kept (regression)', async ({ page }) => {
     await installApi(page);
-    const backend = await installPlaybackBackend(page);
+    const backend = await installQueuePlaybackBackend(page, 'music', 'audio');
     backend.seed('play-source', { source_type: 'artist', source_id: 'ELO' });
-    backend.seed('play-track', { track_id: 'ootb-02' });
+    backend.seed('play-item', { item_id: 'ootb-02' });
     await page.addInitScript(() => {
       sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
         { page: 'browse.html', params: { tab: 'music' }, label: 'Music' },
@@ -470,7 +475,7 @@ test.describe('source crumb (BUG-044)', () => {
 
   test('a playlist source links playlist-detail with the playlist title', async ({ page }) => {
     await installApi(page);
-    const backend = await installPlaybackBackend(page);
+    const backend = await installQueuePlaybackBackend(page, 'music', 'audio');
     backend.seed('play-source', { source_type: 'playlist', source_id: 'pl-roadtrip' });
     await page.goto('/companion/audio.html');
     await expect(page.locator('.track-btn')).toHaveCount(2);
@@ -484,9 +489,9 @@ test.describe('source crumb (BUG-044)', () => {
   // to its own detail.html?id= so the hop lands (the two aren't co-named).
   test('in Browse mode the album source crumb hops to the companion detail page (id-addressed)', async ({ page }) => {
     await installApi(page);
-    const backend = await installPlaybackBackend(page);
+    const backend = await installQueuePlaybackBackend(page, 'music', 'audio');
     backend.seed('play-source', { source_type: 'album', source_id: 'ootb' });
-    backend.seed('play-track', { track_id: 'ootb-02' });
+    backend.seed('play-item', { item_id: 'ootb-02' });
     await page.goto('/companion/audio.html');
     await expect(page.locator('#breadcrumb .crumb-link', { hasText: 'Out of the Blue' })).toBeVisible();
     await page.locator('#btn-status').click();

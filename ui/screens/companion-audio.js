@@ -314,7 +314,7 @@ export function initPage() {
   // A person may hold live queue state in more than one media type at once —
   // the relay tags every push with `media_type`; this page is music's.
   function onQueuePlayback(payload) {
-    [payload.media_type === MUSIC.mediaType].filter(Boolean).forEach(onPlayback);
+    [payload.media_type === MUSIC.mediaType].filter(Boolean).forEach(function() { onPlayback(payload); });
   }
 
   function followContext(payload) {

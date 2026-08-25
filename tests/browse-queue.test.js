@@ -104,12 +104,13 @@ test('queueing a film from browse makes the 🎬 pill appear straight away', asy
 });
 
 // TASK-259: the MUSIC twin beside the video button — shown only when the music
-// override ("Play Next") queue is non-empty (count from GET /api/playback via
-// playNextCount), tapping opens the TV audio page at the queue head
-// (audio.html?playQueue). Stub GET /api/playback after installApi so it wins.
-async function routeMusicQueue(page, playNext) {
-  await page.route(/\/api\/playback\?/, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', play_next: playNext }) }));
+// Queue is non-empty, tapping opens the TV audio page at the queue head
+// (audio.html?playQueue). TASK-504: the count comes from the unified engine's
+// own GET /api/queue/music (queueCount), the same snapshot the film pill reads
+// for its own media type. Stub it after installApi so it wins.
+async function routeMusicQueue(page, queued) {
+  await page.route(/\/api\/queue\/music\?/, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', media_type: 'music', queue: queued, next: [], coming_up: [] }) }));
 }
 
 test('music queue button is hidden when the music queue is empty', async ({ page }) => {
@@ -124,7 +125,7 @@ test('music queue button is hidden when the music queue is empty', async ({ page
 test('music queue button 🎵 (N) shows the count and opens the audio player at the queue head', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
-  await routeMusicQueue(page, [{ track_id: 'a' }, { track_id: 'b' }]);
+  await routeMusicQueue(page, [{ entry_id: 'e1', item_id: 'a' }, { entry_id: 'e2', item_id: 'b' }]);
   await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
   await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 (2)');
   await page.locator('#btn-play-queue-music').click();

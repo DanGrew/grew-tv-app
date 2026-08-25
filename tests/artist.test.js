@@ -1,18 +1,18 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
 // TASK-322 (FEAT-046) — the artist page is a SONG LIST of all the artist's tracks,
 // grouped by album (newest album first, track order within), reusing the album/
 // playlist detail rows. Tapping a song plays the ARTIST source from there
-// (audio.html?artist=&track= → play-source {artist} + play-track), so playback
+// (audio.html?artist=&track= → play-source {artist} + play-item), so playback
 // continues through the artist's songs. No Play/Shuffle header (TASK-321). The
 // data is assembled client-side (option (b)): albumsByArtist + one /api/album per
 // album — ELO has Time (1981) + Out of the Blue (1977) in the fixtures.
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'music');
   await page.route('**/api/browse**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS) })
@@ -54,10 +54,10 @@ test('there is no Play or Shuffle button on the artist page', async ({ page }) =
 });
 
 // Story 2 — tapping a song plays it and continues through the artist's songs.
-test('tapping a song plays the artist source from there (play-source artist + play-track)', async ({ page }) => {
+test('tapping a song plays the artist source from there (play-source artist + play-item)', async ({ page }) => {
   await enterArtist(page);
-  const srcPost = page.waitForRequest(r => r.url().includes('/api/playback/play-source') && r.method() === 'POST');
-  const trkPost = page.waitForRequest(r => r.url().includes('/api/playback/play-track') && r.method() === 'POST');
+  const srcPost = page.waitForRequest(r => r.url().includes('/api/queue/music/play-source') && r.method() === 'POST');
+  const trkPost = page.waitForRequest(r => r.url().includes('/api/queue/music/play-item') && r.method() === 'POST');
   await page.locator('.detail-row[data-id="ootb-01"]').click();
   await expect(page).toHaveURL(/audio\.html/);
   const url = page.url();
@@ -69,7 +69,7 @@ test('tapping a song plays the artist source from there (play-source artist + pl
   expect(src.source_id).toBe('ELO');
   // Shuffle is server-owned per source now (TASK-320) — no client flag.
   expect(src.shuffle).toBeUndefined();
-  expect(JSON.parse((await trkPost).postData()).track_id).toBe('ootb-01');
+  expect(JSON.parse((await trkPost).postData()).item_id).toBe('ootb-01');
   // now-playing = the tapped song; the artist source follows on (queue mode: ⏭ shown).
   await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
   await expect(page.locator('#audio-artist')).toHaveText('ELO');
