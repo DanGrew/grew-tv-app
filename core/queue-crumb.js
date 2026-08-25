@@ -7,7 +7,7 @@
 // core/breadcrumb.js (whose clickable crumbs carry data-page/data-params for a
 // real navigation). It reuses the same .breadcrumb/.crumb-link/.crumb-current/
 // .crumb-sep classes for a consistent look; the back crumb carries a stable id
-// (queue-crumb-back) that ui/screens/screen-queue.js wires to close(), and
+// (queue-crumb-back) that ui/screens/screen-queue-shell.js wires to close(), and
 // "Queue" is the inert current leaf.
 
 var BACK_ID = 'queue-crumb-back';

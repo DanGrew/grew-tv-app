@@ -1,6 +1,7 @@
-// FEAT-039 (TASK-238) shared Queue View tab shell. The music (core/queue-view.js)
-// and video (core/video-queue-view.js) queues have SEPARATE models — they read
-// different snapshot shapes — but the SAME layout: a persistent Now Playing header
+// FEAT-039 (TASK-238) shared Queue View tab shell. The remaining Queue models
+// (core/queue-shell-view.js for every cut-over media type, plus the not-yet-
+// retired core/video-queue-view.js and core/music-video-queue-view.js) read
+// different snapshot shapes — but share the SAME layout: a Now Playing header
 // above three tabs, in play order —
 //   Queue      — the tracks you queued (override).
 //   Next       — the rest of the current source (album / series).

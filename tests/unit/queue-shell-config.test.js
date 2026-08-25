@@ -117,11 +117,13 @@ describe('the ＋Queue map', () => {
     expect(JSON.parse(calls[0].opts.body)).toEqual({ video_id: 'mv-1' });
   });
 
-  it('leaves music on its own engine until TASK-504 cuts it over', async () => {
+  // TASK-504 — music joined them: a ＋ press appends to the unified queue
+  // instead of jumping to Play Next on playback_engine.py's own list.
+  it('posts a track to the SAME unified engine, not the retired music engine', async () => {
     var calls = fakeFetch();
     await queueAdd('http://s', 'music', 'millie', 'ootb-02');
-    expect(calls[0].url).toBe('http://s/api/playback/queue-track?person=millie');
-    expect(JSON.parse(calls[0].opts.body)).toEqual({ track_id: 'ootb-02' });
+    expect(calls[0].url).toBe('http://s/api/queue/music/queue-item?person=millie');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ item_id: 'ootb-02' });
   });
 
   it('POSTs JSON', async () => {
@@ -131,10 +133,10 @@ describe('the ＋Queue map', () => {
     expect(calls[0].opts.headers).toEqual({ 'Content-Type': 'application/json' });
   });
 
-  it('confirms an append for the types on the unified engine, play-next for the ones still migrating', () => {
+  it('confirms an append for the types on the unified engine, play-next for the one still migrating', () => {
     expect(queueAddStatus('film')).toBe('Added to Queue');
     expect(queueAddStatus('home-movie')).toBe('Added to Queue');
-    expect(queueAddStatus('music')).toBe('Queued to Play Next');
+    expect(queueAddStatus('music')).toBe('Added to Queue');
     expect(queueAddStatus('music-video')).toBe('Queued to Play Next');
   });
 });

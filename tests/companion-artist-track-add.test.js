@@ -32,7 +32,7 @@ async function mockArtist(page) {
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS).concat(PLAYLIST_CARDS) })
   }));
-  await page.route('**/api/playback/queue-track**', route => route.fulfill({ status: 204, body: '' }));
+  await page.route('**/api/queue/music/queue-item**', route => route.fulfill({ status: 204, body: '' }));
 }
 
 // Synced (Control) entry.
@@ -68,15 +68,15 @@ test('each song row carries a single ＋; the sheet\'s top option is ▶ Play Ne
   await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['♪ Road Trip', '♪ Empty Mix']);
 });
 
-test('Control mode: Play Next POSTs queue-track for the active person, confirms, and closes', async ({ page }) => {
+test('Control mode: the queue option POSTs queue-item for the active person, confirms, and closes', async ({ page }) => {
   await openSynced(page);
   const queued = page.waitForRequest(req =>
-    req.url().includes('/api/playback/queue-track') && req.method() === 'POST');
+    req.url().includes('/api/queue/music/queue-item') && req.method() === 'POST');
   await playNext(page, 'ootb-01');
   const req = await queued;
   expect(req.url()).toContain('person=mom');
-  expect(JSON.parse(req.postData())).toEqual({ track_id: 'ootb-01' });
-  await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+  expect(JSON.parse(req.postData())).toEqual({ item_id: 'ootb-01' });
+  await expect(page.locator('#add-status')).toHaveText('Added to Queue');
   await expect(page.locator('#add-sheet')).toBeHidden();
 });
 
@@ -98,13 +98,13 @@ test('New playlist hands off to the create page carrying the track id and profil
   await expect(page).toHaveURL(/playlist-create\.html\?addTrack=ootb-01&profile=kids/);
 });
 
-test('Browse mode: the play tile greys but the ＋ / Play Next stays live and still POSTs', async ({ page }) => {
+test('Browse mode: the play tile greys but the ＋ / queue option stays live and still POSTs', async ({ page }) => {
   await openDesynced(page);
   await expect(page.locator('.song[data-id="ootb-01"]')).toHaveClass(/desync-off/);
   await expect(page.locator('.detail-add-btn[data-add="ootb-01"]')).not.toHaveClass(/desync-off/);
   const queued = page.waitForRequest(req =>
-    req.url().includes('/api/playback/queue-track') && req.method() === 'POST');
+    req.url().includes('/api/queue/music/queue-item') && req.method() === 'POST');
   await playNext(page, 'ootb-01');
-  expect(JSON.parse((await queued).postData())).toEqual({ track_id: 'ootb-01' });
-  await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+  expect(JSON.parse((await queued).postData())).toEqual({ item_id: 'ootb-01' });
+  await expect(page.locator('#add-status')).toHaveText('Added to Queue');
 });

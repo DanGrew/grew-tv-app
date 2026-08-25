@@ -2,7 +2,8 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadAlbum, loadContinueWatching, addToPlaylist, addSourceToPlaylist, loadBrowse, playbackAction } from '../../core/app-api.js';
+import { loadAlbum, loadContinueWatching, addToPlaylist, addSourceToPlaylist, loadBrowse } from '../../core/app-api.js';
+import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
@@ -130,14 +131,15 @@ export function initAlbumDetailPage() {
       .then(function(res) { showAddSheet(playlistCards(res.content)); })
       .catch(function() { showStatus('Could not load playlists.'); });
   }
-  // FEAT-040/TASK-248 — queue a track to PLAY NEXT. POSTs queue-track for the active
-  // person; the durable override queue (TASK-246) keeps it across album swaps. Reuses
-  // the Add-sheet's transient toast for feedback. TASK-253: this is now the sheet's
-  // top "▶ Play Next" action (no standalone per-row button) — closes the sheet first,
-  // then POSTs.
+  // FEAT-040/TASK-248 — queue a track. The durable queue (TASK-246) keeps it
+  // across album swaps. Reuses the Add-sheet's transient toast for feedback.
+  // TASK-253: this is the sheet's top action (no standalone per-row button) —
+  // closes the sheet first, then POSTs. TASK-504: through queueAdd, THE ＋Queue
+  // producer, so it appends to the end of the unified queue and reads its
+  // wording from the same place every other ＋ on either surface does.
   function queueTrack(item) {
-    playbackAction(SERVER, 'queue-track', getPerson(), { track_id: item.video.id })
-      .then(function() { showStatus('Queued to Play Next'); })
+    queueAdd(SERVER, 'music', getPerson(), item.video.id)
+      .then(function() { showStatus(queueAddStatus('music')); })
       .catch(function() { showStatus('Could not queue track.'); });
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }

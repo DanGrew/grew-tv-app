@@ -7,9 +7,9 @@ import { queueCrumbHtml } from '../../core/queue-crumb.js';
 // (TASK-419) — NOW PLAYING / PLAY NEXT / FROM SOURCE / THEN — on top. It owns
 // no queue state: it renders the snapshot and turns each row's edit controls
 // into TASK-419 actions (play-video / remove-queue-entry / move-queue-entry),
-// then repaints from the next snapshot the server pushes. Mirrors
-// screen-queue.js's overlay mechanics exactly (music's own — every row is
-// editable, not just the queued ones).
+// then repaints from the next snapshot the server pushes. Mirrors the overlay
+// mechanics of music's own retired screen-queue.js (TASK-504) — every row is
+// editable, not just the queued ones.
 //
 // d-pad focus is a 2-D grid over the rows: Up/Down moves between rows, Left/
 // Right between a row's [select, shift-up, shift-down, remove] cells; Enter

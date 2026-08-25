@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS, VIDEOS } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS, VIDEOS } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-018/FEAT-027/FEAT-045 — music browse + album detail + <audio> player +
@@ -14,7 +14,9 @@ const { pickPerson } = require('./fixtures/nav.js');
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installPlaybackBackend(page);
+  // TASK-504 — music runs on the UNIFIED queue engine now, so these drive the
+  // same fixture films and home movies do, one media type over.
+  await installQueuePlaybackBackend(page, 'music');
   await page.route('**/api/browse**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS) })
@@ -164,7 +166,7 @@ test('Next POSTs the server action and the snapshot advances now-playing (no cli
   await page.locator('.film-tile[data-id="ootb"]').click();
   await page.locator('.detail-row[data-id="ootb-01"]').click();
   await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
-  const nextPost = page.waitForRequest(r => r.url().includes('/api/playback/next') && r.method() === 'POST');
+  const nextPost = page.waitForRequest(r => r.url().includes('/api/queue/music/next') && r.method() === 'POST');
   await page.locator('#btn-next').click();
   await nextPost;
   await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
@@ -172,8 +174,9 @@ test('Next POSTs the server action and the snapshot advances now-playing (no cli
 
 // REGRESSION (companion album track-jump race): tapping a track opens the player
 // with album+track params, whose entry fires TWO independent actions — play-source
-// (build the album queue, current = track 0) then play-track (jump to the tapped
-// track). The server runs each on its own thread + DB conn (ThreadingHTTPServer,
+// (build the album queue, current = track 0) then play-item (jump to the tapped
+// track; TASK-504 renamed it from the old engine's play-track).
+// The server runs each on its own thread + DB conn (ThreadingHTTPServer,
 // no lock), so firing them un-awaited races last-writer-wins; play-source is the
 // heavier op and usually persists LAST, clobbering the jump back to track 0 ("it
 // starts at the beginning"). The fix `then`-chains play-track on the resolved
@@ -182,13 +185,13 @@ test('Next POSTs the server action and the snapshot advances now-playing (no cli
 // track 0); fixed code sends it only AFTER play-source resolves.
 test('a tapped track jumps only AFTER play-source persists — no race back to track 0', async ({ page }) => {
   const events = [];
-  await page.route('**/api/playback/play-source**', async route => {
+  await page.route('**/api/queue/music/play-source**', async route => {
     events.push('source-start');
     await new Promise(r => setTimeout(r, 300));
     events.push('source-end');
     await route.fallback();
   });
-  await page.route('**/api/playback/play-track**', async route => {
+  await page.route('**/api/queue/music/play-item**', async route => {
     events.push('track');
     await route.fallback();
   });
@@ -203,23 +206,31 @@ test('a tapped track jumps only AFTER play-source persists — no race back to t
   expect(events).toEqual(['source-start', 'source-end', 'track']);
 });
 
-// The transport reports position via the server `position` action (playback_state
-// is the audio resume source now), not the legacy /api/progress write.
-test('position is reported to the playback position action', async ({ page }) => {
+// TASK-504 — music no longer reports position to any engine. The old music
+// engine took a `position` action to back mid-song resume; TASK-276 removed
+// that resume, and the TASK-498 unified engine registers no such action at all
+// (api/queue_playback.py's action list), exactly as films, home movies and
+// music videos report none either. This pins the absence: a timeupdate on a
+// playing track must POST nothing, so a future change can't quietly reintroduce
+// a per-tick write against an action the backend would reject.
+test('the transport reports no position — the unified engine has no position action', async ({ page }) => {
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();
   await page.locator('.detail-row[data-id="ootb-01"]').click();
   await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
-  const posPost = page.waitForRequest(r => r.url().includes('/api/playback/position') && r.method() === 'POST');
+  const posts = [];
+  page.on('request', r => {
+    if (r.method() === 'POST' && /position/.test(r.url())) posts.push(r.url());
+  });
   await page.evaluate(() => {
     const a = document.getElementById('audio');
     Object.defineProperty(a, 'currentTime', { configurable: true, get: () => 42 });
     Object.defineProperty(a, 'duration', { configurable: true, get: () => 227 });
     a.dispatchEvent(new Event('timeupdate'));
   });
-  const req = await posPost;
-  expect(JSON.parse(req.postData()).current_position).toBe(42);
+  await page.waitForTimeout(300);
+  expect(posts).toEqual([]);
 });
 
 // FEAT-045 (TASK-318) — the Music tab now LEADS with a "Recently Played" rail
@@ -347,7 +358,7 @@ test('a track with startAt seeks the <audio> to startAt on load (TASK-283)', asy
 test('a track with endAt advances via the normal next path on reaching endAt (TASK-283)', async ({ page }) => {
   await trimVideo(page, 'ootb-01', { endAt: 100 });
   await openPlayer(page);
-  const nextPost = page.waitForRequest(r => r.url().includes('/api/playback/next') && r.method() === 'POST');
+  const nextPost = page.waitForRequest(r => r.url().includes('/api/queue/music/next') && r.method() === 'POST');
   await page.evaluate(() => {
     const a = document.getElementById('audio');
     Object.defineProperty(a, 'currentTime', { configurable: true, get: () => 150 });
@@ -365,7 +376,7 @@ test('a track with neither startAt nor endAt is unchanged — start 0, no early 
   await openPlayer(page);
   expect(await page.locator('#audio').evaluate(a => a.currentTime)).toBe(0);
   let nextFired = false;
-  page.on('request', r => { nextFired = nextFired || r.url().includes('/api/playback/next'); });
+  page.on('request', r => { nextFired = nextFired || r.url().includes('/api/queue/music/next'); });
   await page.evaluate(() => {
     const a = document.getElementById('audio');
     Object.defineProperty(a, 'currentTime', { configurable: true, get: () => 200 });

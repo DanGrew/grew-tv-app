@@ -2,7 +2,7 @@ import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, loadConfig, loadQueuePlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadConfig, loadQueuePlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
 import { queueAdd, queueAddStatus, SECTION_MEDIA_TYPE } from '../../core/queue-shell-config.js';
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -10,7 +10,6 @@ import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute, sectionOf, artistTiles } from '../../core/home-rails.js';
 import { mountSearch } from './screen-search.js';
 import { queueCount } from '../../core/queue-playback-router.js';
-import { playNextCount } from '../../core/queue-view.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
 // Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
@@ -41,16 +40,16 @@ export function initBrowsePage() {
   }
   function onPlayQueue() { navTo('video.html', { playQueue: 1, from: 'browse' }); }
 
-  // The MUSIC twin, sitting beside the video button. Count read from the read-only
-  // GET /api/playback snapshot (music override queue = play_next, via playNextCount);
-  // tapping starts the music queue head (audio.html?playQueue, the TASK-255 entry).
+  // The MUSIC twin, sitting beside the video button. TASK-504 — the same
+  // unified-engine read the 🎬 pill does, one media type over, so both pills
+  // count the queue their own ＋ presses actually fill.
   function showPlayQueueMusic(count) {
     var btn = document.getElementById('btn-play-queue-music');
     btn.textContent = '🎵 (' + count + ')';
     btn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[(count > 0) + ''];
   }
   function refreshQueueMusic() {
-    loadPlayback(SERVER, getPerson()).then(function(snap) { showPlayQueueMusic(playNextCount(snap)); }).catch(function() {});
+    loadQueuePlayback(SERVER, 'music', getPerson()).then(function(snap) { showPlayQueueMusic(queueCount(snap)); }).catch(function() {});
   }
   function onPlayQueueMusic() { navTo('audio.html', { playQueue: 1, from: 'browse' }); }
 

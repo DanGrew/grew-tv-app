@@ -4,9 +4,10 @@
 // queue math (the server already resolved every permutation). TASK-419's
 // engine is a byte-for-byte mirror of music's own (play_next / from_source /
 // then, entry_id on every row across all three lists, shuffle + repeat both
-// live) — but this module does NOT reuse core/queue-view.js, because the row
-// shape differs: video_id + poster art, and no now-playing position (a music
-// video never resumes or reports a scrub position, TASK-373).
+// live) — but this module did NOT reuse music's own core/queue-view.js (retired
+// by TASK-504's cutover), because the row shape differs: video_id + poster art,
+// and no now-playing position (a music video never resumes or reports a scrub
+// position, TASK-373).
 //   NOW PLAYING  — the current video (no entry_id; not an editable row).
 //   PLAY NEXT    — override-queue items (origin = user-queued); hidden when empty.
 //   FROM SOURCE  — remaining videos in the current permutation.
@@ -14,8 +15,8 @@
 //                  ends" (ordered + repeat off — nothing plays after the last video).
 // Every row carries its `entry_id` (delete -> remove-queue-entry, shift up/
 // down -> move-queue-entry); a row's own name plays it immediately (play-video)
-// — mirrors queue-view.js's every-row-editable model, not video-queue-view.js's
-// queued-only one.
+// — the every-row-editable model music's retired queue-view.js had, not
+// video-queue-view.js's queued-only one.
 
 import { fmt } from './time.js';
 import { tabShellHtml, phTabShellHtml } from './queue-tabs.js';

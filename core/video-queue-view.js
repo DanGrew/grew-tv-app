@@ -165,7 +165,8 @@ export function videoQueueModel(snap) {
 
 // Shuffle + Repeat are live toggles inside the Queue View (data-act=transport
 // -> the overlay fires toggle-shuffle / toggle-repeat; the snapshot flips the
-// `on` state) — mirrors music's own Queue View pills (core/queue-view.js)
+// `on` state) — mirrors the pills music's own Queue View had (the retired
+// core/queue-view.js, TASK-504)
 // exactly. TASK-446: Shuffle only renders for a shuffleable source
 // (SHUFFLEABLE_SOURCE_TYPES) — a series/boxset never had shuffle meaning, so
 // it is omitted there entirely (not shown-disabled — that would be permanent

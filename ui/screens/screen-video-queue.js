@@ -10,8 +10,9 @@ import { queueCrumbHtml } from '../../core/queue-crumb.js';
 // server pushes. The phone mirror is ui/screens/companion-video-queue.js.
 //
 // d-pad focus is a 2-D grid over the rows: Up/Down between rows, Left/Right between
-// a row's cells; Enter fires the focused cell; Back closes. Mirrors screen-queue.js
-// (the music Queue View); every fn stays cyclomatic-1 per the UI gate.
+// a row's cells; Enter fires the focused cell; Back closes. Mirrors the music
+// Queue View's own retired screen-queue.js (TASK-504); every fn stays
+// cyclomatic-1 per the UI gate.
 export function setupVideoQueue(config) {
   var root    = config.root;          // #queue-overlay (display toggled by .open)
   var body    = config.body;          // inner container we own the innerHTML of

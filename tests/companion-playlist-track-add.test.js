@@ -40,7 +40,7 @@ function mockPlaylistApp(page, playlistId) {
 async function openPlaylist(page) {
   await installApi(page);
   await browseWithPlaylists(page);
-  await page.route('**/api/playback/queue-track**', route => route.fulfill({ status: 204, body: '' }));
+  await page.route('**/api/queue/music/queue-item**', route => route.fulfill({ status: 204, body: '' }));
   await mockPlaylistApp(page, 'pl-roadtrip');
   await page.goto('/companion/playlist.html');
   await expect(page.locator('#ctx-title')).toHaveText('Road Trip');
@@ -78,16 +78,17 @@ test('＋ opens a sheet with Play Next on top, then the profile\'s playlists + N
   await expect(page.locator('#btn-add-cancel')).toBeVisible();
 });
 
-test('Play Next queues the one track (queue-track POST carries person=)', async ({ page }) => {
+// TASK-504: appends to the unified engine's Queue, confirmed "Added to Queue".
+test('the queue option queues the one track (queue-item POST carries person=)', async ({ page }) => {
   await openPlaylist(page);
   await openAddSheet(page, 'ootb-03');
   const queue = page.waitForRequest(req =>
-    req.url().includes('/api/playback/queue-track') && req.method() === 'POST');
+    req.url().includes('/api/queue/music/queue-item') && req.method() === 'POST');
   await page.locator('#add-sheet-list .add-queue').click();
   const req = await queue;
   expect(req.url()).toContain('person=kids');
-  expect(JSON.parse(req.postData())).toEqual({ track_id: 'ootb-03' });
-  await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+  expect(JSON.parse(req.postData())).toEqual({ item_id: 'ootb-03' });
+  await expect(page.locator('#add-status')).toHaveText('Added to Queue');
   await expect(page.locator('#add-sheet')).toBeHidden();
 });
 

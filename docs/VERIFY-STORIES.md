@@ -363,8 +363,9 @@ add (detail ＋ Play Next) → `#queue-overlay` → reorder → play-now (pop) �
 DATA: Black Books ep 1/2/3.
 
 ### T14 · QUEUE MUSIC (full CRUD)  🆕 new
-TV music queue overlay (`screen-queue.js`) d-pad CRUD: add → open queue → reorder →
-play-track → remove.
+TV music queue overlay (`screen-queue-shell.js`, the shared shell — TASK-504
+retired music's own `screen-queue.js`) d-pad CRUD: add → open queue → reorder →
+play-item → remove.
 DATA: first album, tracks 2 & 3.
 
 ---

@@ -2,7 +2,8 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, loadAlbum, addToPlaylist, playbackAction } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadAlbum, addToPlaylist } from '../../core/app-api.js';
+import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
@@ -125,9 +126,11 @@ export function initArtistPage() {
       .then(function(res) { showAddSheet(playlistCards(res.content)); })
       .catch(function() { showStatus('Could not load playlists.'); });
   }
+  // TASK-504 — through queueAdd, THE ＋Queue producer: appends to the end of the
+  // unified queue, same as every other ＋ on either surface.
   function queueTrack(item) {
-    playbackAction(SERVER, 'queue-track', getPerson(), { track_id: item.video.id })
-      .then(function() { showStatus('Queued to Play Next'); })
+    queueAdd(SERVER, 'music', getPerson(), item.video.id)
+      .then(function() { showStatus(queueAddStatus('music')); })
       .catch(function() { showStatus('Could not queue track.'); });
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
