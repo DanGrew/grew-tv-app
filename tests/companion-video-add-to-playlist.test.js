@@ -25,7 +25,7 @@ async function installMusicVideoBackend(page, opts) {
         snapshot_request: function() {
           ws.send(JSON.stringify({
             type: 'context',
-            payload: { context_id: 'video', version: 1, display: { id: o.id, title: o.title }, musicVideo: true, musicVideoMulti: !!o.multi }
+            payload: { context_id: 'video', version: 1, display: { id: o.id, title: o.title }, musicVideo: true }
           }));
           ws.send(JSON.stringify({ type: 'app_state', payload: { person: 'kids', profile: 'kids', screen: 'player', itemId: o.id } }));
         }
@@ -47,19 +47,20 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('the Add to playlist button shows for a music video, hidden for a film/series', async ({ page }) => {
-  await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: false });
+  await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House' });
   await page.goto('/companion/video.html');
   await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
   await expect(page.locator('#c-add-playlist')).toBeVisible();
-  // and the reverse of repeat, which hides for a music video. The queue link
-  // (FEAT-418/TASK-420) stays visible for a music video too — it repoints
-  // to its own Queue View rather than hiding.
-  await expect(page.locator('#c-repeat')).toBeHidden();
+  // TASK-505 — Repeat no longer HIDES for a lone music video; it stays put and
+  // dims, like every other control with nothing to act on. The queue link
+  // (FEAT-418/TASK-420) stays visible too, repointing rather than hiding.
+  await expect(page.locator('#c-repeat')).toBeVisible();
+  await expect(page.locator('#c-repeat')).toHaveClass(/single/);
   await expect(page.locator('#c-queue')).toBeVisible();
 });
 
 test('tapping it offers only the profile\'s music-video playlists + New playlist', async ({ page }) => {
-  await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: false });
+  await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House' });
   await page.goto('/companion/video.html');
   await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
   await page.locator('#c-add-playlist').click();
@@ -69,7 +70,7 @@ test('tapping it offers only the profile\'s music-video playlists + New playlist
 });
 
 test('picking a playlist adds the currently-playing music video and confirms', async ({ page }) => {
-  const backend = await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: false });
+  const backend = await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House' });
   await page.goto('/companion/video.html');
   await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
   await page.locator('#c-add-playlist').click();
@@ -80,7 +81,7 @@ test('picking a playlist adds the currently-playing music video and confirms', a
 });
 
 test('New playlist hands off to the companion create page carrying the video id + collectionType=music-video-playlist', async ({ page }) => {
-  await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: false });
+  await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House' });
   await page.goto('/companion/video.html');
   await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
   await page.locator('#c-add-playlist').click();
@@ -89,7 +90,7 @@ test('New playlist hands off to the companion create page carrying the video id 
 });
 
 test('Cancel closes the sheet without adding', async ({ page }) => {
-  const backend = await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House', multi: false });
+  const backend = await installMusicVideoBackend(page, { id: 'mv-01', title: 'Head Like a Haunted House' });
   await page.goto('/companion/video.html');
   await expect(page.locator('#now-title')).toHaveText('Head Like a Haunted House');
   await page.locator('#c-add-playlist').click();

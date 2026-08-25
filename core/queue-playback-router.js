@@ -101,3 +101,15 @@ export function queueCount(snapshot) {
 export function sourceId(snapshot) {
   return snap(snapshot).source_type ? snap(snapshot).source_id : null;
 }
+
+// TASK-505 — the active source's IDENTITY, for a caller that fetches the
+// source's display name once and must know when that name is stale. `sourceId`
+// alone cannot serve: the whole-catalog Play All sources ('mv-all',
+// 'home-movies-all') are real sources carrying no id, which an id-only key
+// cannot tell apart from having no source at all. null when there is no
+// source, so a caller clears its cached title rather than fetching.
+export function sourceKey(snapshot) {
+  var s = snap(snapshot);
+  if (!s.source_type) return null;
+  return s.source_type + '/' + s.source_id;
+}

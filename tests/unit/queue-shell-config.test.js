@@ -110,11 +110,14 @@ describe('the ＋Queue map', () => {
     expect(JSON.parse(calls[0].opts.body)).toEqual({ item_id: 'beach-day' });
   });
 
-  it('leaves music videos on their own engine until TASK-505 cuts them over', async () => {
+  // TASK-505 — the last type to move: a ＋ press appends to the end of the
+  // unified queue instead of front-inserting on the music-video engine's own
+  // queue-video, so nothing jumps the line any more.
+  it('posts a music video to the SAME unified engine, not the retired music-video engine', async () => {
     var calls = fakeFetch();
     await queueAdd('http://s', 'music-video', 'millie', 'mv-1');
-    expect(calls[0].url).toBe('http://s/api/music-video-playback/queue-video?person=millie');
-    expect(JSON.parse(calls[0].opts.body)).toEqual({ video_id: 'mv-1' });
+    expect(calls[0].url).toBe('http://s/api/queue/music-video/queue-item?person=millie');
+    expect(JSON.parse(calls[0].opts.body)).toEqual({ item_id: 'mv-1' });
   });
 
   // TASK-504 — music joined them: a ＋ press appends to the unified queue
@@ -133,10 +136,12 @@ describe('the ＋Queue map', () => {
     expect(calls[0].opts.headers).toEqual({ 'Content-Type': 'application/json' });
   });
 
-  it('confirms an append for the types on the unified engine, play-next for the one still migrating', () => {
+  // Every media type is on the unified engine now, so every ＋ press confirms
+  // the same thing — and says what it actually does.
+  it('confirms an append for every media type', () => {
     expect(queueAddStatus('film')).toBe('Added to Queue');
     expect(queueAddStatus('home-movie')).toBe('Added to Queue');
     expect(queueAddStatus('music')).toBe('Added to Queue');
-    expect(queueAddStatus('music-video')).toBe('Queued to Play Next');
+    expect(queueAddStatus('music-video')).toBe('Added to Queue');
   });
 });

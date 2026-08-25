@@ -17,15 +17,15 @@
 //   transport      — (snap) -> which transport controls are live. Every type
 //                    uses the shell's ONE rule; the field exists so a genuine
 //                    per-type need has somewhere to go, not as an invitation.
-//   add            — the ＋Queue map entry: which engine, which action, which
-//                    body key, and the confirmation wording.
+//   add            — the ＋Queue map entry: which action, which body key, and
+//                    the confirmation wording.
 //
 // ⛔ A difference discovered between two types is a defect to fix toward
 // docs/QUEUE-UX-SHELL.md, not a precedent to codify as a new config field.
 
 import { transportState, durationText } from './queue-shell-view.js';
 import { homeMoviesSourceLabel } from './home-rails.js';
-import { queuePlaybackAction, musicVideoPlaybackAction } from './app-api.js';
+import { queuePlaybackAction } from './app-api.js';
 
 // Home movies' source is a person or a month — both derivable from the
 // snapshot's own source_type/source_id slugs, so no caller lookup.
@@ -52,11 +52,12 @@ function artistSub(entry) {
   return entry.artist || durationText(entry.duration);
 }
 
-// ＋Queue routing. 'queue' is the TASK-498 unified engine (append-only, per
-// FEAT-497's model — hence "Added to Queue"); music videos are still on their
-// own pre-FEAT-497 engine until TASK-505 cuts them over, where a queue press
-// still means play-next, and the wording stays honest about that.
-var APPEND = { engine: 'queue', action: 'queue-item', bodyKey: 'item_id', status: 'Added to Queue' };
+// ＋Queue routing. TASK-505 cut the last media type over, so every ＋ press
+// now lands the same way: the TASK-498 unified engine's append-only queue-item
+// (FEAT-497's model — hence "Added to Queue"). Nothing routes to a
+// pre-FEAT-497 engine any more, which is why there is no per-type engine
+// field left to route on.
+var APPEND = { action: 'queue-item', bodyKey: 'item_id', status: 'Added to Queue' };
 
 export var HOME_MOVIE = {
   mediaType: 'home-movie',
@@ -97,7 +98,10 @@ export var MUSIC_VIDEO = {
   sourceSubtitle: suppliedSource,
   rowSub: artistSub,
   transport: transportState,
-  add: { engine: 'music-video', action: 'queue-video', bodyKey: 'video_id', status: 'Queued to Play Next' }
+  // TASK-505: a music video appends to the end of the Queue like every other
+  // cut-over type, where a ＋ press used to jump it to the front of the
+  // playing head on the music-video engine's own queue-video.
+  add: APPEND
 };
 
 export var QUEUE_SHELL_CONFIG = {
@@ -117,20 +121,18 @@ export var SECTION_MEDIA_TYPE = {
   music: 'music'
 };
 
-var POST = {
-  queue: function(serverUrl, config, person, body) { return queuePlaybackAction(serverUrl, config.mediaType, config.add.action, person, body); },
-  'music-video': function(serverUrl, config, person, body) { return musicVideoPlaybackAction(serverUrl, config.add.action, person, body); }
-};
-
 // THE ＋Queue producer. Every ＋ affordance — browse tile, rail-grid badge,
 // clip/track list row, on either surface — routes through this instead of
 // keeping its own dispatch table, which is how home movies' five producers
 // ended up still posting to an engine its player had stopped reading.
+// TASK-505 retired the per-engine dispatch this used to route through: with
+// all four media types on the unified engine, the only thing that varies is
+// which media_type the POST names.
 export function queueAdd(serverUrl, mediaType, person, itemId) {
   var config = QUEUE_SHELL_CONFIG[mediaType];
   var body = {};
   body[config.add.bodyKey] = itemId;
-  return POST[config.add.engine](serverUrl, config, person, body);
+  return queuePlaybackAction(serverUrl, config.mediaType, config.add.action, person, body);
 }
 
 // The confirmation a ＋Queue press shows once it lands.

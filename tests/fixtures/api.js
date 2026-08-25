@@ -897,146 +897,6 @@ function mvPlaylistIds(id) {
   var pl = PLAYLISTS[id];
   return pl ? pl.items.map(function(it) { return it.video.id; }) : [];
 }
-var MV_GEN = {
-  'mv-item': function(id) { return [id]; },
-  'mv-artist': mvArtistIds,
-  'mv-playlist': mvPlaylistIds,
-  'mv-all': mvAllIds
-};
-function mvResolveBase(sourceType, sourceId) { return (MV_GEN[sourceType] || function() { return []; })(sourceId); }
-
-async function installMusicVideoPlaybackBackend(page) {
-  var state = { sourceType: null, sourceId: null, pass: [], pos: 0, currentVideoId: null, currentEntryId: null, queue: [], shuffle: true, repeat: true };
-  var live = null;
-  function resolve(id) {
-    var v = VIDEOS[id] || { id: id };
-    return { video_id: id, title: v.title, artist: v.artist, poster: v.poster, duration: v.duration, subtitles: v.subtitles, ext: v.ext };
-  }
-  function nowPlayingId() {
-    if (state.currentVideoId) return state.currentVideoId;
-    return (state.pos >= 0 && state.pos < state.pass.length) ? state.pass[state.pos] : null;
-  }
-  // Pending "Play Next" = the queue minus the currently-playing durable head
-  // (mirrors build_snapshot — only the FRONT is hidden, and only when it IS
-  // the now-playing video's own queue entry).
-  function pendingQueue() {
-    var q = state.queue;
-    return (q.length && state.currentEntryId && q[0].entry_id === state.currentEntryId) ? q.slice(1) : q;
-  }
-  function fromSourceIds() { return state.pass.slice(state.pos + 1); }
-  function thenIds() { return state.repeat ? state.pass.slice() : []; }
-  function snapshot() {
-    var npId = nowPlayingId();
-    return {
-      person_id: 'kids',
-      now_playing: npId ? resolve(npId) : null,
-      play_next: pendingQueue().map(function(e) { var r = resolve(e.video_id); r.entry_id = e.entry_id; return r; }),
-      from_source: fromSourceIds().map(resolve),
-      then: thenIds().map(resolve),
-      shuffle: state.shuffle, repeat: state.repeat,
-      source_type: state.sourceType, source_id: state.sourceId,
-      item_count: state.pass.length
-    };
-  }
-  function push() {
-    [live].filter(Boolean).forEach(function(ws) { ws.send(JSON.stringify({ type: 'music_video_playback', payload: snapshot() })); });
-  }
-
-  var ENGINE = {
-    'play-source': function(b) {
-      var sourceId = b.source_id === undefined ? null : b.source_id;
-      // RESUME in place for the same already-loaded source (mirrors
-      // engine.play_source) — a re-open never reshuffles/restarts.
-      if (state.sourceType === b.source_type && state.sourceId === sourceId && state.pass.length) return;
-      state.sourceType = b.source_type;
-      state.sourceId = sourceId;
-      state.shuffle = b.shuffle === undefined ? true : !!b.shuffle;
-      state.repeat = b.repeat === undefined ? true : !!b.repeat;
-      state.pass = mvResolveBase(state.sourceType, state.sourceId);
-      state.pos = 0;
-      state.currentVideoId = state.pass.length ? state.pass[0] : null;
-      state.currentEntryId = null;
-    },
-    'play-video': function(b) {
-      state.currentVideoId = b.video_id;
-      state.currentEntryId = null;
-      var idx = state.pass.indexOf(b.video_id);
-      if (idx > -1) state.pos = idx;
-    },
-    'next': function() {
-      if (state.queue.length && state.currentEntryId && state.queue[0].entry_id === state.currentEntryId) state.queue.shift();
-      if (state.queue.length) {
-        state.currentVideoId = state.queue[0].video_id;
-        state.currentEntryId = state.queue[0].entry_id;
-        return;
-      }
-      var next = state.pos + 1;
-      state.currentVideoId = null;
-      state.currentEntryId = null;
-      state.pos = (next < state.pass.length || !state.repeat) ? next : 0;
-    },
-    'previous': function() {
-      if (state.currentEntryId) { state.currentEntryId = null; state.currentVideoId = null; return; }
-      if (state.pos <= 0) return;
-      state.pos -= 1; state.currentVideoId = null; state.currentEntryId = null;
-    },
-    'toggle-shuffle': function() { state.shuffle = !state.shuffle; },
-    'toggle-repeat': function() { state.repeat = !state.repeat; },
-    'queue-video': function(b) {
-      state.queue.push({ entry_id: 'e' + (state.queue.length + 1), video_id: b.video_id });
-    },
-    'remove-queue-entry': function(b) {
-      if (state.currentEntryId === b.entry_id) state.currentEntryId = null;
-      state.queue = state.queue.filter(function(e) { return e.entry_id !== b.entry_id; });
-    },
-    'move-queue-entry': function(b) {
-      var i = state.queue.findIndex(function(e) { return e.entry_id === b.entry_id; });
-      var j = i + (b.direction === 'up' ? -1 : 1);
-      if (i < 0 || j < 0 || j >= state.queue.length) return;
-      var tmp = state.queue[i]; state.queue[i] = state.queue[j]; state.queue[j] = tmp;
-    }
-  };
-
-  await page.routeWebSocket(/:8766/, function(ws) {
-    live = ws;
-    [state.sourceType].filter(Boolean).forEach(push);
-    ws.onMessage(function(raw) {
-      var m = JSON.parse(raw);
-      var REPLY = {
-        register_device: function() {},
-        list_devices: function() {
-          ws.send(JSON.stringify({ type: 'devices', payload: { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] } }));
-        },
-        activate_person: function() {
-          [m.payload.person_id].filter(Boolean).forEach(function(pid) {
-            ws.send(JSON.stringify({ type: 'person_active', payload: { person_id: pid, device_id: m.payload.device_id } }));
-          });
-        },
-        register_companion: function() {},
-        snapshot_request: function() {
-          ws.send(JSON.stringify({ type: 'app_state', payload: { person: 'kids', profile: 'kids', screen: 'player' } }));
-          push();
-        }
-      };
-      [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
-    });
-  });
-  // GET /api/music-video-playback?person= -> read-only snapshot. Registered
-  // before the action route; matched first for the query-form URL.
-  await page.route(/\/api\/music-video-playback\?/, function(route) {
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(snapshot()) });
-  });
-  await page.route('**/api/music-video-playback/*', function(route) {
-    var action = decodeURIComponent(route.request().url().split('/api/music-video-playback/')[1].split('?')[0]);
-    var body = JSON.parse(route.request().postData() || '{}');
-    [ENGINE[action]].filter(Boolean).forEach(function(fn) { fn(body); });
-    route.fulfill({ status: 204, body: '' });
-    push();
-  });
-  function seed(action, body) { [ENGINE[action]].filter(Boolean).forEach(function(fn) { fn(body || {}); }); }
-  return { seed: seed, snapshot: snapshot };
-}
-
 // TASK-498/FEAT-497 — a fixture simulation of the UNIFIED queue engine
 // (media-manager/db/queue_engine.py + api/queue_playback.py), the twin of
 // installVideoPlaybackBackend's ENGINE table above but over THAT engine's own
@@ -1044,13 +904,16 @@ async function installMusicVideoPlaybackBackend(page) {
 // queue-item / next / previous / toggle-shuffle / toggle-repeat /
 // remove-queue-entry / move-queue-entry, and a snapshot of { now_playing,
 // queue, next, coming_up, shuffle, repeat, source_type, source_id }.
-// Parameterized by `mediaType` — TASK-499 installed it for 'home-movie'
-// (the first cutover), TASK-503 for 'film' (series/boxset/standalone, the
-// second); a later media type's own cutover reuses this unchanged.
-// Deliberately does NOT reproduce the real engine's fair shuffle (mirrors
-// installMusicVideoPlaybackBackend's own `state.shuffle` simplification
-// above) — real shuffle order is proven server-side (grew-tv's own pytest
-// suite), not re-proven here.
+// Parameterized by `mediaType` — TASK-499 installed it for 'home-movie' (the
+// first cutover), TASK-503 for 'film' (series/boxset/standalone), TASK-504 for
+// 'music' and TASK-505 for 'music-video'. It is now the ONLY playback backend
+// the app's own suites install: TASK-505 retired
+// installMusicVideoPlaybackBackend, whose `queue-video` APPENDED where the
+// real music_video_playback_engine.queue_video front-inserted, so no ordering
+// assertion written against it could be trusted.
+// Deliberately does NOT reproduce the real engine's fair shuffle — real
+// shuffle order is proven server-side (grew-tv's own pytest suite), not
+// re-proven here.
 async function installQueuePlaybackBackend(page, mediaType, contextId) {
   var state = {
     sourceType: null, sourceId: null,
@@ -1074,7 +937,15 @@ async function installQueuePlaybackBackend(page, mediaType, contextId) {
     // album/artist/playlist yields the identical track order it always did.
     'album':    function() { return sourceOrder('album', state.sourceId); },
     'artist':   function() { return sourceOrder('artist', state.sourceId); },
-    'playlist': function() { return sourceOrder('playlist', state.sourceId); }
+    'playlist': function() { return sourceOrder('playlist', state.sourceId); },
+    // TASK-505 — music videos' three source kinds, through the SAME resolvers
+    // the retired music-video fixture used (mvArtistIds/mvPlaylistIds/
+    // mvAllIds above), so a cut-over artist/playlist/Play All yields the
+    // identical order it always did. 'mv-item' has no entry: a lone pick
+    // reaches this engine as play-standalone, with no source at all.
+    'mv-artist':   function() { return mvArtistIds(state.sourceId); },
+    'mv-playlist': function() { return mvPlaylistIds(state.sourceId); },
+    'mv-all':      function() { return mvAllIds(); }
   };
   function order() { return (ORDER_BY_SOURCE_TYPE[state.sourceType] || function() { return []; })(); }
   function resolve(id) {
@@ -1337,7 +1208,7 @@ async function installQueuePlaybackBackend(page, mediaType, contextId) {
 
 module.exports = {
   VIDEOS, SERIES, ALBUMS, TRACKS, EPISODES, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, MUSIC_VIDEO_CARDS, BROWSE, CONFIG, nextOf,
-  installApi, installPlaybackBackend, installVideoPlaybackBackend, installMusicVideoPlaybackBackend, installQueuePlaybackBackend,
+  installApi, installPlaybackBackend, installVideoPlaybackBackend, installQueuePlaybackBackend,
   // TASK-326: pure response builders + the CW row builder, so the stub<->contract
   // shape test can exercise the exact objects the routes above emit.
   browseResponse, videoResponse, albumResponse, playlistResponse, continueWatchingResponse, midWatchRows

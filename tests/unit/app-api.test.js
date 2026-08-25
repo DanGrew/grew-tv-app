@@ -4,7 +4,8 @@ import {
   mediaUrl, loadLyrics, resetProgress, playbackAction, videoPlaybackAction, musicVideoPlaybackAction,
   loadVideoPlayback, loadMusicVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
   addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
-  deletePlaylist, renamePlaylist, queuePlaybackAction, loadQueuePlayback, loadMusicSourceTitle
+  deletePlaylist, renamePlaylist, queuePlaybackAction, loadQueuePlayback, loadMusicSourceTitle,
+  loadMusicVideoSourceTitle
 } from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
@@ -130,6 +131,38 @@ describe('loadMusicSourceTitle', () => {
   it('rejects on a non-ok album response rather than resolving undefined', async () => {
     fakeFetch({}, false);
     await expect(loadMusicSourceTitle('http://s', 'ootb', 'album')).rejects.toBe(500);
+  });
+});
+
+// TASK-505 — the music-video twin, same dispatch-on-source_type shape over the
+// music-video engine's own registered source names.
+describe('loadMusicVideoSourceTitle', () => {
+  it('resolves a music-video playlist source through /api/playlist/{id}', async () => {
+    var calls = fakeFetch({ id: 'pl-mv', title: 'QOTSA Videos', items: [] });
+    expect(await loadMusicVideoSourceTitle('http://s', 'pl-mv', 'mv-playlist')).toBe('QOTSA Videos');
+    expect(calls[0].url).toBe('http://s/api/playlist/pl-mv');
+  });
+  // An artist source records the artist NAME as its id, so the id IS the title.
+  it('resolves an artist source from its own id, fetching nothing', async () => {
+    var calls = fakeFetch({});
+    expect(await loadMusicVideoSourceTitle('http://s', 'QOTSA', 'mv-artist')).toBe('QOTSA');
+    expect(calls.length).toBe(0);
+  });
+  // Play All is a real source carrying no id — it names itself rather than
+  // resolving to a blank line the way a source-less item does.
+  it('names the whole-catalog Play All source, with no id to look up', async () => {
+    var calls = fakeFetch({});
+    expect(await loadMusicVideoSourceTitle('http://s', null, 'mv-all')).toBe('All Music Videos');
+    expect(calls.length).toBe(0);
+  });
+  // A lone pick plays as a standalone item with no source at all.
+  it('resolves to an empty title for a source type it does not know', async () => {
+    fakeFetch({});
+    expect(await loadMusicVideoSourceTitle('http://s', null, null)).toBe('');
+  });
+  it('rejects on a non-ok playlist response rather than resolving undefined', async () => {
+    fakeFetch({}, false);
+    await expect(loadMusicVideoSourceTitle('http://s', 'pl-mv', 'mv-playlist')).rejects.toBe(500);
   });
 });
 

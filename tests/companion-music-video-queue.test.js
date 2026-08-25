@@ -1,82 +1,135 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installMusicVideoPlaybackBackend } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js');
 
-// FEAT-418 (TASK-420, BUG-485) — the companion Music-Video Queue View mirror.
-// The phone renders the SAME server `music_video_playback` snapshot the TV
-// gets (per-person relay) into NOW PLAYING / PLAY NEXT / FROM SOURCE / THEN,
-// and DRIVES the queue by POSTing music-video-playback actions to
-// /api/music-video-playback for the active person — the same engine that also
-// drives the actual <video> element (BUG-485 retired the earlier split).
-// Ships the Screen row (`mountScreenBar` + `#screen-bar`) from the start
-// (TASK-417's gap, not repeated here — Constraints, TASK-420 spec).
+// TASK-505 (FEAT-497) — the companion MUSIC-VIDEO Queue page, the last of the
+// four moved onto THE shared shell (ui/screens/companion-queue-shell.js +
+// core/queue-shell-view.js). Its own copy (companion-music-video-queue.js,
+// core/music-video-queue-view.js) went with it, so every phone Queue page is
+// now one renderer told which media type it is: same crumb, same rows, same
+// transport rule, differing only where the media genuinely does — the noun in
+// the empty-Queue line, and how the hero's source line resolves (a music
+// video's playlist/artist source is opaque, so the page passes
+// `loadMusicVideoSourceTitle`).
 //
-// Seeds via the fixture's real mv-artist:QOTSA source (mv-01/mv-02) plus a
-// queue-video for mv-03 (a different artist, Muse) — mirrors how a companion
-// queues any video regardless of the active source, same as the real engine.
+// Written as a deliberate TWIN of tests/companion-film-queue-page.test.js, so
+// a music-video/film divergence shows up here as a failure.
+//
+// The phone renders the SAME `queue_playback` snapshot the TV gets (per-person
+// relay, filtered to media_type 'music-video') and DRIVES the queue by POSTing
+// to /api/queue/music-video for the active person.
 
 async function setup(page, seedActions) {
   await installApi(page);
-  const backend = await installMusicVideoPlaybackBackend(page);
+  const backend = await installQueuePlaybackBackend(page, 'music-video');
   backend.seed('play-source', { source_type: 'mv-artist', source_id: 'QOTSA' });
-  (seedActions || [{ action: 'queue-video', body: { video_id: 'mv-03' } }])
+  (seedActions || [{ action: 'queue-item', body: { item_id: 'mv-03' } }])
     .forEach(function(s) { backend.seed(s.action, s.body); });
   await page.goto('/companion/music-video-queue.html');
-  await expect(page.locator('.ph-np .nm')).toHaveText('Head Like a Haunted House');   // settle signal
+  await expect(page.locator('.qs-ph-title')).toHaveText('Head Like a Haunted House');   // settle signal
   return backend;
 }
 
-// Every action must carry the active person.
 function expectPersonOnPost(page, fragment) {
   return page.waitForRequest(req =>
-    req.url().includes('/api/music-video-playback/' + fragment) && req.method() === 'POST'
+    req.url().includes('/api/queue/music-video/' + fragment) && req.method() === 'POST'
     && req.url().includes('person=kids'));
 }
 
-test('mirrors the sections from the server snapshot', async ({ page }) => {
+function activeRows(page) { return page.locator('.ph-qtab-panel.active .ph-qrow'); }
+
+test('mirrors the hero + sections from the server snapshot', async ({ page }) => {
   await setup(page);
-  await expect(page.locator('.ph-np .by')).toHaveText('QOTSA');
-  await expect(page.locator('.ph-qrow.queued')).toHaveCount(1);
-  await expect(page.locator('.ph-qrow.queued .nm')).toContainText('Starlight');
-  await page.locator('.ph-qtab[data-tab="next"]').click();   // source rows live under the Next tab
-  // mv-02 also appears in the (inactive) Coming Up panel — repeat defaults on.
-  await expect(page.locator('.ph-qtab-panel.active .ph-qname[data-act="select"][data-video="mv-02"]')).toBeVisible();
+  await expect(activeRows(page)).toHaveCount(1);
+  await expect(activeRows(page).locator('.nm')).toContainText('Starlight');
 });
 
-test('tapping a row plays it now (play-video) for the active person', async ({ page }) => {
+// A music video's source id is opaque (a playlist) or IS the name (an artist),
+// so the page resolves it through its own lookup — the one thing it does that
+// the home-movie page doesn't.
+test('the hero names the artist being played', async ({ page }) => {
   await setup(page);
-  const played = expectPersonOnPost(page, 'play-video');
-  await page.locator('.ph-qrow.queued .ph-qname[data-act="select"]').first().click();
-  expect(JSON.parse((await played).postData())).toEqual({ video_id: 'mv-03' });
-  await expect(page.locator('.ph-np .nm')).toHaveText('Starlight');
+  await expect(page.locator('.qs-ph-sub')).toHaveText('QOTSA');
 });
 
-test('reorder: a queued entry down-arrow POSTs move-queue-entry for the person', async ({ page }) => {
-  await setup(page, [
-    { action: 'queue-video', body: { video_id: 'mv-03' } },
-    { action: 'queue-video', body: { video_id: 'mv-02' } }
-  ]);
-  const moved = expectPersonOnPost(page, 'move-queue-entry');
-  await page.locator('.ph-qrow.queued').first().locator('.ph-ract:not([disabled])').first().click();
-  expect(JSON.parse((await moved).postData())).toEqual({ entry_id: 'e1', direction: 'down' });
+test('tapping a row plays it now (play-item) for the active person', async ({ page }) => {
+  await setup(page);
+  const played = expectPersonOnPost(page, 'play-item');
+  await activeRows(page).locator('.ph-qname[data-act="select"]').first().click();
+  expect(JSON.parse((await played).postData())).toEqual({ item_id: 'mv-03' });
+  await expect(page.locator('.qs-ph-title')).toHaveText('Starlight');
 });
 
 test('removing the queued row POSTs remove-queue-entry and repaints without it', async ({ page }) => {
   await setup(page);
   const removed = expectPersonOnPost(page, 'remove-queue-entry');
-  await page.locator('.ph-qrow.queued .ph-ract.x').first().click();
-  expect(JSON.parse((await removed).postData())).toEqual({ entry_id: 'e1' });
-  await expect(page.locator('.ph-qrow.queued')).toHaveCount(0);
+  await activeRows(page).locator('.ph-ract.x').first().click();
+  await removed;
+  await expect(page.locator('.ph-qtab-panel[data-tab="queue"] .ph-qrow')).toHaveCount(0);
 });
 
 test('toggling shuffle POSTs the action and reflects the snapshot', async ({ page }) => {
+  await setup(page);
+  await expect(page.locator('.qs-tbtn[data-action="toggle-shuffle"]')).not.toHaveClass(/on/);
+  await page.locator('.qs-tbtn[data-action="toggle-shuffle"]').click();
+  await expect(page.locator('.qs-tbtn[data-action="toggle-shuffle"]')).toHaveClass(/on/);
+});
+
+// The retired music-video copy had a bare back button with no leaf.
+test('the crumb reads "‹ Now Playing › Queue", not a bare back button', async ({ page }) => {
+  await setup(page);
+  await expect(page.locator('.ph-crumb #btn-back')).toHaveText('‹ Now Playing');
+  await expect(page.locator('.ph-crumb .ph-crumb-current')).toHaveText('Queue');
+});
+
+// A music video's muted second line is its ARTIST, where a film shows a
+// runtime — the one row difference the shared config carries as data.
+test('every row is a title over its artist, like the TV', async ({ page }) => {
+  await setup(page);
+  const row = activeRows(page).locator('.ph-qname').first();
+  await expect(row.locator('.qs-name')).toHaveText('Starlight');
+  await expect(row.locator('.qs-sub')).toHaveText('Muse');
+});
+
+test('Coming Up rows carry the read-only class the phone can dim', async ({ page }) => {
+  await setup(page);
+  const panel = page.locator('.ph-qtab-panel[data-tab="coming-up"]');
+  await expect(panel.locator('.ph-qrow').first()).toHaveClass(/ph-readonly/);
+  expect(await panel.locator('.acts').count()).toBe(0);
+});
+
+test('the empty Queue line names videos, in the shared wording', async ({ page }) => {
+  await setup(page, []);
+  await expect(page.locator('.ph-qtab-panel[data-tab="queue"] .ph-qempty'))
+    .toHaveText('Nothing queued — add videos with ＋');
+});
+
+// Story 4 on the phone — a lone pick has no source: everything but ⏯ dims,
+// and nothing disappears. The retired copy hid the pair outright.
+test('a lone music video dims ⏮/Shuffle/Repeat rather than hiding them', async ({ page }) => {
   await installApi(page);
-  const backend = await installMusicVideoPlaybackBackend(page);
-  backend.seed('play-source', { source_type: 'mv-artist', source_id: 'QOTSA', shuffle: false });
+  const backend = await installQueuePlaybackBackend(page, 'music-video');
+  backend.seed('play-standalone', { item_id: 'mv-01' });
   await page.goto('/companion/music-video-queue.html');
-  await expect(page.locator('.ph-np .nm')).toHaveText('Head Like a Haunted House');
-  await expect(page.locator('.ph-tbtn[data-action="toggle-shuffle"]')).not.toHaveClass(/on/);
-  await page.locator('.ph-tbtn[data-action="toggle-shuffle"]').click();
-  await expect(page.locator('.ph-tbtn[data-action="toggle-shuffle"]')).toHaveClass(/on/);
+  await expect(page.locator('.qs-ph-title')).toHaveText('Head Like a Haunted House');
+  const previous = page.locator('.qs-tbtn[aria-label="Previous"]');
+  const shuffle = page.locator('.qs-tbtn[aria-label="Shuffle"]');
+  await expect(previous).toBeVisible();
+  await expect(previous).toBeDisabled();
+  await expect(shuffle).toBeVisible();
+  await expect(shuffle).toBeDisabled();
+  await expect(page.locator('.qs-tbtn[aria-label="Repeat"]')).toBeDisabled();
+  await expect(page.locator('.qs-ph-sub')).toHaveText('');   // no source to name
+});
+
+test('a queued music video revives ⏭ on a lone pick', async ({ page }) => {
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'music-video');
+  backend.seed('play-standalone', { item_id: 'mv-01' });
+  await page.goto('/companion/music-video-queue.html');
+  await expect(page.locator('.qs-tbtn[aria-label="Next"]')).toBeDisabled();
+  backend.seed('queue-item', { item_id: 'mv-03' });
+  await page.reload();
+  await expect(page.locator('.qs-tbtn[aria-label="Next"]')).toBeEnabled();
 });
 
 test('back returns to the companion video player', async ({ page }) => {
@@ -85,26 +138,9 @@ test('back returns to the companion video player', async ({ page }) => {
   await expect(page).toHaveURL(/companion\/video\.html$/);
 });
 
-// FEAT-418 constraint: this page ships the Screen row from the start, unlike
-// queue.html/video-queue.html (TASK-417's gap).
 test('the Screen row is mounted from the start', async ({ page }) => {
   await setup(page);
   await page.locator('#btn-status').click();
   await expect(page.locator('#screen-bar')).not.toBeEmpty();
   await expect(page.locator('#screen-bar')).toContainText('TV');
-});
-
-test('Switch profile sends the navigate intent to the picker', async ({ page }) => {
-  const intents = [];
-  await installApi(page);
-  await page.routeWebSocket(/:8766/, ws => {
-    ws.onMessage(raw => {
-      const m = JSON.parse(raw);
-      if (m.type === 'intent') intents.push(m.payload);
-    });
-  });
-  await page.goto('/companion/music-video-queue.html');
-  await page.locator('#btn-status').click();
-  await page.locator('#switch-profile').click();
-  await expect.poll(() => intents.filter(i => i.intent === 'navigate' && i.params.page === 'profile.html').length).toBeGreaterThan(0);
 });

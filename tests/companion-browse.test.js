@@ -666,17 +666,17 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
     await expect(page.locator('.ph-txt-cell .ph-cell-queue[data-queue="mv-01"]')).toHaveText('＋');
   });
 
-  test('＋ Queue POSTs to the music-video engine, not the film queue, and confirms with a toast', async ({ page }) => {
+  test('＋ Queue appends to the music-video queue, not the film one, and confirms with a toast', async ({ page }) => {
     let filmQueued = false;
     await page.route('**/api/queue/film/queue-item**', route => { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
-    await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+    await page.route('**/api/queue/music-video/queue-item**', route => route.fulfill({ status: 204, body: '' }));
     const queued = page.waitForRequest(req =>
-      req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+      req.url().includes('/api/queue/music-video/queue-item') && req.method() === 'POST');
     await page.locator('.ph-cell-queue[data-queue="mv-01"]').click();
     const req = await queued;
     expect(req.url()).toContain('person=kids');
-    expect(JSON.parse(req.postData())).toEqual({ video_id: 'mv-01' });
-    await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
+    expect(JSON.parse(req.postData())).toEqual({ item_id: 'mv-01' });
+    await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
     expect(filmQueued).toBe(false);
   });
 
@@ -689,9 +689,9 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
   // anywhere, yet still ate that same tap's own click, making the ＋ Queue
   // badge (and any tile) need a 2nd, steadier press most of the time.
   test('a jittery-but-stationary tap (8-39px, never enough to page) still queues on the FIRST press', async ({ page }) => {
-    await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+    await page.route('**/api/queue/music-video/queue-item**', route => route.fulfill({ status: 204, body: '' }));
     const queued = page.waitForRequest(req =>
-      req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+      req.url().includes('/api/queue/music-video/queue-item') && req.method() === 'POST');
     const box = await page.locator('.ph-cell-queue[data-queue="mv-01"]').boundingBox();
     const x = box.x + box.width / 2;
     const y = box.y + box.height / 2;
@@ -721,7 +721,7 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
   // click, exactly what a real touch drag leaves behind, then a normal
   // (mouse) click on the landed rail's ＋ Queue badge, which must not be eaten.
   test('a drag that pages but leaves no trailing click must not eat the caller\'s NEXT tap', async ({ page }) => {
-    await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+    await page.route('**/api/queue/music-video/queue-item**', route => route.fulfill({ status: 204, body: '' }));
 
     await page.evaluate(() => {
       var el = document.getElementById('txtgrid');
@@ -737,7 +737,7 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
     await expect(page.locator('#pager-name')).toHaveText('Muse'); // the drag paged, exactly as intended (QOTSA -> prev)
 
     const queued = page.waitForRequest(req =>
-      req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+      req.url().includes('/api/queue/music-video/queue-item') && req.method() === 'POST');
     await page.locator('.ph-cell-queue[data-queue="mv-03"]').click(); // a normal, later tap on the landed rail
     const req = await queued; // must queue on this FIRST tap, not need a 2nd
     expect(req.url()).toContain('person=kids');
@@ -765,7 +765,7 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
   // outgoing rail's own tile is still legitimately live mid-transition, same
   // as any animating UI) — the bug this guards is landing on NOTHING at all.
   test('a tap on the landed rail while the slide transition is still animating must not be swallowed', async ({ page }) => {
-    await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+    await page.route('**/api/queue/music-video/queue-item**', route => route.fulfill({ status: 204, body: '' }));
     const box = await page.locator('.ph-txt[data-id="mv-01"]').boundingBox();
     const x = box.x + box.width / 2;
     const y = box.y + box.height / 2;
@@ -810,13 +810,13 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
     test.use({ hasTouch: true });
 
     test('still queues on the FIRST press', async ({ page, context }) => {
-      await page.route('**/api/music-video-playback/queue-video**', route => route.fulfill({ status: 204, body: '' }));
+      await page.route('**/api/queue/music-video/queue-item**', route => route.fulfill({ status: 204, body: '' }));
       const box = await page.locator('.ph-cell-queue[data-queue="mv-01"]').boundingBox();
       const x = box.x + box.width / 2;
       const y = box.y + box.height / 2;
 
       const queued = page.waitForRequest(req =>
-        req.url().includes('/api/music-video-playback/queue-video') && req.method() === 'POST');
+        req.url().includes('/api/queue/music-video/queue-item') && req.method() === 'POST');
 
       const cdp = await context.newCDPSession(page);
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 1 }] });
