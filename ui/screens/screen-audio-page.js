@@ -216,7 +216,7 @@ export function initAudioPage() {
   // A person may hold live queue state in more than one media type at once —
   // the relay tags every push with `media_type` and this page drives only music.
   function applyQueuePlayback(payload) {
-    [payload.media_type === MUSIC.mediaType].filter(Boolean).forEach(applySnapshot);
+    [payload.media_type === MUSIC.mediaType].filter(Boolean).forEach(function() { applySnapshot(payload); });
   }
 
   // BUG-439's fix, which music is the last type to get (films TASK-503, home
@@ -236,7 +236,7 @@ export function initAudioPage() {
   // an answer naming a track other than the one this page was opened for
   // predates our POST.
   function applyResync(snap) {
-    [!qRouter.isStaleResync(trackId, loadedTrackId, snap)].filter(Boolean).forEach(applySnapshot);
+    [!qRouter.isStaleResync(trackId, loadedTrackId, snap)].filter(Boolean).forEach(function() { applySnapshot(snap); });
   }
   function resyncOnActivate() {
     loadQueuePlayback(SERVER, MUSIC.mediaType, person).then(applyResync).catch(function() {});
@@ -389,16 +389,14 @@ export function initAudioPage() {
   function jumpToTrack() {
     [trackId].filter(Boolean).forEach(function(t) { JUMP_ACTION[(kind !== 'track') + ''](t); });
   }
-  // …then pull the resulting snapshot once the entry has fully landed. The
-  // push that would have carried it is routinely lost here (BUG-439: the POSTs
-  // beat the WS handshake, since the socket waits on its own /api/config
-  // fetch), and music cannot rely on the person_active resync alone the way
-  // films can: films enter with ONE action, while music's entry is two, so a
-  // recovery GET can resolve in the window between them, describe the source
-  // head rather than the tapped track, and be discarded as stale — correctly,
-  // but with nothing left to retry. Chaining it here means the GET always
-  // reads the settled state. It stays subject to the same staleness guard, so
-  // a push that did land still wins.
+  // …then pull the resulting snapshot once the entry has fully landed. This is
+  // BUG-439's own fallback, which music was the last cut-over type to lack: the
+  // entry POSTs can beat the WS activate_person handshake (the socket waits on
+  // its own /api/config fetch first), and a push broadcast before this device is
+  // bound is silently dropped — the server applied the action, only the push was
+  // lost. Chaining the GET here rather than only onto person_active means it
+  // reads state settled by BOTH entry actions, never the source head between
+  // them. It stays subject to the staleness guard, so a push that did land wins.
   function fireEntry() {
     Promise.resolve(SOURCE_BASE[kind]()).then(jumpToTrack).then(resyncOnActivate);
   }
