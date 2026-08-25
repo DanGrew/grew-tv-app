@@ -419,8 +419,9 @@ test.describe('desync mode', () => {
 
 // FEAT-040/TASK-255 — the MUSIC "🎵 (N)" queue button beside the video one (TASK-258
 // compact label, de-purpled to match the video button):
-// shown only when the music override ("Play Next") queue is non-empty (count from
-// GET /api/playback), drives the TV audio page to start the queue head
+// shown only when the music Queue is non-empty (TASK-504: counted from the
+// unified engine's own GET /api/queue/music, the same snapshot the film pill
+// reads for its own type), drives the TV audio page to start the queue head
 // (audio.html?playQueue), and greys while desynced (Browse) like the video/profile
 // controls. A dedicated WS mock carries a `person` in app_state (the top-level mock
 // omits it, so the queue is never fetched there) + routes the GET snapshot.
@@ -433,8 +434,8 @@ test.describe('music Play Queue button', () => {
         if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
         if (m.type === 'snapshot_request') { ws.send(msg('context', { version: 2, context_id: 'browse' })); ws.send(msg('app_state', { screen: 'home', profile: 'kids', person: 'kids' })); }
       });
-    }).then(() => page.route(/\/api\/playback\?/, (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', play_next: playNext }) })));
+    }).then(() => page.route(/\/api\/queue\/music\?/, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', media_type: 'music', queue: playNext, next: [], coming_up: [] }) })));
   }
 
   test('hidden when the music queue is empty', async ({ page }) => {
@@ -447,7 +448,7 @@ test.describe('music Play Queue button', () => {
 
   test('shows the count and drives the TV audio queue head', async ({ page }) => {
     const intents2 = [];
-    await musicMock(page, intents2, [{ track_id: 'a' }, { track_id: 'b' }]);
+    await musicMock(page, intents2, [{ entry_id: 'e1', item_id: 'a' }, { entry_id: 'e2', item_id: 'b' }]);
     await page.goto('/companion/browse.html');
     await page.locator('#btn-queue-menu').click();
     await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 (2)');
@@ -459,7 +460,7 @@ test.describe('music Play Queue button', () => {
   });
 
   test('greys out in Browse mode (no dead click)', async ({ page }) => {
-    await musicMock(page, [], [{ track_id: 'a' }]);
+    await musicMock(page, [], [{ entry_id: 'e1', item_id: 'a' }]);
     await page.goto('/companion/browse.html');
     await page.locator('#btn-queue-menu').click();
     await expect(page.locator('#btn-play-queue-music')).toBeVisible();
@@ -479,7 +480,7 @@ test.describe('music Play Queue button', () => {
   // gone; the real invariant — the two queue buttons agree with each other —
   // still holds and is what this compares.
   test('is de-purpled — its border matches the video queue button, not the accent', async ({ page }) => {
-    await musicMock(page, [], [{ track_id: 'a' }]);
+    await musicMock(page, [], [{ entry_id: 'e1', item_id: 'a' }]);
     await page.goto('/companion/browse.html');
     await page.locator('#btn-queue-menu').click();
     await expect(page.locator('#btn-play-queue-music')).toBeVisible();

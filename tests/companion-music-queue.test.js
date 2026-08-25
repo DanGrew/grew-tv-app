@@ -48,7 +48,7 @@ async function mockAlbum(page) {
   await page.route('**/api/series/ootb', route => route.fulfill({
     status: 200, contentType: 'application/json', body: JSON.stringify(ALBUM)
   }));
-  await page.route('**/api/playback/queue-track**', route => route.fulfill({ status: 204, body: '' }));
+  await page.route('**/api/queue/music/queue-item**', route => route.fulfill({ status: 204, body: '' }));
 }
 
 // Synced (Control) entry: the TV is on this album, the companion follows its echo.
@@ -94,29 +94,31 @@ test('each album track row carries a single ＋; the sheet\'s top option is ▶ 
   await expect(page.locator('#add-sheet-list .add-queue')).toHaveText('☰ Play Next');
 });
 
-test('Control mode: Play Next POSTs queue-track for the active person, confirms, and closes', async ({ page }) => {
+// TASK-504: the queue option APPENDS on the unified engine (queue-item), and
+// confirms "Added to Queue" — the same wording films and home movies show.
+test('Control mode: the queue option POSTs queue-item for the active person, confirms, and closes', async ({ page }) => {
   await openSynced(page, []);
   const queued = page.waitForRequest(req =>
-    req.url().includes('/api/playback/queue-track') && req.method() === 'POST');
+    req.url().includes('/api/queue/music/queue-item') && req.method() === 'POST');
   await playNext(page, 'ootb-02');
   const req = await queued;
   expect(req.url()).toContain('person=mom');
-  expect(JSON.parse(req.postData())).toEqual({ track_id: 'ootb-02' });
-  await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+  expect(JSON.parse(req.postData())).toEqual({ item_id: 'ootb-02' });
+  await expect(page.locator('#add-status')).toHaveText('Added to Queue');
   await expect(page.locator('#add-sheet')).toBeHidden();
 });
 
-test('Browse mode: the play tile greys but the ＋ / Play Next stays live and still POSTs', async ({ page }) => {
+test('Browse mode: the play tile greys but the ＋ / queue option stays live and still POSTs', async ({ page }) => {
   await openDesynced(page, []);
   // Play is greyed (drives the TV); the ＋ add control is not (per-person POST).
   await expect(page.locator('.tile-btn[data-id="ootb-02"]')).toHaveClass(/desync-off/);
   await expect(page.locator('.detail-add-btn[data-add="ootb-02"]')).not.toHaveClass(/desync-off/);
   const queued = page.waitForRequest(req =>
-    req.url().includes('/api/playback/queue-track') && req.method() === 'POST');
+    req.url().includes('/api/queue/music/queue-item') && req.method() === 'POST');
   await playNext(page, 'ootb-02');
   const req = await queued;
-  expect(JSON.parse(req.postData())).toEqual({ track_id: 'ootb-02' });
-  await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+  expect(JSON.parse(req.postData())).toEqual({ item_id: 'ootb-02' });
+  await expect(page.locator('#add-status')).toHaveText('Added to Queue');
 });
 
 test('the play tile still plays — opening the ＋ sheet does not hijack the row (Control mode)', async ({ page }) => {
