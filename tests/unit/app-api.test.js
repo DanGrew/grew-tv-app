@@ -4,7 +4,7 @@ import {
   mediaUrl, loadLyrics, resetProgress, playbackAction, videoPlaybackAction, musicVideoPlaybackAction,
   loadVideoPlayback, loadMusicVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
   addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
-  deletePlaylist, renamePlaylist, queuePlaybackAction, loadQueuePlayback
+  deletePlaylist, renamePlaylist, queuePlaybackAction, loadQueuePlayback, loadMusicSourceTitle
 } from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
@@ -97,6 +97,39 @@ describe('loadSeriesTitle', () => {
   it('rejects on non-ok response rather than resolving undefined', async () => {
     fakeFetch({}, false);
     await expect(loadSeriesTitle('http://s', 'bluey')).rejects.toBe(500);
+  });
+});
+
+// TASK-504 — the music twin of loadSeriesTitle, for the Queue shell's hero
+// source line. Music is the one cut-over type with THREE source kinds, so the
+// lookup dispatches on source_type rather than assuming one route.
+describe('loadMusicSourceTitle', () => {
+  it('resolves an album source through /api/album/{id}', async () => {
+    var calls = fakeFetch({ id: 'ootb', title: 'Out of the Blue', items: [] });
+    expect(await loadMusicSourceTitle('http://s', 'ootb', 'album')).toBe('Out of the Blue');
+    expect(calls[0].url).toBe('http://s/api/album/ootb');
+  });
+  it('resolves a playlist source through /api/playlist/{id}', async () => {
+    var calls = fakeFetch({ id: 'pl-1', title: 'Car Songs', items: [] });
+    expect(await loadMusicSourceTitle('http://s', 'pl-1', 'playlist')).toBe('Car Songs');
+    expect(calls[0].url).toBe('http://s/api/playlist/pl-1');
+  });
+  // An artist source records the artist NAME as its id, so the id IS the title
+  // — the same rule home-rails.js's recentsIndex already relies on. No fetch.
+  it('resolves an artist source from its own id, fetching nothing', async () => {
+    var calls = fakeFetch({});
+    expect(await loadMusicSourceTitle('http://s', 'ELO', 'artist')).toBe('ELO');
+    expect(calls.length).toBe(0);
+  });
+  // A standalone track and the Play Queue entry have no source at all; the hero
+  // then shows no source line rather than the page failing to render.
+  it('resolves to an empty title for a source type it does not know', async () => {
+    fakeFetch({});
+    expect(await loadMusicSourceTitle('http://s', null, null)).toBe('');
+  });
+  it('rejects on a non-ok album response rather than resolving undefined', async () => {
+    fakeFetch({}, false);
+    await expect(loadMusicSourceTitle('http://s', 'ootb', 'album')).rejects.toBe(500);
   });
 });
 

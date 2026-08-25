@@ -1,18 +1,20 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
-// FEAT-040 (TASK-248) + TASK-253 — queueing a track to Play Next. The old
-// standalone "＋ Queue" per-row button folded into the single "＋" add sheet: each
-// available row has one ＋ that opens the sheet whose TOP option is "▶ Play Next".
-// Picking it POSTs queue-track per person to /api/playback (then closes the sheet)
-// and confirms with a transient toast. The override queue is durable (TASK-246), so
-// a queued track survives opening another album. Opening the sheet never hijacks the
+// FEAT-040 (TASK-248) + TASK-253 — queueing a track. The old standalone
+// "＋ Queue" per-row button folded into the single "＋" add sheet: each
+// available row has one ＋ that opens the sheet whose TOP option queues.
+// TASK-504: that press now POSTs queue-item to the UNIFIED engine
+// (/api/queue/music) and APPENDS to the end of the Queue — it no longer jumps
+// ahead as Play Next — and the toast reads "Added to Queue", the same wording
+// films and home movies show. The queue is durable (TASK-246), so a queued
+// track survives opening another album. Opening the sheet never hijacks the
 // row's play handler.
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'music');
   await page.route('**/api/browse**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS).concat(PLAYLIST_CARDS) })
@@ -29,21 +31,21 @@ async function openAlbum(page) {
   await expect(page.locator('.detail-row')).toHaveCount(3);
 }
 
-// Open the ＋ sheet for a row and tap its top "▶ Play Next" option.
-async function playNext(page, id) {
+// Open the ＋ sheet for a row and tap its top queue option.
+async function queueTrack(page, id) {
   await page.locator('.detail-row[data-id="' + id + '"] .detail-add').click();
   await expect(page.locator('#add-sheet')).toBeVisible();
   await page.locator('#add-sheet-list .add-queue').click();
 }
 
-test('the sheet\'s Play Next POSTs queue-track for the track, confirms with a toast, and closes', async ({ page }) => {
+test('the sheet\'s queue action POSTs queue-item to the unified engine, confirms with a toast, and closes', async ({ page }) => {
   await openAlbum(page);
   const queued = page.waitForRequest(req =>
-    req.url().includes('/api/playback/queue-track') && req.method() === 'POST');
-  await playNext(page, 'ootb-02');
+    req.url().includes('/api/queue/music/queue-item') && req.method() === 'POST');
+  await queueTrack(page, 'ootb-02');
   const req = await queued;
-  expect(JSON.parse(req.postData())).toEqual({ track_id: 'ootb-02' });
-  await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+  expect(JSON.parse(req.postData())).toEqual({ item_id: 'ootb-02' });
+  await expect(page.locator('#add-status')).toHaveText('Added to Queue');
   await expect(page.locator('#add-sheet')).toBeHidden();
 });
 
@@ -61,18 +63,20 @@ test('the ＋ control is reachable from the row via Right (d-pad)', async ({ pag
 });
 
 // FEAT-040/TASK-255 — entering the audio page with ?playQueue (no album/track)
-// fires the music play-queue action, so the TV starts the override-queue head
-// without opening a track first (the audio twin of the video page's ?playQueue).
+// fires play-queue, so the TV starts the queue head without opening a track
+// first (the audio twin of the video page's ?playQueue). TASK-504 — on the
+// unified engine now, which is also where the ＋ presses above landed.
 test('audio.html?playQueue starts the music queue head (play-queue, no track opened first)', async ({ page }) => {
   await openAlbum(page);
-  await playNext(page, 'ootb-01');   // -> Play Next: ootb-01
-  await playNext(page, 'ootb-02');   // -> front: ootb-02
+  await queueTrack(page, 'ootb-01');
+  await queueTrack(page, 'ootb-02');
   const posted = page.waitForRequest(req =>
-    req.url().includes('/api/playback/play-queue') && req.method() === 'POST');
+    req.url().includes('/api/queue/music/play-queue') && req.method() === 'POST');
   await page.goto('/app/homeview/audio.html?playQueue=1&from=browse');
   const req = await posted;
   expect(req.url()).toContain('person=kids');
   await expect(page.locator('#screen-audio')).toBeVisible();
-  // The queue head (most-recently queued lands at the front) is now playing.
-  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
+  // The head is the FIRST track queued — an append leaves it there, where the
+  // old engine's own queue-track put the most recent press at the front.
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
 });

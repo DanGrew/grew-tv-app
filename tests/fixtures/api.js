@@ -1068,12 +1068,20 @@ async function installQueuePlaybackBackend(page, mediaType) {
     // identical), mirroring the OLD engine fixture's own seriesOrderIds
     // fallback (installVideoPlaybackBackend's order() above).
     'series': function() { return seriesOrderIds(state.sourceId); },
-    'boxset': function() { return seriesOrderIds(state.sourceId); }
+    'boxset': function() { return seriesOrderIds(state.sourceId); },
+    // TASK-504 — music's three source kinds, resolved through the SAME helpers
+    // the old music-engine fixture used (sourceOrder above), so a cut-over
+    // album/artist/playlist yields the identical track order it always did.
+    'album':    function() { return sourceOrder('album', state.sourceId); },
+    'artist':   function() { return sourceOrder('artist', state.sourceId); },
+    'playlist': function() { return sourceOrder('playlist', state.sourceId); }
   };
   function order() { return (ORDER_BY_SOURCE_TYPE[state.sourceType] || function() { return []; })(); }
   function resolve(id) {
     var v = VIDEOS[id] || { id: id };
-    return { item_id: id, title: v.title, poster: v.poster, duration: v.duration, subtitles: v.subtitles, ext: v.ext, type: v.type, itemType: v.itemType };
+    // `artist` rides the snapshot too (TASK-504): it is what music's rows show
+    // as their muted second line, where the other types show a duration.
+    return { item_id: id, title: v.title, artist: v.artist, poster: v.poster, duration: v.duration, subtitles: v.subtitles, ext: v.ext, type: v.type, itemType: v.itemType };
   }
   function resolveEntries(entries) {
     return entries.map(function(e) { var m = resolve(e.item_id); m.entry_id = e.entry_id; return m; });

@@ -1,5 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadAlbum, loadPlaylist, playbackAction } from '../../core/app-api.js';
+import { loadAlbum, loadPlaylist, queuePlaybackAction } from '../../core/app-api.js';
+import { MUSIC, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { screenPage, displayTitle, queryString } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
@@ -150,7 +151,7 @@ export function initPage() {
   // The live current track rides the `playback` snapshot's now-playing (the engine
   // source of truth), not the 1 Hz app_state.
   function currentId() {
-    return [state.psnap].filter(Boolean).map(function(s) { return s.now_playing; }).filter(Boolean).map(function(np) { return np.track_id; }).concat([null])[0];
+    return [state.psnap].filter(Boolean).map(function(s) { return s.now_playing; }).filter(Boolean).map(function(np) { return np.item_id; }).concat([null])[0];
   }
 
   // Highlight the row matching the live current track (episodeId). Scoped to the
@@ -166,8 +167,10 @@ export function initPage() {
   // the server applies the transition and broadcasts the resolved `playback`
   // snapshot, which repaints BOTH surfaces (onPlayback). Mirrors companion-video's
   // sendVideoAction. Keyed to the active person captured off app_state.
-  function sendPlayback(action, body) { playbackAction(server, action, state.person, body).catch(noop); }
-  function playTrack(id) { sendPlayback('play-track', { track_id: id }); }
+  // TASK-504: the unified queue engine (/api/queue/music), the same rail the TV
+  // audio page and every other cut-over media type drive.
+  function sendPlayback(action, body) { queuePlaybackAction(server, MUSIC.mediaType, action, state.person, body).catch(noop); }
+  function playTrack(id) { sendPlayback('play-item', { item_id: id }); }
 
   // BUG-030: transient confirmation toast — mirrors the companion add-sheet's
   // #add-status (companion-detail.js). Hidden by default; fades after 2.5s, a fresh
@@ -181,12 +184,13 @@ export function initPage() {
     state.statusTimer = setTimeout(hideStatus, 2500);
   }
 
-  // FEAT-031 (TASK-189) producer: queue a track to PLAY NEXT — it lands in the
-  // override queue and shows up under PLAY NEXT on the Queue View + TV. BUG-030:
-  // call the engine directly (not via sendPlayback) so we can chain a confirmation
-  // toast on success — the remote no longer looks dead. Direct call keeps the toast
-  // chain here without giving sendPlayback a top-level return (no-pure-fn gate).
-  function queueTrack(id) { playbackAction(server, 'queue-track', state.person, { track_id: id }).then(function() { showStatus('Queued to Play Next'); }).catch(noop); }
+  // FEAT-031 (TASK-189) producer: ＋ queues a track. TASK-504 routes it through
+  // queueAdd — THE ＋Queue producer (core/queue-shell-config.js), the one table
+  // every ＋ affordance on either surface posts through — so music appends to
+  // the end of the Queue like every other type instead of jumping to Play Next,
+  // and the toast reads the same wording from the same place. BUG-030: the
+  // confirmation chains off the POST so the remote never looks dead.
+  function queueTrack(id) { queueAdd(server, MUSIC.mediaType, state.person, id).then(function() { showStatus(queueAddStatus(MUSIC.mediaType)); }).catch(noop); }
 
   // A track row: the play button (tap = play now, keeps the .track-btn contract
   // the highlight + e2e key off) plus a ＋ Queue producer (FEAT-031 mockup).
@@ -307,6 +311,11 @@ export function initPage() {
     captureSource(snap);
     markCurrent();
   }
+  // A person may hold live queue state in more than one media type at once —
+  // the relay tags every push with `media_type`; this page is music's.
+  function onQueuePlayback(payload) {
+    [payload.media_type === MUSIC.mediaType].filter(Boolean).forEach(onPlayback);
+  }
 
   function followContext(payload) {
     els.ctxLabel.textContent = 'Now playing';
@@ -358,7 +367,7 @@ export function initPage() {
   // player.remote.lyrics (toggleLyrics), which flips the ambient layer + server pref
   // and echoes the new lyricsOn back on app_state — reflectLyrics repaints the pill.
   els.lyrics.addEventListener('click', function() { api.sendIntent('lyrics'); });
-  document.getElementById('c-queue').addEventListener('click', function() { window.location.href = 'queue.html'; });
+  document.getElementById('c-queue').addEventListener('click', function() { window.location.href = 'music-queue.html'; });
   document.getElementById('c-quickpause').addEventListener('click', function() { localStorage.setItem(QP_SOURCE_KEY, 'audio'); window.location.href = 'quick-pause.html'; });
   // BUG-007: same switch-profile path the browse companion uses — drives the TV
   // to the picker via `navigate`, which echoes a `profile` context onContext follows.
@@ -368,6 +377,6 @@ export function initPage() {
 
   mountSyncBar(mode, onModeChange);
   applyMode();
-  api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode, onPlayback: onPlayback });
+  api = connect(server, onContext, function(status) { els.connStatus.textContent = status; }, onAppState, onDevices, { mode: mode, onQueuePlayback: onQueuePlayback });
   updateBar = mountScreenBar(getApi, noop);
 }

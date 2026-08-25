@@ -1,9 +1,8 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadContinueWatching, loadQueuePlayback, loadPlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadQueuePlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
 import { queueAdd, queueAddStatus, SECTION_MEDIA_TYPE } from '../../core/queue-shell-config.js';
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { queueCount } from '../../core/queue-playback-router.js';
-import { playNextCount } from '../../core/queue-view.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, railsForSection } from '../../core/home-rails.js';
@@ -193,8 +192,9 @@ export function initPage() {
   }
 
   // FEAT-040/TASK-255 — the MUSIC twin of the Play-Queue button, sitting beside the
-  // video one in the #queue-menu popout (TASK-445). Count read from the read-only GET
-  // /api/playback snapshot (music override queue = play_next). The 🎵 icon (vs the
+  // video one in the #queue-menu popout (TASK-445). TASK-504 — counted off the
+  // unified engine's own music queue, the same read the 🎬 pill does one media
+  // type over, so both count the queue their ＋ presses fill. The 🎵 icon (vs the
   // video 🎬) tells which queue each resumes apart — TASK-258 dropped the "Music"/
   // "Video" word for a compact "🎵 (N)" and de-purpled it to match the video button.
   // Tapping drives the TV audio page to start the music queue head
@@ -207,7 +207,7 @@ export function initPage() {
   }
   function refreshQueueMusic() {
     [state.person].filter(Boolean).forEach(function(p) {
-      loadPlayback(server, p).then(function(snap) { showPlayQueueMusic(playNextCount(snap)); }).catch(noop);
+      loadQueuePlayback(server, 'music', p).then(function(snap) { showPlayQueueMusic(queueCount(snap)); }).catch(noop);
     });
   }
   function onPlayQueueMusic() {

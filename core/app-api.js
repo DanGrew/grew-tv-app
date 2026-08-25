@@ -222,6 +222,25 @@ export function loadAlbum(serverUrl, id) {
   return getJson(serverUrl + '/api/album/' + encodeURIComponent(id));
 }
 
+// TASK-504 — the music twin of loadSeriesTitle, for the Queue shell's hero
+// source line. Music is the one cut-over type whose source id is opaque AND
+// spans three source types, so the lookup dispatches on source_type: an album
+// and a playlist each resolve through their own route, while an artist source
+// records the artist NAME as its id, which IS the title (the same rule
+// home-rails.js's recentsIndex already relies on). An unknown/absent type
+// resolves to '' rather than rejecting — the hero then simply shows no source
+// line, exactly as a standalone item does.
+var MUSIC_SOURCE_TITLE = {
+  album:    function(serverUrl, id) { return loadAlbum(serverUrl, id).then(function(a) { return a.title; }); },
+  playlist: function(serverUrl, id) { return loadPlaylist(serverUrl, id).then(function(p) { return p.title; }); },
+  artist:   function(serverUrl, id) { return Promise.resolve(id); }
+};
+export function loadMusicSourceTitle(serverUrl, id, sourceType) {
+  return [MUSIC_SOURCE_TITLE[sourceType]].filter(Boolean)
+    .map(function(fn) { return fn(serverUrl, id); })
+    .concat([Promise.resolve('')])[0];
+}
+
 // Playlist detail (FEAT-036/TASK-204): a user playlist is state-DB-resident, so
 // it has its own route (not /api/album), but the backend projects it into the
 // same resolved-items shape so the album-detail layout renders it unchanged.

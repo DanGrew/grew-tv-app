@@ -2,7 +2,8 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, playbackAction, musicVideoPlaybackAction, mediaUrl } from '../../core/app-api.js';
+import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
+import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { coverMosaicHtml } from '../../core/cover-mosaic.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -222,17 +223,18 @@ export function initPlaylistDetailPage() {
       .then(function(res) { showAddSheet(playlistCards(res.content, addState.exclude, state.playlist.collectionType)); })
       .catch(function() { showStatus('Could not load playlists.'); });
   }
-  // FEAT-040/TASK-248 — queue a track to PLAY NEXT (queue-track, per person; durable
-  // override queue TASK-246). The sheet's top "☰ Play Next" action — closes the sheet
-  // first, then POSTs. TASK-421: a music-video row (item.video.itemType) POSTs to
-  // its OWN engine (FEAT-418) instead — never the audio engine's own list (story 3).
-  var QUEUE_TRACK_ACTION = {
-    'music-video': function(id) { return musicVideoPlaybackAction(SERVER, 'queue-video', getPerson(), { video_id: id }); },
-    track: function(id) { return playbackAction(SERVER, 'queue-track', getPerson(), { track_id: id }); }
-  };
+  // FEAT-040/TASK-248 — queue a track (per person; durable queue TASK-246). The
+  // sheet's top action — closes the sheet first, then POSTs. TASK-421: a
+  // music-video row (item.video.itemType) queues on its OWN engine, never the
+  // audio one's list (story 3). TASK-504 collapses that dispatch into queueAdd,
+  // THE ＋Queue producer: this screen names the media type and the shared table
+  // owns which engine, which action and which confirmation wording — so a
+  // playlist's two row kinds can't drift from the rest of their own type.
+  var QUEUE_MEDIA_TYPE = { 'music-video': 'music-video', track: 'music' };
   function queueTrack(item) {
-    QUEUE_TRACK_ACTION[playlistQueueKey(item.video.itemType)](item.video.id)
-      .then(function() { showStatus('Queued to Play Next'); })
+    var mediaType = QUEUE_MEDIA_TYPE[playlistQueueKey(item.video.itemType)];
+    queueAdd(SERVER, mediaType, getPerson(), item.video.id)
+      .then(function() { showStatus(queueAddStatus(mediaType)); })
       .catch(function() { showStatus('Could not queue track.'); });
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }

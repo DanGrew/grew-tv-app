@@ -25,7 +25,7 @@
 
 import { transportState, durationText } from './queue-shell-view.js';
 import { homeMoviesSourceLabel } from './home-rails.js';
-import { queuePlaybackAction, musicVideoPlaybackAction, playbackAction } from './app-api.js';
+import { queuePlaybackAction, musicVideoPlaybackAction } from './app-api.js';
 
 // Home movies' source is a person or a month — both derivable from the
 // snapshot's own source_type/source_id slugs, so no caller lookup.
@@ -53,10 +53,9 @@ function artistSub(entry) {
 }
 
 // ＋Queue routing. 'queue' is the TASK-498 unified engine (append-only, per
-// FEAT-497's model — hence "Added to Queue"); music and music videos are
-// still on their own pre-FEAT-497 engines until TASK-504/505 cut them over,
-// where a queue press still means play-next, and the wording stays honest
-// about that.
+// FEAT-497's model — hence "Added to Queue"); music videos are still on their
+// own pre-FEAT-497 engine until TASK-505 cuts them over, where a queue press
+// still means play-next, and the wording stays honest about that.
 var APPEND = { engine: 'queue', action: 'queue-item', bodyKey: 'item_id', status: 'Added to Queue' };
 
 export var HOME_MOVIE = {
@@ -86,7 +85,9 @@ export var MUSIC = {
   sourceSubtitle: suppliedSource,
   rowSub: artistSub,
   transport: transportState,
-  add: { engine: 'music', action: 'queue-track', bodyKey: 'track_id', status: 'Queued to Play Next' }
+  // TASK-504: music appends to the end of the Queue like every cut-over type,
+  // where it used to jump the press to Play Next on its own engine.
+  add: APPEND
 };
 
 export var MUSIC_VIDEO = {
@@ -118,8 +119,7 @@ export var SECTION_MEDIA_TYPE = {
 
 var POST = {
   queue: function(serverUrl, config, person, body) { return queuePlaybackAction(serverUrl, config.mediaType, config.add.action, person, body); },
-  'music-video': function(serverUrl, config, person, body) { return musicVideoPlaybackAction(serverUrl, config.add.action, person, body); },
-  music: function(serverUrl, config, person, body) { return playbackAction(serverUrl, config.add.action, person, body); }
+  'music-video': function(serverUrl, config, person, body) { return musicVideoPlaybackAction(serverUrl, config.add.action, person, body); }
 };
 
 // THE ＋Queue producer. Every ＋ affordance — browse tile, rail-grid badge,

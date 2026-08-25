@@ -28,10 +28,13 @@ import { mountStatusMenu } from './companion-status-menu.js';
 // element via the existing `toggle` WS intent, not a snapshot.
 //
 // options.media          — the core/queue-shell-config.js entry for this type.
-// options.loadSourceName — (server, sourceId) -> Promise<title> for a type
-//                          whose source id is opaque (a series/boxset, an
-//                          album); omitted by a type that derives its own
-//                          source line from the snapshot.
+// options.loadSourceName — (server, sourceId, sourceType) -> Promise<title>
+//                          for a type whose source id is opaque (a series/
+//                          boxset, an album); omitted by a type that derives
+//                          its own source line from the snapshot. sourceType
+//                          is passed for music, whose three source kinds
+//                          (album/playlist/artist) resolve by different routes
+//                          — films read the id alone and ignore it.
 export function initQueueShellPage(options) {
   mountStatusMenu(['mode', 'screen', 'profile']);
   var media = options.media;
@@ -93,8 +96,8 @@ export function initQueueShellPage(options) {
   // source_id and re-renders when it lands; a type that derives its own from
   // the snapshot has no loadSourceName and never fetches.
   function clearSourceTitle() { sourceTitle = ''; }
-  function applySourceTitle(id) {
-    loadSourceName(server, id)
+  function applySourceTitle(id, sourceType) {
+    loadSourceName(server, id, sourceType)
       .then(function(title) { sourceTitle = title; render(lastSnap); })
       .catch(noop);
   }
@@ -103,7 +106,7 @@ export function initQueueShellPage(options) {
     [id !== loadedSourceId].filter(Boolean).forEach(function() {
       loadedSourceId = id;
       clearSourceTitle();
-      [id].filter(Boolean).forEach(applySourceTitle);
+      [id].filter(Boolean).forEach(function(x) { applySourceTitle(x, snap.source_type); });
     });
   }
   var SOURCE_TITLE = { 'true': ensureSourceTitle, 'false': noop };

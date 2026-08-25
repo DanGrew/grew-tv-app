@@ -1,5 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadAlbum, mediaUrl, addToPlaylist, playbackAction } from '../../core/app-api.js';
+import { loadBrowse, loadAlbum, mediaUrl, addToPlaylist } from '../../core/app-api.js';
+import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { albumsByArtist, artistFromId } from '../../core/home-rails.js';
 import { artistTracks } from '../../core/artist-tracks.js';
@@ -121,9 +122,11 @@ export function initPage() {
       '&profile=' + encodeURIComponent(activeProfile());
     loadAndShowSheet();
   }
+  // TASK-504 — through queueAdd, THE ＋Queue producer: appends to the end of the
+  // unified queue, same as every other ＋ on either surface.
   function queueTrack(item) {
-    playbackAction(server, 'queue-track', state.person, { track_id: item.video.id })
-      .then(function() { showStatus('Queued to Play Next'); })
+    queueAdd(server, 'music', state.person, item.video.id)
+      .then(function() { showStatus(queueAddStatus('music')); })
       .catch(function() { showStatus('Could not queue track.'); });
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }

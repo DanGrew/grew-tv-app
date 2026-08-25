@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installPlaybackBackend, BROWSE, MUSIC_CARDS, VIDEOS } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS, VIDEOS } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-018/FEAT-027/FEAT-045 — music browse + album detail + <audio> player +
@@ -14,7 +14,9 @@ const { pickPerson } = require('./fixtures/nav.js');
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installPlaybackBackend(page);
+  // TASK-504 — music runs on the UNIFIED queue engine now, so these drive the
+  // same fixture films and home movies do, one media type over.
+  await installQueuePlaybackBackend(page, 'music');
   await page.route('**/api/browse**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS) })

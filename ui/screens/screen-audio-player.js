@@ -316,12 +316,10 @@ export function setup(config) {
 
   function currentTrackDisplay() { return _currentDisplay; }
 
-  // ⏮/⏭ are queue controls — hidden (and out of the focus cycle) for a single
-  // track with no album queue.
-  var QUEUE_MODE = { 'true': 'remove', 'false': 'add' };
-  function setQueueMode(multi) {
-    ['btn-prev', 'btn-next'].forEach(function(id) { document.getElementById(id).classList[QUEUE_MODE[multi + '']]('hidden'); });
-  }
+  // TASK-504: ⏮/⏭ are no longer hidden for a lone track. They are the Queue
+  // shell's own transport rule now, applied by the page from each snapshot
+  // (screen-audio-page.js's setTransportOn) — visible and dimmed when there is
+  // nothing to step to, the same as every other media type.
 
   // Shuffle + repeat are SERVER-owned (FEAT-031) and toggled from the Queue View
   // now (TASK-237) — the player no longer carries those pills.
@@ -461,5 +459,5 @@ export function setup(config) {
   document.getElementById('btn-reset').addEventListener('click', function() { fireReset(document.getElementById('btn-reset')); });
   document.getElementById('btn-reset').addEventListener('blur', disarmReset);
 
-  return { playTrack, handleAudioKey, setQueueMode, setLyrics, currentTrackDisplay, stop: stopPlayback, remote };
+  return { playTrack, handleAudioKey, setLyrics, currentTrackDisplay, stop: stopPlayback, remote };
 }
