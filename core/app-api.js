@@ -241,6 +241,25 @@ export function loadMusicSourceTitle(serverUrl, id, sourceType) {
     .concat([Promise.resolve('')])[0];
 }
 
+// TASK-505 — the music-video twin of loadMusicSourceTitle, same dispatch-on-
+// source_type shape over the music-video engine's own registered source names.
+// A playlist is an opaque id resolved through its own route; an artist source
+// records the artist NAME as its id, which IS the title (as music's own
+// artist branch already does). 'mv-all' is the whole-catalog Play All — a real
+// source with no catalog record to name, so it carries its own fixed label
+// rather than a lookup. A lone pick reaches the player as a standalone item
+// with no source at all, so it never asks.
+var MUSIC_VIDEO_SOURCE_TITLE = {
+  'mv-playlist': function(serverUrl, id) { return loadPlaylist(serverUrl, id).then(function(p) { return p.title; }); },
+  'mv-artist':   function(serverUrl, id) { return Promise.resolve(id); },
+  'mv-all':      function() { return Promise.resolve('All Music Videos'); }
+};
+export function loadMusicVideoSourceTitle(serverUrl, id, sourceType) {
+  return [MUSIC_VIDEO_SOURCE_TITLE[sourceType]].filter(Boolean)
+    .map(function(fn) { return fn(serverUrl, id); })
+    .concat([Promise.resolve('')])[0];
+}
+
 // Playlist detail (FEAT-036/TASK-204): a user playlist is state-DB-resident, so
 // it has its own route (not /api/album), but the backend projects it into the
 // same resolved-items shape so the album-detail layout renders it unchanged.

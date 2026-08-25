@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { entryMode, playlistTrackTarget, playlistQueueKey, mvTransportVisibility } from '../../core/music-video-playthrough.js';
+import { entryMode, playlistTrackTarget, playlistQueueKey } from '../../core/music-video-playthrough.js';
 
 describe('entryMode', () => {
   it('is "queue" when a video Play Queue is requested, over everything else', () => {
@@ -75,20 +75,5 @@ describe('playlistQueueKey (TASK-421)', () => {
   });
   it('is "track" for an explicitly empty itemType, same as absent', () => {
     expect(playlistQueueKey('')).toBe('track');
-  });
-});
-
-describe('mvTransportVisibility', () => {
-  it('hides both for a non-music-video, single-item source', () => {
-    expect(mvTransportVisibility(false, false)).toEqual({ shuffle: false, repeat: true });
-  });
-  it('shows only Repeat for a non-music-video multi-item source (a series)', () => {
-    expect(mvTransportVisibility(false, true)).toEqual({ shuffle: false, repeat: true });
-  });
-  it('hides both for a lone music-video pick — nothing to shuffle or repeat', () => {
-    expect(mvTransportVisibility(true, false)).toEqual({ shuffle: false, repeat: false });
-  });
-  it('shows both for a multi-item music-video playthrough', () => {
-    expect(mvTransportVisibility(true, true)).toEqual({ shuffle: true, repeat: true });
   });
 });

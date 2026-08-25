@@ -1,17 +1,16 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installMusicVideoPlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS } = require('./fixtures/api.js');
 const { enterBrowse } = require('./fixtures/nav.js');
 
-// BUG-485 — a music video plays through its OWN server-authoritative engine
-// (media-manager/db/music_video_playback_engine.py, FEAT-418), the same
-// play-source/next/previous/toggle-* shape film/series already use
-// (video-playback.test.js) — never the film/series video-playback engine or
-// the music queue engine. installMusicVideoPlaybackBackend (tests/fixtures/
-// api.js) simulates it: Play All / an artist rail / a playlist / a lone pick
-// all resolve their own ordered source, and every Queue View action, TV
-// button, and companion Plane-B POST drives the SAME snapshot that swaps the
-// actual <video> element — retiring the earlier client-owned `seq` this bug
-// fixed (core/music-video-playthrough.js's old order+index half, TASK-374/407).
+// TASK-505 (FEAT-497) — a music video plays through the TASK-498 UNIFIED queue
+// engine (/api/queue/music-video), the same play-source/play-item/next/
+// previous/toggle-* shape films and home movies already use — never the
+// film/series video-playback engine, the music engine, or the dedicated
+// music-video engine FEAT-418 gave it. installQueuePlaybackBackend
+// (tests/fixtures/api.js) simulates it: Play All / an artist rail / a playlist
+// resolve their own ordered source, a lone pick plays as a standalone item
+// with no source, and every Queue action, TV button and companion Plane-B POST
+// drives the SAME snapshot that swaps the actual <video> element.
 
 function engineCalls(page) {
   var calls = [];
@@ -24,7 +23,7 @@ function engineCalls(page) {
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installMusicVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'music-video');
   await page.route('**/api/browse**', function(route) {
     return route.fulfill({
       status: 200, contentType: 'application/json',
@@ -95,15 +94,18 @@ test('an artist\'s music videos play through in order the same way', async ({ pa
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
   await page.locator('#btn-next').click();
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
-  await page.locator('#btn-mv-repeat').click(); // TASK-407: repeat defaults on — off so the boundary is a no-op, not a wrap
-  await page.locator('#btn-next').click();
-  await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/); // no third item — no-op
+  await page.locator('#btn-mv-repeat').click(); // repeat defaults on — off so the source genuinely ends here
+  // TASK-505 — ⏭ DIMS at the end of an un-repeating source: with nothing
+  // ahead, the shared transport rule reads it as dead rather than leaving a
+  // live button that no-ops (which is what it did on the old engine).
+  await expect(page.locator('#btn-next')).toBeVisible();
+  await expect(page.locator('#btn-next')).toHaveClass(/is-disabled/);
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/); // still the last one
 });
 
 // TASK-445 — Play All spans every artist: the shared beforeEach's
 // MUSIC_VIDEO_CARDS has mv-01/mv-02 (QOTSA) + mv-03 (Muse) — the engine's own
-// mv-all source resolves artist-then-title, deterministically (no client
-// shuffle math to pin down, unlike the retired seq's own anchor-then-shuffle).
+// mv-all source resolves artist-then-title, deterministically.
 test('Play All spans every artist, artist-then-title order, and has no source page (Home > leaf)', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoAll=1&from=browse');
   // Muse < QOTSA alphabetically: Starlight plays first, spanning past QOTSA's rail.
@@ -146,44 +148,54 @@ test('pause, resume, next and previous work as they do for a song', async ({ pag
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/); // already first — no-op, no wrap
 });
 
-// FEAT-418 (TASK-420): the Queue button opens the music-video Queue View
-// (its own engine, tests/music-video-queue.test.js).
-test('the Queue button is visible for a music video and opens the music-video Queue View', async ({ page }) => {
+// The Queue button opens the shared Queue shell (TASK-505,
+// tests/music-video-queue.test.js).
+test('the Queue button is visible for a music video and opens the Queue shell', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
   await expect(page.locator('#btn-queue')).toBeVisible();
   await page.locator('#btn-queue').click();
   await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
 });
 
-test('a lone music video pick shows no ⏮/⏭ transport (single-item playthrough)', async ({ page }) => {
+// Story 4 — a lone pick used to LOSE its transport entirely (BUG-485's
+// item_count gate hid ⏮/⏭ and the Shuffle/Repeat pair). On the shared shell's
+// one transportState rule they stay put and dim, like a standalone film's.
+test('a lone music video pick dims ⏮/⏭ rather than hiding them', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
-  await expect(page.locator('#btn-prev')).toBeHidden();
-  await expect(page.locator('#btn-next')).toBeHidden();
+  await expect(page.locator('#btn-prev')).toBeVisible();
+  await expect(page.locator('#btn-prev')).toHaveClass(/is-disabled/);
+  await expect(page.locator('#btn-next')).toBeVisible();
+  await expect(page.locator('#btn-next')).toHaveClass(/is-disabled/);
 });
 
-// TASK-407 — Shuffle + Repeat, TV side.
-test('a lone music video pick shows no Shuffle/Repeat controls either — nothing to shuffle or repeat', async ({ page }) => {
+test('a lone music video pick dims Shuffle/Repeat rather than hiding them', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
-  await expect(page.locator('#btn-mv-shuffle')).toBeHidden();
-  await expect(page.locator('#btn-mv-repeat')).toBeHidden();
+  await expect(page.locator('#btn-mv-shuffle')).toBeVisible();
+  await expect(page.locator('#btn-mv-shuffle')).toHaveClass(/is-disabled/);
+  await expect(page.locator('#btn-mv-repeat')).toBeVisible();
+  await expect(page.locator('#btn-mv-repeat')).toHaveClass(/is-disabled/);
 });
 
-test('a multi-item music-video playthrough shows Shuffle + Repeat, both starting on', async ({ page }) => {
+// Story 5 — the retired music-video engine defaulted shuffle ON whenever the
+// client omitted the flag, and the client always omitted it. The unified
+// engine reads this person's remembered per-source preference instead, which
+// starts off — so a playlist plays in ITS order until you say otherwise.
+test('a playlist offers Shuffle + Repeat live, with Shuffle starting OFF and Repeat on', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
   await expect(page.locator('#btn-mv-shuffle')).toBeVisible();
   await expect(page.locator('#btn-mv-repeat')).toBeVisible();
-  await expect(page.locator('#btn-mv-shuffle')).toHaveClass(/on/);
+  await expect(page.locator('#btn-mv-shuffle')).not.toHaveClass(/is-disabled/);
+  await expect(page.locator('#btn-mv-shuffle')).not.toHaveClass(/on/);
   await expect(page.locator('#btn-mv-repeat')).toHaveClass(/on/);
   await page.locator('#btn-mv-shuffle').click();
-  await expect(page.locator('#btn-mv-shuffle')).not.toHaveClass(/on/);
+  await expect(page.locator('#btn-mv-shuffle')).toHaveClass(/on/);
   await page.locator('#btn-mv-repeat').click();
   await expect(page.locator('#btn-mv-repeat')).not.toHaveClass(/on/);
 });
 
-test('with Repeat on (Shuffle off), the playthrough loops back to the first video after the last one, instead of ending', async ({ page }) => {
+test('with Repeat on (the default), the playthrough loops back to the first video after the last one, instead of ending', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
-  await page.locator('#btn-mv-shuffle').click(); // shuffle defaults on — off so the wrap lands on a fixed item
   await page.locator('#btn-next').click();
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
@@ -191,12 +203,19 @@ test('with Repeat on (Shuffle off), the playthrough loops back to the first vide
   await expect(page).not.toHaveURL(/browse\.html/);
 });
 
-test('with Shuffle + Repeat on (the default), reaching the end of the playthrough starts a fresh pass instead of stopping', async ({ page }) => {
+test('with Shuffle turned on and Repeat on, reaching the end of a pass starts a fresh one instead of stopping', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
-  await page.locator('#btn-next').click(); // the last item of this 2-item pass
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
+  await page.locator('#btn-mv-shuffle').click();
+  await expect(page.locator('#btn-mv-shuffle')).toHaveClass(/on/);
+  // A fresh shuffle anchors the playing item outside the pass, so the first
+  // ⏭ re-enters it at the top — the second reaches the last item.
+  await page.locator('#btn-next').click();
+  await page.locator('#btn-next').click();
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-02/);
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
   await expect(page).not.toHaveURL(/browse\.html/);
-  await expect(page.locator('#video')).toHaveAttribute('src', /mv-0[12]/);
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
 });
 
 test('Repeat off: the playthrough still ends cleanly at the last item', async ({ page }) => {

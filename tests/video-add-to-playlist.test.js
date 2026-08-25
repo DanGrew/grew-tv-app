@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { installApi, installQueuePlaybackBackend, installMusicVideoPlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
+const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
 
 // TASK-378 — "Add to playlist" for the CURRENTLY PLAYING music video, on the TV
 // player itself (screen-video-page.js) — there is no music-video detail page to
@@ -7,13 +7,14 @@ const { installApi, installQueuePlaybackBackend, installMusicVideoPlaybackBacken
 // album-detail per-track one (screen-album-detail-page.js): profile's
 // music-video playlists (never a song playlist) + New playlist + Cancel. Music-
 // video-only: hidden for a film/series, where the existing engine-driven Queue
-// button lives instead. BUG-485: "currently playing" now reads off the
-// server-authoritative music-video engine snapshot, not a client-owned seq —
-// every test needs a working engine backend for the player to swap in at all.
+// button lives instead. "Currently playing" reads off the server-authoritative
+// snapshot, so every test needs a working engine backend for the player to
+// swap in at all — the TASK-498 unified one since TASK-505 cut music videos
+// over to it.
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installMusicVideoPlaybackBackend(page);
+  await installQueuePlaybackBackend(page, 'music-video');
   await page.route('**/api/browse**', function(route) {
     return route.fulfill({
       status: 200, contentType: 'application/json',

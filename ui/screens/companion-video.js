@@ -1,8 +1,7 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadSeries, videoPlaybackAction, musicVideoPlaybackAction, queuePlaybackAction, loadBrowse, addToPlaylist } from '../../core/app-api.js';
+import { loadSeries, videoPlaybackAction, queuePlaybackAction, loadBrowse, addToPlaylist } from '../../core/app-api.js';
 import { screenPage, displayTitle, seriesIdFromSnap, queryString } from '../../core/companion-utils.js';
 import { nowPlaying, upNextLine, seriesMode } from '../../core/video-player-router.js';
-import { mvTransportVisibility } from '../../core/music-video-playthrough.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
 import { buildCrumbs, trailCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
@@ -167,16 +166,15 @@ export function initPage() {
   }
 
   // PLANE B transport: each fires the same server action the TV player fires
-  // (TASK-222 for 'video'/legacy queue mode, FEAT-418/BUG-485 for a music
-  // video, TASK-499 for a home movie, TASK-503 for series/single film), keyed
-  // to the active person — the server advances the engine and broadcasts the
-  // resolved snapshot, which repaints BOTH surfaces. A music video / home
-  // movie / film posts to its OWN engine (/api/music-video-playback,
-  // /api/queue/home-movie, /api/queue/film), never the video-playback one —
-  // the channels stay apart the same way the TV player's own ON_NEXT/ON_PREV
-  // dispatch does.
+  // (TASK-222 for 'video'/legacy queue mode, TASK-499 for a home movie,
+  // TASK-503 for series/single film, TASK-505 for a music video), keyed to the
+  // active person — the server advances the engine and broadcasts the resolved
+  // snapshot, which repaints BOTH surfaces. All three cut-over types post to
+  // the unified engine under their own media type (/api/queue/{type}), never
+  // the video-playback one — the channels stay apart the same way the TV
+  // player's own ON_NEXT/ON_PREV dispatch does.
   function sendVideoAction(action) { videoPlaybackAction(server, action, state.person).catch(noop); }
-  function sendMvAction(action) { musicVideoPlaybackAction(server, action, state.person).catch(noop); }
+  function sendMvAction(action) { queuePlaybackAction(server, 'music-video', action, state.person).catch(noop); }
   function sendHmAction(action) { queuePlaybackAction(server, 'home-movie', action, state.person).catch(noop); }
   function sendFilmAction(action) { queuePlaybackAction(server, 'film', action, state.person).catch(noop); }
   // The four engines this page can be driving are mutually exclusive for a
@@ -196,9 +194,9 @@ export function initPage() {
   }
   var PREV_ACTION = { mv: function() { sendMvAction('previous'); }, hm: function() { sendHmAction('previous'); }, film: function() { sendFilmAction('previous'); }, video: function() { sendVideoAction('previous'); } };
   var NEXT_ACTION = { mv: function() { sendMvAction('next'); }, hm: function() { sendHmAction('next'); }, film: function() { sendFilmAction('next'); }, video: function() { sendVideoAction('next'); } };
-  // TASK-407/TASK-499/TASK-503 — Repeat rides the same Plane B split as
-  // prev/next above. Shuffle is mv/hm/film-only — its button is hidden
-  // outright for 'video'/legacy queue mode (applyMusicVideoMode /
+  // TASK-407/TASK-499/TASK-503/505 — Repeat rides the same Plane B split as
+  // prev/next above. Shuffle belongs to the three cut-over types — its button
+  // is hidden outright for 'video'/legacy queue mode (applyMusicVideoMode /
   // applyFilmMode never unhide it there), so the `video` branch here is
   // unreachable in practice; kept as a safe no-op rather than an assumption a
   // stray tap can't happen.
@@ -269,38 +267,36 @@ export function initPage() {
     captureSeries(snap);
   }
 
-  // FEAT-418 (TASK-420): a music video now HAS a queue (its own engine, on its
-  // own channel) — the link stays visible in both modes and repoints instead
-  // of hiding (QUEUE_HREF below). prev/next still hide only for a lone pick
-  // (mirrors the TV's own seriesMode-style ⏮/⏭ hide for a single item).
-  function applyNav(hide) {
-    els.prev.classList.toggle('single', hide);
-    els.next.classList.toggle('single', hide);
+  // TASK-503/505 — the ONE "disabled but visible" helper both the film and the
+  // music-video mirror apply, so the two cannot drift into two dimming rules.
+  // Reuses the EXISTING `.single` opacity-dim class (applySeriesMode's own,
+  // above) rather than a new one.
+  var TRANSPORT_DEFAULT = { previous: false, next: false, shuffle: false, repeat: false };
+  function applyControl(el, enabled) {
+    el.classList.remove('hidden');
+    el.classList.toggle('single', !enabled);
   }
-  // OFF music-video mode, ⏮/⏭ go BACK to the engine snapshot rather than being
-  // cleared — applySeriesMode owns `single` for 'video'/legacy-queue mode
-  // (applyFilmMode owns it for TASK-503's own film mode instead), and a
-  // standalone film (a one-item/no source) must stay greyed. Clearing it here
-  // instead used to re-arm ⏮/⏭ on every film, because the TV's context push lands AFTER the
-  // snapshot in production (onIntent('play'/'video') only fire once the player
-  // has swapped the snapshot in). Before the first snapshot there is
-  // nothing to restore, so that branch is a no-op.
-  var HIDE_NAV = {
-    'true':  function(multi) { applyNav(!multi); },
-    'false': function() { [state.vsnap].filter(Boolean).forEach(function(s) { applySeriesMode(seriesMode(s)); }); }
-  };
-  // TASK-407 — Repeat now ALSO applies to a multi-item music-video playthrough
-  // (it hid outright before); Shuffle is new and mv-only. mvTransportVisibility
-  // is the one gate both this companion mirror and the TV read (story 4/5), so
-  // the two surfaces can never disagree on when the pair shows.
-  function applyMusicVideoMode(on, multi) {
-    var vis = mvTransportVisibility(on, multi);
-    els.repeat.classList.toggle('hidden', !vis.repeat);
-    els.shuffle.classList.toggle('hidden', !vis.shuffle);
-    // TASK-378 — Add to playlist is the INVERSE of repeat/shuffle: it only
-    // makes sense FOR a music video, so it shows exactly when they hide.
+  function applyTransport(transport) {
+    var t = [transport].filter(Boolean).concat([TRANSPORT_DEFAULT])[0];
+    applyControl(els.repeat, t.repeat);
+    applyControl(els.shuffle, t.shuffle);
+    applyControl(els.prev, t.previous);
+    applyControl(els.next, t.next);
+  }
+  // TASK-505 — Shuffle/Repeat/⏮/⏭ are ALWAYS shown for a music video now,
+  // dimmed when there is nothing to act on rather than hidden
+  // (QUEUE-UX-SHELL.md's Hero section). The TV pushes the resolved
+  // `musicVideoTransport` off the one shared rule (core/queue-shell-view.js
+  // transportState) instead of this page re-deriving a show/hide from a raw
+  // multi-item flag — which is exactly what made a lone pick's controls vanish
+  // here (story 4), and the same fix TASK-517 already made for films.
+  // FEAT-418 (TASK-420): the Queue link stays visible in every mode and
+  // repoints instead of hiding (QUEUE_HREF below).
+  function applyMusicVideoMode(on, transport) {
+    [on].filter(Boolean).forEach(function() { applyTransport(transport); });
+    // TASK-378 — Add to playlist is music-video-only: it shows exactly when
+    // this mode is on, and hides for every other rail.
     els.addPlaylist.classList.toggle('hidden', !on);
-    HIDE_NAV[on + ''](multi);
   }
   // Repeat's/Shuffle's on/off state during a music video comes off the
   // context push's own flags (BUG-485: the TV's own music-video engine
@@ -345,21 +341,8 @@ export function initPage() {
   // surfaces share (core/queue-shell-view.js transportState), so ⏭ lights up
   // for a queued film behind a standalone one here exactly as it does on the
   // TV row and in the Queue hero (BUG-510/512 — the three used to disagree).
-  // Reuses the EXISTING `.single` opacity-dim class (applySeriesMode's own,
-  // above) rather than a new one — the same "disabled but visible" look.
-  var FILM_TRANSPORT_DEFAULT = { previous: false, next: false, shuffle: false, repeat: false };
-  function applyFilmControl(el, enabled) {
-    el.classList.remove('hidden');
-    el.classList.toggle('single', !enabled);
-  }
   function applyFilmMode(on, transport) {
-    var t = [transport].filter(Boolean).concat([FILM_TRANSPORT_DEFAULT])[0];
-    [on].filter(Boolean).forEach(function() {
-      applyFilmControl(els.repeat, t.repeat);
-      applyFilmControl(els.shuffle, t.shuffle);
-      applyFilmControl(els.prev, t.previous);
-      applyFilmControl(els.next, t.next);
-    });
+    [on].filter(Boolean).forEach(function() { applyTransport(transport); });
   }
   var SET_FILM_ON = {
     'true': function(payload) {
@@ -376,7 +359,7 @@ export function initPage() {
     state.homeMovie = !!payload.homeMovie;
     state.film = !!payload.film;
     state.crumb.mvSource = [payload.musicVideoSource].filter(Boolean).concat([null])[0];
-    applyMusicVideoMode(state.musicVideo, !!payload.musicVideoMulti);
+    applyMusicVideoMode(state.musicVideo, payload.musicVideoTransport);
     applyHomeMovieMode(state.homeMovie);
     applyFilmMode(state.film, payload.filmTransport);
     SET_MV_ON[state.musicVideo + ''](payload);

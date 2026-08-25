@@ -1,12 +1,14 @@
-// TASK-374 — the music-video routing helpers: which video.html entry mode a
-// load resolves to, and the playlist-row dispatch a music-video track needs
-// (both TASK-374/376/421). BUG-485 retired this module's OTHER half — the
-// client-owned `seq` playthrough (order + index, Shuffle/Repeat, TASK-374/407)
-// that used to drive the actual <video> element directly — in favour of the
-// music-video engine (media-manager/db/music_video_playback_engine.py) being
-// server-authoritative the same way film/series already are; that logic now
-// lives in core/music-video-playback-router.js over the engine's own
-// `music_video_playback` snapshot.
+// TASK-374 — the music-video ROUTING helpers, and only those: which video.html
+// entry mode a load resolves to, and the playlist-row dispatch a music-video
+// track needs (both TASK-374/376/421). Two earlier halves of this module are
+// gone. BUG-485 retired the client-owned `seq` playthrough (order + index,
+// Shuffle/Repeat, TASK-374/407) that used to drive the <video> element
+// directly, in favour of a server-authoritative engine. TASK-505 then retired
+// `mvTransportVisibility`, the show/hide gate that paired with it: music
+// videos run on the TASK-498 unified queue engine now, where
+// core/queue-shell-view.js's transportState is the ONE rule deciding
+// ⏮⏭🔀🔁 for every media type, and a control with nothing to act on is
+// dimmed rather than hidden.
 
 // Which entry function should run for a video.html load, in priority order:
 // the durable video Play Queue wins if requested, then a music-video source
@@ -57,14 +59,4 @@ export function playlistTrackTarget(item, playlistId, audioTarget) {
 // cyclomatic-1/pure-DOM-only).
 export function playlistQueueKey(itemType) {
   return [itemType].filter(Boolean).concat(['track'])[0];
-}
-
-// The Shuffle/Repeat visibility split for the video page + its companion
-// mirror (story 4/5 — both surfaces must agree): Shuffle only ever applies to
-// a multi-item music-video playthrough; Repeat already exists for a
-// film/series (unaffected — always visible there) and additionally applies to
-// a multi-item music-video playthrough, hiding only for a single pick.
-export function mvTransportVisibility(isMusicVideo, isMultiSeq) {
-  var multi = !!isMusicVideo && !!isMultiSeq;
-  return { shuffle: multi, repeat: multi || !isMusicVideo };
 }

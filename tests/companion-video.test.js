@@ -191,10 +191,10 @@ test.describe('BUG-037: film player breadcrumb retraces to the genre grid', () =
 });
 
 // TASK-422 — the companion mirrors the TV's music-video source crumb. A music
-// video never broadcasts a video_playback snapshot (client-owned seq), so the
-// source rides the SAME `video` context push BUG-037's own mockPlayer already
-// drives — screen-video-page.js's sendVideoContext carries musicVideoSource,
-// captured into state.crumb.mvSource here (onVideoContext).
+// video never broadcasts a video_playback snapshot, so the source rides the
+// SAME `video` context push BUG-037's own mockPlayer already drives —
+// screen-video-page.js's sendVideoContext carries musicVideoSource, captured
+// into state.crumb.mvSource here (onVideoContext).
 test.describe('TASK-422: music-video player breadcrumb names its playback source', () => {
   function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
@@ -203,7 +203,8 @@ test.describe('TASK-422: music-video player breadcrumb names its playback source
       function push() {
         ws.send(msg('context', {
           version: 2, context_id: 'video', display: { title },
-          musicVideo: true, musicVideoMulti: !!source, musicVideoShuffle: true, musicVideoRepeat: true,
+          musicVideo: true, musicVideoShuffle: true, musicVideoRepeat: true,
+          musicVideoTransport: { previous: !!source, next: !!source, shuffle: !!source, repeat: !!source },
           musicVideoSource: source
         }));
         ws.send(msg('app_state', { person: 'kids', profile: 'kids', screen: 'player', itemId: 'mv-01', episodeId: 'mv-01' }));
