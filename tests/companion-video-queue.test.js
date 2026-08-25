@@ -82,7 +82,10 @@ test('Control mode: ＋ Queue POSTs queue-item to the film engine for the active
   const req = await queued;
   expect(req.url()).toContain('person=mom');
   expect(JSON.parse(req.postData())).toEqual({ item_id: 'bluey-s1e02' });
-  await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+  // TASK-504: the film ＋ takes its wording from the shared table, like every
+  // cut-over type — queue-item APPENDS, which "Queued to Play Next" (TASK-503
+  // wording that outlived its behaviour) described wrongly.
+  await expect(page.locator('#add-status')).toHaveText('Added to Queue');
 });
 
 test('Browse mode: the play tile greys but ＋ Queue stays live and still POSTs', async ({ page }) => {
@@ -93,7 +96,7 @@ test('Browse mode: the play tile greys but ＋ Queue stays live and still POSTs'
     req.url().includes('/api/queue/film/queue-item') && req.method() === 'POST');
   await page.locator('.detail-queue-btn[data-queue="bluey-s1e02"]').click();
   expect(JSON.parse((await queued).postData())).toEqual({ item_id: 'bluey-s1e02' });
-  await expect(page.locator('#add-status')).toHaveText('Queued to Play Next');
+  await expect(page.locator('#add-status')).toHaveText('Added to Queue');
 });
 
 test('the play tile still drives the TV — ＋ Queue does not hijack the row', async ({ page }) => {
