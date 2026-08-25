@@ -176,13 +176,6 @@ export function initVideoPage() {
   // one (story 4).
   var MV_SOURCE_TYPE = { mvPlaylist: 'mv-playlist', mvArtist: 'mv-artist', mvAll: 'mv-all' };
   var MV_SOURCE_ID = { mvPlaylist: function() { return mvPlaylist; }, mvArtist: function() { return mvArtist; }, mvAll: function() { return null; } };
-  // ONE action per entry, like startSeries: the unified engine's play-source
-  // takes the optional item_id of a tapped row itself (a playlist track), so
-  // the old play-source-then-play-video pair collapses. No shuffle/repeat
-  // flags either — the engine reads this person's remembered per-source
-  // preference (TASK-498), which is what makes an artist or playlist start in
-  // source order and remember a later Shuffle (story 5).
-  function sendMvSource(startId) { return sendMvAction('play-source', { source_type: MV_SOURCE_TYPE[mode], source_id: MV_SOURCE_ID[mode](), item_id: startId }); }
 
   // TASK-499 (FEAT-497) — the unified queue engine's own action sender for
   // home movies, the hm twin of sendMvAction: POSTs to /api/queue/home-movie.
@@ -258,14 +251,11 @@ export function initVideoPage() {
   // standalone film, a lone music-video pick) clears it rather than fetching,
   // mirroring the companion page's own resolution.
   //
-  // TASK-505 — the key is source_type AND source_id, not the id alone: the
-  // whole-catalog Play All ('mv-all') is a real source carrying no id, which
-  // an id-only key could not tell apart from having no source.
-  function sourceKey(snap) {
-    return [snap.source_type].filter(Boolean).map(function(t) { return t + '/' + snap.source_id; }).concat([null])[0];
-  }
+  // TASK-505 — qRouter.sourceKey is source_type AND source_id, not the id
+  // alone: the whole-catalog Play All ('mv-all') is a real source carrying no
+  // id, which an id-only key could not tell apart from having no source.
   function ensureSourceTitle(snap) {
-    var key = sourceKey(snap);
+    var key = qRouter.sourceKey(snap);
     [key !== loadedSourceKey].filter(Boolean).forEach(function() {
       loadedSourceKey = key;
       sourceTitle = null;
@@ -278,7 +268,7 @@ export function initVideoPage() {
   // still has the last word: if the engine resolves a DIFFERENT source than
   // this entry named, the key won't match and ensureSourceTitle refetches.
   function primeSourceTitle(sourceType, sourceId, title) {
-    loadedSourceKey = sourceKey({ source_type: sourceType, source_id: sourceId });
+    loadedSourceKey = qRouter.sourceKey({ source_type: sourceType, source_id: sourceId });
     sourceTitle = title;
   }
 
@@ -405,13 +395,16 @@ export function initVideoPage() {
   // collapsed the old play-source-then-play-video pair into ONE action, the
   // shape startSeries already used: the unified engine's play-source takes the
   // tapped item itself. `startId` is a tapped playlist track, absent for an
-  // artist rail or Play All, where play-source's own first entry is what plays.
+  // artist rail or Play All, where play-source's own first entry is what
+  // plays. No shuffle/repeat flags either — the engine reads this person's
+  // remembered per-source preference (TASK-498), which is what makes an artist
+  // or playlist start in source order and remember a later Shuffle (story 5).
   function mvBegin(startId) {
     document.getElementById('btn-add-playlist').classList.remove('hidden');
     mvPendingId = startId;   // BUG-522 — null for an artist/Play All, which picks no item
     armEngineTimeout();
     initCaptions(SERVER)
-      .then(function() { return sendMvSource(startId); })
+      .then(function() { sendMvAction('play-source', { source_type: MV_SOURCE_TYPE[mode], source_id: MV_SOURCE_ID[mode](), item_id: startId }); })
       .catch(function() {});
   }
 

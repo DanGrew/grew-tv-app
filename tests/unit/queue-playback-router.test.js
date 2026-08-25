@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nowPlaying, isSwap, isStaleResync, upNextItem, upNextLine, sourceId, queueCount } from '../../core/queue-playback-router.js';
+import { nowPlaying, isSwap, isStaleResync, upNextItem, upNextLine, sourceId, sourceKey, queueCount } from '../../core/queue-playback-router.js';
 
 function item(id, title) { return { item_id: id, title: title }; }
 function snap(fields) {
@@ -111,5 +111,28 @@ describe('sourceId', () => {
   it('is null for an empty/absent snapshot', () => {
     expect(sourceId(snap({}))).toBe(null);
     expect(sourceId(null)).toBe(null);
+  });
+});
+
+// TASK-505 — the identity a caller caches its fetched source NAME against.
+describe('sourceKey', () => {
+  it('joins the source type and id, so two sources never collide', () => {
+    expect(sourceKey(snap({ source_type: 'series', source_id: 'bluey' }))).toBe('series/bluey');
+    expect(sourceKey(snap({ source_type: 'mv-artist', source_id: 'QOTSA' }))).toBe('mv-artist/QOTSA');
+  });
+  // The whole point of keying on the type as well: Play All IS a source, and
+  // an id-only key would read it as having none.
+  it('keys a whole-catalog source that carries no id, rather than reading as source-less', () => {
+    expect(sourceKey(snap({ source_type: 'mv-all', source_id: null }))).toBe('mv-all/null');
+    expect(sourceKey(snap({ source_type: 'home-movies-all', source_id: null }))).toBe('home-movies-all/null');
+  });
+  it('tells two source TYPES apart even when their ids match', () => {
+    expect(sourceKey(snap({ source_type: 'mv-playlist', source_id: 'pl-1' })))
+      .not.toBe(sourceKey(snap({ source_type: 'playlist', source_id: 'pl-1' })));
+  });
+  it('is null when there is no source at all (a standalone item)', () => {
+    expect(sourceKey(snap({ source_type: null, source_id: 'stray' }))).toBe(null);
+    expect(sourceKey(snap({}))).toBe(null);
+    expect(sourceKey(null)).toBe(null);
   });
 });
