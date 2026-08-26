@@ -293,7 +293,7 @@ export function initPage() {
   // FEAT-418 (TASK-420): the Queue link stays visible in every mode and
   // repoints instead of hiding (QUEUE_HREF below).
   function applyMusicVideoMode(on, transport) {
-    [on].filter(Boolean).forEach(function() { applyTransport(transport); });
+    applyEngineMode(on, transport);
     // TASK-378 — Add to playlist is music-video-only: it shows exactly when
     // this mode is on, and hides for every other rail.
     els.addPlaylist.classList.toggle('hidden', !on);
@@ -312,20 +312,14 @@ export function initPage() {
     },
     'false': function() {}
   };
-  // TASK-499 — Shuffle/Repeat are ALWAYS shown for a home movie (never hidden
-  // or dimmed the way film's single-item source is, QUEUE-UX-SHELL.md's Hero
-  // section), unconditionally un-hidden on the one context push that flips
-  // this page into home-movie mode. Their on/off state rides the SAME
-  // per-source flags the TV hero reads (sendVideoContext's homeMovieShuffle/
-  // homeMovieRepeat), mirroring SET_MV_ON above.
-  function applyHomeMovieMode(on) {
-    [on].filter(Boolean).forEach(function() {
-      els.repeat.classList.remove('hidden');
-      els.repeat.classList.remove('single');
-      els.shuffle.classList.remove('hidden');
-      els.shuffle.classList.remove('single');
-    });
-  }
+  // TASK-524 — a home movie reads the resolved `homeMovieTransport` off the
+  // context push like the other two rails, where it used to un-hide
+  // Shuffle/Repeat unconditionally and never dim anything. That was the
+  // companion half of the same divergence the TV player row carried: the
+  // home-movie Queue hero already applied core/queue-shell-view.js's one
+  // transportState rule, so the phone's own row disagreed with the hero right
+  // next to it. Their on/off state still rides the per-source flags below
+  // (sendVideoContext's homeMovieShuffle/homeMovieRepeat), mirroring SET_MV_ON.
   var SET_HM_ON = {
     'true': function(payload) {
       els.repeat.classList.toggle('on', !!payload.homeMovieRepeat);
@@ -333,15 +327,16 @@ export function initPage() {
     },
     'false': function() {}
   };
-  // TASK-503 — Shuffle/Repeat are ALWAYS shown for a film too (never hidden,
-  // QUEUE-UX-SHELL.md's Hero section) but, unlike home movies, disabled-but-
-  // visible when there is nothing to act on. TASK-517 — WHICH controls are
-  // live is no longer re-derived here from a raw `filmHasSource`: the TV
-  // pushes the resolved `filmTransport` straight off the one rule both
-  // surfaces share (core/queue-shell-view.js transportState), so ⏭ lights up
-  // for a queued film behind a standalone one here exactly as it does on the
-  // TV row and in the Queue hero (BUG-510/512 — the three used to disagree).
-  function applyFilmMode(on, transport) {
+  // TASK-503/517/524 — Shuffle/Repeat/⏮/⏭ are ALWAYS shown on whichever rail
+  // is live (never hidden, QUEUE-UX-SHELL.md's Hero section), disabled-but-
+  // visible when there is nothing to act on. WHICH controls are live is not
+  // re-derived here from a raw flag: the TV pushes the resolved transport
+  // straight off the one rule every surface shares (core/queue-shell-view.js
+  // transportState), so ⏭ lights up for a queued film behind a standalone one
+  // here exactly as it does on the TV row and in the Queue hero (BUG-510/512 —
+  // the three used to disagree). TASK-524 pointed the home-movie rail at this
+  // same call, where it had its own always-live copy.
+  function applyEngineMode(on, transport) {
     [on].filter(Boolean).forEach(function() { applyTransport(transport); });
   }
   var SET_FILM_ON = {
@@ -360,8 +355,8 @@ export function initPage() {
     state.film = !!payload.film;
     state.crumb.mvSource = [payload.musicVideoSource].filter(Boolean).concat([null])[0];
     applyMusicVideoMode(state.musicVideo, payload.musicVideoTransport);
-    applyHomeMovieMode(state.homeMovie);
-    applyFilmMode(state.film, payload.filmTransport);
+    applyEngineMode(state.homeMovie, payload.homeMovieTransport);
+    applyEngineMode(state.film, payload.filmTransport);
     SET_MV_ON[state.musicVideo + ''](payload);
     SET_HM_ON[state.homeMovie + ''](payload);
     SET_FILM_ON[state.film + ''](payload);

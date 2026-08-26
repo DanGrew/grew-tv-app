@@ -147,3 +147,65 @@ test('a late stale resync does not drag the player back to the previous film', a
   await page.waitForTimeout(1500);
   await expect(page.locator('#video')).toHaveAttribute('src', new RegExp(SELECTED));
 });
+
+// BUG-522 — the same race, on the LAST rail that never got the guard. Films
+// (BUG-521) and music videos (BUG-505/522) each discard a recovery answer that
+// predates their own play POST; home movies applied it, so a tapped clip could
+// be dragged back to whichever clip played last. TASK-524 collapsed the three
+// rails onto one plumbing, at which point the guard is one config field rather
+// than a third copy — and leaving home movies as the odd one out stopped being
+// defensible.
+//
+// A home-movie entry is the two-action shape (play-source, then play-item for
+// the tapped row), so the pending pick is that row's own `video` param — the
+// same thing ?video= means for a film.
+test('a late stale resync does not drag the player back to the previous home movie', async ({ page }) => {
+  await page.addInitScript(function() { localStorage.setItem('grew-tv-person', 'kids'); });
+  await installApi(page);
+
+  var PREVIOUS = 'millie-walk';   // what the engine is still playing
+  var SELECTED = 'beach-day';     // the clip the viewer just tapped
+
+  function snapshotOf(id) {
+    var TITLES = { 'millie-walk': 'Millie Walk', 'beach-day': 'Beach Day' };
+    return {
+      person_id: 'kids', media_type: 'home-movie',
+      now_playing: { item_id: id, title: TITLES[id], poster: id + '.jpg', duration: 45, subtitles: null, type: 'home', ext: null, itemType: 'home-movie' },
+      queue: [], next: [], coming_up: [],
+      source_type: 'home-movies-by-person', source_id: 'millie', repeat: false, shuffle: false
+    };
+  }
+
+  var socket = null;
+  await page.routeWebSocket(/:8766/, function(ws) {
+    socket = ws;
+    ws.onMessage(function(raw) {
+      var m = JSON.parse(raw);
+      [m.type === 'activate_person' && m.payload.person_id].filter(Boolean).forEach(function(pid) {
+        ws.send(JSON.stringify({ type: 'person_active', payload: { person_id: pid } }));
+      });
+    });
+  });
+
+  await page.route(/\/api\/queue\/home-movie\?/, function(route) {
+    var stale = JSON.stringify(snapshotOf(PREVIOUS));
+    setTimeout(function() {
+      route.fulfill({ status: 200, contentType: 'application/json', body: stale });
+    }, 400);
+  });
+
+  await page.route('**/api/queue/home-movie/*', function(route) {
+    route.fulfill({ status: 204, body: '' });
+    setTimeout(function() {
+      [socket].filter(Boolean).forEach(function(ws) {
+        ws.send(JSON.stringify({ type: 'queue_playback', payload: snapshotOf(SELECTED) }));
+      });
+    }, 50);
+  });
+
+  await page.goto('/app/homeview/video.html?homeMoviesPerson=millie&video=' + SELECTED + '&from=home-movies-list');
+  await expect(page.locator('#video')).toHaveAttribute('src', new RegExp(SELECTED), { timeout: 8000 });
+
+  await page.waitForTimeout(1500);
+  await expect(page.locator('#video')).toHaveAttribute('src', new RegExp(SELECTED));
+});

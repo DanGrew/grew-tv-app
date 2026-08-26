@@ -2,10 +2,9 @@ import { getParam, getProfile, getPerson, navTo, initCaptions } from '../../core
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { setupQueueShell } from './screen-queue-shell.js';
-import { HOME_MOVIE, FILM, MUSIC_VIDEO } from '../../core/queue-shell-config.js';
 import { transportState } from '../../core/queue-shell-view.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadSeriesTitle, loadProgress, loadPlaylist, loadBrowse, loadMusicVideoSourceTitle, loadQueuePlayback, queuePlaybackAction, addToPlaylist } from '../../core/app-api.js';
+import { loadProgress, loadPlaylist, loadBrowse, loadQueuePlayback, queuePlaybackAction, addToPlaylist } from '../../core/app-api.js';
 import { isMidWatch } from '../../core/progress.js';
 import { entryMode } from '../../core/music-video-playthrough.js';
 // TASK-503/505: qRouter is the shared view-router for the TASK-498 unified
@@ -13,6 +12,8 @@ import { entryMode } from '../../core/music-video-playthrough.js';
 // media_type 'home-movie'), films (TASK-503) and music videos (TASK-505), so
 // it is no longer hm-specific despite the module's own file name.
 import * as qRouter from '../../core/queue-playback-router.js';
+// TASK-524: what this page knows about a video media type, as data.
+import { VIDEO_PAGE_CONFIG, MODE_ENGINE, SOURCE_TYPE, sourceIdFor, videoContext, videoRecord } from '../../core/video-page-config.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { gridIndex } from '../../core/playlist-name.js';
 import { buildCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
@@ -25,16 +26,11 @@ import { mountBreadcrumb } from './breadcrumb.js';
 // THREE server-authoritative rails share this page, picked once per load off
 // `engineMode` (mutually exclusive, never a live switch) and never crossed —
 // a rail's own actions, snapshot and Queue View stay entirely its own. All
-// three run on the TASK-498 unified queue engine, one media_type apart, so
-// every rail below fires the same qRouter-backed call — a per-type
-// difference from here on is a data entry, never a new branch:
+// three run on the TASK-498 unified queue engine, one media_type apart:
 //   'film'  — TASK-503/517: a SERIES/BOXSET/STANDALONE FILM, and (TASK-517)
-//             the browse "Play Queue" entry too (/api/queue/film) — the fm*
-//             functions below fire play-source/play-standalone/play-queue/
-//             next/previous and render the `queue_playback` snapshot the
-//             backend pushes (core/queue-playback-router.js, aliased qRouter,
-//             turns it into the view-model). A standalone film has no source
-//             at all (play-standalone clears it); a series/boxset always does.
+//             the browse "Play Queue" entry too (/api/queue/film). A
+//             standalone film has no source at all (play-standalone clears
+//             it); a series/boxset always does.
 //   'hm'    — TASK-499: home movies, its own media_type
 //             (/api/queue/home-movie).
 //   'mv'    — a MUSIC VIDEO (single pick, a music-video playlist, an
@@ -42,6 +38,14 @@ import { mountBreadcrumb } from './breadcrumb.js';
 //             TASK-374/445): TASK-505 cut it over, its own media_type
 //             (/api/queue/music-video), retiring the dedicated engine +
 //             channel FEAT-418 gave it (TASK-419/420, BUG-485).
+//
+// TASK-524 — the three rails share ONE set of plumbing: one action sender, one
+// snapshot apply, one swap, one entry path. Everything that genuinely differs
+// between them is an entry in core/video-page-config.js, so a fix lands once
+// instead of three times. Before this, each rail carried its own copy of all
+// of it, and two of the copies had already drifted — see that module's own ⛔
+// note for the two divergences this collapse found and preserved rather than
+// silently normalised.
 //
 // TASK-525 removed a FOURTH rail, 'video' — the OLD video engine
 // (/api/video-playback, TASK-221/251). TASK-517 had already moved its last
@@ -70,6 +74,7 @@ var RESUME_BY_RESTART = {
 };
 function resumeStart(restart, prog) { return RESUME_BY_RESTART[!!restart + ''](prog); }
 function zeroProgress() { return { position_secs: 0, duration_secs: null }; }
+function noop() {}
 var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 // BUG-439: an engine-fired action (play-source/-standalone/-queue) waits this long
 // for its first queue_playback snapshot before giving up and surfacing error.html,
@@ -93,40 +98,17 @@ export function initVideoPage() {
   var person   = getPerson();
   var isSeries = !!seriesId;
   var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson, homeMoviesMonth: homeMoviesMonth, isSeries: isSeries });
-  var MV_MODE = { mvItem: true, mvPlaylist: true, mvArtist: true, mvAll: true };
-  var isMusicVideo = !!MV_MODE[mode];
-  // TASK-499 (FEAT-497) — home movies are the first media type cut over onto
-  // the TASK-498 unified queue engine (/api/queue/home-movie), a THIRD
-  // server-authoritative rail alongside the video engine (series/film) and
-  // the music-video engine above — never the video engine's own
-  // home-movies-all/-by-person/-month sources, which stop being called from
-  // here (TASK-503/504/505 do the same for the other three media types, one
-  // at a time; nothing here changes their still-live engines).
-  var HM_MODE = { homeMoviesAll: true, homeMoviesPerson: true, homeMoviesMonth: true };
-  var isHomeMovie = !!HM_MODE[mode];
-  // TASK-503 (FEAT-497) — series/single (a standalone film, boxset or TV
-  // series) are the SECOND media type cut over onto the TASK-498 unified
-  // queue engine (/api/queue/film) — the video engine's own play-video/
-  // play-source stop being called for them.
-  //
-  // TASK-517 — `queue` mode (the browse "Play Queue" tile, `?playQueue`) is
-  // the LAST film route to move: TASK-503 left it on the old video engine
-  // because the unified engine had no "pop the queue and start playing"
-  // action, so a film reached that way still showed the pre-FEAT-497 Queue.
-  // The engine has one now (queue_engine.play_queue — the co-deployed
-  // grew-tv half of this task), so `queue` resolves to engineMode 'film' like
-  // every other film route, and the Queue it opens is the same shell.
-  //
   // Which rail this page load drives — resolved once off `mode` (mutually
-  // exclusive per page load, never a live switch) and used to key every
-  // ENGINE/onEnded/onNext/…/queue-setup dispatch table below, so none of them
-  // need their own musicVideo/homeMovie/… branch.
-  var MODE_ENGINE = {
-    mvPlaylist: 'mv', mvArtist: 'mv', mvItem: 'mv', mvAll: 'mv',
-    homeMoviesAll: 'hm', homeMoviesPerson: 'hm', homeMoviesMonth: 'hm',
-    series: 'film', single: 'film', queue: 'film'
-  };
+  // exclusive per page load, never a live switch), and `config` is everything
+  // that rail does differently from the other two. Between them they key every
+  // dispatch table below, so none of them need a musicVideo/homeMovie/film
+  // branch of their own.
   var engineMode = MODE_ENGINE[mode];
+  var config = VIDEO_PAGE_CONFIG[engineMode];
+  // The source id lives in a different nav param per mode; the mapping is data
+  // (core/video-page-config.js), so an entry reads it rather than each source
+  // entry point keeping its own two-table pair.
+  var sourceParams = { mvPlaylist: mvPlaylist, mvArtist: mvArtist, homeMoviesPerson: homeMoviesPerson, homeMoviesMonth: homeMoviesMonth, seriesId: seriesId };
   var wsApp = null;
   var player;
   var queue;
@@ -138,60 +120,28 @@ export function initVideoPage() {
   // sourceKey below says which source it was fetched for.
   var sourceTitle = null;
   var loadedSourceKey = null;
-  var mvSnapshot = {};     // latest queue_playback snapshot (music-video mode only, TASK-505)
-  var hmSnapshot = {};     // latest queue_playback snapshot (home-movie mode only, TASK-499)
-  var fmSnapshot = {};     // latest queue_playback snapshot (film mode only, TASK-503)
-  var fmPendingId = null;  // BUG-521: the item this page was opened for, until a snapshot confirms it
-  var mvPendingId = null;  // BUG-522: the same guard for music videos, cut over onto the same racy entry chain
+  // The latest queue_playback snapshot for THIS rail — one var where three sat
+  // side by side, two of them permanently {} (TASK-524).
+  var snapshot = {};
+  // BUG-521/522: the item this page was opened for, until a snapshot confirms
+  // it. Only read by a rail whose config sets `staleGuard`.
+  var pendingId = null;
   var enginePending = null;  // ENGINE_TIMEOUT_MS watchdog, armed per engine action, cleared on first swap
   // TASK-422: the music-video playback source's own crumb — { label, page, params }
   // linking to its playlist/artist page, mirroring BUG-044's audio sourceCrumb.
-  // Built once per entry (startMvPlaylist/startMvArtist, before mvBegin), never
-  // per-swap; stays null for a standalone mvItem pick (no source page, story 4).
+  // Built once per entry (startMvPlaylist/startMvArtist, before the entry's own
+  // send), never per-swap; stays null for a standalone mvItem pick (no source
+  // page, story 4).
   var mvSourceCrumb = null;
 
-  // TASK-505 (FEAT-497) — the unified queue engine's own action sender for
-  // MUSIC-VIDEO mode, now the exact twin of the hm/film senders below: POSTs
-  // to /api/queue/music-video, never the retired /api/music-video-playback
-  // engine. A function EXPRESSION, not a declaration — same reason
+  // TASK-524 — THE action sender, for whichever media type this page load is
+  // driving (/api/queue/{media_type}), replacing sendMvAction/sendHmAction/
+  // sendFmAction. A function EXPRESSION, not a declaration — same reason
   // screen-audio-page's own sendAction is one: it is an IO call (no DOM token,
   // returns a value), which the no-pure-fn-outside-core arch check would
   // otherwise flag as "move to core/", but it closes over SERVER/person and
   // only fans out a request, so it belongs here.
-  var sendMvAction = function(action, body) { return queuePlaybackAction(SERVER, 'music-video', action, person, body).catch(function() {}); };
-  // source_type/source_id for the CURRENT mv playthrough, keyed off the same
-  // `mode` entryMode() already resolved (mvPlaylist/mvArtist/mvAll are
-  // mutually exclusive per page load) — mirrors the unified engine's own
-  // "mv-artist"/"mv-playlist"/"mv-all" registered names (TASK-498,
-  // media-manager/db/queue_engine.py). `mvItem` — a LONE pick — has no entry:
-  // it plays as a standalone item with no source at all (startMvItem below),
-  // the same shape a standalone film uses, which is what leaves its
-  // ⏮/⏭/Shuffle/Repeat dimmed-but-visible rather than acting on a source of
-  // one (story 4).
-  var MV_SOURCE_TYPE = { mvPlaylist: 'mv-playlist', mvArtist: 'mv-artist', mvAll: 'mv-all' };
-  var MV_SOURCE_ID = { mvPlaylist: function() { return mvPlaylist; }, mvArtist: function() { return mvArtist; }, mvAll: function() { return null; } };
-
-  // TASK-499 (FEAT-497) — the unified queue engine's own action sender for
-  // home movies, the hm twin of sendMvAction: POSTs to /api/queue/home-movie.
-  // source_type/source_id mirror MV_SOURCE_TYPE/MV_SOURCE_ID's shape, keyed
-  // off the same `mode` (homeMoviesAll/-Person/-Month are mutually exclusive
-  // per page load) against the engine's own registered names
-  // (media-manager/db/queue_engine.py).
-  var sendHmAction = function(action, body) { return queuePlaybackAction(SERVER, 'home-movie', action, person, body).catch(function() {}); };
-  var HM_SOURCE_TYPE = { homeMoviesAll: 'home-movies-all', homeMoviesPerson: 'home-movies-by-person', homeMoviesMonth: 'home-movie-month' };
-  var HM_SOURCE_ID = { homeMoviesAll: function() { return null; }, homeMoviesPerson: function() { return homeMoviesPerson; }, homeMoviesMonth: function() { return homeMoviesMonth; } };
-  function sendHmSource() { return sendHmAction('play-source', { source_type: HM_SOURCE_TYPE[mode], source_id: HM_SOURCE_ID[mode]() }); }
-
-  // TASK-503 (FEAT-497) — the unified queue engine's own action sender for
-  // FILM mode (series/single), the fm twin of sendHmAction: POSTs to
-  // /api/queue/film, never the OLD video engine (whose last rail here went
-  // with TASK-525). A boxset resolves through the SAME
-  // registered source_type as a TV series ('series' — queue_engine.py's own
-  // series_items/boxset_items are identical catalog queries, mirroring the
-  // OLD video_playback_engine's own unconditional 'series' tag for either) —
-  // there is no separate 'boxset' source_id to send, only the collection id
-  // already carried as `seriesId` for either kind.
-  var sendFmAction = function(action, body) { return queuePlaybackAction(SERVER, 'film', action, person, body).catch(function() {}); };
+  var send = function(action, body) { return queuePlaybackAction(SERVER, config.mediaType, action, person, body).catch(noop); };
 
   // Breadcrumb (FEAT-021): a film is Home > Title; a series episode is Home >
   // Series > Episode. The series title is fetched once (graceful 'Series'
@@ -210,31 +160,22 @@ export function initVideoPage() {
     }
   };
   function mountCrumbs() {
-    mountBreadcrumb('breadcrumb', CRUMBS_FOR[isMusicVideo + '']());
+    mountBreadcrumb('breadcrumb', CRUMBS_FOR[config.sourceCrumbs + '']());
   }
   // TASK-503/505 — sourceTitle also feeds the Queue shell hero's source line;
   // a re-render past the overlay's first paint picks up a title that resolves
   // after that paint (screen-queue-shell.js's own getSourceTitle() reads this
   // same var live, but only on ITS next render — this nudges one the moment
-  // the fetch lands). Only the two rails whose source name arrives
-  // ASYNCHRONOUSLY need the nudge: home movies derive theirs from the
-  // snapshot's own slugs.
-  var TITLE_IS_FETCHED = { film: true, mv: true };
+  // the fetch lands). Only a rail whose source name arrives ASYNCHRONOUSLY
+  // needs the nudge: home movies derive theirs from the snapshot's own slugs.
+  var REFRESH_TITLE = { 'true': function() { queue.refreshSourceTitle(); }, 'false': noop };
   function refreshQueueSourceTitle() {
-    [TITLE_IS_FETCHED[engineMode]].filter(Boolean).forEach(function() { queue.refreshSourceTitle(); });
+    REFRESH_TITLE[config.fetchesSourceTitle + '']();
   }
-  // Which lookup names this rail's source. A film's is an opaque series/boxset
-  // id; a music video's is one of three source kinds, so it dispatches on the
-  // snapshot's own source_type (TASK-505) — the same split the companion Queue
-  // page's `loadSourceName` already makes.
-  var SOURCE_TITLE_FOR = {
-    film: function(snap) { return loadSeriesTitle(SERVER, snap.source_id); },
-    mv:   function(snap) { return loadMusicVideoSourceTitle(SERVER, snap.source_id, snap.source_type); }
-  };
   function applySourceTitle(snap) {
-    SOURCE_TITLE_FOR[engineMode](snap)
+    config.sourceTitle(SERVER, snap)
       .then(function(title) { sourceTitle = title; mountCrumbs(); refreshQueueSourceTitle(); })
-      .catch(function() {});
+      .catch(noop);
   }
   // TASK-517 — keyed on the SOURCE the engine says is loaded, not on this
   // page's own `series` param, so the "Play Queue" entry (which has no param
@@ -256,6 +197,9 @@ export function initVideoPage() {
       [key].filter(Boolean).forEach(function() { applySourceTitle(snap); });
     });
   }
+  // Home movies name their own source off the snapshot's slugs, so they never
+  // fetch one (core/queue-shell-config.js's homeMovieSource).
+  var ENSURE_TITLE = { 'true': ensureSourceTitle, 'false': noop };
   // An entry that has ALREADY fetched its source's name records it here rather
   // than letting the first snapshot fetch the same record again (a music-video
   // playlist reads its own title for the breadcrumb, TASK-422). The snapshot
@@ -280,218 +224,65 @@ export function initVideoPage() {
     enginePending = null;
   }
 
-  // BUG-439: the play-source/-standalone/-queue POST can land before the WS
-  // activate_person handshake finishes binding this device server-side, so its
-  // snapshot broadcast is silently dropped (the server already applied the
-  // action — only the push was lost). Once activate_person is confirmed, pull
-  // the current snapshot directly and apply it — a no-op if the push already
-  // landed (isSwap sees the same item_id), the fix if it didn't.
-  //
-  // TASK-505: music-video mode rides the unified engine's own GET now, and
-  // goes through applyMvResync — the BUG-521 stale guard, which BUG-522 found
-  // this rail needs too (its recovery answer can describe the PREVIOUSLY
-  // selected video and override a fresh pick). Converging onto the shared
-  // path is what closes that here, rather than shipping a known-racy new one.
-  var RESYNC_ON_ACTIVATE = {
-    mv:    function() { loadQueuePlayback(SERVER, 'music-video', person).then(applyMvResync).catch(function() {}); },
-    hm:    function() { loadQueuePlayback(SERVER, 'home-movie', person).then(applyHmSnapshot).catch(function() {}); },
-    film:  function() { loadQueuePlayback(SERVER, 'film', person).then(applyFmResync).catch(function() {}); }
-  };
-  function resyncOnActivate() { RESYNC_ON_ACTIVATE[engineMode](); }
-
-  // ── music-video queue (TASK-505, FEAT-497): server-authoritative over the
-  // TASK-498 unified queue engine's own `queue_playback` snapshot
-  // (core/queue-playback-router.js, aliased qRouter), the mv twin of the hm
-  // and fm blocks — the same qRouter calls, the same shell, the same one
-  // transportState rule. Two behaviours stay genuinely mv's own: it always
-  // starts at 0 (no loadProgress, no resume — a music video never resumes,
-  // TASK-373; the video player "assumes resume" and this deliberately never
-  // asks it to), and it advances with no "Up next" countdown, directly, like a
-  // song (screen-audio-page's onEnded) rather than a film's 5s overlay.
-  function renderMvUpNextLine() {
-    [qRouter.upNextLine(mvSnapshot)].filter(Boolean).forEach(function(l) { player.setUpNext(l.prefix, l.label); });
+  // ── the ONE queue rail (TASK-524), server-authoritative over the TASK-498
+  // unified queue engine's own `queue_playback` snapshot
+  // (core/queue-playback-router.js, aliased qRouter). Everything below runs
+  // for whichever media type this page load drives; `config` says what that
+  // type does differently.
+  function renderUpNextLine() {
+    [qRouter.upNextLine(snapshot)].filter(Boolean).forEach(function(l) { player.setUpNext(l.prefix, l.label); });
   }
-  function mvSwap(np) {
-    clearEngineTimeout();
-    loadedId = np.item_id;
-    currentTitle = np.title;
-    player.playVideo({ id: np.item_id, title: np.title, subtitles: np.subtitles, ext: np.ext }, from, 0);
-    renderMvUpNextLine();
+  // A film or home movie resumes mid-watch from watch_progress; a music video
+  // always starts at 0 and never asks (TASK-373 — the player "assumes resume",
+  // and this deliberately never lets it).
+  function playFromZero(np) {
+    player.playVideo(videoRecord(np), from, 0);
+    renderUpNextLine();
     mountCrumbs();
   }
-  function mvEnded() {
-    ({ 'true': function() { sendMvAction('next', {}); }, 'false': function() { player.stop(); } })[!!qRouter.upNextItem(mvSnapshot) + '']();
-  }
-  // Add to playlist (below) always targets the CURRENTLY PLAYING video, read
-  // off the live snapshot rather than a locally-tracked id.
-  function mvNowPlayingId() { return [qRouter.nowPlaying(mvSnapshot)].filter(Boolean).concat([{}])[0].item_id; }
-  // One entry point every mv* start function below chains through. TASK-505
-  // collapsed the old play-source-then-play-video pair into ONE action, the
-  // shape startSeries already used: the unified engine's play-source takes the
-  // tapped item itself. `startId` is a tapped playlist track, absent for an
-  // artist rail or Play All, where play-source's own first entry is what
-  // plays. No shuffle/repeat flags either — the engine reads this person's
-  // remembered per-source preference (TASK-498), which is what makes an artist
-  // or playlist start in source order and remember a later Shuffle (story 5).
-  function mvBegin(startId) {
-    document.getElementById('btn-add-playlist').classList.remove('hidden');
-    mvPendingId = startId;   // BUG-522 — null for an artist/Play All, which picks no item
-    armEngineTimeout();
-    initCaptions(SERVER)
-      .then(function() { sendMvAction('play-source', { source_type: MV_SOURCE_TYPE[mode], source_id: MV_SOURCE_ID[mode](), item_id: startId }); })
-      .catch(function() {});
-  }
-
-  // Shuffle + Repeat and ⏮/⏭, TV side, at the player screen's own control row
-  // — ONE rule with the Queue hero (core/queue-shell-view.js transportState),
-  // exactly as TASK-517 made it for films. TASK-505 retired mvApplyMulti, the
-  // pre-FEAT-497 gate that HID all four on a lone pick off BUG-485's
-  // `item_count`: the unified snapshot carries no such field, and the shell's
-  // model is disabled-but-visible everywhere (QUEUE-UX-SHELL.md's Hero
-  // section, TASK-493 row 21). So a lone music video now dims its transport
-  // instead of losing it (story 4), and ⏭ lights up whenever anything is
-  // ahead — including a video queued behind a lone pick, which the old gate
-  // could not express at all.
-  function mvSetTransportOn(snap) {
-    var t = transportState(snap);
-    setControlOn('btn-mv-shuffle', !!snap.shuffle, t.shuffle);
-    setControlOn('btn-mv-repeat', !!snap.repeat, t.repeat);
-    setControlOn('btn-prev', false, t.previous);
-    setControlOn('btn-next', false, t.next);
-  }
-  function mvToggleShuffle() { sendMvAction('toggle-shuffle', {}); }
-  function mvToggleRepeat() { sendMvAction('toggle-repeat', {}); }
-
-  // The Queue shell AND the actual <video> element render off the SAME
-  // snapshot — repaint the overlay, then swap media only when the now-playing
-  // item actually changed (isSwap), mirroring applyFmSnapshot above.
-  var MV_SWAP = { 'true': function(np) { mvSwap(np); }, 'false': function() { renderMvUpNextLine(); } };
-  function renderMvNowPlaying(np) { MV_SWAP[qRouter.isSwap(loadedId, mvSnapshot) + ''](np); }
-  function applyMvSnapshot(snap) {
-    [engineMode === 'mv'].filter(Boolean).forEach(function() {
-      mvSnapshot = snap;
-      // No setSeriesMode here (the fm block's own note applies): ⏮/⏭ are the
-      // transport rule's now, dimmed rather than hidden.
-      mvSetTransportOn(snap);
-      ensureSourceTitle(snap);
-      queue.applySnapshot(snap);
-      [snap.now_playing].filter(Boolean).forEach(renderMvNowPlaying);
-      sendVideoContext();
-    });
-  }
-  // BUG-522 — the same guard applyFmResync applies for films (BUG-521): the
-  // entry-time recovery GET is a fallback, never an override, or the player
-  // swaps back to the previously selected music video.
-  function applyMvResync(snap) {
-    [!qRouter.isStaleResync(mvPendingId, loadedId, snap)].filter(Boolean).forEach(function() {
-      applyMvSnapshot(snap);
-    });
-  }
-
-  // ── home-movie queue (TASK-499, FEAT-497): server-authoritative over the
-  // TASK-498 unified queue engine's own `queue_playback` snapshot
-  // (core/queue-playback-router.js), the hm twin of the mv block above. A
-  // home movie DOES resume mid-watch like a series/film (hmSwapVideo does its
-  // own loadProgress/resumeStart, not mvSwap's always-0 start —
-  // a short clip you stopped partway through still resumes where you left
-  // off). No "Up next" countdown on end either (TASK-487, preserved
-  // unchanged from the old engine): hmEnded advances directly, like mvEnded.
-  function renderHmUpNextLine() {
-    [qRouter.upNextLine(hmSnapshot)].filter(Boolean).forEach(function(l) { player.setUpNext(l.prefix, l.label); });
-  }
-  function hmSwapVideo(np) {
-    clearEngineTimeout();
-    loadedId = np.item_id;
-    currentTitle = np.title;
+  function resumeThenPlay(np) {
     var restartThis = [restart].filter(Boolean).filter(function() { return np.item_id === videoId; })[0];
     loadProgress(SERVER, np.item_id, person)
       .catch(zeroProgress)
       .then(function(prog) {
-        player.playVideo({ id: np.item_id, title: np.title, subtitles: np.subtitles, itemType: np.itemType }, from, resumeStart(restartThis, prog));
-        renderHmUpNextLine();
+        player.playVideo(videoRecord(np), from, resumeStart(restartThis, prog));
+        renderUpNextLine();
         mountCrumbs();
       });
   }
-  function hmEnded() {
-    ({ 'true': function() { sendHmAction('next', {}); }, 'false': function() { player.stop(); } })[!!qRouter.upNextItem(hmSnapshot) + '']();
-  }
-  function hmToggleShuffle() { sendHmAction('toggle-shuffle', {}); }
-  function hmToggleRepeat() { sendHmAction('toggle-repeat', {}); }
-  // Shuffle/Repeat are ALWAYS shown for a home movie (QUEUE-UX-SHELL.md's
-  // Hero section) — un-hidden unconditionally on the first (and every)
-  // snapshot (removing an absent class is a no-op, so repeating it every
-  // snapshot is harmless); the ⏮/⏭ transport row stays visible too
-  // (setSeriesMode(true) below), matching that same always-shown philosophy
-  // rather than gating on a source item-count this engine's snapshot has no
-  // field for.
-  function hmSetTransportOn(snap) {
-    document.getElementById('btn-hm-shuffle').classList.remove('hidden');
-    document.getElementById('btn-hm-repeat').classList.remove('hidden');
-    document.getElementById('btn-hm-shuffle').classList.toggle('on', !!snap.shuffle);
-    document.getElementById('btn-hm-repeat').classList.toggle('on', !!snap.repeat);
-  }
-  var HM_SWAP = { 'true': function(np) { hmSwapVideo(np); }, 'false': function() { renderHmUpNextLine(); } };
-  function renderHmNowPlaying(np) { HM_SWAP[qRouter.isSwap(loadedId, hmSnapshot) + ''](np); }
-  function applyHmSnapshot(snap) {
-    [engineMode === 'hm'].filter(Boolean).forEach(function() {
-      hmSnapshot = snap;
-      player.setSeriesMode(true);
-      hmSetTransportOn(snap);
-      queue.applySnapshot(snap);
-      [snap.now_playing].filter(Boolean).forEach(renderHmNowPlaying);
-      sendVideoContext();
-    });
-  }
-
-  // ── film queue (TASK-503, FEAT-497): server-authoritative over the
-  // TASK-498 unified queue engine's own `queue_playback` snapshot
-  // (core/queue-playback-router.js, aliased qRouter above), the fm twin of
-  // the hm block above — series/single (a standalone film, boxset or TV
-  // series episode) and, since TASK-517, `queue` mode too. A film DOES resume
-  // mid-watch (fmSwapVideo does its own loadProgress/resumeStart) and DOES
-  // keep the 5s "Up next" countdown on end (fmAdvanceAuto, unlike hmEnded's
-  // direct advance) — both unchanged FILM behaviours
-  // (docs/QUEUE.md rows 29/33), only the engine driving them moves.
-  function renderFmUpNextLine() {
-    [qRouter.upNextLine(fmSnapshot)].filter(Boolean).forEach(function(l) { player.setUpNext(l.prefix, l.label); });
-  }
-  function fmSwapVideo(np) {
+  var START_AT = { 'true': resumeThenPlay, 'false': playFromZero };
+  function swapMedia(np) {
     clearEngineTimeout();
     loadedId = np.item_id;
     currentTitle = np.title;
-    var restartThis = [restart].filter(Boolean).filter(function() { return np.item_id === videoId; })[0];
-    loadProgress(SERVER, np.item_id, person)
-      .catch(zeroProgress)
-      .then(function(prog) {
-        player.playVideo({ id: np.item_id, title: np.title, subtitles: np.subtitles, itemType: np.itemType }, from, resumeStart(restartThis, prog));
-        renderFmUpNextLine();
-        mountCrumbs();
-      });
+    START_AT[config.resumes + ''](np);
   }
-  // Auto-advance at true 100% end, the countdown shape films have always had:
-  // the next item -> a 5s "Up next" countdown then fire `next`; no next ->
-  // stop back to origin.
-  function fmAdvanceAuto() {
-    var next = qRouter.upNextItem(fmSnapshot);
+  // Auto-advance at true 100% end. A film runs the 5s "Up next" countdown it
+  // has always had; a home movie or music video is a short clip where that
+  // reads as a gap, so it advances directly, like a song
+  // (TASK-487, docs/QUEUE.md rows 29/33). Nothing ahead -> stop back to origin.
+  function advanceDirect() {
+    ({ 'true': function() { send('next', {}); }, 'false': function() { player.stop(); } })[!!qRouter.upNextItem(snapshot) + '']();
+  }
+  function advanceWithCountdown() {
+    var next = qRouter.upNextItem(snapshot);
     ({
-      'true':  function() { player.startUpNext(next.title, function() { sendFmAction('next', {}); }); },
+      'true':  function() { player.startUpNext(next.title, function() { send('next', {}); }); },
       'false': function() { player.stop(); }
     })[!!next + '']();
   }
-  function fmToggleShuffle() { sendFmAction('toggle-shuffle', {}); }
-  function fmToggleRepeat() { sendFmAction('toggle-repeat', {}); }
-  // The film transport, at the player screen's own control row — ONE rule
-  // with the Queue hero, which is the whole of BUG-510/512: both sites gated
-  // on `source_type` alone, so ⏭ read dead on a standalone film even with a
-  // film queued behind it, while the engine's own advance() would happily
-  // have played it. core/queue-shell-view.js's transportState IS that rule
-  // (⏭ live whenever anything is ahead, from the override queue or the
-  // source; ⏮/Shuffle/Repeat need a source) and the Queue hero already
-  // renders from it — reading it here too is what keeps the two surfaces from
-  // disagreeing again. Every control stays VISIBLE and dims when it has
-  // nothing to act on, never hidden (QUEUE-UX-SHELL.md's Hero section;
-  // TASK-493 row 21, the Films-hides-Shuffle finding). TASK-505: mv reads the
-  // same helper, so the two rails cannot drift into two dimming rules.
+  var ON_ENDED = { 'true': advanceWithCountdown, 'false': advanceDirect };
+
+  function toggleShuffle() { send('toggle-shuffle', {}); }
+  function toggleRepeat() { send('toggle-repeat', {}); }
+
+  // THE transport rule at the player screen's own control row — ONE rule with
+  // the Queue hero (core/queue-shell-view.js transportState), which is the
+  // whole of BUG-510/512: both sites gated on `source_type` alone, so ⏭ read
+  // dead on a standalone film even with a film queued behind it, while the
+  // engine's own advance() would happily have played it. Every control stays
+  // VISIBLE and dims when it has nothing to act on, never hidden
+  // (QUEUE-UX-SHELL.md's Hero section; TASK-493 row 21).
   function setControlOn(id, on, enabled) {
     var btn = document.getElementById(id);
     btn.classList.remove('hidden');
@@ -499,81 +290,84 @@ export function initVideoPage() {
     btn.classList.toggle('is-disabled', !enabled);
     btn.disabled = !enabled;
   }
-  function fmSetTransportOn(snap) {
+  //
+  // TASK-524 — ALL THREE rails now, where home movies were the exception: they
+  // un-hid Shuffle/Repeat and showed ⏮/⏭ live at all times, so nothing on their
+  // player row ever dimmed even as their own Queue hero dimmed it, and ⏭ read
+  // live at the end of a list with nothing behind it. One rule, one place, all
+  // four surfaces (TV row, TV hero, companion row, companion hero) agreeing.
+  function applyTransport(snap) {
     var t = transportState(snap);
-    setControlOn('btn-film-shuffle', !!snap.shuffle, t.shuffle);
-    setControlOn('btn-film-repeat', !!snap.repeat, t.repeat);
+    setControlOn(config.shuffleId, !!snap.shuffle, t.shuffle);
+    setControlOn(config.repeatId, !!snap.repeat, t.repeat);
     setControlOn('btn-prev', false, t.previous);
     setControlOn('btn-next', false, t.next);
   }
-  var FM_SWAP = { 'true': function(np) { fmSwapVideo(np); }, 'false': function() { renderFmUpNextLine(); } };
-  function renderFmNowPlaying(np) { FM_SWAP[qRouter.isSwap(loadedId, fmSnapshot) + ''](np); }
-  function applyFmSnapshot(snap) {
-    [engineMode === 'film'].filter(Boolean).forEach(function() {
-      fmSnapshot = snap;
-      // No setSeriesMode here (TASK-517): ⏮/⏭ are the transport rule's now,
-      // dimmed rather than hidden — fmSetTransportOn owns both buttons.
-      fmSetTransportOn(snap);
-      ensureSourceTitle(snap);
-      queue.applySnapshot(snap);
-      [snap.now_playing].filter(Boolean).forEach(renderFmNowPlaying);
-      sendVideoContext();
-    });
+
+  // The Queue shell AND the actual <video> element render off the SAME
+  // snapshot — repaint the overlay, then swap media only when the now-playing
+  // item actually changed (isSwap).
+  var SWAP = { 'true': swapMedia, 'false': renderUpNextLine };
+  function renderNowPlaying(np) { SWAP[qRouter.isSwap(loadedId, snapshot) + ''](np); }
+  function applySnapshot(snap) {
+    snapshot = snap;
+    applyTransport(snap);
+    ENSURE_TITLE[config.fetchesSourceTitle + ''](snap);
+    queue.applySnapshot(snap);
+    [snap.now_playing].filter(Boolean).forEach(renderNowPlaying);
+    sendVideoContext();
   }
-  // BUG-521 — the recovery GET is a fallback, never an override: discard an
-  // answer that predates this page's own play POST, or the player swaps back to
-  // the previously selected film. A WS push needs no such guard — it is always
-  // the server's current state. armEngineTimeout still covers a pick that never
-  // arrives at all, so discarding here can't leave the page inert forever.
-  function applyFmResync(snap) {
-    [!qRouter.isStaleResync(fmPendingId, loadedId, snap)].filter(Boolean).forEach(function() {
-      applyFmSnapshot(snap);
-    });
+  // BUG-521/522 — the entry-time recovery GET is a fallback, never an
+  // override: discard an answer that predates this page's own play POST, or
+  // the player swaps back to the previously selected item. A WS push needs no
+  // such guard — it is always the server's current state. armEngineTimeout
+  // still covers a pick that never arrives at all, so discarding here can't
+  // leave the page inert forever.
+  //
+  // TASK-524 — every rail, closing BUG-522-STALE-RESYNC-REMAINING-TYPES: films
+  // (BUG-521) and music videos (BUG-505) each got this guard as their own copy
+  // and home movies never did, so a tapped clip could still be dragged back to
+  // whichever clip played last. One plumbing means one guard.
+  function guardedResync(snap) {
+    [!qRouter.isStaleResync(pendingId, loadedId, snap)].filter(Boolean).forEach(function() { applySnapshot(snap); });
+  }
+  // BUG-439: the play-source/-standalone/-queue POST can land before the WS
+  // activate_person handshake finishes binding this device server-side, so its
+  // snapshot broadcast is silently dropped (the server already applied the
+  // action — only the push was lost). Once activate_person is confirmed, pull
+  // the current snapshot directly and apply it — a no-op if the push already
+  // landed (isSwap sees the same item_id), the fix if it didn't.
+  function resyncOnActivate() {
+    loadQueuePlayback(SERVER, config.mediaType, person)
+      .then(guardedResync)
+      .catch(noop);
   }
 
-  // The music-video/home-movie/film context push (also fired on every new
-  // video load, below) — reflects the live engine snapshot so the
-  // companion's title/up-next/pills never lag behind what the Queue View or
-  // the TV's own buttons just did.
+  // The companion context push (also fired on every new video load, below) —
+  // reflects the live engine snapshot so the companion's title/up-next/pills
+  // never lag behind what the Queue View or the TV's own buttons just did.
+  // TASK-517/505 — the phone's controls read the SAME transportState the TV
+  // row and the Queue hero do, pushed as resolved booleans rather than a raw
+  // flag it re-derives a rule from (which is how BUG-512 left the two surfaces
+  // disagreeing).
   function sendVideoContext() {
     [wsApp].filter(Boolean).forEach(function(ws) {
-      ws.sendContext({
-        context_id: 'video',
-        display: player.currentVideoDisplay(),
-        musicVideo: isMusicVideo,
-        musicVideoShuffle: !!mvSnapshot.shuffle,
-        musicVideoRepeat: !!mvSnapshot.repeat,
-        musicVideoSource: mvSourceCrumb,
-        // TASK-505 — the phone's music-video controls read the SAME
-        // transportState the TV row and the Queue hero do, pushed as resolved
-        // booleans, exactly as TASK-517 did for films. This replaces the
-        // `musicVideoMulti` flag the companion used to re-derive a
-        // show/hide rule from, which is what made a lone pick's controls
-        // vanish on both surfaces (story 4).
-        musicVideoTransport: transportState(mvSnapshot),
-        homeMovie: isHomeMovie,
-        homeMovieShuffle: !!hmSnapshot.shuffle,
-        homeMovieRepeat: !!hmSnapshot.repeat,
-        film: engineMode === 'film',
-        filmShuffle: !!fmSnapshot.shuffle,
-        filmRepeat: !!fmSnapshot.repeat,
-        // TASK-517 — the phone's film controls read the SAME transportState
-        // the TV row and the Queue hero do, pushed as resolved booleans
-        // rather than the raw `filmHasSource` it used to re-derive the rule
-        // from (which is how BUG-512 left the two surfaces disagreeing).
-        filmTransport: transportState(fmSnapshot)
-      });
+      ws.sendContext(videoContext(engineMode, snapshot, mvSourceCrumb, player.currentVideoDisplay()));
     });
   }
 
   // TASK-378 — "Add to playlist" for the CURRENTLY PLAYING music video (works from
   // any mv entry mode — a lone pick, inside a music-video playlist, or an artist's
-  // videos — mvNowPlayingId() is always the one on screen). Music-video-only: the
-  // button stays hidden (CSS) for a series/film, and mvBegin is the only place that
-  // reveals it. One sheet, no Play Next option (that is the album-detail per-track
-  // sheet's own thing) — just the profile's music-video playlists + New playlist,
-  // mirroring screen-album-detail-page's openAddSheet almost verbatim so the two
-  // stay in lock-step.
+  // videos — nowPlayingId() is always the one on screen). Music-video-only: the
+  // button stays hidden (CSS) for a series/film, and only an mv entry reveals it
+  // (config.addsToPlaylist). One sheet, no Play Next option (that is the
+  // album-detail per-track sheet's own thing) — just the profile's music-video
+  // playlists + New playlist, mirroring screen-album-detail-page's openAddSheet
+  // almost verbatim so the two stay in lock-step.
+  //
+  // Add to playlist always targets the CURRENTLY PLAYING video, read off the
+  // live snapshot rather than a locally-tracked id.
+  function nowPlayingId() { return [qRouter.nowPlaying(snapshot)].filter(Boolean).concat([{}])[0].item_id; }
   var addState = { cells: [] };
   function focusAdd(i) { addState.cells[i].focus(); }
   function closeAddSheet() {
@@ -590,12 +384,12 @@ export function initVideoPage() {
     addStatusTimer = setTimeout(hideAddStatus, 2500);
   }
   function addExisting(id, title) {
-    addToPlaylist(SERVER, id, mvNowPlayingId())
+    addToPlaylist(SERVER, id, nowPlayingId())
       .then(function() { closeAddSheet(); showAddStatus('Added to ' + title); })
       .catch(function() { closeAddSheet(); showAddStatus('Could not add to playlist.'); });
   }
   function createNewPlaylist() {
-    navTo('playlist-create.html', { addTrack: mvNowPlayingId(), collectionType: 'music-video-playlist' });
+    navTo('playlist-create.html', { addTrack: nowPlayingId(), collectionType: 'music-video-playlist' });
   }
   function moveAdd(e) {
     var i = addState.cells.indexOf(document.activeElement);
@@ -629,14 +423,8 @@ export function initVideoPage() {
       .then(function(res) { showAddSheet(playlistCards(res.content, null, 'music-video-playlist')); })
       .catch(function() { showAddStatus('Could not load playlists.'); });
   }
-
-  // Music-video/home-movie/film mode all resolve next/prev/end against the
-  // TASK-498 unified queue engine, their own media_type apart (TASK-499 home
-  // movies, TASK-503 films, TASK-505 music videos) — the OLD video-playback
-  // engine's own entries went with TASK-525.
-  var ON_ENDED = { mv: mvEnded, hm: hmEnded, film: fmAdvanceAuto };
-  var ON_NEXT  = { mv: function() { sendMvAction('next', {}); }, hm: function() { sendHmAction('next', {}); }, film: function() { sendFmAction('next', {}); } };
-  var ON_PREV  = { mv: function() { sendMvAction('previous', {}); }, hm: function() { sendHmAction('previous', {}); }, film: function() { sendFmAction('previous', {}); } };
+  function revealAddPlaylist() { document.getElementById('btn-add-playlist').classList.remove('hidden'); }
+  var REVEAL_ADD = { 'true': revealAddPlaylist, 'false': noop };
 
   player = setupPlayer({
     video: document.getElementById('video'),
@@ -652,14 +440,12 @@ export function initVideoPage() {
       };
       [STOP_NAV[from]].filter(Boolean).concat([function() { navTo('browse.html'); }])[0]();
     },
-    onEnded: ON_ENDED[engineMode],
-    onNext:  ON_NEXT[engineMode],
-    onPrev:  ON_PREV[engineMode],
+    onEnded: ON_ENDED[config.countdown + ''],
+    onNext:  function() { send('next', {}); },
+    onPrev:  function() { send('previous', {}); },
     // Full app_state snapshot to the companion (FEAT-017): static context here,
-    // live position/playing/captions added by the player. The music-video/
-    // home-movie flags ride the CONTEXT push below, not this one — that is
-    // what the companion mirror reads to stop trusting the video-playback
-    // engine snapshot.
+    // live position/playing/captions added by the player. The per-media-type
+    // flags ride the CONTEXT push above, not this one.
     emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
     appContext: function() {
       return { screen: 'player', itemId: [seriesId].filter(Boolean).concat([loadedId, videoId]).filter(Boolean)[0], episodeId: [loadedId].filter(Boolean).concat([videoId])[0], profile: profile };
@@ -690,19 +476,17 @@ export function initVideoPage() {
   // series/boxset id and a music video's playlist/artist source are opaque, so
   // both read this page's own lookup. TASK-525 took the unreachable 'video'
   // mode's own controller with the old engines, so the shell is now the ONLY
-  // Queue View this page mounts.
-  var SETUP_QUEUE = { mv: setupQueueShell, hm: setupQueueShell, film: setupQueueShell };
-  var QUEUE_MEDIA = { mv: MUSIC_VIDEO, hm: HOME_MOVIE, film: FILM };
-  var SEND_QUEUE_ACTION = { mv: sendMvAction, hm: sendHmAction, film: sendFmAction };
-  queue = SETUP_QUEUE[engineMode]({
+  // Queue View this page mounts — and TASK-524 the three-entry table that
+  // pointed every rail at it.
+  queue = setupQueueShell({
     root: document.getElementById('queue-overlay'),
     body: document.getElementById('queue-body'),
     crumb: document.getElementById('queue-crumb'),
-    onAction: function(action, body) { SEND_QUEUE_ACTION[engineMode](action, body); },
+    onAction: function(action, body) { send(action, body); },
     onToggle: function() { player.remote.toggle(); },
     onClose: function() { document.getElementById('btn-queue').focus(); },
     getSourceTitle: function() { return sourceTitle; },
-    media: QUEUE_MEDIA[engineMode]
+    media: config.shell
   });
   document.getElementById('btn-queue').addEventListener('click', function() { queue.open(); });
   document.getElementById('btn-add-playlist').addEventListener('click', openAddSheet);
@@ -710,12 +494,10 @@ export function initVideoPage() {
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddSheet);
   document.getElementById('btn-add-create').addEventListener('keydown', onAddKey);
   document.getElementById('btn-add-cancel').addEventListener('keydown', onAddKey);
-  document.getElementById('btn-mv-shuffle').addEventListener('click', mvToggleShuffle);
-  document.getElementById('btn-mv-repeat').addEventListener('click', mvToggleRepeat);
-  document.getElementById('btn-hm-shuffle').addEventListener('click', hmToggleShuffle);
-  document.getElementById('btn-hm-repeat').addEventListener('click', hmToggleRepeat);
-  document.getElementById('btn-film-shuffle').addEventListener('click', fmToggleShuffle);
-  document.getElementById('btn-film-repeat').addEventListener('click', fmToggleRepeat);
+  // video.html carries a Shuffle/Repeat pair per rail and unhides exactly one;
+  // only the live rail's pair is wired, where all three pairs used to be.
+  document.getElementById(config.shuffleId).addEventListener('click', toggleShuffle);
+  document.getElementById(config.repeatId).addEventListener('click', toggleRepeat);
 
   var KEY_TARGET = {
     'true':  function(e) { queue.handleKey(e); },
@@ -727,18 +509,21 @@ export function initVideoPage() {
   initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote });
 
   // Breadcrumb crumbs on the companion send a `navigate` intent (FEAT-021);
-  // everything else routes to the player's d-pad/transport remote.
+  // everything else routes to the player's d-pad/transport remote. The two
+  // toggles act on whichever rail this page drives — they were wired to the
+  // music-video sender alone until TASK-524, which would have crossed engines
+  // had anything ever sent the intent.
   function appIntent(intent, params) {
-    var EXTRA = { navigate: function() { navTo(params.page, params.params); }, toggleShuffle: mvToggleShuffle, toggleRepeat: mvToggleRepeat };
+    var EXTRA = { navigate: function() { navTo(params.page, params.params); }, toggleShuffle: toggleShuffle, toggleRepeat: toggleRepeat };
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }
   // TASK-499/503/505: a person may hold live queue state in more than one
   // media type at once (the WS relay tags every push with `media_type`) —
-  // this page only ever drives ONE of them per load, so it filters to its own.
-  var APPLY_QUEUE_SNAPSHOT = { 'home-movie': applyHmSnapshot, film: applyFmSnapshot, 'music-video': applyMvSnapshot };
+  // this page only ever drives ONE of them per load, so it filters to its own,
+  // and a stray push from another type can't hijack the live player.
   function applyQueuePlayback(payload) {
-    [APPLY_QUEUE_SNAPSHOT[payload.media_type]].filter(Boolean).forEach(function(fn) { fn(payload); });
+    [payload.media_type === config.mediaType].filter(Boolean).forEach(function() { applySnapshot(payload); });
   }
   wsApp = connectApp(window.location.origin, appIntent, {
     onQueuePlayback: applyQueuePlayback,
@@ -747,63 +532,73 @@ export function initVideoPage() {
 
   document.addEventListener('keydown', dispatchKey);
 
-  // ── entry: series fires play-source (server then drives swaps); a standalone
-  // film loads directly. initCaptions seeds the global captions cache before the
-  // first playVideo reads it (FEAT-023); it never rejects.
+  // ── entry ────────────────────────────────────────────────────────────────
+  // TASK-524 — every entry below fires through ONE begin: arm the BUG-439
+  // watchdog, record the BUG-521/522 pending pick, seed the global captions
+  // cache (FEAT-023 — it never rejects) and send. What differs per entry is
+  // only WHICH action and body, which is the point of the collapse.
   //
-  // TASK-503 — series/single now fire the TASK-498 unified queue engine
-  // (/api/queue/film), never the OLD video engine's own play-source/
-  // play-video (TASK-517 moved `queue` mode over too, and TASK-525 took this
-  // page's last reference to them with it). A
-  // boxset sends the SAME 'series' source_type as a TV series — queue_engine
-  // registers 'series' and 'boxset' as two names for the identical catalog
-  // query (queue_catalog_source.py both just call get_collection_item_ids),
-  // and the OLD engine already sent 'series' unconditionally for either
-  // (video_playback_engine.py, same catalog identity) — this cutover keeps
-  // that exact behaviour rather than threading collectionType through the
-  // nav params for a purely cosmetic tag.
-  function startSeries() {
-    mountCrumbs();
-    ensureSourceTitle({ source_type: 'series', source_id: seriesId });
-    fmPendingId = videoId;   // BUG-521 — null for Play All, which picks no item
+  // A function EXPRESSION for the same reason `send` is one: it returns a
+  // value (the chain each entry appends its own tail to) and touches no DOM.
+  var beginPlayback = function(pendingItemId, action, body) {
+    pendingId = pendingItemId;
+    REVEAL_ADD[config.addsToPlaylist + '']();
     armEngineTimeout();
-    initCaptions(SERVER)
-      .then(function() { sendFmAction('play-source', { source_type: 'series', source_id: seriesId, item_id: videoId }); })
-      .catch(function() {});
+    return initCaptions(SERVER).then(function() { return send(action, body); });
+  };
+  // A SOURCE entry — a series/boxset, a music-video playlist/artist, a
+  // home-movie person/month/Play All, the whole music-video catalog.
+  //
+  // ⛔ TWO actions whenever a tapped item is named, because the engine's
+  // play-source ALWAYS starts a source at its own first entry:
+  // api/queue_playback.py reads `source_type` and `source_id` off the body and
+  // passes neither an item nor a follow-up to engine.play_source, which sets
+  // current_item_id from current[0]. Landing on the tapped row therefore takes
+  // a play-item behind it. Home movies always sent that pair; films and music
+  // videos each sent ONE play-source carrying an `item_id` the server silently
+  // dropped, so a mid-series tap played episode 1 and a tapped playlist track
+  // played the playlist's first video (TASK-524 — the app's own e2e fixture
+  // honoured that field and hid it). `startId` absent — an artist rail, a Play
+  // All, an untapped list — stays one action: the source's own first entry is
+  // exactly what should play.
+  //
+  // No shuffle/repeat flags either — the engine reads this person's remembered
+  // per-source preference (TASK-498), which is what makes an artist or playlist
+  // start in source order and remember a later Shuffle (story 5).
+  function playTapped(startId) {
+    [startId].filter(Boolean).forEach(function(id) { send('play-item', { item_id: id }); });
   }
-  // A standalone film plays THROUGH the engine too (FEAT-040/TASK-251,
-  // TASK-503: 'play-standalone' on the NEW engine — the twin of the OLD
-  // engine's own 'play-video'), so the companion + Queue View always reflect
-  // the real now-playing. The snapshot's now_playing is the film
-  // (current_item_id, no source); fmSwapVideo loads it + resumes from
+  function startSource(startId) {
+    beginPlayback(startId, 'play-source', { source_type: SOURCE_TYPE[mode], source_id: sourceIdFor(mode, sourceParams) })
+      .then(function() { playTapped(startId); })
+      .catch(noop);
+  }
+  // A STANDALONE entry — a single film, or a LONE music-video pick, which is
+  // the one mv entry with no source at all: play-standalone, the same action a
+  // standalone film uses, rather than a source of exactly one. That is what
+  // leaves its ⏮/⏭/Shuffle/Repeat dimmed-but-visible (story 4) instead of
+  // offering controls with nothing to act on, and why the engine's registered
+  // 'mv-item' source goes unused from here. The snapshot's now_playing is the
+  // item itself (no source); the swap loads it and, for a film, resumes from
   // watch_progress. The durable queue plays after it.
+  function startStandalone(itemId) {
+    beginPlayback(itemId, 'play-standalone', { item_id: itemId }).catch(noop);
+  }
+  // TASK-524 — a tapped SERIES EPISODE and a tapped HOME-MOVIE CLIP are the
+  // same entry: open a scoped list, tap a row, play that row inside its source.
+  // They were two functions that had drifted into two different entry shapes;
+  // what actually separates them is one bit already in the config — a series
+  // fetches its source's name (the top crumb needs it before any snapshot
+  // lands), while home movies derive theirs from the snapshot's own slugs, so
+  // ENSURE_TITLE is the same no-op here that it is on every snapshot.
+  function startTappedSource() {
+    mountCrumbs();
+    ENSURE_TITLE[config.fetchesSourceTitle + '']({ source_type: SOURCE_TYPE[mode], source_id: sourceIdFor(mode, sourceParams) });
+    startSource(videoId);
+  }
   function startSingle() {
     mountCrumbs();
-    fmPendingId = videoId;   // BUG-521 — always set here; a single IS the pick
-    armEngineTimeout();
-    initCaptions(SERVER)
-      .then(function() { sendFmAction('play-standalone', { item_id: videoId }); })
-      .catch(function() {});
-  }
-  // TASK-499 (FEAT-497) — Home Movies Play All / by-person / by-month: cut
-  // over from the video engine's own home-movies-* sources (TASK-446/486/
-  // 491) onto the TASK-498 unified queue engine, mirroring mvBegin's own
-  // two-action entry pattern (the new engine's play-source takes no item_id
-  // of its own — a tapped row's `video` param plays via a follow-up
-  // play-item once the source resolves, same as an mv entry's tapped pick).
-  // ONE entry point for all three source shapes (HM_SOURCE_TYPE/HM_SOURCE_ID
-  // already key on `mode`), always unshuffled — shuffle is a live Queue View
-  // toggle (owner correction, unchanged by this cutover), not a param here.
-  function hmBegin(itemId) {
-    armEngineTimeout();
-    initCaptions(SERVER)
-      .then(function() { return sendHmSource(); })
-      .then(function() { [itemId].filter(Boolean).forEach(function(id) { sendHmAction('play-item', { item_id: id }); }); })
-      .catch(function() {});
-  }
-  function startHomeMovies() {
-    mountCrumbs();
-    hmBegin(videoId);
+    startStandalone(videoId);
   }
   // FEAT-040 (Play Queue): entered with ?playQueue (no video/series) — fire
   // play-queue (the server makes the queue head current, without consuming
@@ -812,13 +607,11 @@ export function initVideoPage() {
   // engine now (/api/queue/film), the same rail every other film route uses —
   // so the queue this plays is the one every ＋Queue press has been filling
   // since TASK-503, and the Queue it opens is the shell, not the pre-FEAT-497
-  // screen this route showed until now.
+  // screen this route showed until now. No pending pick of its own: the
+  // engine picks the item, we did not.
   function startQueue() {
     mountCrumbs();
-    armEngineTimeout();
-    initCaptions(SERVER)
-      .then(function() { sendFmAction('play-queue', {}); })
-      .catch(function() {});
+    beginPlayback(null, 'play-queue', {}).catch(noop);
   }
   // TASK-422: the mv source crumb's own { label, page, params } targets, one per
   // entry mode with a source page — mirrors companion-audio.js's SOURCE_CRUMB.
@@ -827,48 +620,32 @@ export function initVideoPage() {
     mvPlaylist: function(title) { return { label: title, page: 'playlist-detail.html', params: { playlist: mvPlaylist } }; },
     mvArtist:   function() { return { label: mvArtist, page: 'artist.html', params: { artist: mvArtist } }; }
   };
-  // Music-video entries (TASK-374, TASK-505): each fires ONE unified-engine
-  // action, mvBegin priming captions + the engine timeout + the BUG-522 stale
-  // guard around it. The server resolves the source's own order (mv-artist/
-  // mv-all need no client-side loadBrowse sort — the engine's catalog
-  // resolution already matches it, TASK-445).
-  //
-  // A LONE pick is the one entry with no source at all: play-standalone, the
-  // same action a standalone film uses, rather than a source of exactly one.
-  // That is what leaves its ⏮/⏭/Shuffle/Repeat dimmed-but-visible (story 4)
-  // instead of offering controls with nothing to act on, and it is why the
-  // engine's registered 'mv-item' source goes unused from here.
-  function startMvItem() {
-    document.getElementById('btn-add-playlist').classList.remove('hidden');
-    mvPendingId = mvItem;   // BUG-522 — a lone pick always IS the pick
-    armEngineTimeout();
-    initCaptions(SERVER)
-      .then(function() { sendMvAction('play-standalone', { item_id: mvItem }); })
-      .catch(function() {});
-  }
   function startMvPlaylist() {
     loadPlaylist(SERVER, mvPlaylist)
       .then(function(pl) {
         mvSourceCrumb = MV_SOURCE_CRUMB.mvPlaylist(pl.title);
-        primeSourceTitle('mv-playlist', mvPlaylist, pl.title);
+        primeSourceTitle(SOURCE_TYPE.mvPlaylist, mvPlaylist, pl.title);
         // TASK-376/377: reached from the playlist's own detail screen, tapping
         // a specific track — the playthrough starts there, same as an audio
         // playlist starts from the tapped track, then carries on in order. No
-        // tapped track ⇒ mvBegin(undefined), which sends play-source with no
-        // item_id, and the playlist's own first item plays.
-        mvBegin(mvTrack);
+        // tapped track ⇒ play-source with no item_id, and the playlist's own
+        // first item plays.
+        startSource(mvTrack);
       })
       .catch(function() { navTo('error.html'); });
   }
   function startMvArtist() {
     mvSourceCrumb = MV_SOURCE_CRUMB.mvArtist();
-    mvBegin();
+    startSource();
   }
   // TASK-445 — Play All: every music video in the catalog, no source page to
   // link back to (mvSourceCrumb stays null, degrading to Home > leaf like
   // mvItem — story 4 has no equivalent here since there is no single item).
   function startMvAll() {
-    mvBegin();
+    startSource();
+  }
+  function startMvItem() {
+    startStandalone(mvItem);
   }
   var ENTRY = {
     queue: startQueue,
@@ -876,10 +653,10 @@ export function initVideoPage() {
     mvArtist: startMvArtist,
     mvItem: startMvItem,
     mvAll: startMvAll,
-    homeMoviesAll: startHomeMovies,
-    homeMoviesPerson: startHomeMovies,
-    homeMoviesMonth: startHomeMovies,
-    series: startSeries,
+    homeMoviesAll: startTappedSource,
+    homeMoviesPerson: startTappedSource,
+    homeMoviesMonth: startTappedSource,
+    series: startTappedSource,
     single: startSingle
   };
   ENTRY[mode]();
