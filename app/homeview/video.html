@@ -120,46 +120,60 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
 /* TASK-499 (docs/QUEUE-UX-SHELL.md) — the FEAT-497 Queue UX shell, home
    movies first. A NEW class set (`.qs-*`), not a restyle of `.qtab`/`.q-row`/
    `.now-playing` above: those stay live for every media type not yet cut
-   over onto this shell. Companion-first (390px), not the 880px `.queue`
-   desktop stretch — each qs- block centers itself at that width instead of
-   widening to fill `.queue`'s own max-width. */
-.qs-hero { max-width: 390px; margin: 0 auto 8px; display: flex; flex-direction: column; gap: 14px; }
-.qs-hero-top { display: flex; gap: 16px; align-items: center; }
-.qs-art { flex: 0 0 64px; width: 64px; height: 64px; border-radius: var(--radius-sm); background: var(--surface-hi); display: flex; align-items: center; justify-content: center; font-size: 28px; color: var(--text-muted); overflow: hidden; }
+   over onto this shell.
+   BUG-532 — these are the TV's OWN metrics. The shell was specced
+   companion-first and this block took the phone's numbers verbatim: a 390px
+   column (an iPhone viewport) inside the 880px `.queue`, 36/44px transport, a
+   48px thumb, 18px type — from the sofa, a phone screenshot pasted into the
+   middle of a big screen. TASK-515 renders both surfaces from ONE set of
+   builders where only class names differ, each surface's own <style> block
+   sizing them, so the TV sizes itself here and companion/*-queue.html keeps
+   the phone numbers untouched. That IS the FEAT-017/028 mirror: parity of
+   function, each surface at its own scale — not identical pixels.
+   Every value below comes from a TV surface this app already ships —
+   `.now-playing`/`.np-art` and `.q-*`/`.qtab` in this same overlay, and
+   `.detail-row`/`.detail-thumb`/`.detail-label` on the detail screen. The one
+   derived number is `.qs-tbtn-lg`: the primary, sized to hold the `--fs-lg`
+   glyph `.ctrl-btn` carries, at the phone's own large:small ratio.
+   Held by tests/queue-shell-tv-metrics.test.js; the phone side of the shared
+   class names is held by tests/companion-queue-phone-metrics.test.js. */
+.qs-hero { margin: 0 0 8px; display: flex; flex-direction: column; gap: 20px; }
+.qs-hero-top { display: flex; gap: 20px; align-items: center; }
+.qs-art { flex: 0 0 96px; width: 96px; height: 96px; border-radius: var(--radius-sm); background: var(--surface-hi); display: flex; align-items: center; justify-content: center; font-size: 44px; color: var(--text-muted); overflow: hidden; }
 .qs-art .poster-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
 .qs-hero-body { flex: 1; min-width: 0; }
 .qs-hero-title { font-size: var(--fs-md); font-weight: 700; letter-spacing: var(--heading-ls); }
 .qs-hero-sub { font-size: var(--fs-xs); color: var(--text-muted); margin-top: 4px; }
-.qs-transport { display: flex; align-items: center; gap: 8px; }
-.qs-tbtn { border-radius: 50%; border: 2px solid var(--border); background: var(--surface); color: var(--text); display: flex; align-items: center; justify-content: center; font-size: var(--fs-xs); min-width: auto; padding: 0; }
+.qs-transport { display: flex; align-items: center; gap: 14px; }
+.qs-tbtn { border-radius: 50%; border: 2px solid var(--border); background: var(--surface); color: var(--text); display: flex; align-items: center; justify-content: center; font-size: var(--fs-sm); min-width: auto; padding: 0; }
 .qs-tbtn:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 .qs-tbtn.on { border-color: var(--focus); background: var(--surface-hi); color: var(--focus); }
-.qs-tbtn-sm { width: 36px; height: 36px; }
-.qs-tbtn-lg { width: 44px; height: 44px; font-size: var(--fs-sm); }
-.qs-tabbar { max-width: 390px; margin: 22px auto 14px; display: flex; border-bottom: 2px solid var(--border); }
-.qs-tab { flex: 1; font-size: var(--fs-xs); padding: 10px 6px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--text-muted); margin-bottom: -2px; text-align: center; }
+.qs-tbtn-sm { width: 44px; height: 44px; }
+.qs-tbtn-lg { width: 56px; height: 56px; font-size: var(--fs-lg); }
+.qs-tabbar { margin: 26px 0 18px; display: flex; border-bottom: 2px solid var(--border); }
+.qs-tab { flex: 1; font-size: 20px; padding: 10px 22px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--text-muted); margin-bottom: -2px; text-align: center; }
 .qs-tab.active { color: var(--focus); border-bottom-color: var(--focus); }
 .qs-tab:focus { outline: none; color: var(--focus); border-radius: var(--radius-sm); box-shadow: var(--focus-glow); }
-.qs-panel { max-width: 390px; margin: 0 auto; display: none; }
+.qs-panel { margin: 0; display: none; }
 .qs-panel.active { display: block; }
-.qs-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; margin-bottom: 8px; background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); }
+.qs-row { display: flex; align-items: center; gap: 14px; padding: 11px 14px; margin-bottom: 8px; background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); }
 .qs-row.qs-readonly { opacity: 0.75; }
-.qs-select { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; background: none; border: 2px solid transparent; border-radius: var(--radius-sm); padding: 4px 6px; color: inherit; text-align: left; }
+.qs-select { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; background: none; border: 2px solid transparent; border-radius: var(--radius-sm); padding: 4px 8px; color: inherit; text-align: left; }
 .qs-select:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
-.qs-thumb { flex: 0 0 48px; width: 48px; height: 48px; border-radius: var(--radius-sm); background: var(--surface-hi); display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--text-muted); font-size: var(--fs-xs); }
+.qs-thumb { flex: 0 0 60px; width: 60px; height: 60px; border-radius: var(--radius-sm); background: var(--surface-hi); display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--text-muted); font-size: var(--fs-lg); }
 .qs-thumb .poster-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
-.qs-name { flex: 1; min-width: 0; font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qs-name { flex: 1; min-width: 0; font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* TASK-516 — the shell's row is a title over a muted second line; TASK-517
    retired the last emitter of the old right-aligned duration column. */
 .qs-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.qs-sub { font-size: 16px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qs-sub { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qs-actions { display: flex; gap: 6px; margin-left: 6px; }
-.qs-act { width: 34px; height: 34px; border: 2px solid var(--border); border-radius: 6px; background: var(--surface-hi); color: var(--text-muted); font-size: 16px; line-height: 1; min-width: auto; display: flex; align-items: center; justify-content: center; }
+.qs-act { width: 40px; height: 40px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-hi); color: var(--text-muted); font-size: 20px; line-height: 1; min-width: auto; display: flex; align-items: center; justify-content: center; }
 .qs-act:focus { outline: none; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 .qs-act.danger:focus { border-color: #ff6b6b; color: #ff6b6b; box-shadow: 0 0 0 1px rgba(255,107,107,0.5); }
 .qs-act.is-disabled { opacity: 0.28; cursor: default; }
-.qs-empty { font-size: var(--fs-xs); color: var(--text-muted); font-style: italic; padding: 18px 10px; }
-.qs-ends { font-size: var(--fs-xs); color: var(--text-muted); font-style: italic; padding: 10px; }
+.qs-empty { font-size: var(--fs-xs); color: var(--text-muted); font-style: italic; padding: 18px 14px; }
+.qs-ends { font-size: var(--fs-xs); color: var(--text-muted); font-style: italic; padding: 10px 14px; }
 .qs-tbtn.is-disabled { opacity: 0.35; pointer-events: none; }
 #add-sheet { position: fixed; inset: 0; z-index: 210; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; }
 .add-sheet-panel { background: var(--surface); border: 2.5px solid var(--border); border-radius: var(--radius); padding: 32px; width: 560px; max-height: 80vh; display: flex; flex-direction: column; gap: 14px; backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4); }
