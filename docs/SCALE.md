@@ -22,8 +22,9 @@ Two separate answers, and it matters not to conflate them.
 | Queue View, whole-catalog Play All | **Capped page size.** Its images are already lazy; the cost is 18,632 DOM nodes and a 513 KB snapshot per repaint. Cap `next`/`coming_up` in `build_snapshot` — the client only ever shows a lookahead. |
 | Search overlay | **Capped page size.** A one-character query renders every match — 1,047 rows for `2`. Cap the rendered result list. |
 
-**But only three of sixteen sites are actually guarded.** Thirteen render every
-item they are given, and nothing in them stops at any size — see
+**But only three of seventeen sites are actually guarded.** Thirteen render every
+item they are given and nothing in them stops at any size; the fourteenth
+(companion browse) has a partial cap that a growing rail defeats — see
 [What caps each site](#what-caps-each-site). The three above are simply the ones
 whose content type grew first. Ranking by today's pain is what this task asked
 for; it is the wrong basis for deciding what to protect.
@@ -98,11 +99,16 @@ same catalog: **now** = the app as it stands, **lazy** = the same app with
 🟢 here means **fine at today's size**, not guarded — for what actually stops
 each one growing, read [What caps each site](#what-caps-each-site) instead.
 
+Every number below was painted in a real browser, with two exceptions, both
+flagged in their row: the Queue View (mounted from the shared builder's own
+output) and the companion Home Movies list. Both of those pages need a paired TV
+session to populate, which this audit did not set up.
+
 | site | what scales | real max today | DOM nodes | imgs at rest: now → lazy | verdict |
 |---|---|---|---|---|---|
 | **Home Movies clip list · All** (`screen-home-movies-list-page.js`) | one row + thumb per clip | **1,035 rows** | 7,307 (1,047 buttons, 2,082 focus targets) | **1,033 → 22** · **214 MB** of poster JPEG | 🔴 **risk** |
 | **Home Movies clip list · ollie** | as above, per-kid scope | **819 rows** | 5,785 | **819 → 22** | 🔴 **risk** |
-| **Companion Home Movies list** (`companion-home-movies-list.js`) | the same clips, its own renderer | **1,035 rows** | pays the same per-row DOM cost | already lazy — its `posterImg` sets `loading` | 🔴 **risk** — DOM only |
+| **Companion Home Movies list** (`companion-home-movies-list.js`) | the same clips, its own renderer | **1,035 rows** | *not painted* — read from source, see below | already lazy — its `posterImg` sets `loading` | 🔴 **risk** — DOM only |
 | **Queue View, Play All (All)** (`core/queue-shell-view.js`) | one row per queued item, both surfaces | **2,067 rows** (queue 2 + next 1,032 + coming-up 1,033) | **18,632** (5,177 buttons), 1.28 MB markup, 44 ms to mount, 31,600 px tall | 90 (already lazy) | 🔴 **risk** — DOM + payload, not images |
 | **Search overlay** (`core/search-rank.js`) | one row per match, uncapped | **1,047 rows** for query `2`; pool is 1,501 video + 392 music candidates | 6,282 | already lazy | 🔴 **risk** |
 | `GET /api/browse` | whole catalog per profile, no pagination, no compression | **391 KB / 1,211 cards** (323 B per card) | — | — | 🟠 **watch** |
@@ -148,7 +154,8 @@ what to fix this week, this one tells you what to guard.
 | `loader.py` ingest | the whole catalog | ❌ nothing — but a very small constant | 110–250 ms | ~1 s |
 | Companion Home Movies list | home movies | ❌ nothing | 1,035 rows | 5,175 rows |
 
-**Three capped, fourteen not.** The three sites in the recommendation are not the
+**Of seventeen: three capped, one partially, thirteen not at all.** The three
+sites in the recommendation are not the
 three that are structurally exposed — they are the three whose content type had
 its bulk ingest first. Home movies simply got there before films did.
 
@@ -282,6 +289,13 @@ no shared implementation to change once.
 This is also why the companion is already fully lazy while the TV is not: each
 of those five companion builders sets `img.loading` for itself, and the two TV
 builders never did.
+
+**The one measurement gap this audit leaves.** `companion-home-movies-list.js`
+draws the same 1,035 clips as the flagship screen through its own `clipRow`, so
+it pays the same order of per-row DOM cost — but that row is read from source,
+not painted, because the page needs a paired TV session. Its thumbs *are* lazy
+(`posterImg` sets `loading`), so the image half is settled; it is the DOM half
+that is inferred. Worth painting properly before anyone sizes a fix for it.
 
 ## Sites the spec named that no longer exist
 
