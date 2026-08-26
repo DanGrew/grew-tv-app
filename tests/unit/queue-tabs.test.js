@@ -1,8 +1,14 @@
-import { tabShellHtml, phTabShellHtml } from '../../core/queue-tabs.js';
+import { phTabShellHtml } from '../../core/queue-tabs.js';
 
-// FEAT-039 (TASK-238): the shared Queue View tab shell. Music + video queues have
-// separate models but the same Now Playing header + Queue / Next / Coming Up tab
-// layout; this pure shell wraps the per-tab body HTML each module supplies.
+// FEAT-039 (TASK-238): the shared Queue View tab shell — the same Now Playing
+// header + Queue / Next / Coming Up tab layout on both surfaces; this pure shell
+// wraps the per-tab body HTML each module supplies.
+//
+// TASK-525: the TV `tabShellHtml` (.qtab classes) went with the legacy video
+// Queue, its only consumer. The shared shell()/activeKey rules it covered are
+// exercised here through phTabShellHtml — the same code path, ph- classes
+// apart. qsTabShellHtml, the TV bar in use today, is covered by
+// tests/unit/queue-shell-view.test.js.
 function panels(emptyFlags) {
   return [
     { tab: 'queue', label: 'Queue', html: '<i>q</i>', empty: emptyFlags[0] },
@@ -11,14 +17,14 @@ function panels(emptyFlags) {
   ];
 }
 
-describe('tabShellHtml (TV)', () => {
+describe('phTabShellHtml (companion)', () => {
   it('renders the header, a tab button + a panel per entry', () => {
-    var html = tabShellHtml('<header/>', panels([false, false, false]));
+    var html = phTabShellHtml('<header/>', panels([false, false, false]));
     expect(html).toContain('<header/>');
-    expect(html).toContain('class="qtab-bar"');
+    expect(html).toContain('class="ph-qtab-bar"');
     expect(html).toContain('data-act="tab" data-tab="queue"');
     expect(html).toContain('>Coming Up</button>');
-    expect(html).toContain('class="qtab-panel active" data-tab="queue"');
+    expect(html).toContain('class="ph-qtab-panel active" data-tab="queue"');
     expect(html).toContain('<i>n</i>');
     // Each panel closes its own div, and the coming-up panel wraps its body.
     expect(html).toContain('role="tabpanel">');
@@ -27,27 +33,18 @@ describe('tabShellHtml (TV)', () => {
     // are adjacent, the bar closes </div>, and adjacent panels touch.
     expect(html).toContain('</button><button');
     expect(html).toContain('Coming Up</button></div>');
-    expect(html).toContain('</div><div class="qtab-panel" data-tab="next"');
+    expect(html).toContain('</div><div class="ph-qtab-panel" data-tab="next"');
   });
 
   it('opens on the first NON-empty tab', () => {
-    var html = tabShellHtml('', panels([true, false, false]));   // Queue empty -> Next
-    expect(html).toContain('class="qtab active" data-act="tab" data-tab="next"');
-    expect(html).toContain('class="qtab-panel active" data-tab="next"');
-    expect(html).toContain('class="qtab-panel" data-tab="queue"');   // inactive
+    var html = phTabShellHtml('', panels([true, false, false]));   // Queue empty -> Next
+    expect(html).toContain('class="ph-qtab active" data-act="tab" data-tab="next"');
+    expect(html).toContain('class="ph-qtab-panel active" data-tab="next"');
+    expect(html).toContain('class="ph-qtab-panel" data-tab="queue"');   // inactive
   });
 
   it('falls back to the first tab when every tab is empty', () => {
-    var html = tabShellHtml('', panels([true, true, true]));
-    expect(html).toContain('class="qtab active" data-act="tab" data-tab="queue"');
-  });
-});
-
-describe('phTabShellHtml (companion)', () => {
-  it('uses the ph- tab classes and the same active-tab rule', () => {
-    var html = phTabShellHtml('', panels([true, false, false]));
-    expect(html).toContain('class="ph-qtab-bar"');
-    expect(html).toContain('class="ph-qtab active" data-act="tab" data-tab="next"');
-    expect(html).toContain('class="ph-qtab-panel active" data-tab="next"');
+    var html = phTabShellHtml('', panels([true, true, true]));
+    expect(html).toContain('class="ph-qtab active" data-act="tab" data-tab="queue"');
   });
 });

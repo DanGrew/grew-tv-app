@@ -58,7 +58,7 @@ export function initBrowsePage() {
   // renderBrowse's onTabChange fires this on every tab select, including the
   // initial one. TASK-446 (owner correction): ONE entry point, always
   // unshuffled — shuffle is a live toggle inside the player's Queue View
-  // (core/video-queue-view.js), matching every other media source's shuffle
+  // (core/queue-shell-view.js), matching every other media source's shuffle
   // UX, not a second pre-entry button. TASK-486 drops 'home-movies' from this
   // map — its whole-catalog entry point is now the Play All rail's own "All"
   // tile (home-rails.js homeMoviesPlayAllRail), replacing this header button

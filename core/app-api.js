@@ -93,12 +93,6 @@ export function musicVideoPlaybackAction(serverUrl, action, person, body) {
   });
 }
 
-// FEAT-040 (Play Queue): read-only video playback snapshot for a person — lets a
-// non-player screen (browse) read the override queue (to offer "Play Queue").
-export function loadVideoPlayback(serverUrl, person) {
-  return getJson(serverUrl + '/api/video-playback?person=' + encodeURIComponent(person || ''));
-}
-
 // TASK-498/FEAT-497: server-authoritative UNIFIED queue playback, the shared
 // twin of playbackAction/videoPlaybackAction/musicVideoPlaybackAction —
 // covers all four media types ('film'/'music'/'music-video'/'home-movie')
@@ -118,8 +112,8 @@ export function queuePlaybackAction(serverUrl, mediaType, action, person, body) 
   });
 }
 
-// Read-only UNIFIED queue snapshot for a person + media type — the twin of
-// loadVideoPlayback/loadMusicVideoPlayback, backed by queue_playback.py's GET
+// Read-only UNIFIED queue snapshot for a person + media type — THE playback
+// snapshot read every media type uses, backed by queue_playback.py's GET
 // route. Lets a non-player screen read the queue, and backs the BUG-439
 // activate-person resync the same way the other three engines' own GETs do.
 export function loadQueuePlayback(serverUrl, mediaType, person) {
@@ -127,7 +121,7 @@ export function loadQueuePlayback(serverUrl, mediaType, person) {
 }
 
 // FEAT-040/TASK-255 (music Play Queue): read-only MUSIC playback snapshot for a
-// person — the twin of loadVideoPlayback, backed by the TASK-254 GET route. Lets a
+// person, backed by the TASK-254 GET route. Lets a
 // non-player screen (browse) read the music override ("Play Next") queue to offer a
 // music "Play Queue" button. The snapshot shape differs from video (play_next holds
 // the resolved override queue) — read its length via queue-view.playNextCount.
@@ -135,7 +129,7 @@ export function loadPlayback(serverUrl, person) {
   return getJson(serverUrl + '/api/playback?person=' + encodeURIComponent(person || ''));
 }
 
-// BUG-485 (mirrors loadVideoPlayback): read-only MUSIC-VIDEO playback snapshot
+// BUG-485: read-only MUSIC-VIDEO playback snapshot
 // for a person, backed by api/music_video_playback.py's GET route. The BUG-439
 // activate-person resync now covers music-video mode too — screen-video-page.js
 // applies this the same way it applies a fresh WS push (core/

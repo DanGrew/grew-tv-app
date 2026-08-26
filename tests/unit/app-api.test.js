@@ -2,7 +2,7 @@ import {
   loadBrowse, loadVideo, loadSeries, loadSeriesTitle, loadNext, loadProgress, saveProgress,
   loadContinueWatching, loadConfig, loadSettings, saveSettings, scanDevices,
   mediaUrl, loadLyrics, resetProgress, playbackAction, videoPlaybackAction, musicVideoPlaybackAction,
-  loadVideoPlayback, loadMusicVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
+  loadMusicVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
   addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
   deletePlaylist, renamePlaylist, queuePlaybackAction, loadQueuePlayback, loadMusicSourceTitle,
   loadMusicVideoSourceTitle
@@ -428,22 +428,12 @@ describe('loadQueuePlayback', () => {
   });
 });
 
-describe('loadVideoPlayback / loadPlayback', () => {
-  it('loadVideoPlayback GETs /api/video-playback keyed by person', async () => {
-    var calls = fakeFetch({ override_queue: [] });
-    await loadVideoPlayback('http://s', 'mom');
-    expect(calls[0].url).toBe('http://s/api/video-playback?person=mom');
-    expect(calls[0].opts).toEqual({ cache: 'no-store' });
-  });
-  it('loadVideoPlayback defaults an absent person', async () => {
-    var calls = fakeFetch({});
-    await loadVideoPlayback('http://s');
-    expect(calls[0].url).toBe('http://s/api/video-playback?person=');
-  });
+describe('loadPlayback / loadMusicVideoPlayback', () => {
   it('loadPlayback GETs /api/playback keyed by person', async () => {
     var calls = fakeFetch({ play_next: [] });
     await loadPlayback('http://s', 'dad');
     expect(calls[0].url).toBe('http://s/api/playback?person=dad');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
   });
   it('loadPlayback defaults an absent person', async () => {
     var calls = fakeFetch({});

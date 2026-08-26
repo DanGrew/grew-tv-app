@@ -9,8 +9,9 @@ const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS } = require
 // ui/screens/screen-queue-shell.js) that films (TASK-517) and home movies
 // (TASK-516) already run on — one renderer, told it is music by `config.media`.
 //
-// This suite is deliberately the twin of tests/video-queue-view.test.js: the
-// same assertions in the same order against /api/queue/music instead of
+// This suite was written as the twin of the film suite that lived in
+// tests/video-queue-view.test.js (removed with the legacy Queue in TASK-525):
+// the same assertions in the same order against /api/queue/music instead of
 // /api/queue/film, because "music behaves like the other media types" is the
 // whole of this cutover and a divergence here is the thing worth catching.
 
