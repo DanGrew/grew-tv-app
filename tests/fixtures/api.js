@@ -1028,13 +1028,15 @@ async function installQueuePlaybackBackend(page, mediaType, contextId) {
       // client, like the real app, sends neither on play-source.
       state.shuffle = false;
       state.repeat = true;
-      // TASK-503 — mirrors api/queue_playback.py's own play-source handling: an
-      // optional item_id starts on that member (a tapped episode), a non-member
-      // id leaves the fresh index (0) untouched — the SAME follow-up play_item
-      // call the real _apply makes.
-      var i = -1;
-      state.currentPermutation.forEach(function(e, idx) { if (e.item_id === b.item_id) i = idx; });
-      if (i > -1) { state.sourcePosition = i; state.currentItemId = b.item_id; }
+      // ⛔ TASK-524 — play-source starts the source at its FIRST entry, full
+      // stop. api/queue_playback.py reads `source_type` and `source_id` off the
+      // body and passes NEITHER an item to engine.play_source, which sets
+      // current_item_id from current[0]; there is no follow-up play_item in the
+      // real _apply. This fixture used to honour a body `item_id` here, with a
+      // comment claiming otherwise, which masked a live defect for three
+      // releases: a tapped episode / playlist track started its source from the
+      // top. Landing on a tapped item takes the two-action shape — play-source,
+      // then play-item — which is what the page now sends.
     },
     'play-item': function(b) {
       state.currentItemId = b.item_id;
