@@ -17,6 +17,7 @@ Root holds only this file and `README.md`; everything else is `docs/`, flat, are
 | `docs/GATES.md` | index — what has to be green, and where each rule lives | before you push, or a gate went red |
 | `docs/DEV.md` | run commands (worktree-safe), git/GitHub specifics, tooling | you're standing up a local run, or about to branch/push |
 | `docs/VERIFY.md` | index — the visual-regression coverage registry and golden-story spec (flows live in `verify-flows/`) | you're authoring or extending a `verify-flows/*.cjs` flow |
+| `docs/SCALE.md` | every screen, payload and per-row computation whose cost grows with the catalog, its measured max at today's library, and the verdict per site | you're adding a screen that renders a whole list, or something got slow as the library grew |
 
 ## True before you open anything
 
