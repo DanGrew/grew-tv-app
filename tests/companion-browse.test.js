@@ -425,71 +425,17 @@ test.describe('desync mode', () => {
 // (audio.html?playQueue), and greys while desynced (Browse) like the video/profile
 // controls. A dedicated WS mock carries a `person` in app_state (the top-level mock
 // omits it, so the queue is never fetched there) + routes the GET snapshot.
-test.describe('music Play Queue button', () => {
-  function musicMock(page, intents2, playNext) {
-    return page.routeWebSocket(/:8766/, (ws) => {
-      ws.onMessage(function(raw) {
-        const m = JSON.parse(raw);
-        if (m.type === 'intent') intents2.push(m.payload);
-        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
-        if (m.type === 'snapshot_request') { ws.send(msg('context', { version: 2, context_id: 'browse' })); ws.send(msg('app_state', { screen: 'home', profile: 'kids', person: 'kids' })); }
-      });
-    }).then(() => page.route(/\/api\/queue\/music\?/, (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', media_type: 'music', queue: playNext, next: [], coming_up: [] }) })));
-  }
-
-  test('hidden when the music queue is empty', async ({ page }) => {
-    await musicMock(page, [], []);
-    await page.goto('/companion/browse.html');
-    await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();  // settled
-    await page.locator('#btn-queue-menu').click();
-    await expect(page.locator('#btn-play-queue-music')).toBeHidden();
-  });
-
-  test('shows the count and drives the TV audio queue head', async ({ page }) => {
-    const intents2 = [];
-    await musicMock(page, intents2, [{ entry_id: 'e1', item_id: 'a' }, { entry_id: 'e2', item_id: 'b' }]);
-    await page.goto('/companion/browse.html');
-    await page.locator('#btn-queue-menu').click();
-    await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 (2)');
-    await page.locator('#btn-play-queue-music').click();
-    await expect.poll(() => {
-      const nav = intents2.find((i) => i.intent === 'navigate' && i.params.page === 'audio.html');
-      return nav && nav.params.params.playQueue;
-    }).toBe(1);
-  });
-
-  test('greys out in Browse mode (no dead click)', async ({ page }) => {
-    await musicMock(page, [], [{ entry_id: 'e1', item_id: 'a' }]);
-    await page.goto('/companion/browse.html');
-    await page.locator('#btn-queue-menu').click();
-    await expect(page.locator('#btn-play-queue-music')).toBeVisible();
-    await expect(page.locator('#btn-play-queue-music')).not.toHaveClass(/desync-off/);
-    // TASK-412 — Mode lives in the SEPARATE ☰ status menu (TASK-445 split the
-    // two popouts apart); open it too, alongside the still-open queue menu.
-    await page.locator('#btn-status').click();
-    await page.locator('.seg-opt').filter({ hasText: 'Browse' }).click();
-    await expect(page.locator('#btn-play-queue-music')).toHaveClass(/desync-off/);
-  });
-
-  // TASK-258 (3): the music queue button carries no purple `--accent` tint —
-  // its border matches the video button, not some one-off colour. TASK-445
-  // moved both into the #queue-menu popout as full-width rows (matching
-  // switch-profile's own resting --border, not the pill buttons' old
-  // permanent --focus white), so the fixed literal this used to assert is
-  // gone; the real invariant — the two queue buttons agree with each other —
-  // still holds and is what this compares.
-  test('is de-purpled — its border matches the video queue button, not the accent', async ({ page }) => {
-    await musicMock(page, [], [{ entry_id: 'e1', item_id: 'a' }]);
-    await page.goto('/companion/browse.html');
-    await page.locator('#btn-queue-menu').click();
-    await expect(page.locator('#btn-play-queue-music')).toBeVisible();
-    const musicBorder = await page.locator('#btn-play-queue-music').evaluate(el => getComputedStyle(el).borderTopColor);
-    const videoBorder = await page.locator('#btn-play-queue').evaluate(el => getComputedStyle(el).borderTopColor);
-    expect(musicBorder).toBe(videoBorder);
-    expect(musicBorder).not.toBe('rgb(185, 140, 255)');   // the old --accent purple
-  });
-});
+// The music Play Queue button's own describe block lived here — hidden at an
+// empty queue, its "🎵 (N)" count, its audio.html?playQueue drive, its
+// desync greying and its de-purpled border (TASK-255/258/445/504). TASK-501
+// replaced both count pills with one Continue button per media type: no count,
+// disabled-but-visible rather than hidden, and carrying on rather than starting
+// the queue. Every one of those behaviours has its Continue counterpart in
+// tests/companion-play-queue.test.js — including the desync greying, which is
+// the only one of the five that survived the change of shape unaltered. The
+// shared border/tint invariant is now structural: all four buttons come out of
+// one builder (ui/screens/continue-menu.js) under one .continue-btn rule, so
+// there are no two per-button styles left to drift apart.
 
 // TASK-445 — the companion Play All twin: lives in the SEPARATE #queue-menu
 // popout (its own ▶ icon beside the ☰ status menu, not folded into it — play
@@ -607,30 +553,10 @@ test.describe('companion Home Movies Play All', () => {
   // `companion-home-movies-list.test.js` covers the same ＋ on the same engine.
 });
 
-// TASK-258 (2): the VIDEO queue button reads a compact "🎬 (N)" — media icon +
-// bracketed count, no "Video" word or list icon (mirrors the music button). A
-// dedicated mock carries a `person` in app_state (the top-level mock omits it, so
-// the queue is never fetched) + routes the GET queue snapshot.
-// TASK-517 — that snapshot is the FILM queue on the unified engine now (the
-// TV mirror moved the same way), not the old video-playback engine's.
-test.describe('video Play Queue button label (TASK-258)', () => {
-  function videoMock(page, queue) {
-    return page.routeWebSocket(/:8766/, (ws) => {
-      ws.onMessage(function(raw) {
-        const m = JSON.parse(raw);
-        if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
-        if (m.type === 'snapshot_request') { ws.send(msg('context', { version: 2, context_id: 'browse' })); ws.send(msg('app_state', { screen: 'home', profile: 'kids', person: 'kids' })); }
-      });
-    }).then(() => page.route(/\/api\/queue\/film\?/, (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', media_type: 'film', queue: queue }) })));
-  }
-
-  test('shows just the icon and bracketed count — no "Video" word', async ({ page }) => {
-    await videoMock(page, [{ entry_id: 'e1' }, { entry_id: 'e2' }, { entry_id: 'e3' }]);
-    await page.goto('/companion/browse.html');
-    await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (3)');
-  });
-});
+// TASK-258 (2)'s "🎬 (N)" video Play Queue label was asserted here. TASK-501
+// retired both count pills along with their play-the-queue behaviour: browse
+// offers one Continue button per media type, showing no count (owner's call).
+// The replacement is covered in tests/companion-play-queue.test.js.
 
 // TASK-421 — the Music Videos twin of the companion film ＋ Queue control
 // (tests/companion-film-queue.test.js): a music-video grid tile (an artist's

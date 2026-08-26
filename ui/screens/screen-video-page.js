@@ -92,8 +92,8 @@ export function initVideoPage() {
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
   var person   = getPerson();
   var isSeries = !!seriesId;
-  var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson, homeMoviesMonth: homeMoviesMonth, isSeries: isSeries });
-  var MV_MODE = { mvItem: true, mvPlaylist: true, mvArtist: true, mvAll: true };
+  var mode = entryMode({ continueType: getParam('continueType'), playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson, homeMoviesMonth: homeMoviesMonth, isSeries: isSeries });
+  var MV_MODE = { mvItem: true, mvPlaylist: true, mvArtist: true, mvAll: true, continueMusicVideo: true };
   var isMusicVideo = !!MV_MODE[mode];
   // TASK-499 (FEAT-497) — home movies are the first media type cut over onto
   // the TASK-498 unified queue engine (/api/queue/home-movie), a THIRD
@@ -102,7 +102,7 @@ export function initVideoPage() {
   // home-movies-all/-by-person/-month sources, which stop being called from
   // here (TASK-503/504/505 do the same for the other three media types, one
   // at a time; nothing here changes their still-live engines).
-  var HM_MODE = { homeMoviesAll: true, homeMoviesPerson: true, homeMoviesMonth: true };
+  var HM_MODE = { homeMoviesAll: true, homeMoviesPerson: true, homeMoviesMonth: true, continueHomeMovie: true };
   var isHomeMovie = !!HM_MODE[mode];
   // TASK-503 (FEAT-497) — series/single (a standalone film, boxset or TV
   // series) are the SECOND media type cut over onto the TASK-498 unified
@@ -121,10 +121,15 @@ export function initVideoPage() {
   // exclusive per page load, never a live switch) and used to key every
   // ENGINE/onEnded/onNext/…/queue-setup dispatch table below, so none of them
   // need their own musicVideo/homeMovie/… branch.
+  //
+  // TASK-501 — the three Continue entries (browse's per-type Continue buttons)
+  // sit here too, one per media type this page plays: each drives its OWN
+  // engine, exactly as that type's other entries do, so nothing below needs a
+  // continue branch of its own.
   var MODE_ENGINE = {
-    mvPlaylist: 'mv', mvArtist: 'mv', mvItem: 'mv', mvAll: 'mv',
-    homeMoviesAll: 'hm', homeMoviesPerson: 'hm', homeMoviesMonth: 'hm',
-    series: 'film', single: 'film', queue: 'film'
+    mvPlaylist: 'mv', mvArtist: 'mv', mvItem: 'mv', mvAll: 'mv', continueMusicVideo: 'mv',
+    homeMoviesAll: 'hm', homeMoviesPerson: 'hm', homeMoviesMonth: 'hm', continueHomeMovie: 'hm',
+    series: 'film', single: 'film', queue: 'film', continueFilm: 'film'
   };
   var engineMode = MODE_ENGINE[mode];
   var wsApp = null;
@@ -870,7 +875,36 @@ export function initVideoPage() {
   function startMvAll() {
     mvBegin();
   }
+  // TASK-501 — Continue, one media type per entry, from browse's play menu.
+  // The entry fires the engine's own advance (`next`) and renders from the
+  // snapshot like every other route: the queue's front if anything is queued,
+  // else the next item of the source this person was last playing. That
+  // fallback is the ENGINE's, never reproduced here — the same rule
+  // transportState's ⏭ already lights from, and what browse's own button reads
+  // to decide whether it is live at all.
+  //
+  // No source POST (the engine keeps the one it has — carrying on with it is
+  // the point) and no item pick, so BUG-521's pending-id guard has nothing to
+  // name, exactly like startQueue.
+  function continueEntry(send) {
+    mountCrumbs();
+    armEngineTimeout();
+    initCaptions(SERVER)
+      .then(function() { send('next', {}); })
+      .catch(function() {});
+  }
+  function continueFilm() { continueEntry(sendFmAction); }
+  function continueHomeMovie() { continueEntry(sendHmAction); }
+  // The mv shape adds its own ＋Playlist affordance, the same one every other
+  // music-video entry reveals (mvBegin/startMvItem).
+  function continueMusicVideo() {
+    document.getElementById('btn-add-playlist').classList.remove('hidden');
+    continueEntry(sendMvAction);
+  }
   var ENTRY = {
+    continueFilm: continueFilm,
+    continueHomeMovie: continueHomeMovie,
+    continueMusicVideo: continueMusicVideo,
     queue: startQueue,
     mvPlaylist: startMvPlaylist,
     mvArtist: startMvArtist,

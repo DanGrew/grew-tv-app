@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nowPlaying, isSwap, isStaleResync, upNextItem, upNextLine, sourceId, sourceKey, queueCount } from '../../core/queue-playback-router.js';
+import { nowPlaying, isSwap, isStaleResync, upNextItem, upNextLine, sourceId, sourceKey } from '../../core/queue-playback-router.js';
 
 function item(id, title) { return { item_id: id, title: title }; }
 function snap(fields) {
@@ -88,18 +88,8 @@ describe('upNextLine', () => {
   });
 });
 
-describe('queueCount', () => {
-  it('counts what is waiting in the override queue', () => {
-    expect(queueCount(snap({ queue: [item('a', 'A'), item('b', 'B')] }))).toBe(2);
-  });
-  it('ignores the source lists — only the queue counts', () => {
-    expect(queueCount(snap({ queue: [], next: [item('a', 'A')], coming_up: [item('b', 'B')] }))).toBe(0);
-  });
-  it('is 0 for an empty/absent snapshot', () => {
-    expect(queueCount(snap({}))).toBe(0);
-    expect(queueCount(null)).toBe(0);
-  });
-});
+// TASK-501 removed queueCount along with browse's 🎬/🎵 pills — the Continue
+// buttons that replace them show no count.
 
 describe('sourceId', () => {
   it('is the snapshot\'s source_id when a source_type is set', () => {

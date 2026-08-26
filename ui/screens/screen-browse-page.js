@@ -2,14 +2,15 @@ import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, loadConfig, loadQueuePlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadConfig, loadTracks, loadEpisodes } from '../../core/app-api.js';
 import { queueAdd, queueAddStatus, SECTION_MEDIA_TYPE } from '../../core/queue-shell-config.js';
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute, sectionOf, artistTiles } from '../../core/home-rails.js';
 import { mountSearch } from './screen-search.js';
-import { queueCount } from '../../core/queue-playback-router.js';
+import { mountContinueMenu } from './continue-menu.js';
+import { continueTarget } from '../../core/browse-continue.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
 // Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
@@ -19,39 +20,28 @@ var LAST_TAB_KEY = 'grew-tv:last-tab';
 var ACTIVATE_KEYS = { Enter: true, ' ': true };
 
 export function initBrowsePage() {
-  // FEAT-040 Play Queue / TASK-259: the bottom-right shows TWO adjacent icon+count
-  // buttons — 🎬 video, 🎵 music — each appearing only when ITS OWN override queue
-  // is non-empty; each drives its persistent player to start the queue head
-  // (?playQueue). The icon+`(N)` style matches the companion (TASK-258). Counts read
-  // from the read-only playback snapshots, refreshed on load (+ the video one after
-  // queueing a film here). Before this the music queue was unreachable from browse.
+  // TASK-501 (FEAT-497) — Continue, one button per media type, in a play menu
+  // behind the bottom-right ▶ icon (the shape the companion has carried since
+  // TASK-445, now the TV's too — owner's call: four Continue buttons would
+  // otherwise make that floating row six wide). Replaces FEAT-040/TASK-259's
+  // two 🎬/🎵 play-the-queue pills, which covered two of the four types, hid
+  // themselves at an empty queue, and STARTED a queue rather than carrying on.
   //
-  // TASK-517 — 🎬 counts the FILM queue on the unified engine, which is the
-  // queue every ＋ here has actually filled since TASK-503. It read the old
-  // video engine's queue until now, so the pill sat hidden on an empty count
-  // while films piled up in the queue it wasn't looking at.
-  function showPlayQueue(count) {
-    var btn = document.getElementById('btn-play-queue');
-    btn.textContent = '🎬 (' + count + ')';
-    btn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[(count > 0) + ''];
-  }
-  function refreshQueue() {
-    loadQueuePlayback(SERVER, 'film', getPerson()).then(function(snap) { showPlayQueue(queueCount(snap)); }).catch(function() {});
-  }
-  function onPlayQueue() { navTo('video.html', { playQueue: 1, from: 'browse' }); }
-
-  // The MUSIC twin, sitting beside the video button. TASK-504 — the same
-  // unified-engine read the 🎬 pill does, one media type over, so both pills
-  // count the queue their own ＋ presses actually fill.
-  function showPlayQueueMusic(count) {
-    var btn = document.getElementById('btn-play-queue-music');
-    btn.textContent = '🎵 (' + count + ')';
-    btn.style.display = ({ 'true': 'inline-block', 'false': 'none' })[(count > 0) + ''];
-  }
-  function refreshQueueMusic() {
-    loadQueuePlayback(SERVER, 'music', getPerson()).then(function(snap) { showPlayQueueMusic(queueCount(snap)); }).catch(function() {});
-  }
-  function onPlayQueueMusic() { navTo('audio.html', { playQueue: 1, from: 'browse' }); }
+  // A press carries on with that type — the front of its queue, else the next
+  // item of the source it was last playing. Both halves are the engine's own
+  // advance(), fired by the player's continue entry; browse itself does no
+  // queue maths, and the buttons come out of one shared builder the companion
+  // uses too (ui/screens/continue-menu.js).
+  var continueMenu = mountContinueMenu({
+    mount: document.getElementById('queue-menu'),
+    server: SERVER,
+    getPerson: getPerson,
+    onContinue: function(mediaType) {
+      var t = continueTarget(mediaType);
+      navTo(t.page, t.params);
+    }
+  });
+  function toggleQueueMenu() { document.getElementById('queue-menu').classList.toggle('open'); }
 
   // TASK-445 — Play All: a whole-catalog "play everything of this type"
   // control, shown only on a tab that has one. Keyed by tab id, no branch.
@@ -92,15 +82,14 @@ export function initBrowsePage() {
   // nothing has read since TASK-499 — a home-movie ＋Queue silently queued to
   // nothing. The confirmation is the config's own wording, so it stays honest
   // per type: appended to a queue, or queued to play next.
-  // TASK-517 — the 🎬 pill counts the same film queue this ＋ feeds again, so
-  // a queue press refreshes it: queue a film and the pill appears (or its
-  // count climbs) without a page reload, as it did before TASK-503 split the
-  // two apart. A press on another media type re-reads a count that has not
-  // moved, which is cheaper than a branch to decide it.
+  // TASK-501 — a ＋ press refreshes the Continue cluster, so queueing the first
+  // thing of a type wakes that type's button without a reload (the 🎬 pill's
+  // own TASK-517 behaviour, now across all four). Refreshing every type re-reads
+  // three snapshots that have not moved, which is cheaper than a branch.
   function onQueue(card) {
     var mediaType = SECTION_MEDIA_TYPE[sectionOf(card)];
     queueAdd(SERVER, mediaType, getPerson(), card.id)
-      .then(function() { showStatus(queueAddStatus(mediaType)); refreshQueue(); })
+      .then(function() { showStatus(queueAddStatus(mediaType)); continueMenu.refresh(); })
       .catch(function() {});
   }
 
@@ -119,8 +108,7 @@ export function initBrowsePage() {
     [ACTIVATE_KEYS[e.key]].filter(Boolean).forEach(function() { e.preventDefault(); goToProfile(); });
   });
 
-  document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
-  document.getElementById('btn-play-queue-music').addEventListener('click', onPlayQueueMusic);
+  document.getElementById('btn-queue-menu').addEventListener('click', toggleQueueMenu);
   document.getElementById('btn-play-all').addEventListener('click', onPlayAll);
   document.addEventListener('keydown', dispatchKey);
   mountBreadcrumb('breadcrumb', buildCrumbs('browse'));
@@ -276,8 +264,7 @@ export function initBrowsePage() {
       var initialTab = [getParam('tab')].filter(Boolean).concat([sessionStorage.getItem(LAST_TAB_KEY)]).filter(Boolean)[0];
       renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist, recents, showPlayAll);
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
-      refreshQueue();
-      refreshQueueMusic();
+      continueMenu.refresh();
     })
     .catch(function() { navTo('error.html'); });
 }
