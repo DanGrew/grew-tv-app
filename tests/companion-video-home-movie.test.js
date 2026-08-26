@@ -39,7 +39,13 @@ async function installHomeMovieBackend(page, opts) {
             type: 'context',
             payload: {
               context_id: 'video', version: 1, display: { id: o.id, title: o.title },
-              homeMovie: true, homeMovieShuffle: !!o.shuffle, homeMovieRepeat: !!o.repeat
+              homeMovie: true, homeMovieShuffle: !!o.shuffle, homeMovieRepeat: !!o.repeat,
+              // TASK-524 — the TV resolves the transport off the ONE
+              // transportState rule and pushes booleans; a home movie always
+              // plays from a source, so all four are live unless a test says
+              // otherwise (the end of a list, where ⏭ has nowhere to go).
+              homeMovieTransport: [o.transport].filter(Boolean)
+                .concat([{ previous: true, next: true, shuffle: true, repeat: true }])[0]
             }
           }));
           ws.send(JSON.stringify({ type: 'app_state', payload: { person: 'kids', profile: 'kids', screen: 'player' } }));
@@ -119,14 +125,33 @@ test('tapping Repeat/Shuffle on the companion POSTs straight to the unified queu
   expect(backend.queuePlaybackPosts.some(function(u) { return u.includes('/toggle-shuffle'); })).toBe(true);
 });
 
-// ⏮/⏭ stay live for a home movie (QUEUE-UX-SHELL's always-shown transport,
-// unlike a lone music-video pick's greyed single-item row) — nothing on this
-// page ever adds `.single` while home-movie mode is active.
-test('⏮/⏭ stay ungreyed on the companion for a home movie', async ({ page }) => {
+// Playing inside a list, everything ahead: all four controls live.
+test('⏮/⏭ stay ungreyed on the companion mid-list', async ({ page }) => {
   await installApi(page);
   await installHomeMovieBackend(page, { id: 'millie-walk', title: 'Millie Walk' });
   await page.goto('/companion/video.html');
   await expect(page.locator('#now-title')).toHaveText('Millie Walk');
   await expect(page.locator('#c-prev')).not.toHaveClass(/single/);
   await expect(page.locator('#c-next')).not.toHaveClass(/single/);
+});
+
+// ⛔ TASK-524 — this page used to un-hide a home movie's controls
+// unconditionally and dim nothing, whatever the TV pushed: ⏭ read live on the
+// last clip of a list with nothing behind it, while the home-movie Queue page
+// one tap away dimmed it. It reads the resolved `homeMovieTransport` now, the
+// same field a film and a music video already rode (TASK-517/505) — so the
+// phone row, the TV row and both heroes finally agree.
+test('⏭ dims on the companion at the end of a list, the rest staying live', async ({ page }) => {
+  await installApi(page);
+  await installHomeMovieBackend(page, {
+    id: 'millie-walk', title: 'Millie Walk',
+    transport: { previous: true, next: false, shuffle: true, repeat: true }
+  });
+  await page.goto('/companion/video.html');
+  await expect(page.locator('#now-title')).toHaveText('Millie Walk');
+  await expect(page.locator('#c-next')).toBeVisible();      // dimmed, never hidden
+  await expect(page.locator('#c-next')).toHaveClass(/single/);
+  await expect(page.locator('#c-prev')).not.toHaveClass(/single/);
+  await expect(page.locator('#c-shuffle')).not.toHaveClass(/single/);
+  await expect(page.locator('#c-repeat')).not.toHaveClass(/single/);
 });

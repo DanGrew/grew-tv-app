@@ -6,8 +6,10 @@ const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js')
 // home-movies-* sources (TASK-446/486/491, formerly video-playback.test.js's
 // sibling coverage). Every entry fires TWO actions against
 // /api/queue/home-movie — play-source (the source alone), then play-item
-// ONLY when a specific row was tapped (mirrors the mv entry pattern) — never
-// video-playback's old single play-source+item_id call.
+// ONLY when a specific row was tapped — never video-playback's old single
+// play-source+item_id call. TASK-524: that is now EVERY video rail's entry
+// shape, films and music videos included; play-source has never read a body
+// item_id, so the one-action rails were starting sources from the top.
 //
 // NOT covered here: the queue engine's own transition math (play-source
 // resume-in-place, advance/previous reanchoring, the fair shuffle) is a pure
@@ -199,6 +201,8 @@ test.describe('Queue UX shell — hero + tabs', () => {
 // ahead and dead only when there is genuinely nothing next, while
 // ⏮/Shuffle/Repeat go disabled-but-visible rather than disappearing. Home
 // movies had no such rule at all — every control read live at all times.
+// TASK-524 brought their PLAYER ROW onto this same rule (see the pill-row
+// describe below); the hero has applied it since TASK-516.
 test.describe('Queue UX shell — the transport rule', () => {
   test('⏭ stays live while the source still has clips ahead', async ({ page }) => {
     await page.goto('/app/homeview/video.html?homeMoviesAll=1&from=browse');
@@ -244,6 +248,26 @@ test.describe('Queue UX shell — the transport rule', () => {
 // only, always shown for home-movie mode — QUEUE-UX-SHELL.md's Player-screen
 // pill row section), and the icon-only Queue-open button.
 test.describe('player pill row', () => {
+  // TASK-524 — the player ROW runs the same transportState rule the hero above
+  // does. It did not: home movies alone un-hid Shuffle/Repeat and showed ⏮/⏭
+  // live unconditionally, so this row read every control as live while the
+  // Queue hero one tap away dimmed them. Same state as the hero test above —
+  // last clip, repeat off, nothing queued.
+  test('⏭ dims on the last clip, the same rule the Queue hero applies', async ({ page }) => {
+    queueBackend.seed('play-source', { source_type: 'home-movies-all', source_id: null });
+    queueBackend.seed('toggle-repeat');
+    queueBackend.seed('next');
+    await page.goto('/app/homeview/video.html?homeMoviesAll=1&from=browse');
+    const next = page.locator('#btn-next');
+    await expect(next).toBeVisible();            // dimmed, never hidden
+    await expect(next).toBeDisabled();
+    await expect(next).toHaveClass(/is-disabled/);
+    // A home movie always plays from a source, so the other three stay live.
+    await expect(page.locator('#btn-prev')).toBeEnabled();
+    await expect(page.locator('#btn-hm-shuffle')).toBeEnabled();
+    await expect(page.locator('#btn-hm-repeat')).toBeEnabled();
+  });
+
   test('Shuffle/Repeat are visible, icon-only, and toggle the engine', async ({ page }) => {
     await page.goto('/app/homeview/video.html?homeMoviesAll=1&from=browse');
     await expect(page.locator('#btn-hm-shuffle')).toBeVisible();
