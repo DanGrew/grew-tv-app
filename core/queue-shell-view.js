@@ -245,7 +245,9 @@ function comingUpBody(rows, m, s) {
   return '<div class="' + s.ends + '">&#9209; ' + escapeHtml(m.texts.ends) + '</div>';
 }
 
-function tabLabel(base, count) { return base + ' ' + count; }
+// The count is bracketed — "Next (2)" — and an empty tab still reads "(0)"
+// rather than losing the number. Both surfaces label through here.
+function tabLabel(base, count) { return base + ' (' + count + ')'; }
 
 function tabPanels(m, s) {
   return [
