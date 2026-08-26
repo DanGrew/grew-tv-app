@@ -460,8 +460,18 @@ export function initPage() {
   els.reset.addEventListener('click', onResetTap);
   // FEAT-418 (TASK-420) / TASK-499/503: the queue link goes to whichever
   // queue matches the current mode.
-  var QUEUE_HREF = { mv: 'music-video-queue.html', hm: 'home-movies-queue.html', film: 'film-queue.html', video: 'video-queue.html' };
-  document.getElementById('c-queue').addEventListener('click', function() { window.location.href = QUEUE_HREF[engineMode()]; });
+  //
+  // TASK-525 removed the 'video' entry with the page it pointed at
+  // (companion/video-queue.html). engineMode() still FALLS BACK to 'video'
+  // for the three cut-over rails' own tables below, and that fallback is what
+  // this button sees in the one window where no context push has landed yet
+  // (the page mounts with all three mode flags false) — so an absent href
+  // leaves the tap inert rather than navigating to a page that no longer
+  // exists. Every real mode has an entry.
+  var QUEUE_HREF = { mv: 'music-video-queue.html', hm: 'home-movies-queue.html', film: 'film-queue.html' };
+  document.getElementById('c-queue').addEventListener('click', function() {
+    [QUEUE_HREF[engineMode()]].filter(Boolean).forEach(function(href) { window.location.href = href; });
+  });
   document.getElementById('c-quickpause').addEventListener('click', function() { localStorage.setItem(QP_SOURCE_KEY, 'video'); window.location.href = 'quick-pause.html'; });
   els.addPlaylist.addEventListener('click', openAddSheet);
   document.getElementById('btn-add-create').addEventListener('click', createNewPlaylist);

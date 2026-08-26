@@ -28,8 +28,6 @@ Legend: ✅ covered · ⚠️ partial · ❌ gap · ➖ low-value (skip)
 | `tv-app` | **TV** app-side | `tv-app.cjs` | profile → browse → detail → video play/pause → breadcrumb → **Continue Watching rail** |
 | `tv-music` | **TV** app-side — music | `tv-music.cjs` | profile → Music tab (Artists/Albums rails) → album detail → audio play/pause |
 | `companion-artist` | companion — artist drill | `companion-artist.cjs` | Music → Artists rail → artist → albums grid → album detail |
-| `tv-video-queue` | **TV** — video queue view | `tv-video-queue.cjs` | play a film (single-item) → Queue overlay → greyed Repeat pill |
-| `companion-video-queue` | companion — video queue view | `companion-video-queue.cjs` | play a film (single-item) → Video Queue View → greyed Repeat button |
 | `tv-artist-playlist` | **TV** — artist + playlist detail | `tv-artist-playlist.cjs` | Music → Artists rail → artist (rail-grid) → album → build playlist → populated playlist-detail |
 
 Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MASK`).
@@ -51,7 +49,7 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 | audio | ＋Queue toast confirmation | — | ❌ | BUG-030 (state) |
 | video | remote play / pause | companion | ✅ | |
 | queue | audio queue list | music | ✅ | minimal (body-only snap) |
-| video-queue | video queue list + greyed Repeat pill | companion-video-queue | ✅ | **TASK-289** gap closed (single-item source drives the greyed pill), BUG-024 |
+| queue-shell | FEAT-497 Queue page + dimmed non-repeatable controls | — | ❌ | TASK-525: the `companion-video-queue` flow went with the legacy Queue page it drove. The shell that replaced it (`companion-queue-shell.js`, all four types) has never had a flow of its own — the TASK-289 `(surface, state)` pair is open again on the shell |
 | playlist | populated tracklist + cover thumbs + NEXT | playlists | ✅ | populated view snapped (playlists step 07); text-only baseline — TASK-287 (thumbs), BUG-033 (NEXT) land here |
 | playlist-create | create form | playlists | ✅ | |
 | profile | profile pick | — | ➖ | low visual value |
@@ -73,7 +71,7 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 | rail-grid | "see all" rail grid | tv-artist-playlist | ✅ | artist page renders via screen-rail-grid.js (same grid renderer) |
 | playlist-create | create form | — | ➖ | companion create covers the path |
 | video | TV player play / pause | tv-app | ✅ | video frame hidden for determinism |
-| video-queue | TV video queue + greyed Repeat pill | tv-video-queue | ✅ | TASK-289 gap closed, BUG-024 |
+| queue-shell | FEAT-497 Queue overlay + dimmed non-repeatable controls | — | ❌ | TASK-525: the `tv-video-queue` flow went with the legacy Queue overlay it drove. The shell that replaced it (`screen-queue-shell.js`, all three video types) has never had a flow of its own — the TASK-289 `(surface, state)` pair is open again on the shell |
 | error | error state | — | ➖ | |
 
 ## Cross-cutting
@@ -96,6 +94,9 @@ Ranked by churn. Extend where the surface sits on an existing path; else new flo
 3. ~~**`video-queue`** *(new)* — build a video queue → open queue view → snap greyed Repeat pill
    (companion + TV). Closes the TASK-289 blind spot; BUG-024.~~ ✅ **landed** — two files, one per surface
    (`tv-video-queue.cjs` + `companion-video-queue.cjs`); a single-item film is the non-repeatable source.
+   ⚠️ **Both removed by TASK-525** with the pre-FEAT-497 Queue they drove. The pair they covered is a
+   gap again — it wants re-doing against the FEAT-497 shell, which serves every media type, so ONE
+   flow per surface now covers what four types used to need separately.
 4. ~~**`tv-artist-playlist`** *(new)* — TV: Music → Artists → album-by-year → playlist-detail.
    Closes TV `artist`, `playlist-detail`, `rail-grid`.~~ ✅ **landed** (`tv-artist-playlist.cjs`) — one
    journey; playlist built via a Queen album's Add-all → New playlist (catalog seeds none).
@@ -115,3 +116,7 @@ When a flow lands, flip its `(surface, state)` rows to ✅ and name it in Flow(s
 `tv-artist-playlist`, populated-playlist (extended `companion-playlists`), Continue-rail
 (extended `tv-app`). Remaining ❌ rows above are follow-ons outside this batch (e.g. the
 companion browse Continue rail, companion ＋Queue toast, audio ＋Queue toast).
+
+**TASK-525** removed `tv-video-queue.cjs` + `companion-video-queue.cjs` with the legacy
+Queue they drove — 5 flow files now. The Queue View's own `(surface, state)` pair is
+unsnapped on both surfaces until a shell flow replaces them.

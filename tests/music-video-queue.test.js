@@ -10,8 +10,9 @@ const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS } = r
 // /api/queue/music-video actions; the overlay repaints from the next snapshot
 // the backend pushes.
 //
-// Written as a deliberate TWIN of tests/video-queue-view.test.js (films), the
-// way TASK-504 twinned music's own Queue suites: the two media types now share
+// Written as a deliberate TWIN of the film suite that lived in
+// tests/video-queue-view.test.js (removed with the legacy Queue in TASK-525),
+// the way TASK-504 twinned music's own Queue suites: the two media types share
 // one screen and one engine, so a divergence between them should show up here
 // as a failure rather than as a difference nobody notices.
 
@@ -192,7 +193,7 @@ test('advancing to the next music video re-syncs the engine\'s now-playing', asy
 });
 
 // ── story 4: a lone pick keeps its transport, dimmed ───────────────────────
-// The twin of video-queue-view.test.js's own standalone-film cases. A lone
+// The twin of the standalone-film cases the removed film suite carried. A lone
 // music video plays as a STANDALONE item (no source at all), which is what
 // leaves ⏮/⏭/Shuffle/Repeat dimmed-but-visible instead of hidden — BUG-485's
 // `item_count` gate used to remove them from the page outright.

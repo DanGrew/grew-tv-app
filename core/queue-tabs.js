@@ -1,8 +1,7 @@
-// FEAT-039 (TASK-238) shared Queue View tab shell. The remaining Queue models
-// (core/queue-shell-view.js for every cut-over media type, plus the not-yet-
-// retired core/video-queue-view.js and core/music-video-queue-view.js) read
-// different snapshot shapes — but share the SAME layout: a Now Playing header
-// above three tabs, in play order —
+// FEAT-039 (TASK-238) shared Queue View tab shell. core/queue-shell-view.js —
+// THE Queue model, every media type on it since TASK-505 — renders both
+// surfaces through here: a Now Playing header above three tabs, in play
+// order —
 //   Queue      — the tracks you queued (override).
 //   Next       — the rest of the current source (album / series).
 //   Coming Up  — what plays after the source (repeat wrap / next permutation).
@@ -38,11 +37,6 @@ function shell(headerHtml, panels, barCls, tabCls, panelCls) {
   return headerHtml + bar + body;
 }
 
-// TV overlay shell (.qtab-bar / .qtab / .qtab-panel).
-export function tabShellHtml(headerHtml, panels) {
-  return shell(headerHtml, panels, 'qtab-bar', 'qtab', 'qtab-panel');
-}
-
 // Companion phone shell (.ph-qtab-bar / .ph-qtab / .ph-qtab-panel).
 export function phTabShellHtml(headerHtml, panels) {
   return shell(headerHtml, panels, 'ph-qtab-bar', 'ph-qtab', 'ph-qtab-panel');
@@ -51,10 +45,10 @@ export function phTabShellHtml(headerHtml, panels) {
 // FEAT-497 (docs/QUEUE-UX-SHELL.md) TV Queue UX shell tab bar (.qs-tabbar /
 // .qs-tab / .qs-panel) — full-width equal tabs, mirroring the companion's own
 // .ph-qtab flex:1 behaviour instead of the older TV .qtab's padding-only,
-// non-stretched style. A NEW class set rather than restyling .qtab/.qtab-bar/
-// .qtab-panel in place: those stay live for every media type not yet cut over
-// onto this shell (TASK-503/504/505), so changing their look here would leak
-// into screens this task never touches.
+// non-stretched style. It was added as a NEW class set rather than restyling
+// .qtab/.qtab-bar/.qtab-panel in place, so the not-yet-cut-over media types
+// kept their look; TASK-525 removed the last of those (`tabShellHtml`, the TV
+// .qtab shell), leaving this the only TV tab bar.
 export function qsTabShellHtml(headerHtml, panels) {
   return shell(headerHtml, panels, 'qs-tabbar', 'qs-tab', 'qs-panel');
 }

@@ -283,7 +283,7 @@ queue from detail via ＋ → ☰ Play Next.
 [build] 01-detail   TV Series → Comedy → Black Books → detail
         02-add      ep2 ＋ → ☰ Play Next (queue-video); ep3 same → toasts
         03-play-source play ep1 → video.html (ep2, ep3 queued)
-        04-queue-view open Video Queue → video-queue.html, ep2 & ep3 listed
+        04-queue-view open Queue → film-queue.html, ep2 & ep3 listed
 [reorder]05-reorder ↑/↓ on a queued row → order swaps (move-queue-entry)
 [pop]   06-play-now tap a queued row → play-now (removes entry + plays it)
 [delete]07-remove   ✕ on remaining queued row → remove-queue-entry, gone
@@ -309,7 +309,7 @@ DATA: first album, tracks 2 & 3.
 
 Same arcs as the companion twins; mechanics per §2 (sidebar tabs, `.film-tile`,
 `#btn-play-pause`, PIN keypad, no bind/screen-bar). Existing TV flows: `tv-app`,
-`tv-music`, `tv-artist-playlist`, `tv-video-queue`.
+`tv-music`, `tv-artist-playlist`.
 
 ### T1 · PLAY TV SERIES  ✅ exists (`tv-app.cjs`)
 profile → PIN → browse → Black Books detail → #btn-play-next → paused/playing → crumb. Hide `#video`.
@@ -356,10 +356,14 @@ Fixed-progress; keep progress bar visible.
 ### T12 · CONTINUE LISTENING  🆕 new  ⚠️ G-COLD
 Mirror of T11 on the TV Music-tab Continue Listening rail. Same cold-rail gate.
 
-### T13 · QUEUE VIDEOS (full CRUD)  ➕ extend (partial in `tv-video-queue.cjs`)
-Today: queue view + greyed Repeat pill only. NEW: full CRUD via the d-pad grid
-(Up/Down rows, Left/Right across `[select, shift-up, shift-down, remove]`, Enter) —
-add (detail ＋ Play Next) → `#queue-overlay` → reorder → play-now (pop) → remove.
+### T13 · QUEUE VIDEOS (full CRUD)  🆕 new
+`tv-video-queue.cjs` covered the queue view + greyed Repeat pill on the
+pre-FEAT-497 overlay; TASK-525 removed both, so this starts from nothing on the
+shell (`screen-queue-shell.js`, same overlay for every video type). Full CRUD via
+the d-pad grid (Up/Down rows, Left/Right across `[select, shift-up, shift-down,
+remove]`, Enter) — add (detail ＋ Play Next) → `#queue-overlay` → reorder →
+play-now (pop) → remove, plus the dimmed non-repeatable controls a single-item
+source drives.
 DATA: Black Books ep 1/2/3.
 
 ### T14 · QUEUE MUSIC (full CRUD)  🆕 new
