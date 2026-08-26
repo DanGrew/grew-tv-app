@@ -141,10 +141,15 @@ export var VIDEO_PAGE_CONFIG = { mv: MUSIC_VIDEO_PAGE, hm: HOME_MOVIE_PAGE, film
 
 // Which rail an entryMode() answer drives. Mutually exclusive per page load,
 // never a live switch — resolved once and used to key everything else.
+//
+// TASK-501 — the three Continue entries (browse's per-type Continue buttons)
+// are rows here like any other entry: each names the media type its button was
+// pressed for, so it advances that type's OWN engine and nothing downstream
+// needs a continue branch of its own.
 export var MODE_ENGINE = {
-  mvPlaylist: 'mv', mvArtist: 'mv', mvItem: 'mv', mvAll: 'mv',
-  homeMoviesAll: 'hm', homeMoviesPerson: 'hm', homeMoviesMonth: 'hm',
-  series: 'film', single: 'film', queue: 'film'
+  mvPlaylist: 'mv', mvArtist: 'mv', mvItem: 'mv', mvAll: 'mv', continueMusicVideo: 'mv',
+  homeMoviesAll: 'hm', homeMoviesPerson: 'hm', homeMoviesMonth: 'hm', continueHomeMovie: 'hm',
+  series: 'film', single: 'film', queue: 'film', continueFilm: 'film'
 };
 
 // The engine's own registered source names, per entry mode — one table where

@@ -2,6 +2,24 @@ import { describe, it, expect } from 'vitest';
 import { entryMode, playlistTrackTarget, playlistQueueKey } from '../../core/music-video-playthrough.js';
 
 describe('entryMode', () => {
+  // TASK-501 — browse's Continue press. Each of the three types video.html
+  // plays resolves to its OWN mode, which is what lets the page key its engine
+  // off `mode` like every other entry rather than branching on a media type.
+  it('is a per-type continue mode when a Continue press names its media type', () => {
+    expect(entryMode({ continueType: 'film' })).toBe('continueFilm');
+    expect(entryMode({ continueType: 'home-movie' })).toBe('continueHomeMovie');
+    expect(entryMode({ continueType: 'music-video' })).toBe('continueMusicVideo');
+  });
+  it('wins over every other entry param', () => {
+    expect(entryMode({ continueType: 'film', playQueue: true, mvPlaylist: 'pl1', mvAll: true, homeMoviesAll: true, isSeries: true })).toBe('continueFilm');
+  });
+  // music carries on in audio.html's own entry, never here, so its media type
+  // is not a video.html mode — it falls through like any unknown value.
+  it('ignores a continueType this page does not play', () => {
+    expect(entryMode({ continueType: 'music' })).toBe('single');
+    expect(entryMode({ continueType: 'music', isSeries: true })).toBe('series');
+    expect(entryMode({ continueType: 'nonsense', playQueue: true })).toBe('queue');
+  });
   it('is "queue" when a video Play Queue is requested, over everything else', () => {
     expect(entryMode({ playQueue: true, mvPlaylist: 'pl1', mvArtist: 'ELO', mvItem: 'mv1', isSeries: true })).toBe('queue');
   });

@@ -1,14 +1,17 @@
 const { test, expect } = require('@playwright/test');
 const { installApi } = require('./fixtures/api.js');
 
-// FEAT-040 (Play Queue) — the companion browse "🎬 (N)" video queue button (TASK-258
-// compact label: media icon + bracketed count, no "Video" word). When the
-// film queue is non-empty (read from GET /api/queue/film — TASK-517 moved it
-// off the old video engine's snapshot onto the unified one, the queue the ＋
-// badges actually fill), the
-// button appears; tapping it drives the TV player to start the queue head via a
-// `navigate` intent to video.html?playQueue=1. Solves: "to reach the queue you had
-// to start something random first." It drives the TV, so it greys while desynced.
+// TASK-501 (FEAT-497) — the companion's play menu (#queue-menu, its own ▶ icon
+// beside ☰ since TASK-445) holds one Continue button per media type, where
+// FEAT-040's two 🎬/🎵 play-the-queue pills used to sit. Those covered two of
+// the four types, hid themselves at an empty queue and STARTED a queue; a
+// Continue press carries on with its type — the queue's front, else the next
+// item of the source it was last playing, both the engine's own advance.
+//
+// Story 4: the phone does exactly what the TV's own button does — it drives the
+// TV with a `navigate` intent to the same target the TV would navigate itself
+// to, off the same shared builder (ui/screens/continue-menu.js). And like every
+// TV-driving control here, it greys while desynced.
 
 function msg(type, payload) { return JSON.stringify({ type, payload }); }
 
@@ -29,49 +32,102 @@ function mockApp(page, intents) {
   });
 }
 
-// A GET snapshot with `count` queued films.
-async function mockQueue(page, count) {
-  const queue = Array.from({ length: count }, (_, i) => ({ entry_id: 'e' + (i + 1), item_id: 'f' + i, title: 'Film ' + i }));
-  await page.route(/\/api\/queue\/film\?/, route => route.fulfill({
+// A GET snapshot for one media type. Every type reads its own, so a test
+// seeding one must answer for the other three too (mockAllQueues below).
+async function mockQueue(page, mediaType, fields) {
+  await page.route(new RegExp('/api/queue/' + mediaType + '\\?'), route => route.fulfill({
     status: 200, contentType: 'application/json',
-    body: JSON.stringify({ person_id: 'mom', media_type: 'film', now_playing: null, queue: queue, next: [], coming_up: [], source_type: null, source_id: null, repeat: false, shuffle: false })
+    body: JSON.stringify(Object.assign({ person_id: 'mom', media_type: mediaType, now_playing: null, queue: [], next: [], coming_up: [], source_type: null, source_id: null, repeat: false, shuffle: false }, fields))
   }));
 }
+async function mockAllQueues(page) {
+  await mockQueue(page, 'film', {});
+  await mockQueue(page, 'home-movie', {});
+  await mockQueue(page, 'music', {});
+  await mockQueue(page, 'music-video', {});
+}
+function queued(count) {
+  return { queue: Array.from({ length: count }, (_, i) => ({ entry_id: 'e' + (i + 1), item_id: 'f' + i, title: 'Film ' + i })) };
+}
 
-test('Play Queue button shows the count and drives the TV to start the queue', async ({ page }) => {
+async function openPlayMenu(page) {
+  await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
+  await page.locator('#btn-queue-menu').click();
+}
+
+// Story 3 — nothing to continue anywhere still shows four buttons, dimmed
+// rather than gone, so the menu never shrinks to a shifting list.
+test('all four Continue buttons stay visible with nothing to continue', async ({ page }) => {
   const intents = [];
   await installApi(page);
   await mockApp(page, intents);
-  await mockQueue(page, 2);
+  await mockAllQueues(page);
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
-  // TASK-445 — Play Queue moved into the SEPARATE #queue-menu popout (its own
-  // ▶ icon beside ☰), off the flat #queue-actions row.
-  await page.locator('#btn-queue-menu').click();
-  await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (2)');
-  await page.locator('#btn-play-queue').click();
+  await openPlayMenu(page);
+  await expect(page.locator('#queue-menu .continue-btn')).toHaveCount(4);
+  for (const id of ['btn-continue-film', 'btn-continue-home-movie', 'btn-continue-music', 'btn-continue-music-video']) {
+    await expect(page.locator('#' + id)).toBeVisible();
+    await expect(page.locator('#' + id)).toBeDisabled();
+  }
+  await expect(page.locator('#btn-continue-home-movie')).toHaveText('▶ Continue Home Movies');
+});
+
+// Story 1 + story 4 — a queued film wakes Continue Films, and pressing it
+// drives the TV to the film continue entry (the TV's own button's target).
+test('Continue Films drives the TV to the film continue entry', async ({ page }) => {
+  const intents = [];
+  await installApi(page);
+  await mockApp(page, intents);
+  await mockAllQueues(page);
+  await mockQueue(page, 'film', queued(2));
+  await page.goto('/companion/browse.html');
+  await openPlayMenu(page);
+  await expect(page.locator('#btn-continue-film')).toBeEnabled();
+  await page.locator('#btn-continue-film').click();
   await expect.poll(() => intents.find(i => i.intent === 'navigate' && i.params.page === 'video.html')).toBeTruthy();
   const nav = intents.find(i => i.intent === 'navigate' && i.params.page === 'video.html');
-  expect(nav.params.params).toMatchObject({ playQueue: 1 });
+  expect(nav.params.params).toMatchObject({ continueType: 'film', from: 'browse' });
 });
 
-test('Play Queue button is hidden when the queue is empty', async ({ page }) => {
+// Music carries on in the audio player, not the video one — the per-type
+// target the config resolves, identical on both surfaces.
+test('Continue Music drives the TV to the audio player', async ({ page }) => {
   const intents = [];
   await installApi(page);
   await mockApp(page, intents);
-  await mockQueue(page, 0);
+  await mockAllQueues(page);
+  await mockQueue(page, 'music', queued(1));
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
-  await expect(page.locator('#btn-play-queue')).toBeHidden();
+  await openPlayMenu(page);
+  await page.locator('#btn-continue-music').click();
+  await expect.poll(() => intents.find(i => i.intent === 'navigate' && i.params.page === 'audio.html')).toBeTruthy();
+  const nav = intents.find(i => i.intent === 'navigate' && i.params.page === 'audio.html');
+  expect(nav.params.params).toMatchObject({ continueType: 'music', from: 'browse' });
 });
 
-test('Play Queue greys out in Browse (desync) mode — it drives the TV', async ({ page }) => {
+// Story 2 — nothing queued, but the source has more ahead: Continue is still
+// live. The old pill, counting the queue alone, read dead here.
+test('Continue is live on an empty queue when the source has more ahead', async ({ page }) => {
+  const intents = [];
+  await installApi(page);
+  await mockApp(page, intents);
+  await mockAllQueues(page);
+  await mockQueue(page, 'music-video', { next: [{ entry_id: 'e1', item_id: 'mv-02' }], source_type: 'mv-all' });
+  await page.goto('/companion/browse.html');
+  await openPlayMenu(page);
+  await expect(page.locator('#btn-continue-music-video')).toBeEnabled();
+  await expect(page.locator('#btn-continue-film')).toBeDisabled();
+});
+
+test('a Continue button greys out in Browse (desync) mode — it drives the TV', async ({ page }) => {
   const intents = [];
   await page.addInitScript(() => sessionStorage.setItem('grew-tv:companion-mode', 'desynced'));
   await installApi(page);
   await mockApp(page, intents);
-  await mockQueue(page, 1);
+  await mockAllQueues(page);
+  await mockQueue(page, 'film', queued(1));
   await page.goto('/companion/browse.html');
-  await expect(page.locator('#section-dock .dock-tab').first()).toBeVisible();
-  await expect(page.locator('#btn-play-queue')).toHaveClass(/desync-off/);
+  await openPlayMenu(page);
+  await expect(page.locator('#btn-continue-film')).toHaveClass(/desync-off/);
+  await expect(page.locator('#btn-continue-music')).toHaveClass(/desync-off/);
 });

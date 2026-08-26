@@ -75,8 +75,14 @@ button:hover { background: var(--surface-hi); }
 .tile-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,0.45); }
 .tile-progress-fill { height: 100%; background: var(--focus); }
 #queue-actions { position: fixed; bottom: 32px; right: 32px; z-index: 6; display: flex; align-items: center; gap: 12px; }
-#btn-play-queue, #btn-play-queue-music, #btn-play-all { font-size: var(--fs-sm); padding: 12px 22px; min-width: auto; border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); border-radius: 999px; }
-#btn-play-queue:focus, #btn-play-queue-music:focus, #btn-play-all:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); }
+#queue-menu-mount { position: relative; }
+#btn-queue-menu { font-size: var(--fs-sm); padding: 12px 22px; min-width: auto; border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); border-radius: 999px; }
+#btn-queue-menu:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); }
+#queue-menu { display: none; flex-direction: column; gap: 12px; position: absolute; bottom: calc(100% + 14px); right: 0; z-index: 15; width: max-content; min-width: 340px; padding: 18px; background: #1f2d50; border: 2.5px solid var(--border); border-radius: var(--radius); box-shadow: 0 16px 44px rgba(0,0,0,0.55); }
+#queue-menu.open { display: flex; }
+#btn-play-all, .continue-btn { width: 100%; text-align: left; font-size: var(--fs-sm); padding: 14px 22px; min-width: auto; border: 2px solid var(--border); background: var(--surface); color: var(--text); border-radius: var(--radius-sm); }
+#btn-play-all:focus, .continue-btn:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
+.continue-btn.is-disabled { opacity: 0.35; cursor: default; }
 #queue-status { display: none; position: fixed; bottom: 96px; right: 32px; z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }
 #breadcrumb { position: fixed; top: 20px; left: 32px; z-index: 5; }
 body.sidebar-collapsed #breadcrumb { display: none; }
@@ -127,9 +133,12 @@ body.sidebar-collapsed #breadcrumb { display: none; }
 </div>
 <div id="queue-actions">
 <button id="btn-search" type="button" aria-label="Search">🔍</button>
-<button id="btn-play-all" type="button" style="display:none">▶ Play All</button>
-<button id="btn-play-queue" tabindex="0" style="display:none">&#127916;</button>
-<button id="btn-play-queue-music" tabindex="0" style="display:none">&#127925;</button>
+<div id="queue-menu-mount">
+  <button id="btn-queue-menu" type="button" aria-label="Play controls">&#9654;</button>
+  <div id="queue-menu">
+    <button id="btn-play-all" type="button" style="display:none">▶ Play All</button>
+  </div>
+</div>
 </div>
 <div id="queue-status"></div>
 <div id="search-panel">
