@@ -82,3 +82,18 @@ test('Back target survives an in-place advance (still the original launcher)', a
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/detail\.html\?.*series=bluey/);
 });
+
+// TASK-524 — the tapped episode, which every other test in this file dodged by
+// tapping the series' FIRST member (where starting-at-the-top and starting-at-
+// the-tap are the same answer). api/queue_playback.py's play-source reads
+// source_type/source_id only and never the body's item_id, so a mid-series tap
+// used to land on episode 1: the page sent one play-source carrying an item_id
+// the server dropped. Entry is the two-action shape — play-source, then
+// play-item for the tapped member — the one shape that lands where the viewer
+// pointed.
+test('tapping a mid-series episode starts on THAT episode, not the first', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?video=bluey-s1e03&series=bluey&from=detail');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e03/);
+  await expect(page.locator('#breadcrumb .crumb')).toHaveText(['Home', 'Bluey', 'Hammerbarn']);
+});

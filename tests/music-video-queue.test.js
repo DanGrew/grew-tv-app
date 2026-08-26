@@ -142,16 +142,44 @@ test('playing a music-video playlist syncs the engine\'s source + now-playing', 
   await expect.poll(() => (backend.snapshot().now_playing || {}).item_id).toBe('mv-01');
 });
 
-test('a tapped playlist track starts THERE, in one play-source with its item_id', async ({ page }) => {
+// TASK-524 — this used to assert ONE play-source carrying the tapped track's
+// item_id, and passed only because the fixture honoured that field.
+// api/queue_playback.py never has: it reads source_type/source_id off the body
+// and passes neither an item nor a follow-up to engine.play_source, which
+// starts the source at current[0]. Tapping "No One Knows" mid-playlist really
+// played the playlist's first video. Entry is the two-action shape now — load
+// the source, then land on the tap — which is what home movies always sent.
+test('a tapped playlist track starts THERE: play-source, then play-item for the tap', async ({ page }) => {
   await installApi(page);
   const backend = await installQueuePlaybackBackend(page, 'music-video');
   const started = page.waitForRequest(req =>
     req.url().includes('/api/queue/music-video/play-source') && req.method() === 'POST');
+  const landed = page.waitForRequest(req =>
+    req.url().includes('/api/queue/music-video/play-item') && req.method() === 'POST');
   await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&musicVideoTrack=mv-02&from=detail-playlist');
   await expect(page.locator('#screen-video')).toBeVisible();
+  // The source POST names the source and NOTHING else — an item_id here is a
+  // field the server drops.
   expect(JSON.parse((await started).postData()))
-    .toEqual({ source_type: 'mv-playlist', source_id: 'pl-mv', item_id: 'mv-02' });
+    .toEqual({ source_type: 'mv-playlist', source_id: 'pl-mv' });
+  expect(JSON.parse((await landed).postData())).toEqual({ item_id: 'mv-02' });
   await expect.poll(() => (backend.snapshot().now_playing || {}).item_id).toBe('mv-02');
+});
+
+// The other half of the same rule: no tapped track means no play-item at all,
+// and the playlist's own first video plays.
+test('a playlist played from the top sends play-source alone', async ({ page }) => {
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'music-video');
+  var items = [];
+  await page.route('**/api/queue/music-video/play-item*', function(route) {
+    items.push(route.request().url());
+    route.fulfill({ status: 204, body: '' });
+  });
+  await page.goto('/app/homeview/video.html?musicVideoPlaylist=pl-mv&from=browse');
+  await expect(page.locator('#video')).toHaveAttribute('src', /mv-01/);
+  await expect.poll(() => (backend.snapshot().now_playing || {}).item_id).toBe('mv-01');
+  expect(items).toEqual([]);
 });
 
 test('playing an artist\'s music videos syncs source_type mv-artist / source_id the artist name', async ({ page }) => {
