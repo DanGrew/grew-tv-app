@@ -1,8 +1,9 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadContinueWatching, loadQueuePlayback, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadTracks, loadEpisodes } from '../../core/app-api.js';
 import { queueAdd, queueAddStatus, SECTION_MEDIA_TYPE } from '../../core/queue-shell-config.js';
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
-import { queueCount } from '../../core/queue-playback-router.js';
+import { CONTINUE_TYPES, continueTarget } from '../../core/browse-continue.js';
+import { mountContinueMenu } from './continue-menu.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildTabs, railsForSection } from '../../core/home-rails.js';
@@ -164,54 +165,34 @@ export function initPage() {
   // the same); another media type just re-reads an unmoved count.
   function queueCard(mediaType, id) {
     queueAdd(server, mediaType, state.person, id)
-      .then(function() { showQueueStatus(queueAddStatus(mediaType)); refreshQueue(); })
+      .then(function() { showQueueStatus(queueAddStatus(mediaType)); continueMenu.refresh(); })
       .catch(noop);
   }
 
-  // FEAT-040 (Play Queue): when the video override queue is non-empty, offer a quick
-  // compact "🎬 (N)" button (TASK-258 — media icon + bracketed count, no word) —
-  // tapping it drives the TV player to start the queue head (?playQueue), so you
-  // don't have to open a random video to reach the queue. The
-  // count is read from the read-only GET snapshot (refreshed on person-load + after
-  // queueing here). It drives the TV, so it greys while desynced (Browse).
-  // TASK-517 — that snapshot is the FILM queue on the unified engine now (the
-  // TV mirror's own move): the same queue every ＋ here fills, instead of the
-  // old video engine's, which nothing has added to since TASK-503.
-  function showPlayQueue(count) {
-    var btn = document.getElementById('btn-play-queue');
-    btn.textContent = '🎬 (' + count + ')';
-    btn.style.display = ({ 'true': 'block', 'false': 'none' })[(count > 0) + ''];
-  }
-  function refreshQueue() {
-    [state.person].filter(Boolean).forEach(function(p) {
-      loadQueuePlayback(server, 'film', p).then(function(snap) { showPlayQueue(queueCount(snap)); }).catch(noop);
+  // TASK-501 (FEAT-497) — Continue, one button per media type, in the #queue-menu
+  // popout (TASK-445) where the two 🎬/🎵 play-the-queue pills used to sit. Those
+  // covered two of the four types, hid themselves at an empty queue, and STARTED
+  // a queue; a Continue press carries on with its type — the front of its queue,
+  // else the next item of the source it was last playing, both the engine's own
+  // advance(). The buttons come out of the SAME builder the TV's own menu uses
+  // (ui/screens/continue-menu.js), so story 4 holds by construction: this drives
+  // the TV through the usual `navigate` intent, to the exact target the TV's own
+  // button would navigate itself to.
+  var continueMenu = mountContinueMenu({
+    mount: document.getElementById('queue-menu'),
+    server: server,
+    getPerson: function() { return state.person; },
+    onContinue: function(mediaType) {
+      var t = continueTarget(mediaType);
+      api.sendIntent('navigate', { page: t.page, params: t.params });
+    }
+  });
+  // Like every other TV-driving control here, a Continue button greys out while
+  // desynced (the WS layer already no-ops its intent; this is the visible half).
+  function applyContinueMode() {
+    CONTINUE_TYPES.forEach(function(entry) {
+      continueMenu.buttons[entry.mediaType].classList.toggle('desync-off', mode.isDesynced());
     });
-  }
-  function onPlayQueue() {
-    api.sendIntent('navigate', { page: 'video.html', params: { playQueue: 1, from: 'browse' } });
-  }
-
-  // FEAT-040/TASK-255 — the MUSIC twin of the Play-Queue button, sitting beside the
-  // video one in the #queue-menu popout (TASK-445). TASK-504 — counted off the
-  // unified engine's own music queue, the same read the 🎬 pill does one media
-  // type over, so both count the queue their ＋ presses fill. The 🎵 icon (vs the
-  // video 🎬) tells which queue each resumes apart — TASK-258 dropped the "Music"/
-  // "Video" word for a compact "🎵 (N)" and de-purpled it to match the video button.
-  // Tapping drives the TV audio page to start the music queue head
-  // (audio.html?playQueue); like the video button it drives the TV, so it greys
-  // while desynced (Browse).
-  function showPlayQueueMusic(count) {
-    var btn = document.getElementById('btn-play-queue-music');
-    btn.textContent = '🎵 (' + count + ')';
-    btn.style.display = ({ 'true': 'block', 'false': 'none' })[(count > 0) + ''];
-  }
-  function refreshQueueMusic() {
-    [state.person].filter(Boolean).forEach(function(p) {
-      loadQueuePlayback(server, 'music', p).then(function(snap) { showPlayQueueMusic(queueCount(snap)); }).catch(noop);
-    });
-  }
-  function onPlayQueueMusic() {
-    api.sendIntent('navigate', { page: 'audio.html', params: { playQueue: 1, from: 'browse' } });
   }
 
   // TASK-445 — the Play All twin: shown only while drilled into the section
@@ -419,16 +400,15 @@ export function initPage() {
   function renderDoor() {
     externalDestinations().forEach(function(dest) { els.door.appendChild(doorTile(dest)); });
   }
-  document.getElementById('btn-play-queue').addEventListener('click', onPlayQueue);
-  document.getElementById('btn-play-queue-music').addEventListener('click', onPlayQueueMusic);
   document.getElementById('btn-play-all').addEventListener('click', onPlayAll);
 
   // TASK-445 — a SEPARATE popout, its own icon beside the ☰ status menu (not
-  // folded into it — this is play controls, not settings/navigation): three
-  // TV-driving buttons that used to sit in a flat #queue-actions row, which
-  // breaks on a phone-width screen once Play All joins Search + the two queue
+  // folded into it — this is play controls, not settings/navigation): the
+  // TV-driving play buttons that used to sit in a flat #queue-actions row, which
+  // breaks on a phone-width screen once Play All joins Search + the queue
   // buttons. Opens/closes only via its own icon, mirroring #btn-status exactly
   // (never on an outside tap, so the drill underneath stays usable).
+  // TASK-501 — it now holds Play All plus one Continue button per media type.
   document.getElementById('btn-queue-menu').addEventListener('click', function() {
     document.getElementById('queue-menu').classList.toggle('open');
   });
@@ -437,8 +417,7 @@ export function initPage() {
   // already no-ops its intent; this is the visible half — no dead click).
   function applyMode() {
     document.getElementById('switch-profile').classList.toggle('desync-off', mode.isDesynced());
-    document.getElementById('btn-play-queue').classList.toggle('desync-off', mode.isDesynced());
-    document.getElementById('btn-play-queue-music').classList.toggle('desync-off', mode.isDesynced());
+    applyContinueMode();
     document.getElementById('btn-play-all').classList.toggle('desync-off', mode.isDesynced());
     document.getElementById('btn-play-all').style.display = ({ 'true': 'block', 'false': 'none' })[!!PLAY_ALL_PARAMS[state.section] + ''];
     applyRowStepMode();
@@ -763,10 +742,10 @@ export function initPage() {
   // (FEAT-026 TASK-158) and keys Continue-Watching per person.
   function onAppState(snap) {
     state.person = [snap.person].filter(Boolean).concat([state.person])[0];
-    // Read the queue once the person is known (first app_state) — drives the
-    // "Play Queue" button's count.
+    // Read the queues once the person is known (first app_state) — TASK-501:
+    // that is what decides which of the four Continue buttons are live.
     [state.person].filter(Boolean).filter(function() { return !state.queueFetched; }).forEach(function() {
-      state.queueFetched = true; refreshQueue(); refreshQueueMusic();
+      state.queueFetched = true; continueMenu.refresh();
     });
     [snap.profile].filter(Boolean).filter(function(p) { return p !== state.profile; }).forEach(loadCatalog);
     // Following the TV's deep position is the inbound nav seam — gated when

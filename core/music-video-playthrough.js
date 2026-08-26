@@ -10,8 +10,19 @@
 // ⏮⏭🔀🔁 for every media type, and a control with nothing to act on is
 // dimmed rather than hidden.
 
+// TASK-501 — browse's Continue lands here: `continueType` names the media type
+// to carry on with, and video.html serves the three that play in it (music
+// carries on in audio.html's own entry). It wins outright — a Continue press
+// carries no other entry param, and resolving to a distinct mode per type is
+// what lets the page key its engine off `mode` like every other entry does.
+var CONTINUE_MODE = {
+  film: 'continueFilm',
+  'home-movie': 'continueHomeMovie',
+  'music-video': 'continueMusicVideo'
+};
+
 // Which entry function should run for a video.html load, in priority order:
-// the durable video Play Queue wins if requested, then a music-video source
+// a Continue press wins if requested, then the durable video Play Queue, then a music-video source
 // (playlist beats artist beats a lone item pick beats the TASK-445 whole-
 // catalog Play All — the four are mutually exclusive in practice; the
 // priority is a defensive fallback, not a real choice), then the TASK-446
@@ -24,6 +35,7 @@
 // core (not the page) because it branches — ui/** must stay cyclomatic-1.
 export function entryMode(p) {
   var params = p || {};
+  if (CONTINUE_MODE[params.continueType]) return CONTINUE_MODE[params.continueType];
   if (params.playQueue) return 'queue';
   if (params.mvPlaylist) return 'mvPlaylist';
   if (params.mvArtist) return 'mvArtist';

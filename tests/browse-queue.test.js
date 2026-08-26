@@ -67,79 +67,138 @@ test('tapping the film tile body (not the ＋) opens the player', async ({ page 
   await expect(page).toHaveURL(/video\.html/);
 });
 
-test('video queue button is hidden when the video queue is empty', async ({ page }) => {
-  await installApi(page);
-  await installVideoPlaybackBackend(page);
-  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+// ── TASK-501: Continue, one button per media type ───────────────────────────
+// The two 🎬/🎵 play-the-queue pills are gone. Browse's bottom-right is now
+// Search + a ▶ icon opening a play menu (the shape the companion has had since
+// TASK-445), holding Play All and four Continue buttons — films, music, home
+// movies, music videos. A press carries on with that type via the engine's own
+// advance (`next`): the queue front, else the next item of the source it was
+// last playing.
+
+// Every type reads its own snapshot to decide whether its button is live, so a
+// test seeding one type must answer for the other three too.
+async function routeEmptyQueue(page, mediaType) {
+  await page.route(new RegExp('/api/queue/' + mediaType + '\\?'), (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', media_type: mediaType, queue: [], next: [], coming_up: [] }) }));
+}
+async function routeQueued(page, mediaType, queued) {
+  await page.route(new RegExp('/api/queue/' + mediaType + '\\?'), (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', media_type: mediaType, queue: queued, next: [], coming_up: [] }) }));
+}
+async function routeAllEmpty(page) {
+  await routeEmptyQueue(page, 'film');
+  await routeEmptyQueue(page, 'home-movie');
+  await routeEmptyQueue(page, 'music');
+  await routeEmptyQueue(page, 'music-video');
+}
+async function openPlayMenu(page) {
   await expect(page.locator('.sidebar-tab[data-tab="films"]')).toBeVisible();   // settled
-  await expect(page.locator('#btn-play-queue')).toBeHidden();
-});
-
-// TASK-517 — the count comes off the FILM queue on the unified engine now: the
-// same queue the ＋ badges above fill. It read the old video engine's until
-// now, which nothing has added to since TASK-503, so the pill stayed hidden
-// however many films you queued.
-test('video queue button 🎬 (N) shows the count and opens the video player at the queue head', async ({ page }) => {
-  await installApi(page);
-  const backend = await installQueuePlaybackBackend(page, 'film');
-  backend.seed('queue-item', { item_id: 'finding-nemo-main' });
-  backend.seed('queue-item', { item_id: 'toy-story-main' });
-  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
-  await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (2)');
-  await page.locator('#btn-play-queue').click();
-  await expect(page).toHaveURL(/video\.html\?.*playQueue=1/);
-});
-
-// TASK-517 — and it climbs as you queue, without a reload: the ＋ press and
-// the pill finally read the same queue.
-test('queueing a film from browse makes the 🎬 pill appear straight away', async ({ page }) => {
-  await installApi(page);
-  await installQueuePlaybackBackend(page, 'film');
-  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
-  await expect(page.locator('.sidebar-tab[data-tab="films"]')).toBeVisible();   // settled
-  await expect(page.locator('#btn-play-queue')).toBeHidden();
-  await openFilms(page);
-  await page.locator('.film-tile[data-id="finding-nemo-main"] .tile-queue').click();
-  await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (1)');
-});
-
-// TASK-259: the MUSIC twin beside the video button — shown only when the music
-// Queue is non-empty, tapping opens the TV audio page at the queue head
-// (audio.html?playQueue). TASK-504: the count comes from the unified engine's
-// own GET /api/queue/music (queueCount), the same snapshot the film pill reads
-// for its own media type. Stub it after installApi so it wins.
-async function routeMusicQueue(page, queued) {
-  await page.route(/\/api\/queue\/music\?/, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', media_type: 'music', queue: queued, next: [], coming_up: [] }) }));
+  await page.locator('#btn-queue-menu').click();
 }
 
-test('music queue button is hidden when the music queue is empty', async ({ page }) => {
+// Story 3 — the cluster does not shift. Nothing queued and no source anywhere
+// still shows four buttons, disabled-but-visible (the FEAT-497 transport rule),
+// where the old pills vanished entirely.
+test('all four Continue buttons are visible with nothing to continue, and do nothing', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
-  await routeMusicQueue(page, []);
+  await routeAllEmpty(page);
   await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
-  await expect(page.locator('.sidebar-tab[data-tab="films"]')).toBeVisible();   // settled
-  await expect(page.locator('#btn-play-queue-music')).toBeHidden();
+  await openPlayMenu(page);
+  await expect(page.locator('#queue-menu .continue-btn')).toHaveCount(4);
+  for (const id of ['btn-continue-film', 'btn-continue-home-movie', 'btn-continue-music', 'btn-continue-music-video']) {
+    await expect(page.locator('#' + id)).toBeVisible();
+    await expect(page.locator('#' + id)).toBeDisabled();
+    await expect(page.locator('#' + id)).toHaveClass(/is-disabled/);
+  }
+  await expect(page.locator('#btn-continue-film')).toHaveText('▶ Continue Films');
 });
 
-test('music queue button 🎵 (N) shows the count and opens the audio player at the queue head', async ({ page }) => {
+// Story 1 — a type with things queued: its button wakes, and pressing it opens
+// that type's player on the continue entry.
+test('Continue Films is live with a film queued, and opens the video player on the film continue entry', async ({ page }) => {
   await installApi(page);
-  await installVideoPlaybackBackend(page);
-  await routeMusicQueue(page, [{ entry_id: 'e1', item_id: 'a' }, { entry_id: 'e2', item_id: 'b' }]);
-  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
-  await expect(page.locator('#btn-play-queue-music')).toHaveText('🎵 (2)');
-  await page.locator('#btn-play-queue-music').click();
-  await expect(page).toHaveURL(/audio\.html\?.*playQueue=1/);
-});
-
-test('the two queue buttons show independently — video queued, music empty', async ({ page }) => {
-  await installApi(page);
+  await routeAllEmpty(page);
   const backend = await installQueuePlaybackBackend(page, 'film');
   backend.seed('queue-item', { item_id: 'finding-nemo-main' });
-  await routeMusicQueue(page, []);
   await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
-  await expect(page.locator('#btn-play-queue')).toHaveText('🎬 (1)');
-  await expect(page.locator('#btn-play-queue-music')).toBeHidden();
+  await openPlayMenu(page);
+  await expect(page.locator('#btn-continue-film')).toBeEnabled();
+  await page.locator('#btn-continue-film').click();
+  await expect(page).toHaveURL(/video\.html\?.*continueType=film/);
+});
+
+test('Continue Music is live with a track queued, and opens the audio player on its continue entry', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await routeAllEmpty(page);
+  await routeQueued(page, 'music', [{ entry_id: 'e1', item_id: 'a' }, { entry_id: 'e2', item_id: 'b' }]);
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await openPlayMenu(page);
+  await expect(page.locator('#btn-continue-music')).toBeEnabled();
+  await page.locator('#btn-continue-music').click();
+  await expect(page).toHaveURL(/audio\.html\?.*continueType=music/);
+});
+
+// Story 2 — nothing queued, but a source mid-play: Continue still carries on,
+// which is what the old pills could not do (they counted the queue alone).
+test('Continue is live on an empty queue when the source has more ahead', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await routeAllEmpty(page);
+  await routeQueued(page, 'home-movie', []);
+  await page.route(/\/api\/queue\/home-movie\?/, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ person_id: 'kids', media_type: 'home-movie', queue: [], next: [{ entry_id: 'e9', item_id: 'hm-02' }], coming_up: [], source_type: 'home-movies-all' }) }));
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await openPlayMenu(page);
+  await expect(page.locator('#btn-continue-home-movie')).toBeEnabled();
+  await page.locator('#btn-continue-home-movie').click();
+  await expect(page).toHaveURL(/video\.html\?.*continueType=home-movie/);
+});
+
+// The buttons are independent — one type's queue never wakes another's.
+test('a queued film wakes only Continue Films', async ({ page }) => {
+  await installApi(page);
+  await routeAllEmpty(page);
+  const backend = await installQueuePlaybackBackend(page, 'film');
+  backend.seed('queue-item', { item_id: 'finding-nemo-main' });
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await openPlayMenu(page);
+  await expect(page.locator('#btn-continue-film')).toBeEnabled();
+  await expect(page.locator('#btn-continue-music')).toBeDisabled();
+  await expect(page.locator('#btn-continue-home-movie')).toBeDisabled();
+  await expect(page.locator('#btn-continue-music-video')).toBeDisabled();
+});
+
+// TASK-517's live-refresh behaviour, now across all four: queueing the first
+// thing of a type wakes its button without a reload.
+test('queueing a film from browse wakes Continue Films straight away', async ({ page }) => {
+  await installApi(page);
+  await routeAllEmpty(page);
+  await installQueuePlaybackBackend(page, 'film');
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await openPlayMenu(page);
+  await expect(page.locator('#btn-continue-film')).toBeDisabled();
+  await page.locator('#btn-queue-menu').click();                                 // close, so tiles are reachable
+  await openFilms(page);
+  await page.locator('.film-tile[data-id="finding-nemo-main"] .tile-queue').click();
+  await expect(page.locator('#btn-continue-film')).toBeEnabled();
+});
+
+// The play menu is a popout off its own icon, like the companion's: closed
+// until pressed, and closing again on a second press.
+test('the play menu opens and closes on its own ▶ icon', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await routeAllEmpty(page);
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await expect(page.locator('.sidebar-tab[data-tab="films"]')).toBeVisible();   // settled
+  await expect(page.locator('#btn-continue-film')).toBeHidden();
+  await page.locator('#btn-queue-menu').click();
+  await expect(page.locator('#btn-continue-film')).toBeVisible();
+  await page.locator('#btn-queue-menu').click();
+  await expect(page.locator('#btn-continue-film')).toBeHidden();
 });
 
 // TASK-421: a music video gets its own ＋ Queue badge, wired to the SEPARATE
@@ -175,10 +234,13 @@ test('a music-video tile carries a ＋ Queue badge that appends to the music-vid
 });
 
 // TASK-445 — the Play All control: hidden on a tab with no whole-catalog
-// source, shown on Music Videos, navigates to the mvAll entry.
+// source, shown on Music Videos, navigates to the mvAll entry. TASK-501 — it
+// now sits inside the TV's own play menu, so the menu opens first (the
+// companion's Play All has always lived in one).
 test('Play All is hidden on Films, shown on Music Videos, and navigates to the whole-catalog entry', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
+  await routeAllEmpty(page);
   await page.route('**/api/browse**', function(route) {
     return route.fulfill({
       status: 200, contentType: 'application/json',
@@ -186,8 +248,11 @@ test('Play All is hidden on Films, shown on Music Videos, and navigates to the w
     });
   });
   await openFilms(page);
+  await page.locator('#btn-queue-menu').click();
   await expect(page.locator('#btn-play-all')).toBeHidden();
+  await page.locator('#btn-queue-menu').click();
   await page.locator('.sidebar-tab[data-tab="music-videos"]').click();
+  await page.locator('#btn-queue-menu').click();
   await expect(page.locator('#btn-play-all')).toBeVisible();
   await page.locator('#btn-play-all').click();
   await expect(page).toHaveURL(/video\.html\?.*musicVideoAll=1/);
@@ -201,9 +266,13 @@ test('Play All is hidden on Films, shown on Music Videos, and navigates to the w
 test('Play All header button stays hidden on Home Movies (TASK-486 replaces it with the rail)', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
+  await routeAllEmpty(page);
   await openFilms(page);
+  await page.locator('#btn-queue-menu').click();
   await expect(page.locator('#btn-play-all')).toBeHidden();
+  await page.locator('#btn-queue-menu').click();
   await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
+  await page.locator('#btn-queue-menu').click();
   await expect(page.locator('#btn-play-all')).toBeHidden();
 });
 

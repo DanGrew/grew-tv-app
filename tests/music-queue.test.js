@@ -80,3 +80,30 @@ test('audio.html?playQueue starts the music queue head (play-queue, no track ope
   // old engine's own queue-track put the most recent press at the front.
   await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
 });
+
+// TASK-501 story 1 — Continue Music from browse. Entering with ?continueType
+// fires the engine's own advance (`next`), which pops the queue's front and
+// plays it. The audio twin of the video page's continue entries.
+test('audio.html?continueType=music advances the music engine and plays the queued track', async ({ page }) => {
+  await openAlbum(page);
+  await queueTrack(page, 'ootb-02');
+  const posted = page.waitForRequest(req =>
+    req.url().includes('/api/queue/music/next') && req.method() === 'POST');
+  await page.goto('/app/homeview/audio.html?continueType=music&from=browse');
+  const req = await posted;
+  expect(req.url()).toContain('person=kids');
+  await expect(page.locator('#screen-audio')).toBeVisible();
+  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
+});
+
+// TASK-501 story 2 — nothing queued, but a source mid-play: Continue carries on
+// with the SOURCE, one track further. Nothing here reproduces that fallback —
+// the same `next` action leaves the engine to choose.
+test('audio.html?continueType=music advances the source when the queue is empty', async ({ page }) => {
+  await openAlbum(page);
+  await page.locator('.detail-row[data-id="ootb-01"]').click();
+  await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
+  await page.goto('/app/homeview/audio.html?continueType=music&from=browse');
+  await expect(page.locator('#screen-audio')).toBeVisible();
+  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
+});

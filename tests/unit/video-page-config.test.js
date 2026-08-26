@@ -147,11 +147,13 @@ describe('the source-title lookup', () => {
 });
 
 describe('the entry-mode tables', () => {
-  var MODES = ['queue', 'mvPlaylist', 'mvArtist', 'mvItem', 'mvAll', 'homeMoviesAll', 'homeMoviesPerson', 'homeMoviesMonth', 'series', 'single'];
+  // TASK-501 added the three Continue answers, one per video media type.
+  var MODES = ['queue', 'mvPlaylist', 'mvArtist', 'mvItem', 'mvAll', 'homeMoviesAll', 'homeMoviesPerson', 'homeMoviesMonth', 'series', 'single',
+               'continueFilm', 'continueHomeMovie', 'continueMusicVideo'];
 
   // The same totality argument TASK-525 used to prove the fourth rail dead:
-  // entryMode is total over these ten answers, and every one maps to a rail
-  // that exists — so no load can resolve to a rail this page cannot drive.
+  // entryMode is total over these thirteen answers, and every one maps to a
+  // rail that exists — so no load can resolve to a rail this page cannot drive.
   it('maps every entryMode answer onto a rail that exists', () => {
     expect(Object.keys(MODE_ENGINE).sort()).toEqual(MODES.slice().sort());
     MODES.forEach(function(mode) {
@@ -172,12 +174,23 @@ describe('the entry-mode tables', () => {
     expect(MODE_ENGINE.queue).toBe('film');
   });
 
+  // TASK-501 — a Continue press advances the engine of the type whose button
+  // was pressed, so each continue mode sits on that type's OWN rail. Films and
+  // home movies both play through video.html, and getting these two crossed is
+  // exactly how a Continue Home Movies press would advance the film queue.
+  it('puts each Continue answer on its own type\'s rail', () => {
+    expect(MODE_ENGINE.continueFilm).toBe('film');
+    expect(MODE_ENGINE.continueHomeMovie).toBe('hm');
+    expect(MODE_ENGINE.continueMusicVideo).toBe('mv');
+  });
+
   // entryMode() itself must not answer something MODE_ENGINE has no row for.
   it('covers what entryMode actually returns for every param shape', () => {
     var SHAPES = [
       { playQueue: true }, { mvPlaylist: 'sat' }, { mvArtist: 'ELO' }, { mvItem: 'mv-1' }, { mvAll: '1' },
       { homeMoviesAll: '1' }, { homeMoviesPerson: 'millie' }, { homeMoviesMonth: '2026-01' },
-      { isSeries: true }, {}
+      { isSeries: true }, {},
+      { continueType: 'film' }, { continueType: 'home-movie' }, { continueType: 'music-video' }
     ];
     SHAPES.forEach(function(shape) {
       expect(MODE_ENGINE[entryMode(shape)]).toBeTruthy();

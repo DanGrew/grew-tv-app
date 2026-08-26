@@ -97,7 +97,10 @@ export function initVideoPage() {
   var profile  = [getProfile()].filter(Boolean).concat(['kids'])[0];
   var person   = getPerson();
   var isSeries = !!seriesId;
-  var mode = entryMode({ playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson, homeMoviesMonth: homeMoviesMonth, isSeries: isSeries });
+  // TASK-501 — `continueType` names the media type browse's Continue button was
+  // pressed for, and resolves to that type's own continue mode, so the rail is
+  // picked here exactly as every other entry picks it.
+  var mode = entryMode({ continueType: getParam('continueType'), playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson, homeMoviesMonth: homeMoviesMonth, isSeries: isSeries });
   // Which rail this page load drives — resolved once off `mode` (mutually
   // exclusive per page load, never a live switch), and `config` is everything
   // that rail does differently from the other two. Between them they key every
@@ -647,7 +650,29 @@ export function initVideoPage() {
   function startMvItem() {
     startStandalone(mvItem);
   }
+  // TASK-501 — Continue, from browse's play menu. The entry fires the engine's
+  // own advance (`next`) and renders from the snapshot like every other route:
+  // the queue's front if anything is queued, else the next item of the source
+  // this person was last playing. That fallback is the ENGINE's, never
+  // reproduced here — the same rule transportState's ⏭ already lights from, and
+  // what browse's own button reads to decide whether it is live at all.
+  //
+  // ONE entry for all three video types, because TASK-524 already made every
+  // per-rail difference a config field: which engine it advances is
+  // config.mediaType, and the ＋Playlist reveal a music video needs is
+  // config.addsToPlaylist inside beginPlayback.
+  //
+  // No source POST (the engine keeps the one it has — carrying on with it is
+  // the point) and no item pick, so BUG-521's pending-id guard has nothing to
+  // name, exactly like startQueue.
+  function startContinue() {
+    mountCrumbs();
+    beginPlayback(null, 'next', {}).catch(noop);
+  }
   var ENTRY = {
+    continueFilm: startContinue,
+    continueHomeMovie: startContinue,
+    continueMusicVideo: startContinue,
     queue: startQueue,
     mvPlaylist: startMvPlaylist,
     mvArtist: startMvArtist,

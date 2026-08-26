@@ -372,11 +372,18 @@ export function initAudioPage() {
   // and render from the broadcast snapshot like the others, so the TV starts the
   // music queue without opening a track first (the audio twin of the video page's
   // startQueue). No jumpToTrack (no trackId), no source title.
+  // TASK-501 (Continue Music, from browse's play menu): entered with
+  // ?continueType=music — fire the engine's own advance (`next`) and render
+  // from the broadcast snapshot like the others. Queued track first, else the
+  // next track of the album/playlist/artist this person was last playing; the
+  // fallback is the ENGINE's, not browse's, which is why this is one action and
+  // no source of its own. The audio twin of the video page's continueEntry.
   var SOURCE_BASE = {
     album:    function() { return sendAction('play-source', { source_type: 'album', source_id: albumId }); },
     artist:   function() { return sendAction('play-source', { source_type: 'artist', source_id: artistId }); },
     playlist: function() { return sendAction('play-source', { source_type: 'playlist', source_id: playlistId }); },
     queue:    function() { return sendAction('play-queue', {}); },
+    continue: function() { return sendAction('next', {}); },
     track:    function() {}
   };
   // With a source, the tapped track is a play-item INSIDE it — the source stays
@@ -401,7 +408,7 @@ export function initAudioPage() {
     Promise.resolve(SOURCE_BASE[kind]()).then(jumpToTrack).then(resyncOnActivate);
   }
   function sourceKind() {
-    return [['queue'].filter(function() { return !!getParam('playQueue'); })[0], ['album'].filter(function() { return !!albumId; })[0], ['artist'].filter(function() { return !!artistId; })[0], ['playlist'].filter(function() { return !!playlistId; })[0]]
+    return [['continue'].filter(function() { return !!getParam('continueType'); })[0], ['queue'].filter(function() { return !!getParam('playQueue'); })[0], ['album'].filter(function() { return !!albumId; })[0], ['artist'].filter(function() { return !!artistId; })[0], ['playlist'].filter(function() { return !!playlistId; })[0]]
       .filter(Boolean).concat(['track'])[0];
   }
   var kind = sourceKind();
@@ -431,6 +438,10 @@ export function initAudioPage() {
     artist:   function() { return Promise.resolve(artistId); },
     playlist: function() { return loadPlaylist(SERVER, playlistId).then(function(p) { return p.title; }); },
     queue:    function() { return Promise.resolve('Play Queue'); },
+    // TASK-501 — Continue names no source of its own: which album/playlist the
+    // engine carries on with only becomes known when the snapshot lands, and
+    // setNowTitle upgrades the leaf to the track then (BUG-044's own path).
+    continue: function() { return Promise.resolve('Music'); },
     track:    function() { return loadVideo(SERVER, trackId).then(function(v) { return v.title; }); }
   };
 
