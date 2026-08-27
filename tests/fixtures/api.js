@@ -2,13 +2,17 @@
 // /api/browse, /api/video/{id}, /api/series/{id}, /api/next/{s}/{v} and streams
 // content from /media/{name}; these routes stand in for the media-manager.
 
+// Every record carries its `itemType`, as media-manager's get_video returns one
+// on every video (content_store.py) — it is what a ＋ press reads to name the
+// Queue it fills (BUG-531), so a record without one tests a shape the backend
+// never sends. The older `format` field is a separate, legacy thing.
 const VIDEOS = {
-  'toy-story-main':   { id: 'toy-story-main',   title: 'Toy Story',        profile: 'kids',   duration: 4860, poster: 'toy-story.jpg', subtitles: 'toy-story-main.vtt', type: 'animation', format: 'film',      tags: { year: '1995' }, available: true },
-  'finding-nemo-main':{ id: 'finding-nemo-main',title: 'Finding Nemo',     profile: 'kids',   duration: 6000, poster: 'nemo.jpg',      subtitles: null,                type: 'animation', format: 'film',      tags: null, available: true },
-  'dark-knight-main': { id: 'dark-knight-main', title: 'The Dark Knight',  profile: 'adults', duration: 9120, poster: 'dk.jpg',        subtitles: null,                type: 'action',    format: 'film',      tags: null, available: true },
-  'bluey-s1e01':      { id: 'bluey-s1e01',      title: 'Daddy Putdown',    profile: 'kids',   duration: 420,  poster: 'bluey.jpg',     subtitles: 'bluey-s1e01.vtt',   type: 'animation', format: 'tv-series', tags: null, available: true },
-  'bluey-s1e02':      { id: 'bluey-s1e02',      title: 'The Weekend',      profile: 'kids',   duration: 430,  poster: 'bluey.jpg',     subtitles: null,                type: 'animation', format: 'tv-series', tags: null, available: true },
-  'bluey-s1e03':      { id: 'bluey-s1e03',      title: 'Hammerbarn',       profile: 'kids',   duration: 440,  poster: 'bluey.jpg',     subtitles: null,                type: 'animation', format: 'tv-series', tags: null, available: true },
+  'toy-story-main':   { id: 'toy-story-main',   title: 'Toy Story',        profile: 'kids',   duration: 4860, poster: 'toy-story.jpg', subtitles: 'toy-story-main.vtt', type: 'animation', format: 'film',      itemType: 'film',    tags: { year: '1995' }, available: true },
+  'finding-nemo-main':{ id: 'finding-nemo-main',title: 'Finding Nemo',     profile: 'kids',   duration: 6000, poster: 'nemo.jpg',      subtitles: null,                type: 'animation', format: 'film',      itemType: 'film',    tags: null, available: true },
+  'dark-knight-main': { id: 'dark-knight-main', title: 'The Dark Knight',  profile: 'adults', duration: 9120, poster: 'dk.jpg',        subtitles: null,                type: 'action',    format: 'film',      itemType: 'film',    tags: null, available: true },
+  'bluey-s1e01':      { id: 'bluey-s1e01',      title: 'Daddy Putdown',    profile: 'kids',   duration: 420,  poster: 'bluey.jpg',     subtitles: 'bluey-s1e01.vtt',   type: 'animation', format: 'tv-series', itemType: 'episode', tags: null, available: true },
+  'bluey-s1e02':      { id: 'bluey-s1e02',      title: 'The Weekend',      profile: 'kids',   duration: 430,  poster: 'bluey.jpg',     subtitles: null,                type: 'animation', format: 'tv-series', itemType: 'episode', tags: null, available: true },
+  'bluey-s1e03':      { id: 'bluey-s1e03',      title: 'Hammerbarn',       profile: 'kids',   duration: 440,  poster: 'bluey.jpg',     subtitles: null,                type: 'animation', format: 'tv-series', itemType: 'episode', tags: null, available: true },
   // TASK-446: the home-movies-all Play All source's fixture cards — two, so
   // series-mode transport (prev/next) is live and an explicit `next` at the
   // last item can be exercised (queue-isolation e2e coverage).
@@ -19,19 +23,19 @@ const VIDEOS = {
   'beach-day':        { id: 'beach-day',        title: 'Beach Day',        profile: 'kids',   duration: 45,   poster: 'beach.jpg',     subtitles: 'beach-day.vtt',      type: 'home',       format: 'home-movie', itemType: 'home-movie', tags: { date: '2026-01-07' }, available: true },
   // FEAT-018 audio: album tracks + a standalone single. mediaType audio + ext m4a
   // drive {id}.m4a + the <audio> player; artist drives the now-playing line.
-  'ootb-01':          { id: 'ootb-01',          title: 'Turn to Stone',    profile: 'kids',   duration: 227,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
-  'ootb-02':          { id: 'ootb-02',          title: 'Mr. Blue Sky',     profile: 'kids',   duration: 245,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  lyrics: 'ootb-02.lrc', available: true },
-  'ootb-03':          { id: 'ootb-03',          title: 'Sweet Talkin Woman',profile: 'kids',  duration: 228,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
+  'ootb-01':          { id: 'ootb-01',          title: 'Turn to Stone',    profile: 'kids',   duration: 227,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  itemType: 'track', available: true },
+  'ootb-02':          { id: 'ootb-02',          title: 'Mr. Blue Sky',     profile: 'kids',   duration: 245,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  itemType: 'track', lyrics: 'ootb-02.lrc', available: true },
+  'ootb-03':          { id: 'ootb-03',          title: 'Sweet Talkin Woman',profile: 'kids',  duration: 228,  poster: 'ootb.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  itemType: 'track', available: true },
   // TASK-322: ELO's SECOND album (Time, 1981) — a resolvable /api/album so the
   // artist page's grouped song list has two albums to group under headers.
-  'elo-time-01':      { id: 'elo-time-01',      title: 'Twilight',         profile: 'kids',   duration: 226,  poster: 'time.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
-  'elo-time-02':      { id: 'elo-time-02',      title: 'Ticket to the Moon',profile: 'kids',  duration: 246,  poster: 'time.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  available: true },
-  'dancing-queen':    { id: 'dancing-queen',    title: 'Dancing Queen',    profile: 'kids',   duration: 230,  poster: 'dq.jpg',        subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ABBA', available: true },
+  'elo-time-01':      { id: 'elo-time-01',      title: 'Twilight',         profile: 'kids',   duration: 226,  poster: 'time.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  itemType: 'track', available: true },
+  'elo-time-02':      { id: 'elo-time-02',      title: 'Ticket to the Moon',profile: 'kids',  duration: 246,  poster: 'time.jpg',      subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ELO',  itemType: 'track', available: true },
+  'dancing-queen':    { id: 'dancing-queen',    title: 'Dancing Queen',    profile: 'kids',   duration: 230,  poster: 'dq.jpg',        subtitles: null, mediaType: 'audio', ext: 'm4a', artist: 'ABBA', itemType: 'track', available: true },
   // TASK-123: a multi-season series for the season-selector tests. Not on any
   // browse rail (opened by direct nav) so it can't disturb the rail-count suites.
-  'ib-s1e1':          { id: 'ib-s1e1',          title: 'First Day',        profile: 'kids',   duration: 1500, poster: 'ib-s1e1.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true },
-  'ib-s1e2':          { id: 'ib-s1e2',          title: 'Bunk Off',         profile: 'kids',   duration: 1500, poster: 'ib-s1e2.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true },
-  'ib-s2e1':          { id: 'ib-s2e1',          title: 'The Field Trip',   profile: 'kids',   duration: 1500, poster: 'ib-s2e1.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', tags: null, available: true },
+  'ib-s1e1':          { id: 'ib-s1e1',          title: 'First Day',        profile: 'kids',   duration: 1500, poster: 'ib-s1e1.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', itemType: 'episode', tags: null, available: true },
+  'ib-s1e2':          { id: 'ib-s1e2',          title: 'Bunk Off',         profile: 'kids',   duration: 1500, poster: 'ib-s1e2.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', itemType: 'episode', tags: null, available: true },
+  'ib-s2e1':          { id: 'ib-s2e1',          title: 'The Field Trip',   profile: 'kids',   duration: 1500, poster: 'ib-s2e1.jpg',   subtitles: null, type: 'comedy', format: 'tv-series', itemType: 'episode', tags: null, available: true },
   // TASK-373/374: music videos. itemType 'music-video' (media video, resumable
   // false) — a playlist-detail row reads it to pick its play target
   // (TASK-376/377, core/music-video-playthrough.js playlistTrackTarget).
@@ -203,21 +207,25 @@ const BROWSE = {
   kids: {
     profile: 'kids',
     genreLabels: { animation: 'Animation', comedy: 'Comedy' },
+    // Every `kind: 'video'` card carries its own itemType, as get_browse_list
+    // stamps one on every standalone card (content_store.py) — it is what a ＋
+    // press reads to name the Queue it fills (BUG-531), so a card without one
+    // here would test a shape the backend never sends.
     content: [
-      { kind: 'video',  id: 'toy-story-main',    title: 'Toy Story',    poster: 'toy-story.jpg', duration: 4860, type: 'animation', section: 'films',       genres: ['animation', 'comedy'], people: null },
-      { kind: 'video',  id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg',      duration: 6000, type: 'animation', section: 'films',       genres: null,                    people: null },
+      { kind: 'video',  id: 'toy-story-main',    title: 'Toy Story',    poster: 'toy-story.jpg', duration: 4860, type: 'animation', section: 'films',       itemType: 'film',       genres: ['animation', 'comedy'], people: null },
+      { kind: 'video',  id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg',      duration: 6000, type: 'animation', section: 'films',       itemType: 'film',       genres: null,                    people: null },
       { kind: 'series', id: 'bluey',             title: 'Bluey',        poster: 'bluey.jpg',                     type: 'animation', section: 'series',      genres: ['animation'],           people: null },
       // TASK-491: tags.date mirrors the VIDEOS entries above (millie-walk/beach-day)
       // so the month rail (core/home-rails.js monthOf) can group these into 'Jan 2026'.
-      { kind: 'video',  id: 'millie-walk',       title: 'Millie Walk',  poster: 'millie.jpg',    duration: 30,   type: 'home',      section: 'home-movies', genres: null,                    people: ['millie'], tags: { date: '2026-01-06' } },
-      { kind: 'video',  id: 'beach-day',         title: 'Beach Day',    poster: 'beach.jpg',     duration: 45,   type: 'home',      section: 'home-movies', genres: null,                    people: ['millie'], tags: { date: '2026-01-07' } }
+      { kind: 'video',  id: 'millie-walk',       title: 'Millie Walk',  poster: 'millie.jpg',    duration: 30,   type: 'home',      section: 'home-movies', itemType: 'home-movie', genres: null,                    people: ['millie'], tags: { date: '2026-01-06' } },
+      { kind: 'video',  id: 'beach-day',         title: 'Beach Day',    poster: 'beach.jpg',     duration: 45,   type: 'home',      section: 'home-movies', itemType: 'home-movie', genres: null,                    people: ['millie'], tags: { date: '2026-01-07' } }
     ]
   },
   adults: {
     profile: 'adults',
     genreLabels: {},
     content: [
-      { kind: 'video', id: 'dark-knight-main', title: 'The Dark Knight', poster: 'dk.jpg', duration: 9120, type: 'action', section: 'films', genres: ['action'], people: null }
+      { kind: 'video', id: 'dark-knight-main', title: 'The Dark Knight', poster: 'dk.jpg', duration: 9120, type: 'action', section: 'films', itemType: 'film', genres: ['action'], people: null }
     ]
   }
 };

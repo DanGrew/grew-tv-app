@@ -233,6 +233,48 @@ test('a music-video tile carries a ＋ Queue badge that appends to the music-vid
   expect(filmQueued).toBe(false);
 });
 
+// BUG-531 — the ITEM decides which Queue a ＋ press fills, never the screen it
+// was pressed on. This card is a music video shelved on the Films rail: the
+// press must reach the music-video Queue and leave the film one alone. The old
+// producer read the card's browse SECTION (and fell back to 'films' for a card
+// with none at all), so it filed this under Films.
+test('a ＋ press goes by the item\'s own type, not the rail it is sitting on', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  var filmQueued = false;
+  await page.route('**/api/queue/film/queue-item*', function(route) { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
+  await page.route('**/api/queue/music-video/queue-item*', function(route) { return route.fulfill({ status: 204, body: '' }); });
+  await page.route('**/api/browse**', function(route) {
+    var stray = { kind: 'video', id: 'mv-99', title: 'Stray Video', poster: 'mv-01.jpg', duration: 200, section: 'films', itemType: 'music-video', artist: 'QOTSA' };
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat([stray]) })
+    });
+  });
+  await openFilms(page);
+  const queued = page.waitForRequest(req =>
+    req.url().includes('/api/queue/music-video/queue-item') && req.method() === 'POST');
+  await page.locator('.film-tile[data-id="mv-99"] .tile-queue').click();
+  const req = await queued;
+  expect(JSON.parse(req.postData())).toEqual({ item_id: 'mv-99' });
+  await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
+  expect(filmQueued).toBe(false);
+});
+
+// BUG-531 story 3 — a press the server refuses says so. It used to swallow the
+// failure, so a refused press looked exactly like one that worked.
+test('a refused ＋ press tells you it failed instead of looking queued', async ({ page }) => {
+  await installApi(page);
+  await installVideoPlaybackBackend(page);
+  await page.route('**/api/queue/film/queue-item**', route => route.fulfill({
+    status: 400, contentType: 'application/json',
+    body: JSON.stringify({ error: 'item finding-nemo-main is a film (media_type film), not valid for media_type music-video' })
+  }));
+  await openFilms(page);
+  await page.locator('.film-tile[data-id="finding-nemo-main"] .tile-queue').click();
+  await expect(page.locator('#queue-status')).toHaveText('Could not queue.');
+});
+
 // TASK-445 — the Play All control: hidden on a tab with no whole-catalog
 // source, shown on Music Videos, navigates to the mvAll entry. TASK-501 — it
 // now sits inside the TV's own play menu, so the menu opens first (the

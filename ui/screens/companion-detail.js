@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist } from '../../core/app-api.js';
-import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, rowMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
@@ -151,9 +151,12 @@ export function initPage() {
   // TASK-253: the sheet's top action (no standalone per-row button) — closes
   // the sheet first, then POSTs. TASK-504: through queueAdd, THE ＋Queue
   // producer, so music appends to the end of the unified queue.
+  // BUG-531 — the ROW decides, not this screen: an album's track is music, and
+  // a music-video row listed here is a music video, whichever list it sits in.
   function queueTrack(item) {
-    queueAdd(server, 'music', state.person, item.video.id)
-      .then(function() { showStatus(queueAddStatus('music')); })
+    var mediaType = itemMediaType(item.video.itemType);
+    queueAdd(server, mediaType, state.person, item.video.id)
+      .then(function() { showStatus(queueAddStatus(mediaType)); })
       .catch(function() { showStatus('Could not queue track.'); });
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
@@ -166,9 +169,13 @@ export function initPage() {
   // source swaps. TASK-504 routes it through queueAdd for its wording too: it
   // had kept TASK-503's "Queued to Play Next" while actually appending, which
   // would now read differently from the music ＋ on this same screen.
+  // BUG-531 — the episode's own itemType names the Queue. It resolves to the
+  // film Queue today for both a TV episode and a boxset film; FEAT-541 splits
+  // TV series out, and this producer follows the map without changing.
   function queueVideo(item) {
-    queueAdd(server, 'film', state.person, item.video.id)
-      .then(function() { showStatus(queueAddStatus('film')); })
+    var mediaType = itemMediaType(item.video.itemType);
+    queueAdd(server, mediaType, state.person, item.video.id)
+      .then(function() { showStatus(queueAddStatus(mediaType)); })
       .catch(function() { showStatus('Could not queue.'); });
   }
   function videoQueueBtn(item) {

@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadBrowse, loadAlbum, mediaUrl, addToPlaylist } from '../../core/app-api.js';
-import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { albumsByArtist, artistFromId } from '../../core/home-rails.js';
 import { artistTracks } from '../../core/artist-tracks.js';
@@ -123,10 +123,12 @@ export function initPage() {
     loadAndShowSheet();
   }
   // TASK-504 — through queueAdd, THE ＋Queue producer: appends to the end of the
-  // unified queue, same as every other ＋ on either surface.
+  // unified queue, same as every other ＋ on either surface. BUG-531 — the
+  // ROW's own itemType names the Queue, not this screen being the artist page.
   function queueTrack(item) {
-    queueAdd(server, 'music', state.person, item.video.id)
-      .then(function() { showStatus(queueAddStatus('music')); })
+    var mediaType = itemMediaType(item.video.itemType);
+    queueAdd(server, mediaType, state.person, item.video.id)
+      .then(function() { showStatus(queueAddStatus(mediaType)); })
       .catch(function() { showStatus('Could not queue track.'); });
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }

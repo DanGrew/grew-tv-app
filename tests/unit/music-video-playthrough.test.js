@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { entryMode, playlistTrackTarget, playlistQueueKey } from '../../core/music-video-playthrough.js';
+import { entryMode, playlistTrackTarget } from '../../core/music-video-playthrough.js';
 
 describe('entryMode', () => {
   // TASK-501 — browse's Continue press. Each of the three types video.html
@@ -81,17 +81,5 @@ describe('playlistTrackTarget', () => {
   it('passes a track item straight through to the given audio target unchanged', () => {
     var item = { video: { id: 'trk-1', itemType: 'track' } };
     expect(playlistTrackTarget(item, 'pl-1', audioTarget)).toBe(audioTarget);
-  });
-});
-
-describe('playlistQueueKey (TASK-421)', () => {
-  it('is "music-video" for a music-video item — routes Play Next to its OWN engine', () => {
-    expect(playlistQueueKey('music-video')).toBe('music-video');
-  });
-  it('is "track" for a plain audio track (itemType absent) — routes to the audio engine', () => {
-    expect(playlistQueueKey(undefined)).toBe('track');
-  });
-  it('is "track" for an explicitly empty itemType, same as absent', () => {
-    expect(playlistQueueKey('')).toBe('track');
   });
 });

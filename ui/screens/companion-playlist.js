@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
-import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { fetchHttpsOrigin } from '../../core/server-config.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
@@ -8,7 +8,6 @@ import { buildCrumbs, trailCrumbs } from '../../core/breadcrumb.js';
 import { peek as peekTrail, trimOnCrumb } from '../../core/nav-trail.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { rowActions, popoverTop } from '../../core/playlist-row-menu.js';
-import { playlistQueueKey } from '../../core/music-video-playthrough.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
@@ -171,9 +170,12 @@ export function initPage() {
   // threaded through trackCards) queues on its OWN engine, never the audio
   // one's list (story 3). TASK-504 collapses that dispatch into queueAdd, THE
   // ＋Queue producer — the TV mirror of this screen does the same.
-  var QUEUE_MEDIA_TYPE = { 'music-video': 'music-video', track: 'music' };
+  // BUG-531 drops this screen's own two-entry table for the shared item-type
+  // map every ＋ producer now reads: one place decides which Queue an item
+  // belongs to, and a row whose type resolves to none fails visibly instead of
+  // defaulting to music.
   function queueTrack(card) {
-    var mediaType = QUEUE_MEDIA_TYPE[playlistQueueKey(card.itemType)];
+    var mediaType = itemMediaType(card.itemType);
     queueAdd(server, mediaType, state.person, card.id)
       .then(function() { showStatus(queueAddStatus(mediaType)); })
       .catch(function() { showStatus('Could not queue track.'); });

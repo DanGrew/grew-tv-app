@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadAlbum, loadPlaylist, queuePlaybackAction } from '../../core/app-api.js';
-import { MUSIC, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { MUSIC, itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { screenPage, displayTitle, queryString } from '../../core/companion-utils.js';
 import { fmt } from '../../core/time.js';
 import { percent } from '../../core/progress.js';
@@ -190,7 +190,16 @@ export function initPage() {
   // the end of the Queue like every other type instead of jumping to Play Next,
   // and the toast reads the same wording from the same place. BUG-030: the
   // confirmation chains off the POST so the remote never looks dead.
-  function queueTrack(id) { queueAdd(server, MUSIC.mediaType, state.person, id).then(function() { showStatus(queueAddStatus(MUSIC.mediaType)); }).catch(noop); }
+  // BUG-531 — the media type comes from the ROW's own itemType, not from this
+  // page being the audio page: a music-video row in a playlist is a music
+  // video wherever it is listed. A press that resolves no Queue, or that the
+  // server refuses, now says so instead of failing silently.
+  function queueTrack(video) {
+    var mediaType = itemMediaType(video.itemType);
+    queueAdd(server, mediaType, state.person, video.id)
+      .then(function() { showStatus(queueAddStatus(mediaType)); })
+      .catch(function() { showStatus('Could not queue track.'); });
+  }
 
   // A track row: the play button (tap = play now, keeps the .track-btn contract
   // the highlight + e2e key off) plus a ＋ Queue producer (FEAT-031 mockup).
@@ -217,7 +226,7 @@ export function initPage() {
     b.setAttribute('data-queue', v.id);
     b.setAttribute('aria-label', 'Queue');
     b.textContent = '＋';
-    b.addEventListener('click', function() { queueTrack(v.id); });
+    b.addEventListener('click', function() { queueTrack(v); });
     return b;
   }
 

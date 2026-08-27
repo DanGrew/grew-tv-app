@@ -3,11 +3,11 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, loadConfig, loadTracks, loadEpisodes } from '../../core/app-api.js';
-import { queueAdd, queueAddStatus, SECTION_MEDIA_TYPE } from '../../core/queue-shell-config.js';
+import { queueAdd, queueAddStatus, itemMediaType } from '../../core/queue-shell-config.js';
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
-import { cardRoute, sectionOf, artistTiles } from '../../core/home-rails.js';
+import { cardRoute, artistTiles } from '../../core/home-rails.js';
 import { mountSearch } from './screen-search.js';
 import { mountContinueMenu } from './continue-menu.js';
 import { continueTarget } from '../../core/browse-continue.js';
@@ -74,10 +74,12 @@ export function initBrowsePage() {
     statusTimer = setTimeout(hideStatus, 2500);
   }
   // ＋Queue producer. TASK-516 drops this screen's own dispatch table for
-  // queue-shell-config.js's single routing map: cardRoute() collapses a film
-  // and a home-movie card to the same 'video' nav route, so the card's SECTION
-  // is what names its media type, and queueAdd() takes it from there. A home
-  // movie now reaches the same TASK-498 unified engine its player reads
+  // queue-shell-config.js's single routing map. BUG-531: the media type comes
+  // from the CARD's own itemType, not its browse section — sectionOf() falls
+  // back to 'films' for a card carrying no section, which quietly filed such a
+  // press under Films. Only a `kind: 'video'` card gets a ＋ at all
+  // (core/tile-model.js), and every one of those carries its itemType. A home
+  // movie reaches the same TASK-498 unified engine its player reads
   // (/api/queue/home-movie) instead of the old video-playback engine, which
   // nothing has read since TASK-499 — a home-movie ＋Queue silently queued to
   // nothing. The confirmation is the config's own wording, so it stays honest
@@ -87,10 +89,10 @@ export function initBrowsePage() {
   // own TASK-517 behaviour, now across all four). Refreshing every type re-reads
   // three snapshots that have not moved, which is cheaper than a branch.
   function onQueue(card) {
-    var mediaType = SECTION_MEDIA_TYPE[sectionOf(card)];
+    var mediaType = itemMediaType(card.itemType);
     queueAdd(SERVER, mediaType, getPerson(), card.id)
       .then(function() { showStatus(queueAddStatus(mediaType)); continueMenu.refresh(); })
-      .catch(function() {});
+      .catch(function() { showStatus('Could not queue.'); });
   }
 
   // BUG-007: the top-right profile control returns to the picker. Activating it
