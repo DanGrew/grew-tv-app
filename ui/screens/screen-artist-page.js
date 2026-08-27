@@ -3,7 +3,7 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, loadAlbum, addToPlaylist } from '../../core/app-api.js';
-import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus, QUEUE_ADD_LABEL } from '../../core/queue-shell-config.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
@@ -90,11 +90,13 @@ export function initArtistPage() {
   }
   function onAddKey(e) { e.stopPropagation(); moveAdd(e); closeKeys(e); }
 
+  // BUG-530 — the sheet's queue option, worded by queue-shell-config so it says
+  // the same thing as the confirmation the press then shows.
   function buildQueueChoice() {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'add-queue';
-    b.textContent = '☰ Play Next';
+    b.textContent = QUEUE_ADD_LABEL;
     b.addEventListener('click', addState.queue);
     b.addEventListener('keydown', onAddKey);
     document.getElementById('add-sheet-list').appendChild(b);
@@ -137,8 +139,8 @@ export function initArtistPage() {
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
 
-  // Per-row: the single ＋ opens the sheet for ONE track — Play Next on top,
-  // playlist cards below (mirrors the album page). Return focus to the track row.
+  // Per-row: the single ＋ opens the sheet for ONE track — the queue option on
+  // top, playlist cards below (mirrors the album page). Return focus to the row.
   function openAddSheet(item) {
     addState.add = function(id) { return addToPlaylist(SERVER, id, item.video.id); };
     addState.queue = function() { queueThenClose(item); };

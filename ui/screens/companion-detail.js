@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadSeries, loadContinueWatching, mediaUrl, loadBrowse, addToPlaylist, addSourceToPlaylist } from '../../core/app-api.js';
-import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus, QUEUE_ADD_LABEL } from '../../core/queue-shell-config.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW, percent, rowMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, progressBarMarkup } from '../../core/detail-view.js';
@@ -95,14 +95,15 @@ export function initPage() {
     b.addEventListener('click', function() { addExisting(card.id, card.title); });
     return b;
   }
-  // TASK-253 — the sheet's top option: "▶ Play Next" (queue the track), above the
-  // playlist cards. Present only for the per-TRACK sheet (openAddSheet sets
-  // addState.queue); the album-level "Add all" sheet leaves it null. NOT `.add-choice`
-  // so the playlist-list assertions stay clean.
+  // TASK-253 — the sheet's top option: queue the track, above the playlist cards.
+  // Present only for the per-TRACK sheet (openAddSheet sets addState.queue); the
+  // album-level "Add all" sheet leaves it null. NOT `.add-choice` so the
+  // playlist-list assertions stay clean. BUG-530: the wording comes from
+  // queue-shell-config, the same place the confirmation does.
   function queueChoiceBtn() {
     var b = document.createElement('button');
     b.className = 'add-queue';
-    b.textContent = '☰ Play Next';
+    b.textContent = QUEUE_ADD_LABEL;
     b.addEventListener('click', addState.queue);
     return b;
   }
@@ -118,8 +119,8 @@ export function initPage() {
       .then(function(res) { showAddSheet(playlistCards([res.content].filter(Boolean).concat([[]])[0])); })
       .catch(function() { showStatus('Could not load playlists.'); });
   }
-  // Per-track: the single ＋ opens the sheet for ONE track — Play Next on top, then
-  // the playlist cards (TASK-207 + TASK-253).
+  // Per-track: the single ＋ opens the sheet for ONE track — the queue option on
+  // top, then the playlist cards (TASK-207 + TASK-253).
   function openAddSheet(item) {
     addState.add = function(id) { return addToPlaylist(server, id, item.video.id); };
     addState.queue = function() { queueThenClose(item); };
@@ -129,7 +130,7 @@ export function initPage() {
   }
   // Album-level "Add all to playlist" (TASK-212): snapshot the WHOLE album as a
   // source. Same sheet, but each pick POSTs add-source instead of add-track, and no
-  // Play Next option (queue null — a per-track action).
+  // queue option (queue null — a per-track action).
   function openAddAllSheet() {
     addState.add = function(id) { return addSourceToPlaylist(server, id, 'album', state.seriesId); };
     addState.queue = null;
@@ -294,7 +295,7 @@ export function initPage() {
 
   // An album track row: the play tile + a single ＋ control beside it (TASK-253,
   // was ＋ Playlist and ＋ Queue side by side — they crowded the track text). The ＋
-  // opens the add sheet whose top option is ▶ Play Next (queue), playlist cards
+  // opens the add sheet whose top option queues the track, playlist cards
   // below. A <button> can't nest, so they are siblings in a row.
   function albumTrackNode(item) {
     var row = document.createElement('div');

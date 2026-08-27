@@ -1,6 +1,7 @@
 import {
   HOME_MOVIE, FILM, MUSIC, MUSIC_VIDEO,
-  QUEUE_SHELL_CONFIG, ITEM_MEDIA_TYPE, itemMediaType, queueAdd, queueAddStatus
+  QUEUE_SHELL_CONFIG, ITEM_MEDIA_TYPE, itemMediaType, queueAdd, queueAddStatus,
+  QUEUE_ADD_LABEL
 } from '../../core/queue-shell-config.js';
 import { transportState } from '../../core/queue-shell-view.js';
 
@@ -167,15 +168,19 @@ describe('the ＋Queue map', () => {
   // BUG-531 — a press whose media type never resolved must FAIL, visibly, in
   // the producer's own .catch(). Throwing synchronously would skip that catch
   // and the person would see nothing at all.
+  // The rejection names the media type that failed to resolve — the one thing a
+  // producer's .catch() has to go on when a press lands nowhere.
   it('fails the press rather than posting when no media type resolved', async () => {
     var calls = fakeFetch();
-    await expect(queueAdd('http://s', undefined, 'millie', 'mystery')).rejects.toBeTruthy();
+    await expect(queueAdd('http://s', undefined, 'millie', 'mystery'))
+      .rejects.toThrow('no queue for media type: undefined');
     expect(calls).toEqual([]);
   });
 
   it('fails the press for a media type the engine does not serve', async () => {
     var calls = fakeFetch();
-    await expect(queueAdd('http://s', 'podcast', 'millie', 'ep-1')).rejects.toBeTruthy();
+    await expect(queueAdd('http://s', 'podcast', 'millie', 'ep-1'))
+      .rejects.toThrow('no queue for media type: podcast');
     expect(calls).toEqual([]);
   });
 
@@ -183,14 +188,30 @@ describe('the ＋Queue map', () => {
   // is a failed press, not a quiet one. fetch resolves on a 400, so without
   // this every producer's .then() fired and toasted "Added to Queue" over an
   // item that was never added.
+  // The refusal names the item AND the status the server answered with — a
+  // cross-type press and a server fault read differently in the console.
   it('fails the press when the server refuses the item', async () => {
     global.fetch = async () => ({ ok: false, status: 400, json: async () => ({ error: 'wrong type' }), text: async () => '' });
-    await expect(queueAdd('http://s', 'music-video', 'millie', 'toy-story-main')).rejects.toBeTruthy();
+    await expect(queueAdd('http://s', 'music-video', 'millie', 'toy-story-main'))
+      .rejects.toThrow('queue refused toy-story-main: 400');
   });
 
   it('lands the press on any 2xx the server answers with', async () => {
     global.fetch = async () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' });
     await expect(queueAdd('http://s', 'film', 'millie', 'toy-story-main')).resolves.toBeTruthy();
+  });
+
+  // BUG-530 — the ＋ sheet's own option offered "☰ Play Next" long after every
+  // type had stopped front-inserting, so the sheet promised one thing and the
+  // toast that followed confirmed another. The option names the append now, in
+  // the same words as the confirmation.
+  it('offers the append, not a jump to the front, on the ＋ sheet', () => {
+    expect(QUEUE_ADD_LABEL).toBe('☰ Add to Queue');
+  });
+
+  it('says the same thing on the option as in the confirmation that follows', () => {
+    expect(QUEUE_ADD_LABEL).toContain('Add to Queue');
+    expect(queueAddStatus('music')).toContain('Added to Queue');
   });
 
   // Every media type is on the unified engine now, so every ＋ press confirms

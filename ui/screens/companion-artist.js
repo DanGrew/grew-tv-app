@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadBrowse, loadAlbum, mediaUrl, addToPlaylist } from '../../core/app-api.js';
-import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus, QUEUE_ADD_LABEL } from '../../core/queue-shell-config.js';
 import { screenPage, queryString } from '../../core/companion-utils.js';
 import { albumsByArtist, artistFromId } from '../../core/home-rails.js';
 import { artistTracks } from '../../core/artist-tracks.js';
@@ -96,10 +96,12 @@ export function initPage() {
     b.addEventListener('click', function() { addExisting(card.id, card.title); });
     return b;
   }
+  // BUG-530 — the sheet's queue option, worded by queue-shell-config so it says
+  // the same thing as the confirmation the press then shows.
   function queueChoiceBtn() {
     var b = document.createElement('button');
     b.className = 'add-queue';
-    b.textContent = '☰ Play Next';
+    b.textContent = QUEUE_ADD_LABEL;
     b.addEventListener('click', addState.queue);
     return b;
   }
@@ -172,8 +174,8 @@ export function initPage() {
     return btn;
   }
   // A song track row: the play tile + a single ＋ control beside it (TASK-440,
-  // mirrors companion-detail's albumTrackNode) — the add sheet's top option is
-  // ▶ Play Next, playlist cards below. A <button> can't nest, so they are siblings.
+  // mirrors companion-detail's albumTrackNode) — the add sheet's top option
+  // queues the track, playlist cards below. A <button> can't nest, so siblings.
   function songTrackNode(item) {
     var row = document.createElement('div');
     row.className = 'detail-track-row';

@@ -278,10 +278,10 @@ CHECK/DETERMINISM/GATE: as C11.
 
 ### C13 · QUEUE VIDEOS  🆕 new
 Full CRUD; queue self-built on cold DB (deterministic, no G-COLD). Series episodes
-queue from detail via ＋ → ☰ Play Next.
+queue from detail via ＋ → ☰ Add to Queue.
 ```
 [build] 01-detail   TV Series → Comedy → Black Books → detail
-        02-add      ep2 ＋ → ☰ Play Next (queue-video); ep3 same → toasts
+        02-add      ep2 ＋ → ☰ Add to Queue (queue-video); ep3 same → toasts
         03-play-source play ep1 → video.html (ep2, ep3 queued)
         04-queue-view open Queue → film-queue.html, ep2 & ep3 listed
 [reorder]05-reorder ↑/↓ on a queued row → order swaps (move-queue-entry)
@@ -294,7 +294,7 @@ DATA: Black Books ep 1/2/3.
 ### C14 · QUEUE MUSIC  🆕 new
 ```
 [build] 01-play      Music → Albums → first album → play track 1 → audio.html
-        02-add       crumb to detail → track 2 ＋ ☰ Play Next; track 3 same → toasts
+        02-add       crumb to detail → track 2 ＋ ☰ Add to Queue; track 3 same → toasts
         03-queue-view open Queue → queue.html, Queue tab lists tracks 2 & 3
 [reorder]04-reorder  ↑/↓ queued row → swap (move-queue-entry)
 [play]  05-play-track tap queued row → play-track (plays now; music has no combined pop)
@@ -361,7 +361,7 @@ Mirror of T11 on the TV Music-tab Continue Listening rail. Same cold-rail gate.
 pre-FEAT-497 overlay; TASK-525 removed both, so this starts from nothing on the
 shell (`screen-queue-shell.js`, same overlay for every video type). Full CRUD via
 the d-pad grid (Up/Down rows, Left/Right across `[select, shift-up, shift-down,
-remove]`, Enter) — add (detail ＋ Play Next) → `#queue-overlay` → reorder →
+remove]`, Enter) — add (detail ＋ Add to Queue) → `#queue-overlay` → reorder →
 play-now (pop) → remove, plus the dimmed non-repeatable controls a single-item
 source drives.
 DATA: Black Books ep 1/2/3.

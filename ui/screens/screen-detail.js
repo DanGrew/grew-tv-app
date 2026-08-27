@@ -175,8 +175,8 @@ function appendRestart(row, mid, onPlayItem, item, i) {
 // The single per-track "＋" control (TASK-253, was "＋ Playlist"), present only on
 // available rows AND only when the page wired an onAddToPlaylist handler (album /
 // artist track contexts — never series episodes or the playlist's own detail). It
-// opens the add sheet, whose top option is now "▶ Play Next" (queue) with the
-// playlist choices below — so one control replaces the old side-by-side
+// opens the add sheet, whose top option queues the track with the playlist
+// choices below — so one control replaces the old side-by-side
 // ＋ Playlist / ＋ Queue pair that crowded the track text. Like Restart it stops
 // propagation so it never also fires the row's play handler, and carries
 // `detail-row-action` so Left/Right reach it.
@@ -196,8 +196,8 @@ function appendAdd(row, available, item) {
   });
 }
 
-// A per-track "＋ Queue" control (FEAT-040/TASK-248): queue this track to PLAY
-// NEXT. TASK-253 folded the MUSIC "Play Next" into the ＋ add sheet, so this
+// A per-track "＋ Queue" control (FEAT-040/TASK-248): append this track to the
+// Queue. TASK-253 folded the MUSIC queue action into the ＋ add sheet, so this
 // standalone control now renders ONLY on VIDEO series rows — the ones that wire
 // onQueue but NOT onAddToPlaylist (a video episode has no playlist target). On an
 // album row (onAddToPlaylist set) the single ＋ owns queueing via the sheet, so
