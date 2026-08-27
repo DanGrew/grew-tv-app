@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadBrowse, mediaUrl } from '../../core/app-api.js';
-import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { screenPage } from '../../core/companion-utils.js';
 import { episodeLabel } from '../../core/detail-view.js';
 import { homeMoviesListItems, homeMoviesListTitle } from '../../core/home-rails.js';
@@ -63,9 +63,11 @@ export function initPage() {
   // TASK-516 — the phone's own per-clip ＋Queue, on the same TASK-498 unified
   // engine the TV list now posts to (queue-shell-config.js's routing map).
   // It fed the old video-playback queue, which nothing reads any more.
+  // BUG-531 — the CLIP's own itemType names the Queue, not this screen.
   function queueVideo(item) {
-    queueAdd(server, 'home-movie', state.person, item.video.id)
-      .then(function() { showStatus(queueAddStatus('home-movie')); })
+    var mediaType = itemMediaType(item.video.itemType);
+    queueAdd(server, mediaType, state.person, item.video.id)
+      .then(function() { showStatus(queueAddStatus(mediaType)); })
       .catch(function() { showStatus('Could not queue.'); });
   }
   function queueBtn(item) {

@@ -3,7 +3,7 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
-import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { collectionMetaLine } from '../../core/detail-view.js';
 import { homeMoviesListItems, homeMoviesListTitle, homeMoviesListPlayParams } from '../../core/home-rails.js';
@@ -57,9 +57,11 @@ export function initHomeMoviesListPage() {
     clearTimeout(statusTimer);
     statusTimer = setTimeout(hideStatus, 2500);
   }
+  // BUG-531 — the CLIP's own itemType names the Queue, not this screen.
   function queueVideo(item) {
-    queueAdd(SERVER, 'home-movie', getPerson(), item.video.id)
-      .then(function() { showStatus(queueAddStatus('home-movie')); })
+    var mediaType = itemMediaType(item.video.itemType);
+    queueAdd(SERVER, mediaType, getPerson(), item.video.id)
+      .then(function() { showStatus(queueAddStatus(mediaType)); })
       .catch(function() { showStatus('Could not queue.'); });
   }
 

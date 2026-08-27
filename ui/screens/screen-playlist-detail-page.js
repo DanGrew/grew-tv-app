@@ -3,14 +3,14 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
-import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { coverMosaicHtml } from '../../core/cover-mosaic.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { gridIndex } from '../../core/playlist-name.js';
-import { playlistTrackTarget, playlistQueueKey } from '../../core/music-video-playthrough.js';
+import { playlistTrackTarget } from '../../core/music-video-playthrough.js';
 
 // FEAT-036 (TASK-204) playlist detail. A user playlist resolves into the same
 // detail shape as an album (/api/playlist), so this reuses the FEAT-017
@@ -230,9 +230,12 @@ export function initPlaylistDetailPage() {
   // THE ＋Queue producer: this screen names the media type and the shared table
   // owns which engine, which action and which confirmation wording — so a
   // playlist's two row kinds can't drift from the rest of their own type.
-  var QUEUE_MEDIA_TYPE = { 'music-video': 'music-video', track: 'music' };
+  // BUG-531 drops this screen's own two-entry table for the shared item-type
+  // map, which every ＋ producer now reads: one place decides which Queue an
+  // item belongs to, and a row whose type resolves to none fails visibly
+  // instead of defaulting to music.
   function queueTrack(item) {
-    var mediaType = QUEUE_MEDIA_TYPE[playlistQueueKey(item.video.itemType)];
+    var mediaType = itemMediaType(item.video.itemType);
     queueAdd(SERVER, mediaType, getPerson(), item.video.id)
       .then(function() { showStatus(queueAddStatus(mediaType)); })
       .catch(function() { showStatus('Could not queue track.'); });

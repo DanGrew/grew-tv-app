@@ -563,6 +563,36 @@ test.describe('companion Home Movies Play All', () => {
 // rail, e.g. mv-01 on the QOTSA rail) gains the same ＋ Queue cell, wired to
 // the SEPARATE music-video engine (FEAT-418) — never the film queue this same
 // cell posts to for a plain video tile (story 3: the two engines stay apart).
+// BUG-531 — the ITEM decides which Queue a ＋ press fills, never the screen it
+// was pressed on. This card is a music video shelved on the Films rail: the
+// press must reach the music-video Queue and leave the film one alone. The old
+// producer read the card's browse SECTION (and fell back to 'films' for a card
+// with none at all), so it filed this under Films. The TV mirror of this test
+// lives in browse-queue.test.js.
+test.describe('a ＋ press goes by the item\'s own type (BUG-531)', () => {
+  // genres puts it on the Films section's first rail, beside the real films.
+  const STRAY = { kind: 'video', id: 'mv-99', title: 'Stray Video', poster: 'mv-01.jpg', duration: 200, section: 'films', itemType: 'music-video', artist: 'QOTSA', genres: ['animation'] };
+
+  test('queues a music video shelved on the Films rail to the music-video Queue', async ({ page }) => {
+    let filmQueued = false;
+    await page.route('**/api/browse**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ profile: 'kids', genreLabels: {}, content: BROWSE.kids.content.concat([STRAY]) })
+    }));
+    await page.route('**/api/queue/film/queue-item**', route => { filmQueued = true; return route.fulfill({ status: 204, body: '' }); });
+    await page.route('**/api/queue/music-video/queue-item**', route => route.fulfill({ status: 204, body: '' }));
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="films"]').click();
+    await expect(page.locator('#txtgrid .ph-txt[data-id="mv-99"]')).toBeVisible();
+    const queued = page.waitForRequest(req =>
+      req.url().includes('/api/queue/music-video/queue-item') && req.method() === 'POST');
+    await page.locator('.ph-cell-queue[data-queue="mv-99"]').click();
+    const req = await queued;
+    expect(JSON.parse(req.postData())).toEqual({ item_id: 'mv-99' });
+    expect(filmQueued).toBe(false);
+  });
+});
+
 test.describe('music-video ＋ Queue control (TASK-421)', () => {
   function mvMockApp(page) {
     return page.routeWebSocket(/:8766/, (ws) => {
@@ -604,6 +634,17 @@ test.describe('music-video ＋ Queue control (TASK-421)', () => {
     expect(JSON.parse(req.postData())).toEqual({ item_id: 'mv-01' });
     await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
     expect(filmQueued).toBe(false);
+  });
+
+  // BUG-531 story 3 — a press the server refuses says so. It used to swallow
+  // the failure, so a refused press looked exactly like one that worked.
+  test('a refused ＋ press tells you it failed instead of looking queued', async ({ page }) => {
+    await page.route('**/api/queue/music-video/queue-item**', route => route.fulfill({
+      status: 400, contentType: 'application/json',
+      body: JSON.stringify({ error: 'item mv-01 is a music-video (media_type music-video), not valid for media_type film' })
+    }));
+    await page.locator('.ph-cell-queue[data-queue="mv-01"]').click();
+    await expect(page.locator('#queue-status')).toHaveText('Could not queue.');
   });
 
   // BUG (found in real-device testing after TASK-421 shipped): a real touch tap

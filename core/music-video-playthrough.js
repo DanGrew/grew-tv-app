@@ -1,14 +1,15 @@
 // TASK-374 — the music-video ROUTING helpers, and only those: which video.html
-// entry mode a load resolves to, and the playlist-row dispatch a music-video
-// track needs (both TASK-374/376/421). Two earlier halves of this module are
-// gone. BUG-485 retired the client-owned `seq` playthrough (order + index,
-// Shuffle/Repeat, TASK-374/407) that used to drive the <video> element
-// directly, in favour of a server-authoritative engine. TASK-505 then retired
-// `mvTransportVisibility`, the show/hide gate that paired with it: music
-// videos run on the TASK-498 unified queue engine now, where
-// core/queue-shell-view.js's transportState is the ONE rule deciding
-// ⏮⏭🔀🔁 for every media type, and a control with nothing to act on is
-// dimmed rather than hidden.
+// entry mode a load resolves to, and where a playlist row's tap sends you
+// (TASK-374/376). Three earlier halves of this module are gone. BUG-485
+// retired the client-owned `seq` playthrough (order + index, Shuffle/Repeat,
+// TASK-374/407) that used to drive the <video> element directly, in favour of
+// a server-authoritative engine. TASK-505 then retired `mvTransportVisibility`,
+// the show/hide gate that paired with it: music videos run on the TASK-498
+// unified queue engine now, where core/queue-shell-view.js's transportState is
+// the ONE rule deciding ⏮⏭🔀🔁 for every media type, and a control with
+// nothing to act on is dimmed rather than hidden. BUG-531 retired
+// `playlistQueueKey`, the TASK-421 ＋Queue dispatch key: which Queue an item
+// enters is now one map for every producer, in core/queue-shell-config.js.
 
 // TASK-501 — browse's Continue lands here: `continueType` names the media type
 // to carry on with, and video.html serves the three that play in it (music
@@ -61,14 +62,4 @@ export function playlistTrackTarget(item, playlistId, audioTarget) {
       params: { musicVideoPlaylist: playlistId, musicVideoTrack: item.video.id, from: 'detail-playlist' } };
   }
   return audioTarget;
-}
-
-// TASK-421 (story 3) — the twin dispatch key for a playlist row's "☰ Play Next":
-// a music-video row POSTs to its OWN engine (FEAT-418), never the audio
-// engine's queue-track, so the two Play Next lists stay apart. Same itemType
-// signal playlistTrackTarget already reads, kept in core (both the TV
-// playlist-detail page and its companion mirror call this — ui/** stays
-// cyclomatic-1/pure-DOM-only).
-export function playlistQueueKey(itemType) {
-  return [itemType].filter(Boolean).concat(['track'])[0];
 }

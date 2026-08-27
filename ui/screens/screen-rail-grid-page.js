@@ -3,10 +3,10 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { gridArrow, renderGrid, focusFirstGridTile } from './screen-rail-grid.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
-import { queueAdd, queueAddStatus, SECTION_MEDIA_TYPE } from '../../core/queue-shell-config.js';
+import { queueAdd, queueAddStatus, itemMediaType } from '../../core/queue-shell-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
-import { buildTabs, buildTabRails, cardRoute, sectionOf } from '../../core/home-rails.js';
+import { buildTabs, buildTabRails, cardRoute } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 
 // Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
@@ -53,11 +53,11 @@ export function initRailGridPage() {
   }
 
   // FEAT-040/TASK-421: tile ＋Queue (mirrors the browse page) — POST per person
-  // to the card's own MEDIA TYPE. cardRoute() collapses a film and a
-  // home-movie card to the same 'video' nav route, which isn't fine-grained
-  // enough to pick a queue engine, so the card's SECTION names the type and
-  // TASK-516's single routing map (core/queue-shell-config.js) does the rest —
-  // this screen no longer keeps a dispatch table of its own.
+  // to the card's own MEDIA TYPE, through TASK-516's single routing map
+  // (core/queue-shell-config.js); this screen keeps no dispatch table of its
+  // own. BUG-531: that type comes from the card's own itemType, not its browse
+  // section — sectionOf() falls back to 'films' for an unstamped card, which
+  // filed such a press under Films whatever it actually was.
   var statusTimer = null;
   function hideStatus() { document.getElementById('queue-status').style.display = 'none'; }
   function showStatus(text) {
@@ -68,10 +68,10 @@ export function initRailGridPage() {
     statusTimer = setTimeout(hideStatus, 2500);
   }
   function onQueue(card) {
-    var mediaType = SECTION_MEDIA_TYPE[sectionOf(card)];
+    var mediaType = itemMediaType(card.itemType);
     queueAdd(SERVER, mediaType, getPerson(), card.id)
       .then(function() { showStatus(queueAddStatus(mediaType)); })
-      .catch(function() {});
+      .catch(function() { showStatus('Could not queue.'); });
   }
 
   // Back collapses one level — to the section's rails on the browse page.
