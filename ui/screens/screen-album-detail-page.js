@@ -3,7 +3,7 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadAlbum, loadContinueWatching, addToPlaylist, addSourceToPlaylist, loadBrowse } from '../../core/app-api.js';
-import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus, QUEUE_ADD_LABEL } from '../../core/queue-shell-config.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
@@ -89,17 +89,18 @@ export function initAlbumDetailPage() {
   }
   function onAddKey(e) { e.stopPropagation(); moveAdd(e); closeKeys(e); }
 
-  // TASK-253 — the sheet's top option: "▶ Play Next" (queue the track), above New
-  // playlist and the playlist cards. Present only for the per-TRACK sheet
-  // (openAddSheet sets addState.queue); the album-level "Add all" sheet
-  // (openAddSourceSheet) leaves queue null, so no Play Next there. Carries onAddKey
-  // so the d-pad walks it like every other sheet cell; NOT `.add-choice` so the
-  // playlist-list assertions stay clean.
+  // TASK-253 — the sheet's top option: queue the track, above New playlist and
+  // the playlist cards. Present only for the per-TRACK sheet (openAddSheet sets
+  // addState.queue); the album-level "Add all" sheet (openAddSourceSheet) leaves
+  // queue null, so no queue option there. Carries onAddKey so the d-pad walks it
+  // like every other sheet cell; NOT `.add-choice` so the playlist-list
+  // assertions stay clean. BUG-530: the wording comes from queue-shell-config,
+  // the same place the confirmation does.
   function buildQueueChoice() {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'add-queue';
-    b.textContent = '☰ Play Next';
+    b.textContent = QUEUE_ADD_LABEL;
     b.addEventListener('click', addState.queue);
     b.addEventListener('keydown', onAddKey);
     document.getElementById('add-sheet-list').appendChild(b);
@@ -146,8 +147,8 @@ export function initAlbumDetailPage() {
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
 
-  // Per-row: the single ＋ opens the sheet for ONE track — Play Next on top, playlist
-  // cards below (TASK-253). Return focus to the track row it opened from.
+  // Per-row: the single ＋ opens the sheet for ONE track — the queue option on
+  // top, playlist cards below (TASK-253). Return focus to the row it opened from.
   function openAddSheet(item) {
     addState.add = function(id) { return addToPlaylist(SERVER, id, item.video.id); };
     addState.queue = function() { queueThenClose(item); };
@@ -155,8 +156,8 @@ export function initAlbumDetailPage() {
     addState.returnFocus = function() { focusRow(item.video.id); };
     loadAndShowSheet();
   }
-  // Header "Add all to playlist": bulk-add the whole album as a snapshot. No Play
-  // Next option (queue null — that is a per-track action). Return focus to the header
+  // Header "Add all to playlist": bulk-add the whole album as a snapshot. No queue
+  // option (queue null — that is a per-track action). Return focus to the header
   // button it opened from.
   function openAddSourceSheet() {
     addState.add = function(id) { return addSourceToPlaylist(SERVER, id, 'album', albumId); };

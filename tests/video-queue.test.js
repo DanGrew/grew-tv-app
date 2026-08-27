@@ -34,7 +34,10 @@ test('＋ Queue POSTs queue-item to the film engine for the episode and confirms
   await page.locator('.detail-row[data-id="bluey-s1e02"] .detail-queue').click();
   const req = await queued;
   expect(JSON.parse(req.postData())).toEqual({ item_id: 'bluey-s1e02' });
-  await expect(page.locator('#queue-status')).toHaveText('Queued to Play Next');
+  // BUG-530 — the last hand-written confirmation. It said "Play Next" while the
+  // press appended, and read differently from the companion mirror's own toast
+  // on the same list; both come from queue-shell-config now.
+  await expect(page.locator('#queue-status')).toHaveText('Added to Queue');
 });
 
 test('＋ Queue does not hijack the row — the episode still plays', async ({ page }) => {

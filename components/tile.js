@@ -101,8 +101,8 @@ export function createTile(server, card, opts) {
 
   // FEAT-040/TASK-421: a standalone film/video (or music-video) tile gets a ＋
   // Queue action badge (top-right) when the page supplies `onQueue` — tap to
-  // queue the item to ITS OWN engine's Play Next (the page's onQueue decides
-  // which). stopPropagation so it never triggers the tile's play (onSelect).
+  // append the item to its own Queue (the page's onQueue decides which).
+  // stopPropagation so it never triggers the tile's play (onSelect).
   // Films/music videos have no Lyrics badge, so the right corner is free.
   function appendQueueBadge(fn) {
     var q = document.createElement('button');

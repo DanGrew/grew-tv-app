@@ -33,7 +33,7 @@ test('queueing a music-video row POSTs queue-item under its own media type (pers
   await page.route('**/api/queue/music-video/queue-item**', route => route.fulfill({ status: 204, body: '' }));
   await openPlaylist(page);
   await page.locator('.detail-row[data-id="mv-01"] .detail-add').click();
-  await expect(page.locator('#add-sheet-list .add-queue')).toHaveText('☰ Play Next');
+  await expect(page.locator('#add-sheet-list .add-queue')).toHaveText('☰ Add to Queue');
   const queued = page.waitForRequest(req =>
     req.url().includes('/api/queue/music-video/queue-item') && req.method() === 'POST');
   await page.locator('#add-sheet-list .add-queue').click();

@@ -1,6 +1,7 @@
 import {
   HOME_MOVIE, FILM, MUSIC, MUSIC_VIDEO,
-  QUEUE_SHELL_CONFIG, ITEM_MEDIA_TYPE, itemMediaType, queueAdd, queueAddStatus
+  QUEUE_SHELL_CONFIG, ITEM_MEDIA_TYPE, itemMediaType, queueAdd, queueAddStatus,
+  QUEUE_ADD_LABEL
 } from '../../core/queue-shell-config.js';
 import { transportState } from '../../core/queue-shell-view.js';
 
@@ -191,6 +192,19 @@ describe('the ＋Queue map', () => {
   it('lands the press on any 2xx the server answers with', async () => {
     global.fetch = async () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' });
     await expect(queueAdd('http://s', 'film', 'millie', 'toy-story-main')).resolves.toBeTruthy();
+  });
+
+  // BUG-530 — the ＋ sheet's own option offered "☰ Play Next" long after every
+  // type had stopped front-inserting, so the sheet promised one thing and the
+  // toast that followed confirmed another. The option names the append now, in
+  // the same words as the confirmation.
+  it('offers the append, not a jump to the front, on the ＋ sheet', () => {
+    expect(QUEUE_ADD_LABEL).toBe('☰ Add to Queue');
+  });
+
+  it('says the same thing on the option as in the confirmation that follows', () => {
+    expect(QUEUE_ADD_LABEL).toContain('Add to Queue');
+    expect(queueAddStatus('music')).toContain('Added to Queue');
   });
 
   // Every media type is on the unified engine now, so every ＋ press confirms

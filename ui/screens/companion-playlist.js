@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
-import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus, QUEUE_ADD_LABEL } from '../../core/queue-shell-config.js';
 import { fetchHttpsOrigin } from '../../core/server-config.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
@@ -107,7 +107,7 @@ export function initPage() {
 
   // FEAT-036/039 — the "Add to playlist" sheet, the companion mirror of the app
   // playlist detail's sheet (mirrors companion-detail.js too). ONE sheet, two entry
-  // points: the per-track ＋ (openAddSheet — Play Next + add ONE track, TASK-262) and
+  // points: the per-track ＋ (openAddSheet — queue + add ONE track, TASK-262) and
   // the manage-row "Add all to playlist" (openAddAllSheet — bulk-snapshot THIS whole
   // playlist into ANOTHER, source_type 'playlist', this one EXCLUDED, TASK-212).
   // addState.add(id) is the POST for the chosen mode (add-track vs add-source); queue /
@@ -142,13 +142,14 @@ export function initPage() {
     b.addEventListener('click', function() { addExisting(card.id, card.title); });
     return b;
   }
-  // TASK-253 — the per-track sheet's top option "☰ Play Next" (queue the track), above
-  // the playlist cards. Present only for the per-TRACK sheet (openAddSheet sets
+  // TASK-253 — the per-track sheet's top option: queue the track, above the
+  // playlist cards. Present only for the per-TRACK sheet (openAddSheet sets
   // addState.queue); the "Add all" sheet leaves it null. NOT `.add-choice`.
+  // BUG-530: worded by queue-shell-config, the same place the confirmation is.
   function queueChoiceBtn() {
     var b = document.createElement('button');
     b.className = 'add-queue';
-    b.textContent = '☰ Play Next';
+    b.textContent = QUEUE_ADD_LABEL;
     b.addEventListener('click', addState.queue);
     return b;
   }
@@ -181,7 +182,7 @@ export function initPage() {
       .catch(function() { showStatus('Could not queue track.'); });
   }
   function queueThenClose(card) { closeAddSheet(); queueTrack(card); }
-  // Per-track ＋ (TASK-262): add ONE track — Play Next on top, then the playlist cards.
+  // Per-track ＋ (TASK-262): add ONE track — the queue option on top, then the cards.
   function openAddSheet(card) {
     addState.add = function(id) { return addToPlaylist(server, id, card.id); };
     addState.queue = function() { queueThenClose(card); };
@@ -192,7 +193,7 @@ export function initPage() {
     loadAndShowSheet();
   }
   // Manage-row "Add all to playlist" (TASK-212): snapshot THIS whole playlist into
-  // ANOTHER (add-source, source_type 'playlist'), this one EXCLUDED. No Play Next.
+  // ANOTHER (add-source, source_type 'playlist'), this one EXCLUDED. No queue option.
   function openAddAllSheet() {
     addState.add = function(id) { return addSourceToPlaylist(server, id, 'playlist', state.playlistId); };
     addState.queue = null;

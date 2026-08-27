@@ -62,6 +62,16 @@ function artistSub(entry) {
 // field left to route on.
 var APPEND = { action: 'queue-item', bodyKey: 'item_id', status: 'Added to Queue' };
 
+// BUG-530 — the ＋ sheet's own top option, in the same words as the
+// confirmation APPEND above hands back. It read "☰ Play Next" on all six track
+// sheets long after TASK-504/505 had put the last type on the append, so the
+// sheet promised the front of the Queue and the toast then confirmed the end
+// of it. One constant, not a per-type field: every type appends, so the option
+// says the same thing everywhere — a type that wanted its own word here would
+// be the difference this file's ⛔ says to fix, not to codify. ☰ is the Queue
+// glyph the shell already uses for the page this press fills.
+export var QUEUE_ADD_LABEL = '☰ Add to Queue';
+
 export var HOME_MOVIE = {
   mediaType: 'home-movie',
   noun: 'clip', nounPlural: 'clips',

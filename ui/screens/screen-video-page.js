@@ -363,7 +363,7 @@ export function initVideoPage() {
   // any mv entry mode — a lone pick, inside a music-video playlist, or an artist's
   // videos — nowPlayingId() is always the one on screen). Music-video-only: the
   // button stays hidden (CSS) for a series/film, and only an mv entry reveals it
-  // (config.addsToPlaylist). One sheet, no Play Next option (that is the
+  // (config.addsToPlaylist). One sheet, no queue option (that is the
   // album-detail per-track sheet's own thing) — just the profile's music-video
   // playlists + New playlist, mirroring screen-album-detail-page's openAddSheet
   // almost verbatim so the two stay in lock-step.
