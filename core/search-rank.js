@@ -80,7 +80,12 @@ function episodeItems(episodes) {
     return {
       title: e.title || '', poster: e.cover || null,
       secondary: episodeSecondary(e), tag: 'EPISODE',
-      card: { kind: 'video', id: e.id, series: e.series_id },
+      // TASK-542 — `collectionType: 'series'` is a constant, not a lookup: the
+      // episode index is built from collection_type='series' collections alone
+      // (content_store.py's _SQL_EPISODE_SERIES), so every hit here is a TV
+      // episode by construction. A boxset film is never an episode hit — it
+      // reaches search as its own standalone card.
+      card: { kind: 'video', id: e.id, series: e.series_id, collectionType: 'series' },
       fields: [e.title || '']
     };
   });

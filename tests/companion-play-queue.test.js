@@ -41,6 +41,7 @@ async function mockQueue(page, mediaType, fields) {
   }));
 }
 async function mockAllQueues(page) {
+  await mockQueue(page, 'series', {});
   await mockQueue(page, 'film', {});
   await mockQueue(page, 'home-movie', {});
   await mockQueue(page, 'music', {});
@@ -55,17 +56,17 @@ async function openPlayMenu(page) {
   await page.locator('#btn-queue-menu').click();
 }
 
-// Story 3 — nothing to continue anywhere still shows four buttons, dimmed
+// Story 3 — nothing to continue anywhere still shows every button, dimmed
 // rather than gone, so the menu never shrinks to a shifting list.
-test('all four Continue buttons stay visible with nothing to continue', async ({ page }) => {
+test('all five Continue buttons stay visible with nothing to continue', async ({ page }) => {
   const intents = [];
   await installApi(page);
   await mockApp(page, intents);
   await mockAllQueues(page);
   await page.goto('/companion/browse.html');
   await openPlayMenu(page);
-  await expect(page.locator('#queue-menu .continue-btn')).toHaveCount(4);
-  for (const id of ['btn-continue-film', 'btn-continue-home-movie', 'btn-continue-music', 'btn-continue-music-video']) {
+  await expect(page.locator('#queue-menu .continue-btn')).toHaveCount(5);
+  for (const id of ['btn-continue-series', 'btn-continue-film', 'btn-continue-home-movie', 'btn-continue-music', 'btn-continue-music-video']) {
     await expect(page.locator('#' + id)).toBeVisible();
     await expect(page.locator('#' + id)).toBeDisabled();
   }
@@ -87,6 +88,24 @@ test('Continue Films drives the TV to the film continue entry', async ({ page })
   await expect.poll(() => intents.find(i => i.intent === 'navigate' && i.params.page === 'video.html')).toBeTruthy();
   const nav = intents.find(i => i.intent === 'navigate' && i.params.page === 'video.html');
   expect(nav.params.params).toMatchObject({ continueType: 'film', from: 'browse' });
+});
+
+// TASK-542, and the FEAT-017/028 mirror of browse-queue.test.js's own series
+// Continue: the phone gains the button in the same task as the TV, out of the
+// same CONTINUE_TYPES row, and resolves the identical target.
+test('Continue TV Series drives the TV to the series continue entry', async ({ page }) => {
+  const intents = [];
+  await installApi(page);
+  await mockApp(page, intents);
+  await mockAllQueues(page);
+  await mockQueue(page, 'series', queued(2));
+  await page.goto('/companion/browse.html');
+  await openPlayMenu(page);
+  await expect(page.locator('#btn-continue-series')).toBeEnabled();
+  await page.locator('#btn-continue-series').click();
+  await expect.poll(() => intents.find(i => i.intent === 'navigate' && i.params.page === 'video.html')).toBeTruthy();
+  const nav = intents.find(i => i.intent === 'navigate' && i.params.page === 'video.html');
+  expect(nav.params.params).toMatchObject({ continueType: 'series', from: 'browse' });
 });
 
 // Music carries on in the audio player, not the video one — the per-type

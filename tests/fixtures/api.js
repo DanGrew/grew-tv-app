@@ -49,9 +49,13 @@ const VIDEOS = {
   'mv-03': { id: 'mv-03', title: 'Starlight',                 profile: 'kids', duration: 240, poster: 'mv-03.jpg', subtitles: null,        artist: 'Muse',  itemType: 'music-video', available: true }
 };
 
+// TASK-542 — every collection carries its own `collectionType`, as
+// media-manager's /api/series does. It is what the detail page threads into the
+// player so a TV series opens the TV Series Queue and a boxset the Films one;
+// leaving it off a fixture would let a series flow pass while the real one 400s.
 const SERIES = {
   bluey: {
-    id: 'bluey', title: 'Bluey', profile: 'kids', poster: 'bluey.jpg', type: 'animation', format: 'tv-series', tags: { year: '2018' },
+    id: 'bluey', title: 'Bluey', profile: 'kids', poster: 'bluey.jpg', type: 'animation', format: 'tv-series', collectionType: 'series', tags: { year: '2018' },
     items: [
       { season: 1, episode: 1, video: VIDEOS['bluey-s1e01'] },
       { season: 1, episode: 2, video: VIDEOS['bluey-s1e02'] },
@@ -62,7 +66,7 @@ const SERIES = {
   // the season chip selector. Two seasons; bluey above stays seasons-less so the
   // legacy single-list + inline-divider path is still covered.
   inbetweeners: {
-    id: 'inbetweeners', title: 'The Inbetweeners', profile: 'kids', poster: 'ib.jpg', type: 'comedy', format: 'tv-series', tags: { year: '2008' },
+    id: 'inbetweeners', title: 'The Inbetweeners', profile: 'kids', poster: 'ib.jpg', type: 'comedy', format: 'tv-series', collectionType: 'series', tags: { year: '2008' },
     seasons: [
       { season: 1, poster: 'ib-s1.jpg' },
       { season: 2, poster: 'ib-s2.jpg' }
@@ -71,6 +75,18 @@ const SERIES = {
       { season: 1, episode: 1, video: VIDEOS['ib-s1e1'] },
       { season: 1, episode: 2, video: VIDEOS['ib-s1e2'] },
       { season: 2, episode: 1, video: VIDEOS['ib-s2e1'] }
+    ]
+  },
+  // TASK-542: a film BOXSET (collectionType 'boxset', section 'films') — the
+  // other kind of collection detail.html/loadSeries serves. It reaches the
+  // player through the identical `?series=` param a TV series does, so it is
+  // the case that proves the split: a boxset opens the FILM queue and its
+  // members ＋ to the Films Queue, however the press was addressed (story 3).
+  'toy-box': {
+    id: 'toy-box', title: 'Toy Story Collection', profile: 'kids', poster: 'toy-story.jpg', type: 'animation', collectionType: 'boxset', tags: { year: '1995' },
+    items: [
+      { episode: 1, video: VIDEOS['toy-story-main'] },
+      { episode: 2, video: VIDEOS['finding-nemo-main'] }
     ]
   },
   // TASK-243: an album series (collectionType 'album') reached through /api/series,
@@ -99,6 +115,13 @@ const SERIES = {
 // the Artists/Albums rails and the drill-down grid.
 // `hasLyrics` (backend MAX(v.lyrics IS NOT NULL) over members) drives the Lyrics
 // badge — ootb has a track with an .lrc (ootb-02), the others have none.
+// TASK-542 — the boxset's own browse card. Kept OUT of the default BROWSE (the
+// same way MUSIC_CARDS is) so every suite that counts Films tiles keeps seeing
+// exactly what it always did; the split's own e2e appends it.
+const BOXSET_CARDS = [
+  { kind: 'series', id: 'toy-box', title: 'Toy Story Collection', poster: 'toy-story.jpg', type: 'animation', section: 'films', collectionType: 'boxset', clipCount: 2, genres: ['animation'], people: null }
+];
+
 const MUSIC_CARDS = [
   { kind: 'series', id: 'ootb',         title: 'Out of the Blue', poster: 'ootb.jpg',    type: null, section: 'music', artist: 'ELO',  clipCount: 3, tags: { year: '1977' }, hasLyrics: true },
   { kind: 'series', id: 'elo-time',     title: 'Time',            poster: 'time.jpg',    type: null, section: 'music', artist: 'ELO',  clipCount: 2, tags: { year: '1981' } },
@@ -214,7 +237,7 @@ const BROWSE = {
     content: [
       { kind: 'video',  id: 'toy-story-main',    title: 'Toy Story',    poster: 'toy-story.jpg', duration: 4860, type: 'animation', section: 'films',       itemType: 'film',       genres: ['animation', 'comedy'], people: null },
       { kind: 'video',  id: 'finding-nemo-main', title: 'Finding Nemo', poster: 'nemo.jpg',      duration: 6000, type: 'animation', section: 'films',       itemType: 'film',       genres: null,                    people: null },
-      { kind: 'series', id: 'bluey',             title: 'Bluey',        poster: 'bluey.jpg',                     type: 'animation', section: 'series',      genres: ['animation'],           people: null },
+      { kind: 'series', id: 'bluey',             title: 'Bluey',        poster: 'bluey.jpg',                     type: 'animation', section: 'series',      collectionType: 'series', genres: ['animation'],           people: null },
       // TASK-491: tags.date mirrors the VIDEOS entries above (millie-walk/beach-day)
       // so the month rail (core/home-rails.js monthOf) can group these into 'Jan 2026'.
       { kind: 'video',  id: 'millie-walk',       title: 'Millie Walk',  poster: 'millie.jpg',    duration: 30,   type: 'home',      section: 'home-movies', itemType: 'home-movie', genres: null,                    people: ['millie'], tags: { date: '2026-01-06' } },
@@ -919,9 +942,57 @@ function mvPlaylistIds(id) {
 // installMusicVideoPlaybackBackend, whose `queue-video` APPENDED where the
 // real music_video_playback_engine.queue_video front-inserted, so no ordering
 // assertion written against it could be trusted.
+// TASK-542 split TV series out as its own media type, so a suite that covers a
+// series AND a film now installs TWO of these on one page — see the socket hub
+// below for why that needed a change here.
 // Deliberately does NOT reproduce the real engine's fair shuffle — real
 // shuffle order is proven server-side (grew-tv's own pytest suite), not
 // re-proven here.
+//
+// TASK-542 — ONE WebSocket route per page, shared by every queue backend
+// installed on it. page.routeWebSocket hands a socket to the LAST matching
+// handler alone, so when two backends each registered their own, the first
+// one's `live` stayed null and its pushes went nowhere — the film engine would
+// answer a POST and then never repaint. Every backend attaches to this hub
+// instead and pushes its own `media_type`-tagged snapshot down the shared
+// socket, which is exactly what the real relay does (core/app-ws.js filters
+// each push by media type).
+var QUEUE_SOCKET_HUBS = new WeakMap();
+
+async function queueSocketHub(page) {
+  var existing = QUEUE_SOCKET_HUBS.get(page);
+  if (existing) return existing;
+  var hub = { backends: [] };
+  QUEUE_SOCKET_HUBS.set(page, hub);
+  await page.routeWebSocket(/:8766/, function(ws) {
+    hub.backends.forEach(function(b) { b.attach(ws); });
+    ws.onMessage(function(raw) {
+      var m = JSON.parse(raw);
+      var REPLY = {
+        list_devices: function() { ws.send(JSON.stringify({ type: 'devices', payload: { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] } })); },
+        activate_person: function() {
+          [m.payload.person_id].filter(Boolean).forEach(function(pid) {
+            ws.send(JSON.stringify({ type: 'person_active', payload: { person_id: pid, device_id: m.payload.device_id } }));
+          });
+        },
+        register_companion: function() {},
+        snapshot_request: function() {
+          // TASK-504 — a companion page that lives INSIDE a device context
+          // (companion/audio.html mounts off `context_id`, unlike the
+          // standalone Queue pages) needs that push replayed too, exactly as
+          // the real relay replays the cached context. Opt-in per caller, so a
+          // page that reads no context is left exactly as it was.
+          hub.backends.forEach(function(b) { b.replayContext(ws); });
+          ws.send(JSON.stringify({ type: 'app_state', payload: { person: 'kids', profile: 'kids', screen: 'player' } }));
+          hub.backends.forEach(function(b) { b.push(); });
+        }
+      };
+      [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
+    });
+  });
+  return hub;
+}
+
 async function installQueuePlaybackBackend(page, mediaType, contextId) {
   var state = {
     sourceType: null, sourceId: null,
@@ -1173,34 +1244,17 @@ async function installQueuePlaybackBackend(page, mediaType, contextId) {
   var routeAction = '/api/queue/' + mediaType + '/';
   var routeGet = new RegExp('/api/queue/' + mediaType + '\\?');
 
-  await page.routeWebSocket(/:8766/, function(ws) {
-    live = ws;
-    [state.sourceType].filter(Boolean).forEach(push);
-    ws.onMessage(function(raw) {
-      var m = JSON.parse(raw);
-      var REPLY = {
-        list_devices: function() { ws.send(JSON.stringify({ type: 'devices', payload: { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] } })); },
-        activate_person: function() {
-          [m.payload.person_id].filter(Boolean).forEach(function(pid) {
-            ws.send(JSON.stringify({ type: 'person_active', payload: { person_id: pid, device_id: m.payload.device_id } }));
-          });
-        },
-        register_companion: function() {},
-        snapshot_request: function() {
-          // TASK-504 — a companion page that lives INSIDE a device context
-          // (companion/audio.html mounts off `context_id`, unlike the
-          // standalone Queue pages) needs that push replayed too, exactly as
-          // the real relay replays the cached context. Opt-in per caller, so a
-          // page that reads no context is left exactly as it was.
-          [contextId].filter(Boolean).forEach(function(cid) {
-            ws.send(JSON.stringify({ type: 'context', payload: { context_id: cid, version: 1 } }));
-          });
-          ws.send(JSON.stringify({ type: 'app_state', payload: { person: 'kids', profile: 'kids', screen: 'player' } }));
-          push();
-        }
-      };
-      [REPLY[m.type]].filter(Boolean).forEach(function(fn) { fn(); });
-    });
+  var hub = await queueSocketHub(page);
+  hub.backends.push({
+    // A backend seeded before the socket opened pushes its state as soon as it
+    // does, exactly as it did when it owned the route itself.
+    attach: function(ws) { live = ws; [state.sourceType].filter(Boolean).forEach(push); },
+    replayContext: function(ws) {
+      [contextId].filter(Boolean).forEach(function(cid) {
+        ws.send(JSON.stringify({ type: 'context', payload: { context_id: cid, version: 1 } }));
+      });
+    },
+    push: push
   });
   await page.route(routeGet, function(route) {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(snapshot()) });
@@ -1217,7 +1271,7 @@ async function installQueuePlaybackBackend(page, mediaType, contextId) {
 }
 
 module.exports = {
-  VIDEOS, SERIES, ALBUMS, TRACKS, EPISODES, MUSIC_CARDS, PLAYLISTS, PLAYLIST_CARDS, MUSIC_VIDEO_CARDS, BROWSE, CONFIG, nextOf,
+  VIDEOS, SERIES, ALBUMS, TRACKS, EPISODES, MUSIC_CARDS, BOXSET_CARDS, PLAYLISTS, PLAYLIST_CARDS, MUSIC_VIDEO_CARDS, BROWSE, CONFIG, nextOf,
   installApi, installPlaybackBackend, installVideoPlaybackBackend, installQueuePlaybackBackend,
   // TASK-326: pure response builders + the CW row builder, so the stub<->contract
   // shape test can exercise the exact objects the routes above emit.

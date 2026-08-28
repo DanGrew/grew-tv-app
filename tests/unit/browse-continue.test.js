@@ -5,14 +5,22 @@ import { CONTINUE_TYPES, continueTarget, continueLabel } from '../../core/browse
 // player page each press lands on, and the one wording both surfaces render.
 
 describe('CONTINUE_TYPES', () => {
-  it('covers all four media types, in browse-tab order', () => {
-    expect(CONTINUE_TYPES.map(e => e.mediaType)).toEqual(['film', 'home-movie', 'music', 'music-video']);
+  it('covers all five media types, in browse-tab order', () => {
+    expect(CONTINUE_TYPES.map(e => e.mediaType)).toEqual(['series', 'film', 'home-movie', 'music', 'music-video']);
   });
   it('names each button and labels it with its section name', () => {
     expect(CONTINUE_TYPES.map(e => e.id)).toEqual([
-      'btn-continue-film', 'btn-continue-home-movie', 'btn-continue-music', 'btn-continue-music-video'
+      'btn-continue-series', 'btn-continue-film', 'btn-continue-home-movie', 'btn-continue-music', 'btn-continue-music-video'
     ]);
-    expect(CONTINUE_TYPES.map(e => e.label)).toEqual(['Films', 'Home Movies', 'Music', 'Music Videos']);
+    expect(CONTINUE_TYPES.map(e => e.label)).toEqual(['TV Series', 'Films', 'Home Movies', 'Music', 'Music Videos']);
+  });
+
+  // TASK-542 — the regression this entry exists to stop. While an episode was a
+  // film-engine item, "Continue Films" carried on with a part-watched series;
+  // the media-type split took that away, and without a TV Series button of its
+  // own a series would be the one type browse could not carry on with.
+  it('gives TV series its own button, which Films no longer reaches', () => {
+    expect(CONTINUE_TYPES.some(e => e.mediaType === 'series')).toBe(true);
   });
 });
 
@@ -21,7 +29,8 @@ describe('continueTarget', () => {
   // music in the audio player. Each names its own media type so the player
   // fires `next` on that engine and no other (story 4's TV/phone parity rides
   // on the two surfaces resolving the identical target).
-  it('sends films, home movies and music videos to the video player', () => {
+  it('sends TV series, films, home movies and music videos to the video player', () => {
+    expect(continueTarget('series')).toEqual({ page: 'video.html', params: { continueType: 'series', from: 'browse' } });
     expect(continueTarget('film')).toEqual({ page: 'video.html', params: { continueType: 'film', from: 'browse' } });
     expect(continueTarget('home-movie')).toEqual({ page: 'video.html', params: { continueType: 'home-movie', from: 'browse' } });
     expect(continueTarget('music-video')).toEqual({ page: 'video.html', params: { continueType: 'music-video', from: 'browse' } });
@@ -38,7 +47,7 @@ describe('continueLabel', () => {
   });
   it('labels every configured type', () => {
     expect(CONTINUE_TYPES.map(continueLabel)).toEqual([
-      '▶ Continue Films', '▶ Continue Home Movies', '▶ Continue Music', '▶ Continue Music Videos'
+      '▶ Continue TV Series', '▶ Continue Films', '▶ Continue Home Movies', '▶ Continue Music', '▶ Continue Music Videos'
     ]);
   });
 });

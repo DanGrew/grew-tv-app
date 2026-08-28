@@ -100,7 +100,10 @@ export function initVideoPage() {
   // TASK-501 — `continueType` names the media type browse's Continue button was
   // pressed for, and resolves to that type's own continue mode, so the rail is
   // picked here exactly as every other entry picks it.
-  var mode = entryMode({ continueType: getParam('continueType'), playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson, homeMoviesMonth: homeMoviesMonth, isSeries: isSeries });
+  // TASK-542 — `collectionType` rides beside `?series=` so a TV series and a
+  // film boxset, which reach this page through the identical param, open under
+  // their own media type rather than both under films.
+  var mode = entryMode({ continueType: getParam('continueType'), playQueue: !!getParam('playQueue'), mvPlaylist: mvPlaylist, mvArtist: mvArtist, mvItem: mvItem, mvAll: mvAll, homeMoviesAll: homeMoviesAll, homeMoviesPerson: homeMoviesPerson, homeMoviesMonth: homeMoviesMonth, isSeries: isSeries, collectionType: getParam('collectionType') });
   // Which rail this page load drives — resolved once off `mode` (mutually
   // exclusive per page load, never a live switch), and `config` is everything
   // that rail does differently from the other two. Between them they key every
@@ -657,7 +660,7 @@ export function initVideoPage() {
   // reproduced here — the same rule transportState's ⏭ already lights from, and
   // what browse's own button reads to decide whether it is live at all.
   //
-  // ONE entry for all three video types, because TASK-524 already made every
+  // ONE entry for all four video types, because TASK-524 already made every
   // per-rail difference a config field: which engine it advances is
   // config.mediaType, and the ＋Playlist reveal a music video needs is
   // config.addsToPlaylist inside beginPlayback.
@@ -670,6 +673,7 @@ export function initVideoPage() {
     beginPlayback(null, 'next', {}).catch(noop);
   }
   var ENTRY = {
+    continueSeries: startContinue,
     continueFilm: startContinue,
     continueHomeMovie: startContinue,
     continueMusicVideo: startContinue,
@@ -682,6 +686,7 @@ export function initVideoPage() {
     homeMoviesPerson: startTappedSource,
     homeMoviesMonth: startTappedSource,
     series: startTappedSource,
+    boxset: startTappedSource,
     single: startSingle
   };
   ENTRY[mode]();

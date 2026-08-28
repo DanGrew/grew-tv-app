@@ -33,6 +33,7 @@ async function openBluey(page) {
 test.beforeEach(async ({ page }) => {
   await installApi(page);
   await installQueuePlaybackBackend(page, 'film');
+  await installQueuePlaybackBackend(page, 'series');   // TASK-542 — a restarted episode plays on the series engine
   await page.goto('/app/homeview/profile.html');
 });
 

@@ -1,9 +1,9 @@
 import {
-  MUSIC_VIDEO_PAGE, HOME_MOVIE_PAGE, FILM_PAGE,
+  MUSIC_VIDEO_PAGE, HOME_MOVIE_PAGE, FILM_PAGE, SERIES_PAGE,
   VIDEO_PAGE_CONFIG, MODE_ENGINE, SOURCE_TYPE, SOURCE_ID_PARAM,
   sourceIdFor, videoContext, videoRecord
 } from '../../core/video-page-config.js';
-import { HOME_MOVIE, FILM, MUSIC_VIDEO } from '../../core/queue-shell-config.js';
+import { HOME_MOVIE, FILM, SERIES, MUSIC_VIDEO } from '../../core/queue-shell-config.js';
 import { entryMode } from '../../core/music-video-playthrough.js';
 
 // TASK-524 — the video page drives three media types through ONE set of engine
@@ -23,7 +23,7 @@ function fakeFetch(body) {
 
 describe('the per-type configs', () => {
   it('registers every rail under the key the page resolves off entryMode', () => {
-    expect(VIDEO_PAGE_CONFIG).toEqual({ mv: MUSIC_VIDEO_PAGE, hm: HOME_MOVIE_PAGE, film: FILM_PAGE });
+    expect(VIDEO_PAGE_CONFIG).toEqual({ mv: MUSIC_VIDEO_PAGE, hm: HOME_MOVIE_PAGE, film: FILM_PAGE, series: SERIES_PAGE });
     Object.keys(VIDEO_PAGE_CONFIG).forEach(function(key) {
       expect(VIDEO_PAGE_CONFIG[key].engine).toBe(key);
     });
@@ -33,12 +33,14 @@ describe('the per-type configs', () => {
     expect(MUSIC_VIDEO_PAGE.mediaType).toBe('music-video');
     expect(HOME_MOVIE_PAGE.mediaType).toBe('home-movie');
     expect(FILM_PAGE.mediaType).toBe('film');
+    expect(SERIES_PAGE.mediaType).toBe('series');
   });
 
   it('hands each rail its own Queue shell entry', () => {
     expect(MUSIC_VIDEO_PAGE.shell).toBe(MUSIC_VIDEO);
     expect(HOME_MOVIE_PAGE.shell).toBe(HOME_MOVIE);
     expect(FILM_PAGE.shell).toBe(FILM);
+    expect(SERIES_PAGE.shell).toBe(SERIES);
     // The shell entry and the page entry must agree on which engine they post
     // to, or the Queue View and the player would drive different queues.
     Object.keys(VIDEO_PAGE_CONFIG).forEach(function(key) {
@@ -50,19 +52,33 @@ describe('the per-type configs', () => {
     expect([MUSIC_VIDEO_PAGE.shuffleId, MUSIC_VIDEO_PAGE.repeatId]).toEqual(['btn-mv-shuffle', 'btn-mv-repeat']);
     expect([HOME_MOVIE_PAGE.shuffleId, HOME_MOVIE_PAGE.repeatId]).toEqual(['btn-hm-shuffle', 'btn-hm-repeat']);
     expect([FILM_PAGE.shuffleId, FILM_PAGE.repeatId]).toEqual(['btn-film-shuffle', 'btn-film-repeat']);
+    expect([SERIES_PAGE.shuffleId, SERIES_PAGE.repeatId]).toEqual(['btn-series-shuffle', 'btn-series-repeat']);
+  });
+
+  // TASK-542 — every rail's pill pair is its own, because two rails sharing a
+  // pair would leave one of them toggling the other's engine.
+  it('gives no two rails the same pill', () => {
+    var ids = Object.keys(VIDEO_PAGE_CONFIG)
+      .map(function(k) { return [VIDEO_PAGE_CONFIG[k].shuffleId, VIDEO_PAGE_CONFIG[k].repeatId]; })
+      .reduce(function(a, b) { return a.concat(b); }, []);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   // TASK-373: a music video always starts at 0. A film and a home movie both
   // resume mid-watch from watch_progress.
-  it('resumes a film and a home movie, never a music video', () => {
+  it('resumes a film, a series episode and a home movie, never a music video', () => {
     expect(FILM_PAGE.resumes).toBe(true);
+    expect(SERIES_PAGE.resumes).toBe(true);
     expect(HOME_MOVIE_PAGE.resumes).toBe(true);
     expect(MUSIC_VIDEO_PAGE.resumes).toBe(false);
   });
 
-  // TASK-487 / docs/QUEUE.md rows 29/33: only a film counts down.
-  it('runs the 5s "Up next" countdown for a film alone', () => {
+  // TASK-487 / docs/QUEUE.md rows 29/33: a film counts down, and TASK-542 kept
+  // the series rail on the same default — the countdown suits an episode as
+  // much as a boxset film, so the split changed no transport default.
+  it('runs the 5s "Up next" countdown for a film and a series episode', () => {
     expect(FILM_PAGE.countdown).toBe(true);
+    expect(SERIES_PAGE.countdown).toBe(true);
     expect(HOME_MOVIE_PAGE.countdown).toBe(false);
     expect(MUSIC_VIDEO_PAGE.countdown).toBe(false);
   });
@@ -72,6 +88,7 @@ describe('the per-type configs', () => {
   // shell re-rendered when a fetch lands.
   it('fetches a source title only where the source id is opaque', () => {
     expect(FILM_PAGE.fetchesSourceTitle).toBe(true);
+    expect(SERIES_PAGE.fetchesSourceTitle).toBe(true);
     expect(MUSIC_VIDEO_PAGE.fetchesSourceTitle).toBe(true);
     expect(HOME_MOVIE_PAGE.fetchesSourceTitle).toBe(false);
     expect(HOME_MOVIE_PAGE.sourceTitle).toBeNull();
@@ -83,6 +100,7 @@ describe('the per-type configs', () => {
     expect(MUSIC_VIDEO_PAGE.sourceCrumbs).toBe(true);
     expect(HOME_MOVIE_PAGE.sourceCrumbs).toBe(false);
     expect(FILM_PAGE.sourceCrumbs).toBe(false);
+    expect(SERIES_PAGE.sourceCrumbs).toBe(false);
   });
 
   // TASK-378: "＋ Playlist" is a music-video affordance only.
@@ -90,6 +108,7 @@ describe('the per-type configs', () => {
     expect(MUSIC_VIDEO_PAGE.addsToPlaylist).toBe(true);
     expect(HOME_MOVIE_PAGE.addsToPlaylist).toBe(false);
     expect(FILM_PAGE.addsToPlaylist).toBe(false);
+    expect(SERIES_PAGE.addsToPlaylist).toBe(false);
   });
 
   // ⛔ TASK-524 — the four things that are NOT fields, because collapsing the
@@ -147,13 +166,15 @@ describe('the source-title lookup', () => {
 });
 
 describe('the entry-mode tables', () => {
-  // TASK-501 added the three Continue answers, one per video media type.
-  var MODES = ['queue', 'mvPlaylist', 'mvArtist', 'mvItem', 'mvAll', 'homeMoviesAll', 'homeMoviesPerson', 'homeMoviesMonth', 'series', 'single',
-               'continueFilm', 'continueHomeMovie', 'continueMusicVideo'];
+  // TASK-501 added the Continue answers, one per video media type.
+  // TASK-542 added 'boxset': a collection nav answers one of two modes now.
+  // TASK-542 added 'continueSeries' too — a fifth media type's Continue button.
+  var MODES = ['queue', 'mvPlaylist', 'mvArtist', 'mvItem', 'mvAll', 'homeMoviesAll', 'homeMoviesPerson', 'homeMoviesMonth', 'series', 'boxset', 'single',
+               'continueSeries', 'continueFilm', 'continueHomeMovie', 'continueMusicVideo'];
 
   // The same totality argument TASK-525 used to prove the fourth rail dead:
-  // entryMode is total over these thirteen answers, and every one maps to a
-  // rail that exists — so no load can resolve to a rail this page cannot drive.
+  // entryMode is total over these answers, and every one maps to a rail that
+  // exists — so no load can resolve to a rail this page cannot drive.
   it('maps every entryMode answer onto a rail that exists', () => {
     expect(Object.keys(MODE_ENGINE).sort()).toEqual(MODES.slice().sort());
     MODES.forEach(function(mode) {
@@ -169,9 +190,16 @@ describe('the entry-mode tables', () => {
     expect(MODE_ENGINE.homeMoviesAll).toBe('hm');
     expect(MODE_ENGINE.homeMoviesPerson).toBe('hm');
     expect(MODE_ENGINE.homeMoviesMonth).toBe('hm');
-    expect(MODE_ENGINE.series).toBe('film');
     expect(MODE_ENGINE.single).toBe('film');
     expect(MODE_ENGINE.queue).toBe('film');
+  });
+
+  // TASK-542 — the split this task is. Both modes arrive on the same `?series=`
+  // collection id, and sending a boxset to the series rail (or the reverse) is
+  // exactly the coupling FEAT-541 ended.
+  it('drives a TV series on its own rail and a boxset on the film one', () => {
+    expect(MODE_ENGINE.series).toBe('series');
+    expect(MODE_ENGINE.boxset).toBe('film');
   });
 
   // TASK-501 — a Continue press advances the engine of the type whose button
@@ -179,6 +207,7 @@ describe('the entry-mode tables', () => {
   // home movies both play through video.html, and getting these two crossed is
   // exactly how a Continue Home Movies press would advance the film queue.
   it('puts each Continue answer on its own type\'s rail', () => {
+    expect(MODE_ENGINE.continueSeries).toBe('series');
     expect(MODE_ENGINE.continueFilm).toBe('film');
     expect(MODE_ENGINE.continueHomeMovie).toBe('hm');
     expect(MODE_ENGINE.continueMusicVideo).toBe('mv');
@@ -189,8 +218,9 @@ describe('the entry-mode tables', () => {
     var SHAPES = [
       { playQueue: true }, { mvPlaylist: 'sat' }, { mvArtist: 'ELO' }, { mvItem: 'mv-1' }, { mvAll: '1' },
       { homeMoviesAll: '1' }, { homeMoviesPerson: 'millie' }, { homeMoviesMonth: '2026-01' },
-      { isSeries: true }, {},
-      { continueType: 'film' }, { continueType: 'home-movie' }, { continueType: 'music-video' }
+      { isSeries: true }, { isSeries: true, collectionType: 'series' }, { isSeries: true, collectionType: 'boxset' },
+      { isSeries: true, collectionType: 'nonsense' }, {},
+      { continueType: 'series' }, { continueType: 'film' }, { continueType: 'home-movie' }, { continueType: 'music-video' }
     ];
     SHAPES.forEach(function(shape) {
       expect(MODE_ENGINE[entryMode(shape)]).toBeTruthy();
@@ -201,8 +231,21 @@ describe('the entry-mode tables', () => {
     expect(SOURCE_TYPE).toEqual({
       mvPlaylist: 'mv-playlist', mvArtist: 'mv-artist', mvAll: 'mv-all',
       homeMoviesAll: 'home-movies-all', homeMoviesPerson: 'home-movies-by-person', homeMoviesMonth: 'home-movie-month',
-      series: 'series'
+      series: 'series', boxset: 'boxset'
     });
+  });
+
+  // TASK-542 — a boxset used to open as source_type 'series' too, both names
+  // resolving the identical catalog query. api/queue_playback.py allows
+  // 'boxset' under `film` and 'series' under `series` alone now, so the name
+  // is what keeps a boxset's films out of the TV Series Queue (story 3).
+  it('opens a boxset as a boxset and a series as a series', () => {
+    expect(SOURCE_TYPE.boxset).toBe('boxset');
+    expect(SOURCE_TYPE.series).toBe('series');
+    // Both read the same nav param — the collection id — which is why the
+    // source TYPE is the only thing separating them.
+    expect(SOURCE_ID_PARAM.boxset).toBe('seriesId');
+    expect(SOURCE_ID_PARAM.series).toBe('seriesId');
   });
 
   // A standalone entry (a single film, a lone music-video pick) plays through
@@ -258,7 +301,25 @@ describe('videoContext', () => {
       musicVideoSource: null, musicVideoTransport: DEAD,
       homeMovie: false, homeMovieShuffle: false, homeMovieRepeat: false, homeMovieTransport: DEAD,
       film: true, filmShuffle: true, filmRepeat: true,
-      filmTransport: { previous: true, next: true, shuffle: true, repeat: true }
+      filmTransport: { previous: true, next: true, shuffle: true, repeat: true },
+      series: false, seriesShuffle: false, seriesRepeat: false, seriesTransport: DEAD
+    });
+  });
+
+  // TASK-542 — the series rail's own push. Asserted as an exact object for the
+  // same reason the home-movie one is: a series that pushed `film: true` would
+  // leave the phone's transport driving /api/queue/film while the TV played
+  // /api/queue/series, and the mirror would be silently wrong rather than blank.
+  it('pushes a series\' own keys, and leaves the film ones empty', () => {
+    expect(videoContext('series', live, null, display)).toEqual({
+      context_id: 'video',
+      display: display,
+      musicVideo: false, musicVideoShuffle: false, musicVideoRepeat: false,
+      musicVideoSource: null, musicVideoTransport: DEAD,
+      homeMovie: false, homeMovieShuffle: false, homeMovieRepeat: false, homeMovieTransport: DEAD,
+      film: false, filmShuffle: false, filmRepeat: false, filmTransport: DEAD,
+      series: true, seriesShuffle: true, seriesRepeat: true,
+      seriesTransport: { previous: true, next: true, shuffle: true, repeat: true }
     });
   });
 
@@ -271,7 +332,8 @@ describe('videoContext', () => {
       musicVideoSource: crumb,
       musicVideoTransport: { previous: true, next: true, shuffle: true, repeat: true },
       homeMovie: false, homeMovieShuffle: false, homeMovieRepeat: false, homeMovieTransport: DEAD,
-      film: false, filmShuffle: false, filmRepeat: false, filmTransport: DEAD
+      film: false, filmShuffle: false, filmRepeat: false, filmTransport: DEAD,
+      series: false, seriesShuffle: false, seriesRepeat: false, seriesTransport: DEAD
     });
   });
 
@@ -287,7 +349,8 @@ describe('videoContext', () => {
       musicVideoSource: null, musicVideoTransport: DEAD,
       homeMovie: true, homeMovieShuffle: true, homeMovieRepeat: true,
       homeMovieTransport: { previous: true, next: true, shuffle: true, repeat: true },
-      film: false, filmShuffle: false, filmRepeat: false, filmTransport: DEAD
+      film: false, filmShuffle: false, filmRepeat: false, filmTransport: DEAD,
+      series: false, seriesShuffle: false, seriesRepeat: false, seriesTransport: DEAD
     });
   });
 

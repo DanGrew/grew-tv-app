@@ -208,7 +208,10 @@ export function initBrowsePage() {
     artist:   function(card) { navTo('artist.html', { artist: card.artist }); },
     album:    function(card) { navTo('album-detail.html', { album: card.id }); },
     playlist: function(card) { navTo('playlist-detail.html', { playlist: card.id }); },
-    video:    function(card) { navTo('video.html', { video: card.id, from: 'browse', series: card.series }); },
+    // TASK-542: `collectionType` rides beside the collection id (a CW episode
+    // tile, a search episode hit) so the player opens the right queue; a
+    // standalone film card carries neither and navTo drops both.
+    video:    function(card) { navTo('video.html', { video: card.id, from: 'browse', series: card.series, collectionType: card.collectionType }); },
     series:   function(card) { navTo('detail.html', { series: card.id }); },
     // TASK-324 search: a TRACK opens its album's player STARTED on that song
     // (audio.html fires play-source album -> play-track). Only search emits a

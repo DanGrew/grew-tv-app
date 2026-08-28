@@ -86,6 +86,7 @@ async function routeQueued(page, mediaType, queued) {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ person_id: 'kids', media_type: mediaType, queue: queued, next: [], coming_up: [] }) }));
 }
 async function routeAllEmpty(page) {
+  await routeEmptyQueue(page, 'series');
   await routeEmptyQueue(page, 'film');
   await routeEmptyQueue(page, 'home-movie');
   await routeEmptyQueue(page, 'music');
@@ -97,16 +98,16 @@ async function openPlayMenu(page) {
 }
 
 // Story 3 — the cluster does not shift. Nothing queued and no source anywhere
-// still shows four buttons, disabled-but-visible (the FEAT-497 transport rule),
-// where the old pills vanished entirely.
-test('all four Continue buttons are visible with nothing to continue, and do nothing', async ({ page }) => {
+// still shows every button, disabled-but-visible (the FEAT-497 transport rule),
+// where the old pills vanished entirely. TASK-542 made it five.
+test('all five Continue buttons are visible with nothing to continue, and do nothing', async ({ page }) => {
   await installApi(page);
   await installVideoPlaybackBackend(page);
   await routeAllEmpty(page);
   await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
   await openPlayMenu(page);
-  await expect(page.locator('#queue-menu .continue-btn')).toHaveCount(4);
-  for (const id of ['btn-continue-film', 'btn-continue-home-movie', 'btn-continue-music', 'btn-continue-music-video']) {
+  await expect(page.locator('#queue-menu .continue-btn')).toHaveCount(5);
+  for (const id of ['btn-continue-series', 'btn-continue-film', 'btn-continue-home-movie', 'btn-continue-music', 'btn-continue-music-video']) {
     await expect(page.locator('#' + id)).toBeVisible();
     await expect(page.locator('#' + id)).toBeDisabled();
     await expect(page.locator('#' + id)).toHaveClass(/is-disabled/);
@@ -157,7 +158,25 @@ test('Continue is live on an empty queue when the source has more ahead', async 
   await expect(page).toHaveURL(/video\.html\?.*continueType=home-movie/);
 });
 
-// The buttons are independent — one type's queue never wakes another's.
+// TASK-542 — the button the media-type split had to add. An episode used to be
+// a film-engine item, so Continue Films carried on with a part-watched series;
+// once an episode advances on its own engine, Films cannot reach one, and this
+// is the only way back into a series from browse.
+test('Continue TV Series is live with an episode queued, and opens the video player on the series continue entry', async ({ page }) => {
+  await installApi(page);
+  await routeAllEmpty(page);
+  const backend = await installQueuePlaybackBackend(page, 'series');
+  backend.seed('queue-item', { item_id: 'bluey-s1e02' });
+  await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
+  await openPlayMenu(page);
+  await expect(page.locator('#btn-continue-series')).toBeEnabled();
+  await page.locator('#btn-continue-series').click();
+  await expect(page).toHaveURL(/video\.html\?.*continueType=series/);
+});
+
+// The buttons are independent — one type's queue never wakes another's. A
+// queued FILM leaving Continue TV Series dark is the split itself, read off
+// browse: before TASK-542 the two shared one engine and woke together.
 test('a queued film wakes only Continue Films', async ({ page }) => {
   await installApi(page);
   await routeAllEmpty(page);
@@ -166,6 +185,7 @@ test('a queued film wakes only Continue Films', async ({ page }) => {
   await page.goto('/app/homeview/browse.html?profile=kids&person=kids');
   await openPlayMenu(page);
   await expect(page.locator('#btn-continue-film')).toBeEnabled();
+  await expect(page.locator('#btn-continue-series')).toBeDisabled();
   await expect(page.locator('#btn-continue-music')).toBeDisabled();
   await expect(page.locator('#btn-continue-home-movie')).toBeDisabled();
   await expect(page.locator('#btn-continue-music-video')).toBeDisabled();

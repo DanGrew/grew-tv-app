@@ -8,6 +8,7 @@ const FILM_TILE = '.film-tile[data-id="toy-story-main"]';
 test.beforeEach(async ({ page }) => {
   await installApi(page);
   await installQueuePlaybackBackend(page, 'film');
+  await installQueuePlaybackBackend(page, 'series');   // TASK-542 — the series crumb trail plays on its own engine
   await page.goto('/app/homeview/profile.html');
   await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();

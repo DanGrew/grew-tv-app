@@ -8,7 +8,10 @@ const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js')
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installQueuePlaybackBackend(page, 'film');
+  // TASK-542 — bluey is a TV SERIES, so it plays on the series engine. The nav
+  // carries no collectionType here on purpose: an unstamped `?series=` reads as
+  // a TV series, which is the path an old bookmark takes.
+  await installQueuePlaybackBackend(page, 'series');
   await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
   await expect(page.locator('#screen-video')).toBeVisible();
   // The up-next line is the page's last async signal (set after the first snapshot

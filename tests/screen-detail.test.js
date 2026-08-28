@@ -12,6 +12,9 @@ const VIDEO_TILE = '.film-tile[data-id="toy-story-main"]';
 test.beforeEach(async ({ page }) => {
   await installApi(page);
   await installQueuePlaybackBackend(page, 'film');
+  // TASK-542 — this suite opens a TV series detail and plays from it, which is
+  // the series engine now; the film one stays for the standalone-film tiles.
+  await installQueuePlaybackBackend(page, 'series');
   await page.goto('/app/homeview/profile.html');
   await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();

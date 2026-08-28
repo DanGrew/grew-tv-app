@@ -12,9 +12,11 @@ const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js')
 // (isSwap + swap-in-place), so a stray push from an engine this page ISN'T
 // driving hijacked the live player. Each applier now no-ops unless
 // `engineMode` matches the channel it is for.
-test('a stray video_playback push does not hijack a film playing on the unified engine', async ({ page }) => {
+test('a stray video_playback push does not hijack an episode playing on the unified engine', async ({ page }) => {
   await installApi(page);
-  await installQueuePlaybackBackend(page, 'film');
+  // TASK-542 — bluey plays on the series engine now; the cross-engine gate this
+  // proves is the same one, and a fifth engine only widens what it guards.
+  await installQueuePlaybackBackend(page, 'series');
 
   // Capture the page's live WebSocket instance (registered AFTER the fixtures
   // above so it wraps whatever `window.WebSocket` is by the time they're done

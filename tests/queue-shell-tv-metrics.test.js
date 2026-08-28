@@ -73,15 +73,18 @@ async function expectTvRows(page) {
   expect(await fontOf(page, panel + '.qs-sub')).toBe(TV.subFont);
 }
 
-// Story 4 — all four media types, because the fix lands in the two TV pages'
-// own <style> blocks: video.html serves films, home movies and music videos,
-// audio.html serves music. A type per page would prove the CSS; a type per
-// TYPE proves the shell reaches every one of them at that size.
+// Story 4 — every media type, because the fix lands in the two TV pages'
+// own <style> blocks: video.html serves films, TV series, home movies and music
+// videos, audio.html serves music. A type per page would prove the CSS; a type
+// per TYPE proves the shell reaches every one of them at that size.
 
-test.describe('the film Queue on the TV', () => {
+// TASK-542 — this one opens a TV SERIES, which is its own media type now, so
+// it drives the series engine. The shell's own metrics are the same for every
+// type; what this proves is that the fifth type reaches them too.
+test.describe('the TV series Queue on the TV', () => {
   async function openQueue(page) {
     await installApi(page);
-    const backend = await installQueuePlaybackBackend(page, 'film');
+    const backend = await installQueuePlaybackBackend(page, 'series');
     backend.seed('play-source', { source_type: 'series', source_id: 'bluey' });
     backend.seed('queue-item', { item_id: 'bluey-s1e03' });
     await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');

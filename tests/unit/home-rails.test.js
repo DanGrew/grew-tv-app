@@ -115,7 +115,7 @@ describe('buildRails', () => {
 const TYPED = [
   { kind: 'video',  id: 'toy-story',  title: 'Toy Story',  section: 'films',       genres: ['animation', 'comedy'] },
   { kind: 'video',  id: 'nemo',       title: 'Finding Nemo', section: 'films',     type: 'animation' },             // no genres -> fallback [type]
-  { kind: 'series', id: 'bluey',      title: 'Bluey',      section: 'series',  genres: ['animation'] },
+  { kind: 'series', id: 'bluey',      title: 'Bluey',      section: 'series',  collectionType: 'series', genres: ['animation'] },
   { kind: 'video',  id: 'm-walk',     title: 'Millie Walk', section: 'home-movies', people: ['millie', 'ollie'], tags: { date: '2026-01-02' } },
   { kind: 'video',  id: 'm-park',     title: 'At The Park', section: 'home-movies', people: ['millie'], tags: { date: '2026-01-01' } },
   { kind: 'video',  id: 'orphan',     title: 'Orphan Clip', section: 'home-movies' }                                // no people -> Other
@@ -213,6 +213,32 @@ describe('buildTabRails', () => {
     expect(cw.items[0].kind).toBe('video');                    // selecting plays the episode
     expect(cw.items[0].durationSec).toBe(420);                 // for the progress bar
     expect(cw.items[0].series).toBe('bluey');                  // owning series threaded so a tile launch keeps Next/Prev (BUG-005)
+    expect(cw.items[0].collectionType).toBe('series');         // TASK-542: and its TYPE, so the tile opens the TV Series Queue
+  });
+
+  // TASK-542 — a CW tile is one of three ways into the player carrying a
+  // collection id, and the tile itself knows nothing about its item. The type
+  // comes off the owning collection's own browse card, the same card the row
+  // already borrows its section from. Without it a resumed episode and a
+  // resumed boxset film would open under the same queue again.
+  it('carries the owning collection\'s own type onto a CW tile, series or boxset', () => {
+    const cards = [
+      { kind: 'series', id: 'bluey', title: 'Bluey', section: 'series', collectionType: 'series' },
+      { kind: 'series', id: 'toy-box', title: 'Toy Story Collection', section: 'films', collectionType: 'boxset' }
+    ];
+    const cw = [
+      { item_id: 'bluey-s1e01', title: 'Daddy Putdown', position_secs: 200, duration_secs: 420, collection_id: 'bluey', collection_title: 'Bluey' },
+      { item_id: 'toy-story-2', title: 'Toy Story 2', position_secs: 100, duration_secs: 600, collection_id: 'toy-box', collection_title: 'Toy Story Collection' }
+    ];
+    expect(buildTabRails('series', cards, cw, {})[0].items[0].collectionType).toBe('series');
+    expect(buildTabRails('films', cards, cw, {})[0].items[0].collectionType).toBe('boxset');
+  });
+
+  // A standalone film belongs to no collection, so there is no type to carry —
+  // navTo drops it alongside the null series id and the film opens standalone.
+  it('carries no collection type for a standalone CW tile', () => {
+    const films = buildTabRails('films', TYPED, CW, {});
+    expect(films[0].items[0].collectionType).toBeNull();
   });
 
   it('keeps the backend newest-first CW order (does not re-sort A-Z)', () => {
@@ -1041,6 +1067,9 @@ describe('home-rails mutation hardening (TASK-327)', () => {
     var rail = buildTabRails('films', only, cw, {})[0];
     expect(rail.id).toBe('continue');
     expect(rail.items.map(c => c.id)).toEqual(['toy-story']);
+    // TASK-542 — no card for the collection means no type to carry, and the
+    // tile falls back to a standalone open rather than guessing a queue.
+    expect(rail.items[0].collectionType).toBeNull();
   });
 
   it('a films card with neither genres nor a type lands in an "Other" rail', () => {

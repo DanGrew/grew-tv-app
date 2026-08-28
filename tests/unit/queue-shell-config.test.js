@@ -1,5 +1,5 @@
 import {
-  HOME_MOVIE, FILM, MUSIC, MUSIC_VIDEO,
+  HOME_MOVIE, FILM, SERIES, MUSIC, MUSIC_VIDEO,
   QUEUE_SHELL_CONFIG, ITEM_MEDIA_TYPE, itemMediaType, queueAdd, queueAddStatus,
   QUEUE_ADD_LABEL
 } from '../../core/queue-shell-config.js';
@@ -14,7 +14,7 @@ function fakeFetch() {
 describe('the per-type configs', () => {
   it('registers every media type under the engine key the queue engine uses', () => {
     expect(QUEUE_SHELL_CONFIG).toEqual({
-      'home-movie': HOME_MOVIE, film: FILM, music: MUSIC, 'music-video': MUSIC_VIDEO
+      'home-movie': HOME_MOVIE, film: FILM, series: SERIES, music: MUSIC, 'music-video': MUSIC_VIDEO
     });
     expect(Object.keys(QUEUE_SHELL_CONFIG).map(k => QUEUE_SHELL_CONFIG[k].mediaType)).toEqual(Object.keys(QUEUE_SHELL_CONFIG));
   });
@@ -26,9 +26,18 @@ describe('the per-type configs', () => {
     expect([MUSIC_VIDEO.noun, MUSIC_VIDEO.nounPlural]).toEqual(['video', 'videos']);
   });
 
+  // TASK-542 story 2 — the Queue page calls a series' items EPISODES, where it
+  // used to read the film noun. The shared empty/ends wording is built from
+  // this field alone, so "nothing plays after the last episode" is this line.
+  it('calls a TV series item an episode, where a film is a title', () => {
+    expect([SERIES.noun, SERIES.nounPlural]).toEqual(['episode', 'episodes']);
+    expect(SERIES.noun).not.toBe(FILM.noun);
+  });
+
   it('gives each type a fallback glyph', () => {
     expect(HOME_MOVIE.glyph).toBe('&#127916;');
     expect(FILM.glyph).toBe('&#127916;');
+    expect(SERIES.glyph).toBe('&#128250;');
     expect(MUSIC.glyph).toBe('&#127925;');
     expect(MUSIC_VIDEO.glyph).toBe('&#127916;');
   });
@@ -37,6 +46,7 @@ describe('the per-type configs', () => {
   it('puts every type on the shell transport rule, none of its own', () => {
     expect(HOME_MOVIE.transport).toBe(transportState);
     expect(FILM.transport).toBe(transportState);
+    expect(SERIES.transport).toBe(transportState);
     expect(MUSIC.transport).toBe(transportState);
     expect(MUSIC_VIDEO.transport).toBe(transportState);
   });
@@ -50,7 +60,8 @@ describe('sourceSubtitle', () => {
   });
 
   it('reads the caller lookup for a type whose source id is opaque', () => {
-    expect(FILM.sourceSubtitle({ source_type: 'series', source_id: 'toy-story' }, 'Toy Story Collection')).toBe('Toy Story Collection');
+    expect(FILM.sourceSubtitle({ source_type: 'boxset', source_id: 'toy-story' }, 'Toy Story Collection')).toBe('Toy Story Collection');
+    expect(SERIES.sourceSubtitle({ source_type: 'series', source_id: 'bluey' }, 'Bluey')).toBe('Bluey');
     expect(MUSIC.sourceSubtitle({ source_type: 'album', source_id: 'ootb' }, 'Out of the Blue')).toBe('Out of the Blue');
     expect(MUSIC_VIDEO.sourceSubtitle({ source_type: 'artist', source_id: 'elo' }, 'ELO')).toBe('ELO');
   });
@@ -63,9 +74,10 @@ describe('sourceSubtitle', () => {
 });
 
 describe('rowSub', () => {
-  it('is the item duration for films and home movies', () => {
+  it('is the item duration for films, series episodes and home movies', () => {
     expect(HOME_MOVIE.rowSub({ duration: 61, artist: 'IGNORED' })).toBe('1:01');
     expect(FILM.rowSub({ duration: 5760 })).toBe('1:36:00');
+    expect(SERIES.rowSub({ duration: 1500 })).toBe('25:00');
   });
 
   it('is the artist for music and music videos', () => {
@@ -86,18 +98,27 @@ describe('rowSub', () => {
 });
 
 // BUG-531 — which Queue a ＋ press fills is decided by the ITEM's own type,
-// never by the screen it was pressed on. The map is the whole rule: FEAT-541
-// splits TV series out of the film media type and `episode` is the one entry
-// that flips, which is a one-line change here and thirteen producers otherwise.
+// never by the screen it was pressed on. The map is the whole rule: TASK-542
+// split TV series out of the film media type and `episode` was the one entry
+// that flipped, which was a one-line change here and thirteen producers
+// otherwise.
 describe('the item-type → media-type map', () => {
   it('maps every catalog item type onto the Queue it belongs to', () => {
     expect(ITEM_MEDIA_TYPE).toEqual({
       film: 'film',
-      episode: 'film',
+      episode: 'series',
       'home-movie': 'home-movie',
       track: 'music',
       'music-video': 'music-video'
     });
+  });
+
+  // TASK-542 story 1 — the two are separate queues now, and the map is where
+  // that separation is decided for all thirteen ＋ producers at once.
+  it('sends an episode to the series Queue and a film to the film one', () => {
+    expect(ITEM_MEDIA_TYPE.episode).toBe('series');
+    expect(ITEM_MEDIA_TYPE.film).toBe('film');
+    expect(ITEM_MEDIA_TYPE.episode).not.toBe(ITEM_MEDIA_TYPE.film);
   });
 
   it('only ever names a media type the queue engine actually serves', () => {
@@ -108,7 +129,7 @@ describe('the item-type → media-type map', () => {
 
   it('resolves each item type to its own Queue', () => {
     expect(itemMediaType('film')).toBe('film');
-    expect(itemMediaType('episode')).toBe('film');
+    expect(itemMediaType('episode')).toBe('series');
     expect(itemMediaType('home-movie')).toBe('home-movie');
     expect(itemMediaType('track')).toBe('music');
     expect(itemMediaType('music-video')).toBe('music-video');

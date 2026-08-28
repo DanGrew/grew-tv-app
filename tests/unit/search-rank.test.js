@@ -96,7 +96,10 @@ describe('allVideoItems', () => {
     expect(ep.tag).toBe('EPISODE');
     expect(ep.title).toBe('The Wedding');
     expect(ep.poster).toBe('ngo.jpg');
-    expect(ep.card).toEqual({ kind: 'video', id: 'ngo-01', series: 'series-ngo' });
+    // TASK-542 — `collectionType: 'series'` is a constant: the episode index is
+    // built from collection_type='series' collections alone, so a search
+    // episode hit opens the TV Series Queue and never the Films one.
+    expect(ep.card).toEqual({ kind: 'video', id: 'ngo-01', series: 'series-ngo', collectionType: 'series' });
     expect(ep.fields).toEqual(['The Wedding']);
   });
   it('secondary is the series title plus S<season>E<episode> when both are set', () => {
@@ -106,7 +109,9 @@ describe('allVideoItems', () => {
     var loose = allVideoItems([], EPISODES)[1];
     expect(loose.secondary).toBe('');
     expect(loose.poster).toBeNull();
-    expect(loose.card).toEqual({ kind: 'video', id: 'loose-ep', series: null });
+    // The type rides along regardless; with no collection id beside it, navTo
+    // drops both and the episode opens standalone.
+    expect(loose.card).toEqual({ kind: 'video', id: 'loose-ep', series: null, collectionType: 'series' });
   });
   it('omits the S/E label when only one of season/episode is set', () => {
     var onlySeason = allVideoItems([], [{ id: 'p1', title: 'P1', series: 'S', series_id: 'sid', season: 1, episode: null, cover: null }])[0];

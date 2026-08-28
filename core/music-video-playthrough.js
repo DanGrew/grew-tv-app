@@ -12,11 +12,14 @@
 // enters is now one map for every producer, in core/queue-shell-config.js.
 
 // TASK-501 — browse's Continue lands here: `continueType` names the media type
-// to carry on with, and video.html serves the three that play in it (music
+// to carry on with, and video.html serves the four that play in it (music
 // carries on in audio.html's own entry). It wins outright — a Continue press
 // carries no other entry param, and resolving to a distinct mode per type is
 // what lets the page key its engine off `mode` like every other entry does.
+// TASK-542 — `series` is the fourth: an episode advances on its own engine now,
+// so continuing one can no longer ride in on `continueFilm`.
 var CONTINUE_MODE = {
+  series: 'continueSeries',
   film: 'continueFilm',
   'home-movie': 'continueHomeMovie',
   'music-video': 'continueMusicVideo'
@@ -32,8 +35,32 @@ var CONTINUE_MODE = {
 // own `home-movies-all` / `home-movies-by-person` / `home-movie-month`
 // sources, not the mv* modes above — those route through the music-video
 // engine instead; the three are mutually exclusive, one Play All rail tile
-// sets exactly one param), then a series, else a standalone single. Kept in
-// core (not the page) because it branches — ui/** must stay cyclomatic-1.
+// sets exactly one param), then a collection — a TV series or a boxset — else
+// a standalone single. Kept in core (not the page) because it branches — ui/**
+// must stay cyclomatic-1.
+//
+// TASK-542 — the `?series=` param carries a COLLECTION id, and detail.html /
+// loadSeries have always served a TV series and a film boxset through it
+// identically. That was fine while both played as films; now that TV series is
+// its own media type, the collection's own `collectionType` decides which
+// queue the collection opens under, so it rides the nav param beside the id.
+// TASK-503 skipped threading it as "purely cosmetic" — this is where it stops
+// being cosmetic.
+//
+// An unstamped `?series=` — an old bookmark, a hand-typed URL — reads as a TV
+// series, which is what the param was named for and what the overwhelming
+// majority of them are; a boxset nav from any of this app's own screens
+// carries the field.
+var COLLECTION_MODE = { boxset: 'boxset', series: 'series' };
+
+// The table answers for every type it lists; the default is for a nav it has
+// no answer for at all, so listing a type and omitting it are never the same
+// thing (a `|| 'series'` fallback would make the `series:` entry dead weight).
+function collectionMode(collectionType) {
+  var stamped = COLLECTION_MODE[collectionType];
+  return stamped === undefined ? 'series' : stamped;
+}
+
 export function entryMode(p) {
   var params = p || {};
   if (CONTINUE_MODE[params.continueType]) return CONTINUE_MODE[params.continueType];
@@ -45,7 +72,7 @@ export function entryMode(p) {
   if (params.homeMoviesAll) return 'homeMoviesAll';
   if (params.homeMoviesPerson) return 'homeMoviesPerson';
   if (params.homeMoviesMonth) return 'homeMoviesMonth';
-  if (params.isSeries) return 'series';
+  if (params.isSeries) return collectionMode(params.collectionType);
   return 'single';
 }
 
