@@ -158,9 +158,9 @@ test.describe('Queue UX shell — hero + tabs', () => {
 
   test('the tab bar spans full width equally, labelled with live counts', async ({ page }) => {
     await openQueue(page);
-    await expect(page.locator('.qs-tab[data-tab="queue"]')).toHaveText(/Queue \d+/);
-    await expect(page.locator('.qs-tab[data-tab="next"]')).toHaveText(/Next \d+/);
-    await expect(page.locator('.qs-tab[data-tab="coming-up"]')).toHaveText(/Coming Up \d+/);
+    await expect(page.locator('.qs-tab[data-tab="queue"]')).toHaveText(/Queue \(\d+\)/);
+    await expect(page.locator('.qs-tab[data-tab="next"]')).toHaveText(/Next \(\d+\)/);
+    await expect(page.locator('.qs-tab[data-tab="coming-up"]')).toHaveText(/Coming Up \(\d+\)/);
   });
 
   test('tapping a Next row plays it now via play-item — never mutates the queue', async ({ page }) => {

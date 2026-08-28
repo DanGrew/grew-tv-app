@@ -64,7 +64,7 @@ test('each song row carries a single ＋; the sheet\'s top option is ▶ Play Ne
   await expect(page.locator('.detail-add-btn[data-add="ootb-01"]')).toHaveText('＋');
   await page.locator('.detail-add-btn[data-add="ootb-01"]').click();
   await expect(page.locator('#add-sheet-list > *').first()).toHaveClass(/add-queue/);
-  await expect(page.locator('#add-sheet-list .add-queue')).toHaveText('☰ Play Next');
+  await expect(page.locator('#add-sheet-list .add-queue')).toHaveText('☰ Add to Queue');
   await expect(page.locator('#add-sheet-list .add-choice')).toHaveText(['♪ Road Trip', '♪ Empty Mix']);
 });
 

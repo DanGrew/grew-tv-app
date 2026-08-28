@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadBrowse, loadContinueWatching, loadTracks, loadEpisodes } from '../../core/app-api.js';
-import { queueAdd, queueAddStatus, SECTION_MEDIA_TYPE } from '../../core/queue-shell-config.js';
+import { queueAdd, queueAddStatus, itemMediaType } from '../../core/queue-shell-config.js';
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { CONTINUE_TYPES, continueTarget } from '../../core/browse-continue.js';
 import { mountContinueMenu } from './continue-menu.js';
@@ -10,7 +10,7 @@ import { buildTabs, railsForSection } from '../../core/home-rails.js';
 import { firstRailId, pageOffset, settleIndex, stepIndex, arrowDisabled, shouldActivateDrag, isRealDrag, isTapRelease } from '../../core/rail-pager.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
-import { cardRoute, sectionOf } from '../../core/home-rails.js';
+import { cardRoute } from '../../core/home-rails.js';
 import { externalDestinations, launchExternalParams, destinationUrls } from '../../core/external-destinations.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
 import { desyncOpenPage, tileOffDesynced } from '../../core/companion-button-modes.js';
@@ -163,10 +163,14 @@ export function initPage() {
   // is the config's own per-type wording. TASK-517 — the 🎬 pill counts the
   // film queue this feeds again, so a press refreshes it (the TV mirror does
   // the same); another media type just re-reads an unmoved count.
-  function queueCard(mediaType, id) {
-    queueAdd(server, mediaType, state.person, id)
+  // BUG-531 — the card's own itemType names the Queue, and a press that fails
+  // says so: it used to swallow the failure, so a refused press looked
+  // identical to one that worked.
+  function queueCard(card) {
+    var mediaType = itemMediaType(card.itemType);
+    queueAdd(server, mediaType, state.person, card.id)
       .then(function() { showQueueStatus(queueAddStatus(mediaType)); continueMenu.refresh(); })
-      .catch(noop);
+      .catch(function() { showQueueStatus('Could not queue.'); });
   }
 
   // TASK-501 (FEAT-497) — Continue, one button per media type, in the #queue-menu
@@ -238,16 +242,17 @@ export function initPage() {
   // gap: a standalone film has no detail-row list, so this is its only queue
   // affordance; TASK-421 extends it to music videos — same gap, own rail). The
   // control stays live in Browse (per-person POST), unlike the play tile.
-  // Keyed by sectionOf() (TASK-503), not cardRoute() — cardRoute() collapses a
-  // film and a home-movie card to the same 'video' nav route, which isn't
-  // fine-grained enough to name a media type.
+  // Keyed by the card's own itemType (BUG-531), not cardRoute() and no longer
+  // its browse section — cardRoute() collapses a film and a home-movie card to
+  // the same 'video' nav route, and sectionOf() falls back to 'films' for an
+  // unstamped card; neither names the item's real media type.
   function filmQueueBtn(card) {
     var b = document.createElement('button');
     b.className = 'ph-cell-queue';
     b.setAttribute('data-queue', card.id);
     b.setAttribute('aria-label', 'Queue');
     b.textContent = '＋';
-    b.addEventListener('click', function() { queueCard(SECTION_MEDIA_TYPE[sectionOf(card)], card.id); });
+    b.addEventListener('click', function() { queueCard(card); });
     return b;
   }
   function filmCell(card) {

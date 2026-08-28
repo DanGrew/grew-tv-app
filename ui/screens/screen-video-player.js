@@ -354,10 +354,9 @@ export function setup(config) {
 
   // iOS/Safari block play()-with-sound without a user gesture in THIS document,
   // and selecting a video is a full page navigation, so the browse tap does not
-  // carry over — the catch below falls back to muted. Show a prompt and unmute
+  // carry over — that rejection falls back to muted. Show a prompt and unmute
   // on the first real gesture here; iOS "sticky activation" then lets later
-  // episodes autoplay with sound, so this only fires for the first video. On
-  // desktop/TV the reject never happens, so the prompt never shows.
+  // episodes autoplay with sound, so this only fires for the first video.
   function unmuteForSound() {
     video.muted = false;
     document.getElementById('sound-prompt').classList.add('hidden');
@@ -366,6 +365,25 @@ export function setup(config) {
     document.getElementById('sound-prompt').classList.remove('hidden');
     document.addEventListener('pointerdown', unmuteForSound, { once: true });
     document.addEventListener('keydown', unmuteForSound, { once: true });
+  }
+
+  // BUG-538: only NotAllowedError means the browser blocked SOUND. The other
+  // common rejection is a superseded play — "the play() request was interrupted
+  // by a new load request", or by a pause() — which arrives as AbortError and
+  // happens on EVERY platform, TV included, whenever the queue swaps items on
+  // top of a still-loading play. (The old comment here claimed the reject never
+  // happens on desktop/TV: true of the autoplay policy, never of an interrupted
+  // play.) Muting for that is pure harm — the retry succeeds muted, so the item
+  // plays on in silence behind a prompt nobody earned, which is why short items
+  // that auto-advance constantly (music videos, home movies) showed it and films
+  // rarely did. A superseded play needs no handling: the load that superseded it
+  // is already starting its own playback.
+  var PLAY_REJECTED = {
+    'true':  function() { video.muted = true; video.play().catch(function() {}); promptForSound(); },
+    'false': function() {}
+  };
+  function onPlayRejected(err) {
+    PLAY_REJECTED[String(err.name === 'NotAllowedError')]();
   }
 
   function startPlayback(seekTo) {
@@ -377,7 +395,7 @@ export function setup(config) {
     pendingResume = seekTo > 0;
     video.muted = false;
     var doPlay = function() {
-      video.play().catch(function() { video.muted = true; video.play().catch(function() {}); promptForSound(); });
+      video.play().catch(onPlayRejected);
       showControls();
     };
     [seekTo].filter(function(t) { return t > 0; }).forEach(function(t) {

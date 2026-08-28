@@ -20,6 +20,9 @@
 //   add            — the ＋Queue map entry: which action, which body key, and
 //                    the confirmation wording.
 //
+// Which media type a ＋ press addresses is NOT a per-screen decision: it comes
+// from the item's own itemType through ITEM_MEDIA_TYPE below (BUG-531).
+//
 // ⛔ A difference discovered between two types is a defect to fix toward
 // docs/QUEUE-UX-SHELL.md, not a precedent to codify as a new config field.
 
@@ -58,6 +61,16 @@ function artistSub(entry) {
 // pre-FEAT-497 engine any more, which is why there is no per-type engine
 // field left to route on.
 var APPEND = { action: 'queue-item', bodyKey: 'item_id', status: 'Added to Queue' };
+
+// BUG-530 — the ＋ sheet's own top option, in the same words as the
+// confirmation APPEND above hands back. It read "☰ Play Next" on all six track
+// sheets long after TASK-504/505 had put the last type on the append, so the
+// sheet promised the front of the Queue and the toast then confirmed the end
+// of it. One constant, not a per-type field: every type appends, so the option
+// says the same thing everywhere — a type that wanted its own word here would
+// be the difference this file's ⛔ says to fix, not to codify. ☰ is the Queue
+// glyph the shell already uses for the page this press fills.
+export var QUEUE_ADD_LABEL = '☰ Add to Queue';
 
 export var HOME_MOVIE = {
   mediaType: 'home-movie',
@@ -111,15 +124,33 @@ export var QUEUE_SHELL_CONFIG = {
   'music-video': MUSIC_VIDEO
 };
 
-// Browse/rail screens name their sections, not media types; this is the one
-// place the two vocabularies meet. cardRoute() collapses a film and a home
-// movie to the same nav route, so a ＋Queue press keys off the section.
-export var SECTION_MEDIA_TYPE = {
-  films: 'film',
-  'home-movies': 'home-movie',
-  'music-videos': 'music-video',
-  music: 'music'
+// BUG-531 — which Queue a ＋ press fills, decided by the item's OWN itemType.
+// Every ＋ producer holds the item or card it was pressed on, so this is the
+// one thing it needs to ask; before this, eight producers named a media type
+// from the screen's own assumption and three read the card's browse SECTION,
+// whose sectionOf() falls back to 'films' for an unstamped card — either way a
+// press could file an item under a Queue it doesn't belong to, and the engine
+// took it.
+//
+// A MAP, not branches: FEAT-541 splits TV series out of the film media type,
+// and `episode` is the one entry that flips ('film' -> 'series'). One line here
+// against thirteen producers otherwise. The backend keeps the same map at
+// api/queue_playback.py (_MEDIA_TYPE_BY_ITEM_TYPE), which refuses a press that
+// still names the wrong Queue.
+export var ITEM_MEDIA_TYPE = {
+  film: 'film',
+  episode: 'film',
+  'home-movie': 'home-movie',
+  track: 'music',
+  'music-video': 'music-video'
 };
+
+// The Queue an item belongs in, from its own itemType. undefined for a type
+// this app has no Queue for — queueAdd() below turns that into a failed press
+// rather than a silent one.
+export function itemMediaType(itemType) {
+  return ITEM_MEDIA_TYPE[itemType];
+}
 
 // THE ＋Queue producer. Every ＋ affordance — browse tile, rail-grid badge,
 // clip/track list row, on either surface — routes through this instead of
@@ -128,11 +159,25 @@ export var SECTION_MEDIA_TYPE = {
 // TASK-505 retired the per-engine dispatch this used to route through: with
 // all four media types on the unified engine, the only thing that varies is
 // which media_type the POST names.
+// BUG-531 — two ways a ＋ press can fail, and both must reach the producer's
+// own .catch() so the person sees it:
+//   * no media type resolved. A synchronous throw would skip that catch
+//     entirely, so this REJECTS instead.
+//   * the server refused the item — a cross-type press its own guard will not
+//     file (api/queue_playback.py). fetch() resolves on a 400, so without this
+//     every producer's .then() fired and confirmed "Added to Queue" over an
+//     item that was never added, which is worse than the wrong queue: it says
+//     the press worked.
 export function queueAdd(serverUrl, mediaType, person, itemId) {
   var config = QUEUE_SHELL_CONFIG[mediaType];
+  if (!config) return Promise.reject(new Error('no queue for media type: ' + mediaType));
   var body = {};
   body[config.add.bodyKey] = itemId;
-  return queuePlaybackAction(serverUrl, config.mediaType, config.add.action, person, body);
+  return queuePlaybackAction(serverUrl, config.mediaType, config.add.action, person, body)
+    .then(function(res) {
+      if (!res.ok) throw new Error('queue refused ' + itemId + ': ' + res.status);
+      return res;
+    });
 }
 
 // The confirmation a ＋Queue press shows once it lands.

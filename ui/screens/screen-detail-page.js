@@ -2,7 +2,8 @@ import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadSeries, loadContinueWatching, queuePlaybackAction } from '../../core/app-api.js';
+import { loadSeries, loadContinueWatching } from '../../core/app-api.js';
+import { itemMediaType, queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { primaryAction, playNextLabel } from '../../core/series-detail.js';
 import { collectionMetaLine } from '../../core/detail-view.js';
@@ -35,7 +36,7 @@ export function initDetailPage() {
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
 
-  // FEAT-040/TASK-249 — per-episode "＋ Queue" (Play Next) on a video series
+  // FEAT-040/TASK-249 — per-episode "＋ Queue" on a video series
   // (TV or a film boxset — detail.html/loadSeries serve both identically).
   // TASK-503: this series/boxset detail list is ALWAYS driven by the TASK-498
   // unified queue engine now (screen-video-page's MODE_ENGINE.series/single ->
@@ -44,6 +45,15 @@ export function initDetailPage() {
   // which that player no longer reads at all (queueing there silently queued to
   // nothing). The durable queue (TASK-247) keeps it across source swaps and the
   // persistent player shows it as Up next. A transient toast confirms.
+  // BUG-531 — the last ＋ producer still naming its media type by hand, and the
+  // last one posting around queueAdd(). The EPISODE's own itemType names the
+  // Queue now (a TV episode and a boxset film both resolve to the film Queue
+  // today; FEAT-541 splits TV series out and this follows the map unchanged),
+  // and the press goes through THE ＋Queue producer like the other twelve.
+  // BUG-530 — and its confirmation now comes from queue-shell-config too. It was
+  // the last hand-written one: it said "Queued to Play Next" while the press
+  // appended, and read differently from the companion mirror's toast on this very
+  // same list (companion-detail's queueVideo).
   var statusTimer = null;
   function hideStatus() { document.getElementById('queue-status').style.display = 'none'; }
   function showStatus(text) {
@@ -54,8 +64,9 @@ export function initDetailPage() {
     statusTimer = setTimeout(hideStatus, 2500);
   }
   function queueVideo(item) {
-    queuePlaybackAction(SERVER, 'film', 'queue-item', getPerson(), { item_id: item.video.id })
-      .then(function() { showStatus('Queued to Play Next'); })
+    var mediaType = itemMediaType(item.video.itemType);
+    queueAdd(SERVER, mediaType, getPerson(), item.video.id)
+      .then(function() { showStatus(queueAddStatus(mediaType)); })
       .catch(function() { showStatus('Could not queue.'); });
   }
 

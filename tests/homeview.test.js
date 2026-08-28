@@ -743,3 +743,24 @@ test('iOS: blocked play-with-sound shows a sound prompt that a gesture clears (a
   await expect(page.locator('#video')).toHaveJSProperty('muted', false);
   await expect(page.locator('#sound-prompt')).toHaveClass(/hidden/);
 });
+
+// BUG-538, the twin of the test above: play() also rejects when the play was
+// SUPERSEDED — "the play() request was interrupted by a new load request" (or by
+// a pause()), which arrives as an AbortError on every platform, TV included. That
+// is not the browser blocking sound, so muting in response is the harm: the retry
+// succeeds muted and the item plays on in silence behind a prompt nobody earned.
+// A queue advance lands on a still-loading play constantly for short items, which
+// is why music videos and home movies showed it and films rarely did. Pre-fix the
+// undifferentiated catch muted and prompted here too.
+test('an interrupted play() neither mutes the video nor shows the sound prompt (BUG-538)', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.HTMLMediaElement.prototype.play = function () {
+      return Promise.reject(new DOMException('The play() request was interrupted by a new load request.', 'AbortError'));
+    };
+  });
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#video-upnext')).toHaveText('Up next: The Weekend');
+  await expect(page.locator('#sound-prompt')).toHaveClass(/hidden/);
+  await expect(page.locator('#video')).toHaveJSProperty('muted', false);
+});

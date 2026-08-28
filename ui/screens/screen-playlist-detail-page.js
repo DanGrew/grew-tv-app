@@ -3,14 +3,14 @@ import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
-import { queueAdd, queueAddStatus } from '../../core/queue-shell-config.js';
+import { itemMediaType, queueAdd, queueAddStatus, QUEUE_ADD_LABEL } from '../../core/queue-shell-config.js';
 import { coverMosaicHtml } from '../../core/cover-mosaic.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { gridIndex } from '../../core/playlist-name.js';
-import { playlistTrackTarget, playlistQueueKey } from '../../core/music-video-playthrough.js';
+import { playlistTrackTarget } from '../../core/music-video-playthrough.js';
 
 // FEAT-036 (TASK-204) playlist detail. A user playlist resolves into the same
 // detail shape as an album (/api/playlist), so this reuses the FEAT-017
@@ -140,7 +140,7 @@ export function initPlaylistDetailPage() {
 
   // FEAT-036/039 — the "Add to playlist" sheet, ported from album detail
   // (screen-album-detail-page, TASK-206/212/253). ONE sheet serves two entry points
-  // on this page: the per-track ＋ (openAddSheet — Play Next + add ONE track to a
+  // on this page: the per-track ＋ (openAddSheet — queue + add ONE track to a
   // playlist, TASK-262) and the header "Add all to playlist" (openAddSourceSheet —
   // bulk-snapshot THIS whole playlist into ANOTHER, TASK-212). addState.add(id) is the
   // POST for the chosen mode (add-track vs add-source); queue / createParams /
@@ -185,14 +185,15 @@ export function initPlaylistDetailPage() {
     [ADD_CLOSE[e.key]].filter(Boolean).forEach(function() { e.preventDefault(); closeAddSheet(); });
   }
   function onAddKey(e) { e.stopPropagation(); moveAdd(e); closeKeys(e); }
-  // The per-track sheet's top option "☰ Play Next" (queue the track). Present only for
-  // the per-TRACK sheet (openAddSheet sets addState.queue); the header "Add all" sheet
+  // The per-track sheet's top option: queue the track. Present only for the
+  // per-TRACK sheet (openAddSheet sets addState.queue); the header "Add all" sheet
   // leaves queue null. NOT `.add-choice` so the playlist-list assertions stay clean.
+  // BUG-530: worded by queue-shell-config, the same place the confirmation is.
   function buildQueueChoice() {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'add-queue';
-    b.textContent = '☰ Play Next';
+    b.textContent = QUEUE_ADD_LABEL;
     b.addEventListener('click', addState.queue);
     b.addEventListener('keydown', onAddKey);
     document.getElementById('add-sheet-list').appendChild(b);
@@ -230,16 +231,19 @@ export function initPlaylistDetailPage() {
   // THE ＋Queue producer: this screen names the media type and the shared table
   // owns which engine, which action and which confirmation wording — so a
   // playlist's two row kinds can't drift from the rest of their own type.
-  var QUEUE_MEDIA_TYPE = { 'music-video': 'music-video', track: 'music' };
+  // BUG-531 drops this screen's own two-entry table for the shared item-type
+  // map, which every ＋ producer now reads: one place decides which Queue an
+  // item belongs to, and a row whose type resolves to none fails visibly
+  // instead of defaulting to music.
   function queueTrack(item) {
-    var mediaType = QUEUE_MEDIA_TYPE[playlistQueueKey(item.video.itemType)];
+    var mediaType = itemMediaType(item.video.itemType);
     queueAdd(SERVER, mediaType, getPerson(), item.video.id)
       .then(function() { showStatus(queueAddStatus(mediaType)); })
       .catch(function() { showStatus('Could not queue track.'); });
   }
   function queueThenClose(item) { closeAddSheet(); queueTrack(item); }
-  // Per-track (TASK-262): the single ＋ opens the sheet for ONE track — Play Next on
-  // top, playlist cards below. Return focus to the track row it opened from.
+  // Per-track (TASK-262): the single ＋ opens the sheet for ONE track — the queue
+  // option on top, playlist cards below. Return focus to the row it opened from.
   function openAddSheet(item) {
     addState.add = function(id) { return addToPlaylist(SERVER, id, item.video.id); };
     addState.queue = function() { queueThenClose(item); };
@@ -250,8 +254,8 @@ export function initPlaylistDetailPage() {
   }
   // Header "Add all to playlist" (TASK-212): bulk-add THIS whole playlist into ANOTHER
   // as a snapshot (add-source, source_type 'playlist'), the current playlist EXCLUDED
-  // (no self-add). No Play Next (queue null — a per-track action). Return focus to the
-  // header button.
+  // (no self-add). No queue option (queue null — a per-track action). Return focus to
+  // the header button.
   function openAddSourceSheet() {
     addState.add = function(id) { return addSourceToPlaylist(SERVER, id, 'playlist', playlistId); };
     addState.queue = null;
