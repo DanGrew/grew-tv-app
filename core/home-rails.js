@@ -263,7 +263,14 @@ function groupRails(cards, keyer, labeler, prefix) {
 // this tile must launch the player WITH its series context, or Next/Prev are
 // dead (the player reads series only from the URL). null for a standalone
 // film/home-movie, which navTo then drops so it stays seriesless.
-function cwCard(row) {
+//
+// TASK-542 — and `collectionType` beside it, off the owning collection's own
+// browse card (the same card rowSection already borrows this row's section
+// from). A CW tile is one of the three ways into the player carrying a
+// collection id, and without the type an episode resumed from here would open
+// under films: the tile knows nothing about its item, but the collection card
+// does.
+function cwCard(row, card) {
   var label = row.collection_title
     ? row.collection_title + ' · ' + (row.title || '')
     : (row.title || '');
@@ -273,7 +280,11 @@ function cwCard(row) {
     title: label,
     poster: row.poster,
     durationSec: row.duration_secs,
-    series: row.collection_id
+    series: row.collection_id,
+    // null, never undefined, and null for a standalone item's own card too —
+    // it mirrors `series` above, which is null whenever there is no collection
+    // for a type to describe.
+    collectionType: (card && card.collectionType) || null
   };
 }
 
@@ -286,7 +297,7 @@ function continueRail(sectionId, cwRows, byId) {
   if (!cwRows) return [];
   var items = cwRows
     .filter(function(r) { return rowSection(r, byId) === sectionId; })
-    .map(cwCard);
+    .map(function(r) { return cwCard(r, rowCard(r, byId)); });
   return [{ id: 'continue', title: 'Continue Watching', items: items }]
     .filter(function(rail) { return rail.items.length > 0; });
 }

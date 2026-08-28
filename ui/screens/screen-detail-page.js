@@ -19,9 +19,14 @@ export function initDetailPage() {
   var state = { series: { items: [] }, progress: {} };
 
   // resume = start where the backend left off (the row default); restart = from 0.
+  // TASK-542: `collectionType` rides along so the player knows whether this
+  // detail page is a TV series or a film boxset — detail.html/loadSeries serve
+  // both through the same `?series=` param, and which queue the collection
+  // opens is now the difference between them. Read at call time (every play
+  // happens after the load), off the collection the page already holds.
   var PLAY_PARAMS = {
-    resume:  function(id) { return { video: id, series: seriesId, from: 'detail' }; },
-    restart: function(id) { return { video: id, series: seriesId, from: 'detail', restart: '1' }; }
+    resume:  function(id) { return { video: id, series: seriesId, collectionType: state.series.collectionType, from: 'detail' }; },
+    restart: function(id) { return { video: id, series: seriesId, collectionType: state.series.collectionType, from: 'detail', restart: '1' }; }
   };
   function play(item, mode) { navTo('video.html', PLAY_PARAMS[mode](item.video.id)); }
   function onPlayItem(item, i, mode) { play(item, mode); }
@@ -39,17 +44,18 @@ export function initDetailPage() {
   // FEAT-040/TASK-249 — per-episode "＋ Queue" on a video series
   // (TV or a film boxset — detail.html/loadSeries serve both identically).
   // TASK-503: this series/boxset detail list is ALWAYS driven by the TASK-498
-  // unified queue engine now (screen-video-page's MODE_ENGINE.series/single ->
-  // 'film', matching queue_catalog_source.py's series/boxset/standalone catalog
-  // sources) — POSTs queue-item to /api/queue/film, never the old video engine,
+  // unified queue engine now (screen-video-page's MODE_ENGINE, matching
+  // queue_catalog_source.py's series/boxset/standalone catalog sources) —
+  // POSTs queue-item to the unified engine, never the old video engine,
   // which that player no longer reads at all (queueing there silently queued to
   // nothing). The durable queue (TASK-247) keeps it across source swaps and the
   // persistent player shows it as Up next. A transient toast confirms.
   // BUG-531 — the last ＋ producer still naming its media type by hand, and the
   // last one posting around queueAdd(). The EPISODE's own itemType names the
-  // Queue now (a TV episode and a boxset film both resolve to the film Queue
-  // today; FEAT-541 splits TV series out and this follows the map unchanged),
-  // and the press goes through THE ＋Queue producer like the other twelve.
+  // Queue now, and the press goes through THE ＋Queue producer like the other
+  // twelve. TASK-542 split TV series out and this followed the map unchanged:
+  // the same list ＋'s an episode to the TV Series Queue and a boxset film to
+  // the Films Queue, deciding neither for itself.
   // BUG-530 — and its confirmation now comes from queue-shell-config too. It was
   // the last hand-written one: it said "Queued to Play Next" while the press
   // appended, and read differently from the companion mirror's toast on this very

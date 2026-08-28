@@ -2,13 +2,22 @@ import { describe, it, expect } from 'vitest';
 import { entryMode, playlistTrackTarget } from '../../core/music-video-playthrough.js';
 
 describe('entryMode', () => {
-  // TASK-501 — browse's Continue press. Each of the three types video.html
+  // TASK-501 — browse's Continue press. Each of the four types video.html
   // plays resolves to its OWN mode, which is what lets the page key its engine
   // off `mode` like every other entry rather than branching on a media type.
+  // TASK-542 — a series continue is a mode of its own for the same reason it is
+  // a queue of its own: 'continueFilm' would advance the WRONG engine.
   it('is a per-type continue mode when a Continue press names its media type', () => {
+    expect(entryMode({ continueType: 'series' })).toBe('continueSeries');
     expect(entryMode({ continueType: 'film' })).toBe('continueFilm');
     expect(entryMode({ continueType: 'home-movie' })).toBe('continueHomeMovie');
     expect(entryMode({ continueType: 'music-video' })).toBe('continueMusicVideo');
+  });
+  // A Continue press carries no collection id, so it must not be read as one:
+  // 'continueSeries' and 'series' are different entries onto the same rail.
+  it('separates continuing a series from opening one', () => {
+    expect(entryMode({ continueType: 'series' })).not.toBe('series');
+    expect(entryMode({ continueType: 'series', isSeries: true, collectionType: 'boxset' })).toBe('continueSeries');
   });
   it('wins over every other entry param', () => {
     expect(entryMode({ continueType: 'film', playQueue: true, mvPlaylist: 'pl1', mvAll: true, homeMoviesAll: true, isSeries: true })).toBe('continueFilm');
@@ -53,13 +62,44 @@ describe('entryMode', () => {
     expect(entryMode({ homeMoviesAll: true, homeMoviesMonth: '2026-08' })).toBe('homeMoviesAll');
     expect(entryMode({ mvAll: true, homeMoviesMonth: '2026-08' })).toBe('mvAll');
   });
-  it('is "series" when a series id is flagged (and no music-video/home-movies param)', () => {
+  it('is a collection mode when a series id is flagged (and no music-video/home-movies param)', () => {
     expect(entryMode({ isSeries: true })).toBe('series');
     expect(entryMode({ mvItem: 'mv1', isSeries: true })).toBe('mvItem');
     expect(entryMode({ mvAll: true, isSeries: true })).toBe('mvAll');
     expect(entryMode({ homeMoviesAll: true, isSeries: true })).toBe('homeMoviesAll');
     expect(entryMode({ homeMoviesPerson: 'Alice', isSeries: true })).toBe('homeMoviesPerson');
     expect(entryMode({ homeMoviesMonth: '2026-08', isSeries: true })).toBe('homeMoviesMonth');
+  });
+
+  // TASK-542 — `?series=` carries a COLLECTION id, and detail.html has always
+  // served a TV series and a film boxset through it identically. Which one it
+  // is now decides the queue, so `collectionType` rides alongside. TASK-503
+  // skipped threading it as "purely cosmetic"; this is the assertion that says
+  // it isn't.
+  it('splits a collection nav into a TV series and a boxset on collectionType', () => {
+    expect(entryMode({ isSeries: true, collectionType: 'series' })).toBe('series');
+    expect(entryMode({ isSeries: true, collectionType: 'boxset' })).toBe('boxset');
+  });
+
+  // Story 3: a boxset is films. Getting this branch wrong is where it shows.
+  it('never calls a boxset a series', () => {
+    expect(entryMode({ isSeries: true, collectionType: 'boxset' })).not.toBe('series');
+  });
+
+  // An old bookmark or a hand-typed URL carries no type. It reads as a TV
+  // series — what the param was named for — rather than resolving to no mode.
+  it('reads an unstamped collection nav as a TV series', () => {
+    expect(entryMode({ isSeries: true })).toBe('series');
+    expect(entryMode({ isSeries: true, collectionType: null })).toBe('series');
+    expect(entryMode({ isSeries: true, collectionType: '' })).toBe('series');
+    expect(entryMode({ isSeries: true, collectionType: 'album' })).toBe('series');
+  });
+
+  // collectionType alone is not an entry: it decides WHICH collection mode,
+  // never that there is one. Without an id there is nothing to open.
+  it('ignores collectionType when no series id is flagged', () => {
+    expect(entryMode({ collectionType: 'boxset' })).toBe('single');
+    expect(entryMode({ collectionType: 'series' })).toBe('single');
   });
   it('is "single" for a standalone film — the default with nothing set', () => {
     expect(entryMode({})).toBe('single');

@@ -2,7 +2,8 @@
 // media type, as DATA. core/queue-shell-view.js renders the design; this says
 // what a clip is called, what glyph stands in for missing art, how the hero's
 // source line and a row's muted second line resolve, and which engine a ＋Queue
-// press posts to. A fifth media type is a new entry here, not new code.
+// press posts to. A new media type is a new entry here, not new code — TASK-542
+// added the fifth, TV series, by writing one.
 //
 // The per-type shape:
 //   mediaType      — the queue engine's own media_type key ('film' &c.)
@@ -92,6 +93,21 @@ export var FILM = {
   add: APPEND
 };
 
+// TASK-542 (FEAT-541) — TV series, the fifth media type. The entry that makes
+// the Queue page call its items EPISODES where the film entry above says
+// "title": the shared empty/ends wording reads the noun, so "nothing plays
+// after the last episode" needs no new copy, only this field. Its source is a
+// series id — opaque, like a boxset's, so the caller supplies the title.
+export var SERIES = {
+  mediaType: 'series',
+  noun: 'episode', nounPlural: 'episodes',
+  glyph: '&#128250;',
+  sourceSubtitle: suppliedSource,
+  rowSub: durationSub,
+  transport: transportState,
+  add: APPEND
+};
+
 export var MUSIC = {
   mediaType: 'music',
   noun: 'track', nounPlural: 'tracks',
@@ -120,6 +136,7 @@ export var MUSIC_VIDEO = {
 export var QUEUE_SHELL_CONFIG = {
   'home-movie': HOME_MOVIE,
   film: FILM,
+  series: SERIES,
   music: MUSIC,
   'music-video': MUSIC_VIDEO
 };
@@ -132,14 +149,15 @@ export var QUEUE_SHELL_CONFIG = {
 // press could file an item under a Queue it doesn't belong to, and the engine
 // took it.
 //
-// A MAP, not branches: FEAT-541 splits TV series out of the film media type,
-// and `episode` is the one entry that flips ('film' -> 'series'). One line here
-// against thirteen producers otherwise. The backend keeps the same map at
-// api/queue_playback.py (_MEDIA_TYPE_BY_ITEM_TYPE), which refuses a press that
-// still names the wrong Queue.
+// A MAP, not branches: FEAT-541 split TV series out of the film media type,
+// and `episode` was the one entry that flipped ('film' -> 'series', TASK-542).
+// One line here against thirteen producers otherwise — every ＋ press on an
+// episode moved queue without a single producer changing. The backend keeps the
+// same map at api/queue_playback.py (_MEDIA_TYPE_BY_ITEM_TYPE), which refuses a
+// press that still names the wrong Queue.
 export var ITEM_MEDIA_TYPE = {
   film: 'film',
-  episode: 'film',
+  episode: 'series',
   'home-movie': 'home-movie',
   track: 'music',
   'music-video': 'music-video'
@@ -157,7 +175,7 @@ export function itemMediaType(itemType) {
 // keeping its own dispatch table, which is how home movies' five producers
 // ended up still posting to an engine its player had stopped reading.
 // TASK-505 retired the per-engine dispatch this used to route through: with
-// all four media types on the unified engine, the only thing that varies is
+// every media type on the unified engine, the only thing that varies is
 // which media_type the POST names.
 // BUG-531 — two ways a ＋ press can fail, and both must reach the producer's
 // own .catch() so the person sees it:

@@ -63,7 +63,7 @@ export function initPage() {
     queue: document.getElementById('c-queue'),
     addPlaylist: document.getElementById('c-add-playlist')
   };
-  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, homeMovie: false, film: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '', mvSource: null } };
+  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, homeMovie: false, film: false, series: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '', mvSource: null } };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -177,11 +177,15 @@ export function initPage() {
   function sendMvAction(action) { queuePlaybackAction(server, 'music-video', action, state.person).catch(noop); }
   function sendHmAction(action) { queuePlaybackAction(server, 'home-movie', action, state.person).catch(noop); }
   function sendFilmAction(action) { queuePlaybackAction(server, 'film', action, state.person).catch(noop); }
-  // The four engines this page can be driving are mutually exclusive for a
+  // TASK-542 — a TV series drives its own engine, so the phone posts to
+  // /api/queue/series. Sharing the film sender would have left every companion
+  // ⏮/⏭/🔀/🔁 advancing the Films queue while the TV played an episode.
+  function sendSeriesAction(action) { queuePlaybackAction(server, 'series', action, state.person).catch(noop); }
+  // The engines this page can be driving are mutually exclusive for a
   // whole page load (a full navigate per mode, never a live switch) —
   // resolved off the mode flags the context push sets, keyed for every
   // dispatch table below so none of them need a second musicVideo/homeMovie/
-  // film branch of their own. 'video' (the OLD engine, TASK-221/251) is the
+  // film/series branch of their own. 'video' (the OLD engine, TASK-221/251) is the
   // fallback: TASK-503 moved series/single onto 'film' — only the browse
   // "Play Queue" entry is left on it (screen-video-page.js's own
   // MODE_ENGINE comment), which the TV signals by leaving `film` false on
@@ -190,18 +194,19 @@ export function initPage() {
     return [state.musicVideo].filter(Boolean).map(function() { return 'mv'; })
       .concat([state.homeMovie].filter(Boolean).map(function() { return 'hm'; }))
       .concat([state.film].filter(Boolean).map(function() { return 'film'; }))
+      .concat([state.series].filter(Boolean).map(function() { return 'series'; }))
       .concat(['video'])[0];
   }
-  var PREV_ACTION = { mv: function() { sendMvAction('previous'); }, hm: function() { sendHmAction('previous'); }, film: function() { sendFilmAction('previous'); }, video: function() { sendVideoAction('previous'); } };
-  var NEXT_ACTION = { mv: function() { sendMvAction('next'); }, hm: function() { sendHmAction('next'); }, film: function() { sendFilmAction('next'); }, video: function() { sendVideoAction('next'); } };
+  var PREV_ACTION = { mv: function() { sendMvAction('previous'); }, hm: function() { sendHmAction('previous'); }, film: function() { sendFilmAction('previous'); }, series: function() { sendSeriesAction('previous'); }, video: function() { sendVideoAction('previous'); } };
+  var NEXT_ACTION = { mv: function() { sendMvAction('next'); }, hm: function() { sendHmAction('next'); }, film: function() { sendFilmAction('next'); }, series: function() { sendSeriesAction('next'); }, video: function() { sendVideoAction('next'); } };
   // TASK-407/TASK-499/TASK-503/505 — Repeat rides the same Plane B split as
   // prev/next above. Shuffle belongs to the three cut-over types — its button
   // is hidden outright for 'video'/legacy queue mode (applyMusicVideoMode /
   // applyFilmMode never unhide it there), so the `video` branch here is
   // unreachable in practice; kept as a safe no-op rather than an assumption a
   // stray tap can't happen.
-  var REPEAT_ACTION = { mv: function() { sendMvAction('toggle-repeat'); }, hm: function() { sendHmAction('toggle-repeat'); }, film: function() { sendFilmAction('toggle-repeat'); }, video: function() { sendVideoAction('toggle-repeat'); } };
-  var SHUFFLE_ACTION = { mv: function() { sendMvAction('toggle-shuffle'); }, hm: function() { sendHmAction('toggle-shuffle'); }, film: function() { sendFilmAction('toggle-shuffle'); }, video: function() {} };
+  var REPEAT_ACTION = { mv: function() { sendMvAction('toggle-repeat'); }, hm: function() { sendHmAction('toggle-repeat'); }, film: function() { sendFilmAction('toggle-repeat'); }, series: function() { sendSeriesAction('toggle-repeat'); }, video: function() { sendVideoAction('toggle-repeat'); } };
+  var SHUFFLE_ACTION = { mv: function() { sendMvAction('toggle-shuffle'); }, hm: function() { sendHmAction('toggle-shuffle'); }, film: function() { sendFilmAction('toggle-shuffle'); }, series: function() { sendSeriesAction('toggle-shuffle'); }, video: function() {} };
 
   // ── server `video_playback` snapshot -> companion (the now-playing source of
   // truth, mirroring the TV). Now-playing + the breadcrumb leaf, the inline up-next
@@ -346,6 +351,16 @@ export function initPage() {
     },
     'false': function() {}
   };
+  // TASK-542 — the series rail's own on/off pair. Identical in shape to the
+  // film one above and deliberately so: what separates the two rails is which
+  // engine they drive, not how the phone paints them.
+  var SET_SERIES_ON = {
+    'true': function(payload) {
+      els.repeat.classList.toggle('on', !!payload.seriesRepeat);
+      els.shuffle.classList.toggle('on', !!payload.seriesShuffle);
+    },
+    'false': function() {}
+  };
   function onVideoContext(payload) {
     els.ctxLabel.textContent = 'Now playing';
     els.title.textContent = displayTitle(payload);
@@ -353,13 +368,16 @@ export function initPage() {
     state.musicVideo = !!payload.musicVideo;
     state.homeMovie = !!payload.homeMovie;
     state.film = !!payload.film;
+    state.series = !!payload.series;
     state.crumb.mvSource = [payload.musicVideoSource].filter(Boolean).concat([null])[0];
     applyMusicVideoMode(state.musicVideo, payload.musicVideoTransport);
     applyEngineMode(state.homeMovie, payload.homeMovieTransport);
     applyEngineMode(state.film, payload.filmTransport);
+    applyEngineMode(state.series, payload.seriesTransport);
     SET_MV_ON[state.musicVideo + ''](payload);
     SET_HM_ON[state.homeMovie + ''](payload);
     SET_FILM_ON[state.film + ''](payload);
+    SET_SERIES_ON[state.series + ''](payload);
     mountVideoCrumbs();
   }
 

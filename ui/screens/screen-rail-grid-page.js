@@ -28,7 +28,9 @@ export function initRailGridPage() {
   // playlist, mirroring the browse page). cardRoute (core) picks by the server
   // `section`/`collectionType`, never a type enum. A CW episode tile carries
   // `series` (its owning collection) so the player can run Next/Prev from a tile
-  // launch (BUG-005); a film has none and navTo drops it. `track` is search-only
+  // launch (BUG-005), and `collectionType` beside it (TASK-542) so the player
+  // opens the TV Series Queue rather than the Films one; a film has neither and
+  // navTo drops them. `track` is search-only
   // (TASK-383) — a rail-grid tile's card always comes from /api/browse or
   // continue-watching, never search, so it can never be handed one.
   // @card-route-table unhandled: track
@@ -36,7 +38,7 @@ export function initRailGridPage() {
     artist:   function(card) { navTo('artist.html', { artist: card.artist }); },
     album:    function(card) { navTo('album-detail.html', { album: card.id }); },
     playlist: function(card) { navTo('playlist-detail.html', { playlist: card.id }); },
-    video:    function(card) { navTo('video.html', { video: card.id, from: 'grid', series: card.series }); },
+    video:    function(card) { navTo('video.html', { video: card.id, from: 'grid', series: card.series, collectionType: card.collectionType }); },
     series:   function(card) { navTo('detail.html', { series: card.id }); },
     // A music video plays through its own client-owned playthrough, never the
     // video engine (TASK-374) — same target the browse page uses. Without this

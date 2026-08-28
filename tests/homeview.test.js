@@ -9,6 +9,10 @@ const BROWSE_URL = '**/api/browse**';
 test.beforeEach(async ({ page }) => {
   await installApi(page);
   await installQueuePlaybackBackend(page, 'film');
+  // TASK-542 — a TV series drives its own engine now, so this suite's series
+  // flows need it installed beside the film one. Both share the page's single
+  // WebSocket route (fixtures/api.js), each pushing its own tagged snapshot.
+  await installQueuePlaybackBackend(page, 'series');
   await page.goto('/app/homeview/profile.html');
 });
 

@@ -7,8 +7,8 @@
 // snapshot apply and ONE entry path, and each type is an entry here.
 //
 // Follows core/queue-shell-config.js's precedent exactly: a per-type
-// difference is a field, never a branch. A fourth video type is an entry here,
-// not new code.
+// difference is a field, never a branch. A new video type is an entry here,
+// not new code — TASK-542 added the fourth, TV series, by writing one.
 //
 // The per-type shape:
 //   engine        — the page's own rail key ('mv'/'hm'/'film'), which
@@ -70,7 +70,7 @@
 //                     music video's itemType now reaches the caption rule.
 
 import { transportState } from './queue-shell-view.js';
-import { HOME_MOVIE, FILM, MUSIC_VIDEO } from './queue-shell-config.js';
+import { HOME_MOVIE, FILM, SERIES, MUSIC_VIDEO } from './queue-shell-config.js';
 import { loadSeriesTitle, loadMusicVideoSourceTitle } from './app-api.js';
 
 // (now_playing) -> the record player.playVideo() loads, for every video media
@@ -137,30 +137,63 @@ export var FILM_PAGE = {
   context: { flag: 'film', shuffle: 'filmShuffle', repeat: 'filmRepeat', transport: 'filmTransport' }
 };
 
-export var VIDEO_PAGE_CONFIG = { mv: MUSIC_VIDEO_PAGE, hm: HOME_MOVIE_PAGE, film: FILM_PAGE };
+// TASK-542 (FEAT-541) — the TV series rail. Everything a series does at the
+// PLAYER it did as a film and still does: it resumes, it counts down into the
+// next episode, it fetches its source title for the top crumb. What moved is
+// which engine it drives — media_type 'series', its own queue and its own
+// remembered shuffle/repeat — and what the Queue page calls its items, which
+// is the shell entry. Its own pill pair and its own companion context keys for
+// the same reason every rail has them: exactly one rail is live per page load,
+// and the phone has to drive the engine the TV is actually playing.
+export var SERIES_PAGE = {
+  engine: 'series',
+  mediaType: 'series',
+  shell: SERIES,
+  shuffleId: 'btn-series-shuffle',
+  repeatId: 'btn-series-repeat',
+  resumes: true,
+  countdown: true,
+  fetchesSourceTitle: true,
+  sourceTitle: seriesTitle,
+  sourceCrumbs: false,
+  addsToPlaylist: false,
+  context: { flag: 'series', shuffle: 'seriesShuffle', repeat: 'seriesRepeat', transport: 'seriesTransport' }
+};
+
+export var VIDEO_PAGE_CONFIG = { mv: MUSIC_VIDEO_PAGE, hm: HOME_MOVIE_PAGE, film: FILM_PAGE, series: SERIES_PAGE };
 
 // Which rail an entryMode() answer drives. Mutually exclusive per page load,
 // never a live switch — resolved once and used to key everything else.
 //
-// TASK-501 — the three Continue entries (browse's per-type Continue buttons)
+// TASK-501 — the four Continue entries (browse's per-type Continue buttons)
 // are rows here like any other entry: each names the media type its button was
 // pressed for, so it advances that type's OWN engine and nothing downstream
 // needs a continue branch of its own.
+// TASK-542 — `series` and `boxset` are two modes now, where one covered both.
+// A TV series drives its OWN rail; a boxset stays films, which is what it has
+// always been. Both arrive on the same `?series=` nav param (the collection
+// id); `collectionType` is what tells them apart — see entryMode().
 export var MODE_ENGINE = {
   mvPlaylist: 'mv', mvArtist: 'mv', mvItem: 'mv', mvAll: 'mv', continueMusicVideo: 'mv',
   homeMoviesAll: 'hm', homeMoviesPerson: 'hm', homeMoviesMonth: 'hm', continueHomeMovie: 'hm',
-  series: 'film', single: 'film', queue: 'film', continueFilm: 'film'
+  boxset: 'film', single: 'film', queue: 'film', continueFilm: 'film',
+  series: 'series', continueSeries: 'series'
 };
 
 // The engine's own registered source names, per entry mode — one table where
 // music videos and home movies each kept their own (TASK-505/499), plus the
-// series/boxset one startSeries used to pass inline. `series` covers a TV
-// series AND a boxset: queue_engine.py registers them as two names for the
-// identical catalog query, and the old engine tagged either 'series' too.
+// series/boxset one startSeries used to pass inline.
+//
+// TASK-542 — 'series' used to cover a TV series AND a boxset, both tagged
+// 'series' because queue_engine.py registers the two names against the
+// identical catalog query so either one played. It stopped being cosmetic when
+// TV series became its own media type: api/queue_playback.py now allows
+// 'boxset' under `film` and 'series' under `series` alone, so the name a boxset
+// opens under is the difference between the Films Queue and the wrong one.
 export var SOURCE_TYPE = {
   mvPlaylist: 'mv-playlist', mvArtist: 'mv-artist', mvAll: 'mv-all',
   homeMoviesAll: 'home-movies-all', homeMoviesPerson: 'home-movies-by-person', homeMoviesMonth: 'home-movie-month',
-  series: 'series'
+  series: 'series', boxset: 'boxset'
 };
 
 // Which nav param carries the source id for each of those modes. A
@@ -169,7 +202,7 @@ export var SOURCE_TYPE = {
 export var SOURCE_ID_PARAM = {
   mvPlaylist: 'mvPlaylist', mvArtist: 'mvArtist', mvAll: null,
   homeMoviesAll: null, homeMoviesPerson: 'homeMoviesPerson', homeMoviesMonth: 'homeMoviesMonth',
-  series: 'seriesId'
+  series: 'seriesId', boxset: 'seriesId'
 };
 
 // The source id for a mode, read out of the page's own resolved params.
@@ -179,8 +212,8 @@ export function sourceIdFor(mode, params) {
   return params[key];
 }
 
-// The companion context push (FEAT-017/TASK-499/503/505/517). The page drives
-// exactly ONE rail per load, so the other two types' keys go out at their
+// The companion context push (FEAT-017/TASK-499/503/505/517/542). The page
+// drives exactly ONE rail per load, so every other type's keys go out at their
 // empty values — which is what three snapshot vars, two of them permanently
 // {}, used to produce by accident. Building it from one live snapshot makes
 // that explicit instead.
@@ -204,7 +237,15 @@ export function videoContext(engine, snapshot, sourceCrumb, display) {
     film: false,
     filmShuffle: false,
     filmRepeat: false,
-    filmTransport: empty
+    filmTransport: empty,
+    // TASK-542 — the series rail's own keys. Without them a TV series would
+    // push `film: true` and the phone's ⏮/⏭/🔀/🔁 would drive
+    // /api/queue/film while the TV played /api/queue/series: the mirror would
+    // be pointing at the wrong engine, which is worse than showing nothing.
+    series: false,
+    seriesShuffle: false,
+    seriesRepeat: false,
+    seriesTransport: empty
   };
   context[config.context.flag] = true;
   context[config.context.shuffle] = !!snapshot.shuffle;

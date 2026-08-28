@@ -2,7 +2,7 @@ import { CONTINUE_TYPES, continueLabel } from '../../core/browse-continue.js';
 import { transportState } from '../../core/queue-shell-view.js';
 import { loadQueuePlayback } from '../../core/app-api.js';
 
-// TASK-501 (FEAT-497) — the four Continue buttons, built once from
+// TASK-501 (FEAT-497) — the Continue buttons, built once from
 // core/browse-continue.js's CONTINUE_TYPES and shared by BOTH browse surfaces:
 // the TV's play menu and the companion's. One builder is what stops the two
 // drifting the way the old 🎬/🎵 pills did, each surface carrying its own copy
@@ -12,9 +12,9 @@ import { loadQueuePlayback } from '../../core/app-api.js';
 // Disabled-but-visible, never hidden (QUEUE-UX-SHELL.md's Hero rule, the same
 // one every transport control follows): a type with nothing queued and no
 // source to carry on with keeps its button and its place, dimmed via
-// .is-disabled and carrying the real `disabled` attribute. Four buttons that
-// hid at zero — which is what today's pills do — would leave a cluster
-// shifting between one and four.
+// .is-disabled and carrying the real `disabled` attribute. Buttons that hid at
+// zero — which is what today's pills do — would leave a cluster shifting
+// between one and its full height.
 export function mountContinueMenu(opts) {
   var buttons = {};
 
