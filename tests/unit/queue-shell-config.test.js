@@ -73,6 +73,69 @@ describe('sourceSubtitle', () => {
   });
 });
 
+// TASK-535 — an item playing on its own used to leave the hero's source line
+// blank and two tabs empty behind a count of (0), with nothing saying why. The
+// words are DATA on the five rows, so no type carries its own no-source code
+// path; each reads with its own media noun.
+describe('the playing-on-its-own wording', () => {
+  it('names no source in the hero, in the same words for every type', () => {
+    expect(HOME_MOVIE.standalone.source()).toBe('Playing on its own');
+    expect(FILM.standalone.source()).toBe('Playing on its own');
+    expect(SERIES.standalone.source()).toBe('Playing on its own');
+    expect(MUSIC.standalone.source()).toBe('Playing on its own');
+    expect(MUSIC_VIDEO.standalone.source()).toBe('Playing on its own');
+  });
+
+  // It is a sourceSubtitle-shaped resolver so the shell calls either without
+  // asking which it holds — and a standalone play names no source by
+  // definition, so neither the snapshot nor the caller's lookup can talk it
+  // into naming one.
+  it('names no source however the snapshot or the caller is dressed up', () => {
+    expect(FILM.standalone.source({ source_type: 'boxset', source_id: 'toy-story' }, 'Toy Story Collection')).toBe('Playing on its own');
+    expect(HOME_MOVIE.standalone.source({ source_type: 'home-movies-by-person', source_id: 'millie' }, 'Millie')).toBe('Playing on its own');
+  });
+
+  it('says why Next is empty, in each type\'s own noun', () => {
+    expect(HOME_MOVIE.standalone.emptyNext).toBe('Nothing up next — this clip is playing on its own');
+    expect(FILM.standalone.emptyNext).toBe('Nothing up next — this title is playing on its own');
+    expect(SERIES.standalone.emptyNext).toBe('Nothing up next — this episode is playing on its own');
+    expect(MUSIC.standalone.emptyNext).toBe('Nothing up next — this track is playing on its own');
+    expect(MUSIC_VIDEO.standalone.emptyNext).toBe('Nothing up next — this video is playing on its own');
+  });
+
+  // Coming Up's emptiness is a DIFFERENT fact from Next's — nothing follows
+  // because there is no source to follow — so it gets its own sentence rather
+  // than a second copy of Next's.
+  it('says why Coming Up is empty, in each type\'s own noun', () => {
+    expect(HOME_MOVIE.standalone.ends).toBe('No source to follow — nothing plays after this clip');
+    expect(FILM.standalone.ends).toBe('No source to follow — nothing plays after this title');
+    expect(SERIES.standalone.ends).toBe('No source to follow — nothing plays after this episode');
+    expect(MUSIC.standalone.ends).toBe('No source to follow — nothing plays after this track');
+    expect(MUSIC_VIDEO.standalone.ends).toBe('No source to follow — nothing plays after this video');
+  });
+
+  it('gives the two tabs different words for their two different emptinesses', () => {
+    expect(FILM.standalone.emptyNext).not.toBe(FILM.standalone.ends);
+  });
+
+  // The wording is built from the row's own noun rather than hand-written
+  // beside it, so renaming a media type can't leave one of the three lines
+  // behind — the drift the whole config file exists to prevent.
+  it('reads each row\'s own noun rather than a copy of it', () => {
+    Object.keys(QUEUE_SHELL_CONFIG).forEach(function(key) {
+      var config = QUEUE_SHELL_CONFIG[key];
+      expect(config.standalone.emptyNext).toContain('this ' + config.noun + ' ');
+      expect(config.standalone.ends).toContain('after this ' + config.noun);
+    });
+  });
+
+  it('carries the same three slots on every type — none goes without', () => {
+    Object.keys(QUEUE_SHELL_CONFIG).forEach(function(key) {
+      expect(Object.keys(QUEUE_SHELL_CONFIG[key].standalone).sort()).toEqual(['emptyNext', 'ends', 'source']);
+    });
+  });
+});
+
 describe('rowSub', () => {
   it('is the item duration for films, series episodes and home movies', () => {
     expect(HOME_MOVIE.rowSub({ duration: 61, artist: 'IGNORED' })).toBe('1:01');

@@ -18,6 +18,10 @@
 //   transport      — (snap) -> which transport controls are live. Every type
 //                    uses the shell's ONE rule; the field exists so a genuine
 //                    per-type need has somewhere to go, not as an invitation.
+//   standalone     — the wording set for an item playing on its own, no source
+//                    behind it (TASK-535). Same three slots the sourced set has
+//                    in queue-shell-view.js, so the shell picks between them by
+//                    lookup rather than by a no-source branch.
 //   add            — the ＋Queue map entry: which action, which body key, and
 //                    the confirmation wording.
 //
@@ -56,6 +60,40 @@ function artistSub(entry) {
   return entry.artist || durationText(entry.duration);
 }
 
+// ── playing on its own ─────────────────────────────────────────────────────
+// TASK-535 — three things the Queue page has to say when the item is playing
+// with no source behind it, and they are three DIFFERENT facts: the hero has
+// no source to name, Next has nothing left of a source to list, and Coming Up
+// has no source to follow. Each gets its own sentence rather than one shared
+// apology.
+//
+// The hero's own line, in the shape of every other sourceSubtitle resolver so
+// the shell calls one or the other without asking which it holds. A standalone
+// play names no source by definition, so it reads neither the snapshot nor the
+// caller's lookup.
+function standaloneSource() {
+  return 'Playing on its own';
+}
+
+// Built from the row's OWN noun by one helper, so the five rows carry the
+// words as data with no chance of five wordings drifting apart — the same
+// deal the sourced set already has in queue-shell-view.js, where the media
+// noun is the only thing that varies.
+function standaloneWording(noun) {
+  return {
+    source: standaloneSource,
+    emptyNext: 'Nothing up next — this ' + noun + ' is playing on its own',
+    ends: 'No source to follow — nothing plays after this ' + noun
+  };
+}
+
+// Every row goes through here so `standalone` is never hand-written beside the
+// noun it reads: change the noun and the wording follows.
+function mediaRow(row) {
+  row.standalone = standaloneWording(row.noun);
+  return row;
+}
+
 // ＋Queue routing. TASK-505 cut the last media type over, so every ＋ press
 // now lands the same way: the TASK-498 unified engine's append-only queue-item
 // (FEAT-497's model — hence "Added to Queue"). Nothing routes to a
@@ -73,7 +111,7 @@ var APPEND = { action: 'queue-item', bodyKey: 'item_id', status: 'Added to Queue
 // glyph the shell already uses for the page this press fills.
 export var QUEUE_ADD_LABEL = '☰ Add to Queue';
 
-export var HOME_MOVIE = {
+export var HOME_MOVIE = mediaRow({
   mediaType: 'home-movie',
   noun: 'clip', nounPlural: 'clips',
   glyph: '&#127916;',
@@ -81,9 +119,9 @@ export var HOME_MOVIE = {
   rowSub: durationSub,
   transport: transportState,
   add: APPEND
-};
+});
 
-export var FILM = {
+export var FILM = mediaRow({
   mediaType: 'film',
   noun: 'title', nounPlural: 'titles',
   glyph: '&#127916;',
@@ -91,14 +129,14 @@ export var FILM = {
   rowSub: durationSub,
   transport: transportState,
   add: APPEND
-};
+});
 
 // TASK-542 (FEAT-541) — TV series, the fifth media type. The entry that makes
 // the Queue page call its items EPISODES where the film entry above says
 // "title": the shared empty/ends wording reads the noun, so "nothing plays
 // after the last episode" needs no new copy, only this field. Its source is a
 // series id — opaque, like a boxset's, so the caller supplies the title.
-export var SERIES = {
+export var SERIES = mediaRow({
   mediaType: 'series',
   noun: 'episode', nounPlural: 'episodes',
   glyph: '&#128250;',
@@ -106,9 +144,9 @@ export var SERIES = {
   rowSub: durationSub,
   transport: transportState,
   add: APPEND
-};
+});
 
-export var MUSIC = {
+export var MUSIC = mediaRow({
   mediaType: 'music',
   noun: 'track', nounPlural: 'tracks',
   glyph: '&#127925;',
@@ -118,9 +156,9 @@ export var MUSIC = {
   // TASK-504: music appends to the end of the Queue like every cut-over type,
   // where it used to jump the press to Play Next on its own engine.
   add: APPEND
-};
+});
 
-export var MUSIC_VIDEO = {
+export var MUSIC_VIDEO = mediaRow({
   mediaType: 'music-video',
   noun: 'video', nounPlural: 'videos',
   glyph: '&#127916;',
@@ -131,7 +169,7 @@ export var MUSIC_VIDEO = {
   // cut-over type, where a ＋ press used to jump it to the front of the
   // playing head on the music-video engine's own queue-video.
   add: APPEND
-};
+});
 
 export var QUEUE_SHELL_CONFIG = {
   'home-movie': HOME_MOVIE,

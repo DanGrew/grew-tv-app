@@ -121,7 +121,21 @@ test('a lone track dims ⏮/Shuffle/Repeat rather than hiding them', async ({ pa
   await expect(shuffle).toBeVisible();
   await expect(shuffle).toBeDisabled();
   await expect(page.locator('.qs-tbtn[aria-label="Repeat"]')).toBeDisabled();
-  await expect(page.locator('.qs-ph-sub')).toHaveText('');   // no source to name
+  // TASK-535 — the hero says so rather than leaving the line blank.
+  await expect(page.locator('.qs-ph-sub')).toHaveText('Playing on its own');
+});
+
+// TASK-535 — the other two emptinesses a lone track arrives with, each in its
+// own words and in music's own noun.
+test('a lone track says why Next and Coming Up are empty', async ({ page }) => {
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'music');
+  backend.seed('play-standalone', { item_id: 'ootb-01' });
+  await page.goto('/companion/music-queue.html');
+  await expect(page.locator('.ph-qtab-panel[data-tab="next"] .ph-qempty'))
+    .toHaveText('Nothing up next — this track is playing on its own');
+  await expect(page.locator('.ph-qtab-panel[data-tab="coming-up"] .ph-ends'))
+    .toContainText('No source to follow — nothing plays after this track');
 });
 
 test('a queued track revives ⏭ on a lone track', async ({ page }) => {

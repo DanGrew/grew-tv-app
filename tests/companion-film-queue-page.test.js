@@ -118,7 +118,20 @@ test('a standalone film dims ⏮/Shuffle/Repeat rather than hiding them', async 
   await expect(shuffle).toBeVisible();
   await expect(shuffle).toBeDisabled();
   await expect(page.locator('.qs-tbtn[aria-label="Repeat"]')).toBeDisabled();
-  await expect(page.locator('.qs-ph-sub')).toHaveText('');   // no source to name
+  // TASK-535 — the hero says so rather than leaving the line blank.
+  await expect(page.locator('.qs-ph-sub')).toHaveText('Playing on its own');
+});
+
+// TASK-535 — and the two empty tabs each say why, in the film noun.
+test('a standalone film says why Next and Coming Up are empty', async ({ page }) => {
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'film');
+  backend.seed('play-standalone', { item_id: 'finding-nemo-main' });
+  await page.goto('/companion/film-queue.html');
+  await expect(page.locator('.ph-qtab-panel[data-tab="next"] .ph-qempty'))
+    .toHaveText('Nothing up next — this title is playing on its own');
+  await expect(page.locator('.ph-qtab-panel[data-tab="coming-up"] .ph-ends'))
+    .toContainText('No source to follow — nothing plays after this title');
 });
 
 // Story 1 on the phone — a film queued behind a standalone one revives ⏭,
