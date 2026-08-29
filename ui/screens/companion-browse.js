@@ -176,9 +176,12 @@ export function initPage() {
   // TASK-501 (FEAT-497) — Continue, one button per media type, in the #queue-menu
   // popout (TASK-445) where the two 🎬/🎵 play-the-queue pills used to sit. Those
   // covered two of the four types, hid themselves at an empty queue, and STARTED
-  // a queue; a Continue press carries on with its type — the front of its queue,
-  // else the next item of the source it was last playing, both the engine's own
-  // advance(). The buttons come out of the SAME builder the TV's own menu uses
+  // a queue; a Continue press carries on with its type — TASK-555: what it was
+  // part-way through, else the front of its queue, else the next item of the
+  // source it was last playing, all the engine's own resume(). The mirror
+  // invariant needs no companion-side action change for that: the phone drives
+  // the TV to the same target, and the TV fires the action.
+  // The buttons come out of the SAME builder the TV's own menu uses
   // (ui/screens/continue-menu.js), so story 4 holds by construction: this drives
   // the TV through the usual `navigate` intent, to the exact target the TV's own
   // button would navigate itself to.

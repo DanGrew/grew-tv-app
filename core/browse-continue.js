@@ -1,21 +1,23 @@
 // TASK-501 (FEAT-497) — browse's Continue cluster, as DATA. Browse offers one
-// Continue button per media type; pressing one carries on with that type — the
-// front of its queue, or, with nothing queued, the next item of the source this
-// person was last playing.
+// Continue button per media type; pressing one carries on with that type —
+// TASK-555: the item this person was on if they stopped part-way through one,
+// else the front of its queue, else the next item of the source they were last
+// playing.
 //
-// That rule is the queue engine's own advance(), fired as its `next` action by
-// the player's continue entry (screen-video-page.js / screen-audio-page.js), so
-// nothing here does queue maths — and whether a button is live is
-// queue-shell-view.js's own transportState().next, the same rule ⏭ lights from,
-// read off the same read-only snapshot. The only per-type facts left are the
-// button's identity, its label and which player page a press lands on.
+// That rule is the queue engine's own resume(), fired as its `continue` action
+// by the player's continue entry (screen-video-page.js / screen-audio-page.js),
+// so nothing here does queue maths — and whether a button is live is
+// queue-shell-view.js's own transportState().next, which stays the ⏭ rule: a
+// type with something playing has something to carry on with either way, so the
+// two never disagree about the lit/dim state. The only per-type facts left are
+// the button's identity, its label and which player page a press lands on.
 //
 // ⛔ A further media type is an entry in CONTINUE_TYPES, not a hand-written
 // button on each of two surfaces — which is all TASK-542's fifth type took.
 
 // Which player page carries on with a type. TV series, films, home movies and
 // music videos all play in the video player; music in the audio player. Both
-// pages read `continueType` and fire `next` on that media type's engine.
+// pages read `continueType` and fire `continue` on that media type's engine.
 var PLAYER_PAGE = {
   series: 'video.html',
   film: 'video.html',

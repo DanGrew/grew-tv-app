@@ -12,9 +12,13 @@ const { pickPerson } = require('./fixtures/nav.js');
 // track survives opening another album. Opening the sheet never hijacks the
 // row's play handler.
 
+// The music queue backend for the current test — captured so a test can assert
+// on ENGINE state (what actually plays) and not only on what the page renders.
+let musicBackend;
+
 test.beforeEach(async ({ page }) => {
   await installApi(page);
-  await installQueuePlaybackBackend(page, 'music');
+  musicBackend = await installQueuePlaybackBackend(page, 'music');
   await page.route('**/api/browse**', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ profile: 'kids', genreLabels: BROWSE.kids.genreLabels, content: BROWSE.kids.content.concat(MUSIC_CARDS).concat(PLAYLIST_CARDS) })
@@ -82,13 +86,15 @@ test('audio.html?playQueue starts the music queue head (play-queue, no track ope
 });
 
 // TASK-501 story 1 — Continue Music from browse. Entering with ?continueType
-// fires the engine's own advance (`next`), which pops the queue's front and
-// plays it. The audio twin of the video page's continue entries.
-test('audio.html?continueType=music advances the music engine and plays the queued track', async ({ page }) => {
+// fires one queue action; with nothing playing it lands on the queue's front.
+// TASK-555 renamed that action from `next` to `continue`; this path is the
+// fallback, so what plays is unchanged. The audio twin of the video page's
+// continue entries.
+test('audio.html?continueType=music plays the queued track when nothing is playing', async ({ page }) => {
   await openAlbum(page);
   await queueTrack(page, 'ootb-02');
   const posted = page.waitForRequest(req =>
-    req.url().includes('/api/queue/music/next') && req.method() === 'POST');
+    req.url().includes('/api/queue/music/continue') && req.method() === 'POST');
   await page.goto('/app/homeview/audio.html?continueType=music&from=browse');
   const req = await posted;
   expect(req.url()).toContain('person=kids');
@@ -96,14 +102,22 @@ test('audio.html?continueType=music advances the music engine and plays the queu
   await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
 });
 
-// TASK-501 story 2 — nothing queued, but a source mid-play: Continue carries on
-// with the SOURCE, one track further. Nothing here reproduces that fallback —
-// the same `next` action leaves the engine to choose.
-test('audio.html?continueType=music advances the source when the queue is empty', async ({ page }) => {
+// TASK-555 story 4 — a track was playing, so Continue Music plays THAT track
+// again (from its start; music has never had a mid-track resume, TASK-276).
+// This is the behaviour change: the old `next` action moved on to Mr. Blue Sky.
+//
+// Asserted on the ENGINE's own state, not `#audio-title`: the title element is
+// fed by the track the page loaded, so it reads 'Turn to Stone' whichever action
+// fired and cannot tell the two apart. now_playing is what actually plays.
+test('audio.html?continueType=music replays the track you were on', async ({ page }) => {
   await openAlbum(page);
   await page.locator('.detail-row[data-id="ootb-01"]').click();
   await expect(page.locator('#audio-title')).toHaveText('Turn to Stone');
+  expect(musicBackend.snapshot().now_playing.item_id).toBe('ootb-01');
+  const posted = page.waitForRequest(req =>
+    req.url().includes('/api/queue/music/continue') && req.method() === 'POST');
   await page.goto('/app/homeview/audio.html?continueType=music&from=browse');
+  await posted;
   await expect(page.locator('#screen-audio')).toBeVisible();
-  await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
+  await expect.poll(() => musicBackend.snapshot().now_playing.item_id).toBe('ootb-01');
 });
