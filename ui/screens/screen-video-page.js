@@ -653,15 +653,20 @@ export function initVideoPage() {
   function startMvItem() {
     startStandalone(mvItem);
   }
-  // TASK-501 — Continue, from browse's play menu. The entry fires the engine's
-  // own advance (`next`) and renders from the snapshot like every other route:
-  // the queue's front if anything is queued, else the next item of the source
-  // this person was last playing. That fallback is the ENGINE's, never
-  // reproduced here — the same rule transportState's ⏭ already lights from, and
-  // what browse's own button reads to decide whether it is live at all.
+  // TASK-501 — Continue, from browse's play menu. The entry fires one action and
+  // renders from the snapshot like every other route.
+  //
+  // TASK-555 — that action is `continue`, not `next`. It used to be `next`, the
+  // transport's own advance, which meant coming back to a film you stopped
+  // halfway consumed it and started the one after. `continue` resumes what is
+  // playing, and falls back to exactly the old rule when nothing is: the queue's
+  // front if anything is queued, else the next item of the source this person was
+  // last playing. That fallback is still the ENGINE's, never reproduced here —
+  // the same rule transportState's ⏭ lights from, and what browse's own button
+  // reads to decide whether it is live at all.
   //
   // ONE entry for all four video types, because TASK-524 already made every
-  // per-rail difference a config field: which engine it advances is
+  // per-rail difference a config field: which engine it resumes is
   // config.mediaType, and the ＋Playlist reveal a music video needs is
   // config.addsToPlaylist inside beginPlayback.
   //
@@ -670,7 +675,7 @@ export function initVideoPage() {
   // name, exactly like startQueue.
   function startContinue() {
     mountCrumbs();
-    beginPlayback(null, 'next', {}).catch(noop);
+    beginPlayback(null, 'continue', {}).catch(noop);
   }
   var ENTRY = {
     continueSeries: startContinue,

@@ -3,14 +3,14 @@ const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_VIDEO_CARDS } = r
 
 // TASK-501 (FEAT-497) — the PLAYER half of browse's per-type Continue buttons.
 // Browse navigates to the type's player with ?continueType=<media type>; the
-// page's continue entry fires the unified queue engine's own advance (`next`)
-// and renders from the snapshot like every other entry.
+// page's continue entry fires ONE queue action and renders from the snapshot
+// like every other entry.
 //
-// The two stories that matter here are the engine's, not the app's: with things
-// queued, the queue's front plays (story 1); with an empty queue and a source
-// mid-play, the source's next item plays (story 2). Nothing in the app chooses
-// between them — that is exactly why Continue is one `next` POST and not queue
-// maths on this side.
+// TASK-555 — that action is `continue`, not `next`. Coming back to something you
+// stopped halfway now picks that item up again instead of consuming it and
+// starting the one after; with nothing playing, Continue is exactly the old
+// behaviour. Nothing in the app chooses between those — that is still why this
+// is one POST and not queue maths on this side.
 //
 // Music's own continue entry lives in tests/music-queue.test.js (it plays in
 // audio.html); browse's buttons themselves are in tests/browse-queue.test.js
@@ -22,12 +22,40 @@ test.beforeEach(async ({ page }) => {
 
 // ── films ───────────────────────────────────────────────────────────────────
 
-test('Continue Films plays the queue front (film/next)', async ({ page }) => {
+test('Continue Films resumes the film you stopped, not the one after', async ({ page }) => {
+  // TASK-555 story 1. bluey-s1e01 is mid-source and playing; the old `next`
+  // POST landed on s1e02 here, which is the whole bug.
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'film');
+  backend.seed('play-source', { source_type: 'series', source_id: 'bluey' });
+  const posted = page.waitForRequest(req =>
+    req.url().includes('/api/queue/film/continue') && req.method() === 'POST');
+  await page.goto('/app/homeview/video.html?continueType=film&from=browse');
+  const req = await posted;
+  expect(req.url()).toContain('person=kids');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e01/);
+});
+
+test('Continue Films replays the queued item without consuming it', async ({ page }) => {
+  // TASK-555 stories 6/7 made load-bearing: the durable head stays queued, so
+  // finishing and skipping are the only ways an item leaves.
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'film');
+  backend.seed('queue-item', { item_id: 'finding-nemo-main' });
+  backend.seed('play-queue', {});
+  await page.goto('/app/homeview/video.html?continueType=film&from=browse');
+  await expect(page.locator('#screen-video')).toBeVisible();
+  await expect(page.locator('#video')).toHaveAttribute('src', /finding-nemo-main/);
+  expect(backend.snapshot().now_playing.item_id).toBe('finding-nemo-main');
+});
+
+test('Continue Films plays the queue front when nothing is playing', async ({ page }) => {
   await installApi(page);
   const backend = await installQueuePlaybackBackend(page, 'film');
   backend.seed('queue-item', { item_id: 'finding-nemo-main' });
   const posted = page.waitForRequest(req =>
-    req.url().includes('/api/queue/film/next') && req.method() === 'POST');
+    req.url().includes('/api/queue/film/continue') && req.method() === 'POST');
   await page.goto('/app/homeview/video.html?continueType=film&from=browse');
   const req = await posted;
   expect(req.url()).toContain('person=kids');
@@ -35,36 +63,27 @@ test('Continue Films plays the queue front (film/next)', async ({ page }) => {
   await expect(page.locator('#video')).toHaveAttribute('src', /finding-nemo-main/);
 });
 
-test('Continue Films advances the SOURCE when nothing is queued', async ({ page }) => {
-  await installApi(page);
-  const backend = await installQueuePlaybackBackend(page, 'film');
-  backend.seed('play-source', { source_type: 'series', source_id: 'bluey', item_id: 'bluey-s1e01' });
-  await page.goto('/app/homeview/video.html?continueType=film&from=browse');
-  await expect(page.locator('#screen-video')).toBeVisible();
-  await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e02/);
-});
-
 // ── home movies ─────────────────────────────────────────────────────────────
 
-test('Continue Home Movies advances its own engine, not the film one', async ({ page }) => {
+test('Continue Home Movies resumes its own engine, not the film one', async ({ page }) => {
   await installApi(page);
-  let filmAdvanced = false;
-  await page.route('**/api/queue/film/next*', function(route) { filmAdvanced = true; return route.fulfill({ status: 204, body: '' }); });
+  let filmTouched = false;
+  await page.route('**/api/queue/film/continue*', function(route) { filmTouched = true; return route.fulfill({ status: 204, body: '' }); });
   const backend = await installQueuePlaybackBackend(page, 'home-movie');
   backend.seed('play-source', { source_type: 'home-movies-all' });
   const posted = page.waitForRequest(req =>
-    req.url().includes('/api/queue/home-movie/next') && req.method() === 'POST');
+    req.url().includes('/api/queue/home-movie/continue') && req.method() === 'POST');
   await page.goto('/app/homeview/video.html?continueType=home-movie&from=browse');
   await posted;
   await expect(page.locator('#screen-video')).toBeVisible();
-  // home-movies-all is millie-walk then beach-day; advancing lands on the second.
-  await expect(page.locator('#video')).toHaveAttribute('src', /beach-day/);
-  expect(filmAdvanced).toBe(false);
+  // home-movies-all is millie-walk then beach-day; resuming stays on the first.
+  await expect(page.locator('#video')).toHaveAttribute('src', /millie-walk/);
+  expect(filmTouched).toBe(false);
 });
 
 // ── music videos ────────────────────────────────────────────────────────────
 
-test('Continue Music Videos plays its own queue front', async ({ page }) => {
+test('Continue Music Videos replays its own queue front', async ({ page }) => {
   await installApi(page);
   await page.route('**/api/browse**', function(route) {
     return route.fulfill({
@@ -74,11 +93,13 @@ test('Continue Music Videos plays its own queue front', async ({ page }) => {
   });
   const backend = await installQueuePlaybackBackend(page, 'music-video');
   backend.seed('queue-item', { item_id: 'mv-03' });
+  backend.seed('play-queue', {});
   const posted = page.waitForRequest(req =>
-    req.url().includes('/api/queue/music-video/next') && req.method() === 'POST');
+    req.url().includes('/api/queue/music-video/continue') && req.method() === 'POST');
   await page.goto('/app/homeview/video.html?continueType=music-video&from=browse');
   await posted;
   await expect(page.locator('#screen-video')).toBeVisible();
+  // TASK-555 story 5: the same video plays again, from its start.
   await expect(page.locator('#video')).toHaveAttribute('src', /mv-03/);
   // The mv shape's own ＋Playlist affordance is revealed, as it is on every
   // other music-video entry.
