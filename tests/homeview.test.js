@@ -652,10 +652,12 @@ test('CC button hidden for a video without subtitles', async ({ page }) => {
   await expect(page.locator('#btn-cc')).toHaveClass(/hidden/);
 });
 
-// BUG-489: a home movie never shows CC, even one still carrying a stray
-// `subtitles` ref stamped before BUG-449's ingest fix — beach-day's fixture
-// carries exactly that stray ref (tests/fixtures/api.js).
-test('CC button hidden for a home movie carrying a stale subtitles ref (BUG-489)', async ({ page }) => {
+// TASK-500: a home movie shows no CC because it carries no caption data — the
+// same rule that hides CC for a film without subtitles, not a check on its
+// type. BUG-489 had gated CC off by itemType while pre-BUG-449 records still
+// held a stray `subtitles` ref; the data clean took those refs, and this asserts
+// the outcome survives on the generic rule alone.
+test('CC button hidden for a home movie, which carries no caption data', async ({ page }) => {
   await enterBrowse(page, 'kids');
   await page.goto('/app/homeview/video.html?video=beach-day');
   await expect(page.locator('#screen-video')).toBeVisible();

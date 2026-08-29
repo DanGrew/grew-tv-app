@@ -129,20 +129,31 @@ describe('the per-type configs', () => {
 });
 
 // TASK-524 — ONE record for every video type. A music video used to send `ext`
-// alone and a film/home movie `itemType` alone, so a non-.mp4 home movie could
-// not play and a music video's itemType never reached the caption rule; the
-// engine's own _resolve_item puts BOTH on every entry of every media type.
+// alone and a film/home movie none of it, so a non-.mp4 home movie could not
+// play; the engine's own _resolve_item puts it on every entry of every media
+// type. TASK-500 — `itemType` rode this record too, purely so the player's
+// caption rule could name home movies; with that rule gone, the record carries
+// only what playback actually reads, and the snapshot's own `itemType` (which
+// browse and the Queue still need) is left where it is.
 describe('the play record', () => {
-  it('carries the file extension AND the item type, whichever rail asked', () => {
+  it('carries the file extension, whichever rail asked', () => {
     var np = { item_id: 'mv-1', title: 'Mr Blue Sky', subtitles: 'mv-1.vtt', ext: 'webm', itemType: 'music-video', poster: 'IGNORED' };
-    expect(videoRecord(np)).toEqual({ id: 'mv-1', title: 'Mr Blue Sky', subtitles: 'mv-1.vtt', ext: 'webm', itemType: 'music-video' });
+    expect(videoRecord(np)).toEqual({ id: 'mv-1', title: 'Mr Blue Sky', subtitles: 'mv-1.vtt', ext: 'webm' });
   });
 
   // A .mov home movie is the case the old typedRecord dropped on the floor:
   // the player falls back to .mp4 when no ext rides the record.
   it('carries a home movie\'s own extension, which used to be dropped', () => {
     var clip = { item_id: 'beach-day', title: 'Beach Day', subtitles: null, ext: 'mov', itemType: 'home-movie' };
-    expect(videoRecord(clip)).toEqual({ id: 'beach-day', title: 'Beach Day', subtitles: null, ext: 'mov', itemType: 'home-movie' });
+    expect(videoRecord(clip)).toEqual({ id: 'beach-day', title: 'Beach Day', subtitles: null, ext: 'mov' });
+  });
+
+  // TASK-500 — the record never names a media type: nothing downstream of it
+  // may re-grow a per-type caption rule off a field the player is handed.
+  it('does not carry the item type, for any media type', () => {
+    var clip = { item_id: 'beach-day', title: 'Beach Day', subtitles: null, ext: 'mov', itemType: 'home-movie' };
+    expect(videoRecord(clip)).not.toHaveProperty('itemType');
+    expect(videoRecord({ item_id: 'f1', itemType: 'film' })).not.toHaveProperty('itemType');
   });
 });
 
