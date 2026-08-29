@@ -62,12 +62,14 @@
 //                     (every control visible, dimmed when it has nothing to
 //                     act on), which home movies alone never applied at the
 //                     player row despite their own Queue hero applying it.
-//   the record      — ONE videoRecord below, carrying both `ext` and
-//                     `itemType`. A music video used to send `ext` alone and a
-//                     film/home movie `itemType` alone; the engine's own
-//                     _resolve_item puts BOTH on every snapshot entry for every
-//                     media type, so a non-.mp4 home movie now plays and a
-//                     music video's itemType now reaches the caption rule.
+//   the record      — ONE videoRecord below, carrying `ext` for every media
+//                     type. A music video used to send `ext` alone and a
+//                     film/home movie none of it; the engine's own
+//                     _resolve_item puts it on every snapshot entry for every
+//                     media type, so a non-.mp4 home movie now plays.
+//                     (It carried `itemType` too, for a caption rule that
+//                     named one media type — TASK-500 removed that rule, and
+//                     the field went with it.)
 
 import { transportState } from './queue-shell-view.js';
 import { HOME_MOVIE, FILM, SERIES, MUSIC_VIDEO } from './queue-shell-config.js';
@@ -75,11 +77,12 @@ import { loadSeriesTitle, loadMusicVideoSourceTitle } from './app-api.js';
 
 // (now_playing) -> the record player.playVideo() loads, for every video media
 // type. `ext` picks the file (a music video's are not all .mp4, and neither is
-// every home movie); `itemType` is what the player's caption rule reads to keep
-// subtitles off a home movie. queue_engine's _resolve_item supplies both on
-// every entry, so neither depends on which rail asked.
+// every home movie); `subtitles` is the whole of the caption rule — a track
+// exists iff there is one, and no media type is named. queue_engine's
+// _resolve_item supplies both on every entry, so neither depends on which rail
+// asked.
 export function videoRecord(np) {
-  return { id: np.item_id, title: np.title, subtitles: np.subtitles, ext: np.ext, itemType: np.itemType };
+  return { id: np.item_id, title: np.title, subtitles: np.subtitles, ext: np.ext };
 }
 
 function seriesTitle(server, snap) {
