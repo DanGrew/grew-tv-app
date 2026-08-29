@@ -1179,6 +1179,14 @@ async function installQueuePlaybackBackend(page, mediaType, contextId) {
       state.currentItemId = promoted.length ? promoted[0].item_id : null;
       state.currentEntryId = null;
     },
+    // TASK-555 — Continue's own action, mirroring queue_engine.resume: replay
+    // what is playing, and only fall through to 'next' when nothing is. The
+    // durable head is left where it is, so a queued item is consumed by
+    // finishing or a skip and by nothing else.
+    'continue': function(b) {
+      if (state.currentItemId) return;
+      ENGINE.next(b);
+    },
     'previous': function() {
       var cur = state.currentPermutation;
       if (state.currentEntryId) {

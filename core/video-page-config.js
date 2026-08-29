@@ -167,8 +167,10 @@ export var VIDEO_PAGE_CONFIG = { mv: MUSIC_VIDEO_PAGE, hm: HOME_MOVIE_PAGE, film
 //
 // TASK-501 — the four Continue entries (browse's per-type Continue buttons)
 // are rows here like any other entry: each names the media type its button was
-// pressed for, so it advances that type's OWN engine and nothing downstream
-// needs a continue branch of its own.
+// pressed for, so it acts on that type's OWN engine and nothing downstream
+// needs a continue branch of its own. (TASK-555 changed WHICH action that is —
+// `continue`, not `next` — which is a one-word change in startContinue, not a
+// row here.)
 // TASK-542 — `series` and `boxset` are two modes now, where one covered both.
 // A TV series drives its OWN rail; a boxset stays films, which is what it has
 // always been. Both arrive on the same `?series=` nav param (the collection

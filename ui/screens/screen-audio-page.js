@@ -373,17 +373,21 @@ export function initAudioPage() {
   // music queue without opening a track first (the audio twin of the video page's
   // startQueue). No jumpToTrack (no trackId), no source title.
   // TASK-501 (Continue Music, from browse's play menu): entered with
-  // ?continueType=music — fire the engine's own advance (`next`) and render
-  // from the broadcast snapshot like the others. Queued track first, else the
-  // next track of the album/playlist/artist this person was last playing; the
-  // fallback is the ENGINE's, not browse's, which is why this is one action and
-  // no source of its own. The audio twin of the video page's continueEntry.
+  // ?continueType=music — fire one action and render from the broadcast
+  // snapshot like the others, with no source of its own.
+  // TASK-555: that action is `continue`, not `next`. The track you stopped
+  // halfway plays again from its start (music has never had a mid-track
+  // resume — TASK-276), where `next` used to consume it and start the one
+  // after. Nothing playing falls back to the old rule: queued track first,
+  // else the next track of the album/playlist/artist this person was last
+  // playing — still the ENGINE's fallback, not browse's. The audio twin of
+  // the video page's continueEntry.
   var SOURCE_BASE = {
     album:    function() { return sendAction('play-source', { source_type: 'album', source_id: albumId }); },
     artist:   function() { return sendAction('play-source', { source_type: 'artist', source_id: artistId }); },
     playlist: function() { return sendAction('play-source', { source_type: 'playlist', source_id: playlistId }); },
     queue:    function() { return sendAction('play-queue', {}); },
-    continue: function() { return sendAction('next', {}); },
+    continue: function() { return sendAction('continue', {}); },
     track:    function() {}
   };
   // With a source, the tapped track is a play-item INSIDE it — the source stays
