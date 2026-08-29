@@ -1,5 +1,5 @@
 import { queueShellModel, queueShellHtml, companionQueueShellHtml, transportState, durationText } from '../../core/queue-shell-view.js';
-import { HOME_MOVIE, FILM, MUSIC } from '../../core/queue-shell-config.js';
+import { HOME_MOVIE, FILM, SERIES, MUSIC, MUSIC_VIDEO } from '../../core/queue-shell-config.js';
 
 function entry(id, title, eid, dur, poster) {
   return { item_id: id, title: title, entry_id: eid, duration: dur, poster: poster == null ? 'clip.jpg' : poster };
@@ -34,6 +34,19 @@ function standaloneFilmSnap() {
   return {
     now_playing: { item_id: 'up', title: 'Up', poster: 'up.jpg', duration: 5760 },
     queue: [entry('moana', 'Moana', 'q1', 6420, 'moana.jpg')],
+    next: [],
+    coming_up: [],
+    shuffle: false, repeat: false, source_type: null, source_id: null
+  };
+}
+
+// TASK-535 — a lone clip, nothing queued behind it: all three emptinesses at
+// once, and the case where home movies' own resolver answers 'All' for a
+// source that isn't there.
+function standaloneClipSnap() {
+  return {
+    now_playing: { item_id: 'beach-day', title: 'Beach Day', poster: 'beach.jpg', duration: 55 },
+    queue: [],
     next: [],
     coming_up: [],
     shuffle: false, repeat: false, source_type: null, source_id: null
@@ -105,7 +118,12 @@ describe('queueShellModel', () => {
 
   it('resolves the hero source line through the config — caller-supplied, for films', () => {
     expect(queueShellModel(personSnap(), FILM, 'Toy Story Collection').hero.subtitle).toBe('Toy Story Collection');
-    expect(queueShellModel(standaloneFilmSnap(), FILM).hero.subtitle).toBe('');
+  });
+
+  // A source the caller could not name is still a source — the line stays
+  // blank rather than claiming the film is playing on its own (TASK-535).
+  it('leaves the source line blank when a real source has no title yet', () => {
+    expect(queueShellModel(personSnap(), FILM).hero.subtitle).toBe('');
   });
 
   it('is null hero for an empty/absent snapshot', () => {
@@ -137,6 +155,97 @@ describe('queueShellModel', () => {
 
   it('carries the transport state the config rule resolved', () => {
     expect(queueShellModel(standaloneFilmSnap(), FILM).transport.next).toBe(true);
+  });
+});
+
+// TASK-535 — playing something on its own gives the same page with less in it,
+// not a broken one: the hero says the item is playing on its own instead of
+// leaving its source line blank, and the two empty tabs each say why they are
+// empty. Three separate facts, three separate sentences, one path for all five
+// media types.
+describe('playing on its own — the page still explains itself', () => {
+  it('tells you the item is playing on its own where the source line would be', () => {
+    expect(queueShellModel(standaloneFilmSnap(), FILM).hero.subtitle).toBe('Playing on its own');
+  });
+
+  // Home movies was worse than blank: its resolver falls through to the
+  // whole-catalog label, so a lone clip's hero claimed a source — "All" —
+  // that the snapshot does not name. The wording is picked off the SNAPSHOT,
+  // which is what makes this one line for all five types instead of a fix for
+  // one of them.
+  it('names no source for a lone clip, where the resolver would have said "All"', () => {
+    expect(HOME_MOVIE.sourceSubtitle(standaloneClipSnap(), null)).toBe('All');
+    expect(queueShellModel(standaloneClipSnap(), HOME_MOVIE).hero.subtitle).toBe('Playing on its own');
+  });
+
+  it('says why Next and Coming Up are empty, in the type\'s own noun', () => {
+    expect(queueShellModel(standaloneClipSnap(), HOME_MOVIE).texts).toEqual({
+      emptyQueue: 'Nothing queued — add clips with ＋',
+      emptyNext: 'Nothing up next — this clip is playing on its own',
+      ends: 'No source to follow — nothing plays after this clip'
+    });
+    expect(queueShellModel(standaloneFilmSnap(), FILM).texts).toEqual({
+      emptyQueue: 'Nothing queued — add titles with ＋',
+      emptyNext: 'Nothing up next — this title is playing on its own',
+      ends: 'No source to follow — nothing plays after this title'
+    });
+  });
+
+  it('reads every media type in its own noun, off the one path', () => {
+    var snap = standaloneClipSnap();
+    expect(queueShellModel(snap, SERIES).texts.emptyNext).toBe('Nothing up next — this episode is playing on its own');
+    expect(queueShellModel(snap, MUSIC).texts.ends).toBe('No source to follow — nothing plays after this track');
+    expect(queueShellModel(snap, MUSIC_VIDEO).texts.emptyNext).toBe('Nothing up next — this video is playing on its own');
+  });
+
+  // The other side of the same rule: a play WITH a source behind it keeps
+  // every word it had, on both the hero and the two tabs.
+  it('leaves a sourced play saying exactly what it said before', () => {
+    expect(queueShellModel(personSnap(), HOME_MOVIE).hero.subtitle).toBe('Millie');
+    expect(queueShellModel(monthSnap(), HOME_MOVIE).texts.emptyNext).toBe('Nothing up next');
+    expect(queueShellModel(monthSnap(), HOME_MOVIE).texts.ends).toBe('Source ends — nothing plays after the last clip (repeat is off)');
+  });
+
+  // Nothing playing at all is not a standalone play — no item to say is
+  // playing on its own — so the all-empty shell keeps the wording it had.
+  it('does not claim a lone item when nothing is playing at all', () => {
+    expect(queueShellModel(null, FILM).texts.emptyNext).toBe('Nothing up next');
+    expect(queueShellModel({}, FILM).texts.ends).toBe('Source ends — nothing plays after the last title (repeat is off)');
+    expect(queueShellModel({ queue: [], next: [], coming_up: [] }, FILM).texts.emptyNext).toBe('Nothing up next');
+  });
+
+  it('draws all three lines on the TV', () => {
+    var html = queueShellHtml(standaloneClipSnap(), HOME_MOVIE);
+    expect(html).toContain('<div class="qs-hero-sub">Playing on its own</div>');
+    expect(html).toContain('<div class="qs-empty">Nothing up next — this clip is playing on its own</div>');
+    expect(html).toContain('<div class="qs-ends">&#9209; No source to follow — nothing plays after this clip</div>');
+  });
+
+  it('draws all three lines on the phone', () => {
+    var html = companionQueueShellHtml(standaloneClipSnap(), HOME_MOVIE);
+    expect(html).toContain('<div class="qs-ph-sub">Playing on its own</div>');
+    expect(html).toContain('<div class="ph-qempty">Nothing up next — this clip is playing on its own</div>');
+    expect(html).toContain('<div class="ph-ends">&#9209; No source to follow — nothing plays after this clip</div>');
+  });
+
+  // Story 1 — the same shape as a sourced play: hero, three tabs, transport in
+  // the same places. Nothing about the landing tab changes either: it is still
+  // the first non-empty tab, which for a lone item with one queued title is
+  // Queue, and for a lone item with nothing queued is Queue again as the
+  // stable fallback.
+  it('keeps the shell\'s shape — hero, three counted tabs, transport row', () => {
+    var html = queueShellHtml(standaloneClipSnap(), HOME_MOVIE);
+    expect(html).toContain('class="qs-hero-title">Beach Day</div>');
+    expect(html).toContain('<div class="qs-transport">');
+    expect(html).toContain('>Queue (0)</button>');
+    expect(html).toContain('>Next (0)</button>');
+    expect(html).toContain('>Coming Up (0)</button>');
+    expect(html).toContain('class="qs-tab active" data-act="tab" data-tab="queue"');
+  });
+
+  it('still lands on the first non-empty tab when a lone item has something queued', () => {
+    expect(queueShellHtml(standaloneFilmSnap(), FILM)).toContain('class="qs-tab active" data-act="tab" data-tab="queue"');
+    expect(companionQueueShellHtml(standaloneFilmSnap(), FILM)).toContain('class="ph-qtab active" data-act="tab" data-tab="queue"');
   });
 });
 
@@ -198,7 +307,9 @@ describe('queueShellHtml — TV', () => {
   });
 
   it('shows the empty-next placeholder when the source has nothing left', () => {
-    expect(queueShellHtml(standaloneFilmSnap(), FILM)).toContain('<div class="qs-empty">Nothing up next</div>');
+    var snap = monthSnap();
+    snap.next = [];
+    expect(queueShellHtml(snap, HOME_MOVIE)).toContain('<div class="qs-empty">Nothing up next</div>');
   });
 
   it('shows the end-of-source marker under Coming Up when repeat is off', () => {
@@ -415,7 +526,7 @@ describe('exact markup — mutation coverage', () => {
   });
 
   it("TV: standalone film, 1 queued — every disabled-but-visible transport control, Next live", () => {
-    expect(queueShellHtml(standaloneFilmSnap(), FILM)).toBe("<div class=\"qs-hero\"><div class=\"qs-hero-top\"><div class=\"qs-art\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/up.jpg\" onerror=\"this.style.display='none'\"></div><div class=\"qs-hero-body\"><div class=\"qs-hero-title\">Up</div><div class=\"qs-hero-sub\"></div></div></div><div class=\"qs-transport\"><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Previous\">&#9198;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-lg\" data-act=\"toggle\" aria-label=\"Play / pause\">&#9199;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"next\" aria-label=\"Next\">&#9197;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Shuffle\">&#128256;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Repeat\">&#128257;</button></div></div><div class=\"qs-tabbar\" role=\"tablist\"><button type=\"button\" class=\"qs-tab active\" data-act=\"tab\" data-tab=\"queue\" role=\"tab\">Queue (1)</button><button type=\"button\" class=\"qs-tab\" data-act=\"tab\" data-tab=\"next\" role=\"tab\">Next (0)</button><button type=\"button\" class=\"qs-tab\" data-act=\"tab\" data-tab=\"coming-up\" role=\"tab\">Coming Up (0)</button></div><div class=\"qs-panel active\" data-tab=\"queue\" role=\"tabpanel\"><div class=\"qs-row\"><button type=\"button\" class=\"qs-select\" data-act=\"select\" data-item=\"moana\"><span class=\"qs-thumb\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/moana.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"qs-body\"><span class=\"qs-name\">Moana</span><span class=\"qs-sub\">1:47:00</span></span></button><div class=\"qs-actions\"><button type=\"button\" class=\"qs-act is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"up\" title=\"Shift up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"qs-act is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"down\" title=\"Shift down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"qs-act danger\" data-act=\"remove\" data-entry=\"q1\" title=\"Remove\" aria-label=\"Remove\">&#10005;</button></div></div></div><div class=\"qs-panel\" data-tab=\"next\" role=\"tabpanel\"><div class=\"qs-empty\">Nothing up next</div></div><div class=\"qs-panel\" data-tab=\"coming-up\" role=\"tabpanel\"><div class=\"qs-ends\">&#9209; Source ends — nothing plays after the last title (repeat is off)</div></div>");
+    expect(queueShellHtml(standaloneFilmSnap(), FILM)).toBe("<div class=\"qs-hero\"><div class=\"qs-hero-top\"><div class=\"qs-art\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/up.jpg\" onerror=\"this.style.display='none'\"></div><div class=\"qs-hero-body\"><div class=\"qs-hero-title\">Up</div><div class=\"qs-hero-sub\">Playing on its own</div></div></div><div class=\"qs-transport\"><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Previous\">&#9198;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-lg\" data-act=\"toggle\" aria-label=\"Play / pause\">&#9199;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"next\" aria-label=\"Next\">&#9197;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Shuffle\">&#128256;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Repeat\">&#128257;</button></div></div><div class=\"qs-tabbar\" role=\"tablist\"><button type=\"button\" class=\"qs-tab active\" data-act=\"tab\" data-tab=\"queue\" role=\"tab\">Queue (1)</button><button type=\"button\" class=\"qs-tab\" data-act=\"tab\" data-tab=\"next\" role=\"tab\">Next (0)</button><button type=\"button\" class=\"qs-tab\" data-act=\"tab\" data-tab=\"coming-up\" role=\"tab\">Coming Up (0)</button></div><div class=\"qs-panel active\" data-tab=\"queue\" role=\"tabpanel\"><div class=\"qs-row\"><button type=\"button\" class=\"qs-select\" data-act=\"select\" data-item=\"moana\"><span class=\"qs-thumb\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/moana.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"qs-body\"><span class=\"qs-name\">Moana</span><span class=\"qs-sub\">1:47:00</span></span></button><div class=\"qs-actions\"><button type=\"button\" class=\"qs-act is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"up\" title=\"Shift up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"qs-act is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"down\" title=\"Shift down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"qs-act danger\" data-act=\"remove\" data-entry=\"q1\" title=\"Remove\" aria-label=\"Remove\">&#10005;</button></div></div></div><div class=\"qs-panel\" data-tab=\"next\" role=\"tabpanel\"><div class=\"qs-empty\">Nothing up next — this title is playing on its own</div></div><div class=\"qs-panel\" data-tab=\"coming-up\" role=\"tabpanel\"><div class=\"qs-ends\">&#9209; No source to follow — nothing plays after this title</div></div>");
   });
 
   it("TV: empty/absent snapshot renders a stable all-empty shell", () => {
@@ -431,7 +542,7 @@ describe('exact markup — mutation coverage', () => {
   });
 
   it("companion: standalone film, 1 queued — the same disabled transport row as the TV", () => {
-    expect(companionQueueShellHtml(standaloneFilmSnap(), FILM)).toBe("<div class=\"qs-ph-hero\"><div class=\"qs-ph-top\"><div class=\"qs-art\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/up.jpg\" onerror=\"this.style.display='none'\"></div><div class=\"qs-ph-body\"><div class=\"qs-ph-title\">Up</div><div class=\"qs-ph-sub\"></div></div></div><div class=\"qs-transport\"><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Previous\">&#9198;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-lg\" data-act=\"toggle\" aria-label=\"Play / pause\">&#9199;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"next\" aria-label=\"Next\">&#9197;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Shuffle\">&#128256;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Repeat\">&#128257;</button></div></div><div class=\"ph-qtab-bar\" role=\"tablist\"><button type=\"button\" class=\"ph-qtab active\" data-act=\"tab\" data-tab=\"queue\" role=\"tab\">Queue (1)</button><button type=\"button\" class=\"ph-qtab\" data-act=\"tab\" data-tab=\"next\" role=\"tab\">Next (0)</button><button type=\"button\" class=\"ph-qtab\" data-act=\"tab\" data-tab=\"coming-up\" role=\"tab\">Coming Up (0)</button></div><div class=\"ph-qtab-panel active\" data-tab=\"queue\" role=\"tabpanel\"><div class=\"ph-qrow\"><button type=\"button\" class=\"ph-qname\" data-act=\"select\" data-item=\"moana\"><span class=\"grip\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/moana.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"nm\"><span class=\"qs-name\">Moana</span><span class=\"qs-sub\">1:47:00</span></span></button><span class=\"acts\"><button type=\"button\" class=\"ph-ract is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"up\" title=\"Shift up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"ph-ract is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"down\" title=\"Shift down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"ph-ract x\" data-act=\"remove\" data-entry=\"q1\" title=\"Remove\" aria-label=\"Remove\">&#10005;</button></span></div></div><div class=\"ph-qtab-panel\" data-tab=\"next\" role=\"tabpanel\"><div class=\"ph-qempty\">Nothing up next</div></div><div class=\"ph-qtab-panel\" data-tab=\"coming-up\" role=\"tabpanel\"><div class=\"ph-ends\">&#9209; Source ends — nothing plays after the last title (repeat is off)</div></div>");
+    expect(companionQueueShellHtml(standaloneFilmSnap(), FILM)).toBe("<div class=\"qs-ph-hero\"><div class=\"qs-ph-top\"><div class=\"qs-art\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/up.jpg\" onerror=\"this.style.display='none'\"></div><div class=\"qs-ph-body\"><div class=\"qs-ph-title\">Up</div><div class=\"qs-ph-sub\">Playing on its own</div></div></div><div class=\"qs-transport\"><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Previous\">&#9198;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-lg\" data-act=\"toggle\" aria-label=\"Play / pause\">&#9199;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm\" data-act=\"transport\" data-action=\"next\" aria-label=\"Next\">&#9197;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Shuffle\">&#128256;</button><button type=\"button\" class=\"qs-tbtn qs-tbtn-sm is-disabled\" disabled aria-label=\"Repeat\">&#128257;</button></div></div><div class=\"ph-qtab-bar\" role=\"tablist\"><button type=\"button\" class=\"ph-qtab active\" data-act=\"tab\" data-tab=\"queue\" role=\"tab\">Queue (1)</button><button type=\"button\" class=\"ph-qtab\" data-act=\"tab\" data-tab=\"next\" role=\"tab\">Next (0)</button><button type=\"button\" class=\"ph-qtab\" data-act=\"tab\" data-tab=\"coming-up\" role=\"tab\">Coming Up (0)</button></div><div class=\"ph-qtab-panel active\" data-tab=\"queue\" role=\"tabpanel\"><div class=\"ph-qrow\"><button type=\"button\" class=\"ph-qname\" data-act=\"select\" data-item=\"moana\"><span class=\"grip\"><img class=\"poster-thumb\" alt=\"\" loading=\"lazy\" src=\"/media/moana.jpg\" onerror=\"this.style.display='none'\"></span><span class=\"nm\"><span class=\"qs-name\">Moana</span><span class=\"qs-sub\">1:47:00</span></span></button><span class=\"acts\"><button type=\"button\" class=\"ph-ract is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"up\" title=\"Shift up\" aria-label=\"Shift up\">&#8593;</button><button type=\"button\" class=\"ph-ract is-disabled\" disabled data-act=\"move\" data-entry=\"q1\" data-dir=\"down\" title=\"Shift down\" aria-label=\"Shift down\">&#8595;</button><button type=\"button\" class=\"ph-ract x\" data-act=\"remove\" data-entry=\"q1\" title=\"Remove\" aria-label=\"Remove\">&#10005;</button></span></div></div><div class=\"ph-qtab-panel\" data-tab=\"next\" role=\"tabpanel\"><div class=\"ph-qempty\">Nothing up next — this title is playing on its own</div></div><div class=\"ph-qtab-panel\" data-tab=\"coming-up\" role=\"tabpanel\"><div class=\"ph-ends\">&#9209; No source to follow — nothing plays after this title</div></div>");
   });
 
   it("companion: empty/absent snapshot renders a stable all-empty shell", () => {

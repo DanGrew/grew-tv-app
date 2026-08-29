@@ -166,6 +166,22 @@ test('a lone track renders Shuffle/Repeat/⏮ disabled-but-visible, never hidden
   await expect(previous).toHaveClass(/is-disabled/);
 });
 
+// TASK-535 — the same lone track on the TV: the page reads as itself with less
+// in it, not as a broken one. Three emptinesses arrive together and each says
+// its own thing, in music's own noun — the phone mirror of this is
+// companion-queue.test.js.
+test('a lone track explains its blank hero line and its two empty tabs', async ({ page }) => {
+  await installQueuePlaybackBackend(page, 'music');
+  await page.goto('/app/homeview/audio.html?track=ootb-01&from=browse');
+  await expect(page.locator('#screen-audio')).toBeVisible();
+  await openQueue(page);
+  await expect(page.locator('.qs-hero-sub')).toHaveText('Playing on its own');
+  await expect(page.locator('.qs-panel[data-tab="next"] .qs-empty'))
+    .toHaveText('Nothing up next — this track is playing on its own');
+  await expect(page.locator('.qs-panel[data-tab="coming-up"] .qs-ends'))
+    .toContainText('No source to follow — nothing plays after this track');
+});
+
 // The music twin of TASK-517 story 1: a lone track with something queued behind
 // it lights ⏭ at BOTH sites off the one transport rule, and either plays it.
 test('a queued track lights ⏭ on the player row AND the Queue hero', async ({ page }) => {

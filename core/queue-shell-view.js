@@ -25,8 +25,8 @@
 //
 // Everything media-type-specific is CONFIG, never a branch — see
 // core/queue-shell-config.js for the shape (media noun, fallback glyph,
-// source-subtitle resolver, row sub-line resolver, transport rule). A fifth
-// media type is data, not code.
+// source-subtitle resolver, row sub-line resolver, transport rule, the
+// playing-on-its-own wording). A fifth media type is data, not code.
 //
 // Every row's tap plays it now via `play-item` — never queue-item, never a
 // remove/re-add pair — so no row mutates queue/source data by being tapped
@@ -99,20 +99,43 @@ function modelRows(arr, config) {
   return (arr || []).map(function(entry) { return modelRow(entry, config); });
 }
 
-function heroModel(snap, config, sourceTitle) {
+function heroModel(snap, wording, sourceTitle) {
   var np = snap.now_playing;
   if (!np) return null;
-  return { itemId: np.item_id, title: np.title, poster: np.poster, subtitle: config.sourceSubtitle(snap, sourceTitle) };
+  return { itemId: np.item_id, title: np.title, poster: np.poster, subtitle: wording.source(snap, sourceTitle) };
 }
 
-// The media noun is the ONLY thing that varies in these three strings — the
-// wording itself is the shared design's, identical across types (home movies
-// and films shipped two different empty-Queue strings; that was drift).
-function textsFor(config) {
+// ── which words the page uses ──────────────────────────────────────────────
+// Two wording sets, three slots each: the hero's source line, the empty-Next
+// line, and the Coming Up end-marker. This is the set for a play WITH a source
+// behind it — the media noun is the ONLY thing that varies in it, the wording
+// itself being the shared design's (home movies and films shipped two
+// different empty-Queue strings; that was drift). The standalone set is the
+// same three slots as data on each config row (queue-shell-config.js).
+function sourcedWording(config) {
   return {
-    emptyQueue: 'Nothing queued — add ' + config.nounPlural + ' with ＋',
+    source: config.sourceSubtitle,
     emptyNext: 'Nothing up next',
     ends: 'Source ends — nothing plays after the last ' + config.noun + ' (repeat is off)'
+  };
+}
+
+// TASK-535 — a MAP keyed on whether something is playing with no source to
+// name, not a branch for the no-source case: the same boolean-key dispatch the
+// Queue overlay's own ON_SNAP already uses. One rule for all five types, and
+// it reads the SNAPSHOT rather than what a source resolver handed back — home
+// movies' resolver answers 'All' for a standalone clip, which claims a source
+// that isn't there. An absent snapshot (nothing playing at all) is not a
+// standalone play, so the all-empty shell keeps the wording it always had.
+function wordingFor(snap, config) {
+  return { false: sourcedWording(config), true: config.standalone }[!!(snap.now_playing && !snap.source_type)];
+}
+
+function textsFor(config, wording) {
+  return {
+    emptyQueue: 'Nothing queued — add ' + config.nounPlural + ' with ＋',
+    emptyNext: wording.emptyNext,
+    ends: wording.ends
   };
 }
 
@@ -122,15 +145,16 @@ function textsFor(config) {
 // slugs) ignores it.
 export function queueShellModel(snap, config, sourceTitle) {
   var s = snap || {};
+  var wording = wordingFor(s, config);
   return {
-    hero: heroModel(s, config, sourceTitle),
+    hero: heroModel(s, wording, sourceTitle),
     transport: config.transport(s),
     shuffle: !!s.shuffle,
     repeat: !!s.repeat,
     queueRows: modelRows(s.queue, config),
     nextRows: modelRows(s.next, config),
     comingUpRows: modelRows(s.coming_up, config),
-    texts: textsFor(config),
+    texts: textsFor(config, wording),
     glyph: config.glyph
   };
 }

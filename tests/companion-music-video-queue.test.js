@@ -118,7 +118,20 @@ test('a lone music video dims ⏮/Shuffle/Repeat rather than hiding them', async
   await expect(shuffle).toBeVisible();
   await expect(shuffle).toBeDisabled();
   await expect(page.locator('.qs-tbtn[aria-label="Repeat"]')).toBeDisabled();
-  await expect(page.locator('.qs-ph-sub')).toHaveText('');   // no source to name
+  // TASK-535 — the hero says so rather than leaving the line blank.
+  await expect(page.locator('.qs-ph-sub')).toHaveText('Playing on its own');
+});
+
+// TASK-535 — and the two empty tabs each say why, in the music-video noun.
+test('a lone music video says why Next and Coming Up are empty', async ({ page }) => {
+  await installApi(page);
+  const backend = await installQueuePlaybackBackend(page, 'music-video');
+  backend.seed('play-standalone', { item_id: 'mv-01' });
+  await page.goto('/companion/music-video-queue.html');
+  await expect(page.locator('.ph-qtab-panel[data-tab="next"] .ph-qempty'))
+    .toHaveText('Nothing up next — this video is playing on its own');
+  await expect(page.locator('.ph-qtab-panel[data-tab="coming-up"] .ph-ends'))
+    .toContainText('No source to follow — nothing plays after this video');
 });
 
 test('a queued music video revives ⏭ on a lone pick', async ({ page }) => {
