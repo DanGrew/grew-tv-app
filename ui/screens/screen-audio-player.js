@@ -416,38 +416,49 @@ export function setup(config) {
   // reconnect (bt-audio.sh) flips the macOS default afterwards but never rebinds
   // the live element. devicechange fires on that default-output flip — tearing
   // the element down and remounting (same src, same position) re-grabs whatever
-  // device is current now. A no-op while paused/idle — nothing to rebind.
+  // device is current now.
+  // BUG-558: that remount is two acts — rebind the element to the current
+  // output, and resume playback — and skipping BOTH while paused left a track
+  // the drop-out stopped bound to the speaker that went away, so play did
+  // nothing and only picking a new track (a fresh binding) got sound back. They
+  // are split now: every devicechange rebinds, and only playback the drop-out
+  // interrupted resumes, so a track someone paused on purpose stays paused.
   // BUG-423: `_stream()` (media-manager) enforces no read timeout on the track's
   // streaming request, so a stalled connection wedges forever — no error, no
   // close, nothing for the browser to recover from on its own. `waiting` arms a
   // timer; a `canplay`/`playing` well inside the threshold (normal buffering)
   // clears it. Outlasting the threshold means the connection is wedged, not
-  // buffering, so drive the same reload-in-place path BUG-061 uses.
+  // buffering, so drive the same reload-in-place path BUG-061 uses — a stall
+  // only ever arms while playing, so it stays a playing-only recovery.
   function armStallTimer() {
     clearStallTimer();
-    stallTimer = setTimeout(remountOnDeviceChange, STALL_RECOVERY_MS);
+    stallTimer = setTimeout(remountOnStall, STALL_RECOVERY_MS);
   }
   function clearStallTimer() {
     clearTimeout(stallTimer);
     stallTimer = null;
   }
+  function remountOnStall() {
+    [!audio.paused].filter(Boolean).forEach(function() { remount(true); });
+  }
 
-  function remountOnDeviceChange() {
-    var resumeAt   = audio.currentTime;
-    var wasPlaying = !audio.paused;
-    [wasPlaying].filter(Boolean).forEach(function() {
-      audio.load();
-      var doPlay = function() { audio.play().catch(function() {}); };
-      [audio].filter(function(el) { return el.readyState >= 1; }).forEach(function() { audio.currentTime = resumeAt; doPlay(); });
-      [audio].filter(function(el) { return el.readyState < 1; }).forEach(function() {
-        audio.addEventListener('loadedmetadata', function onMeta() {
-          audio.removeEventListener('loadedmetadata', onMeta);
-          audio.currentTime = resumeAt;
-          doPlay();
-        });
+  function remount(resumePlayback) {
+    var resumeAt = audio.currentTime;
+    audio.load();
+    var rebind = function() {
+      audio.currentTime = resumeAt;
+      [resumePlayback].filter(Boolean).forEach(function() { audio.play().catch(function() {}); });
+    };
+    [audio].filter(function(el) { return el.readyState >= 1; }).forEach(rebind);
+    [audio].filter(function(el) { return el.readyState < 1; }).forEach(function() {
+      audio.addEventListener('loadedmetadata', function onMeta() {
+        audio.removeEventListener('loadedmetadata', onMeta);
+        rebind();
       });
     });
   }
+
+  function remountOnDeviceChange() { remount(!audio.paused); }
   [navigator.mediaDevices].filter(Boolean).forEach(function(md) { md.addEventListener('devicechange', remountOnDeviceChange); });
 
   document.getElementById('btn-play-pause').addEventListener('click', togglePlayPause);

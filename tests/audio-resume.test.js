@@ -83,7 +83,14 @@ test('devicechange while playing remounts the audio element and resumes at the s
   expect(await page.evaluate(() => window.__pos)).toBe(42);
 });
 
-test('devicechange while paused does not auto-resume playback (BUG-061)', async ({ page }) => {
+// BUG-558 — the reconnect handler did the rebind and the resume as one act, and
+// skipped both while paused, so a track the drop-out stopped stayed pointed at
+// the speaker that went away: pressing play did nothing, and only picking a
+// different track (a fresh element binding) got sound back. The two are split
+// now — every devicechange rebinds, and only playback the drop-out interrupted
+// resumes. This is BUG-061's paused case rewritten: a silent rebind, not a
+// whole-handler no-op.
+test('devicechange while paused rebinds the audio element silently, and play afterwards plays that same track (BUG-558)', async ({ page }) => {
   await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   await page.locator('.sidebar-tab[data-tab="music"]').click();
@@ -95,7 +102,7 @@ test('devicechange while paused does not auto-resume playback (BUG-061)', async 
     window.__loads = 0;
     window.__plays = 0;
     Object.defineProperty(a, 'readyState', { configurable: true, get: () => 1 });
-    Object.defineProperty(a, 'currentTime', { configurable: true, get: () => 42, set: () => {} });
+    Object.defineProperty(a, 'currentTime', { configurable: true, get: () => (window.__pos === undefined ? 42 : window.__pos), set: v => { window.__pos = v; } });
     Object.defineProperty(a, 'paused', { configurable: true, get: () => true });
     a.load = () => { window.__loads += 1; };
     a.play = () => { window.__plays += 1; return Promise.resolve(); };
@@ -103,8 +110,13 @@ test('devicechange while paused does not auto-resume playback (BUG-061)', async 
 
   await page.evaluate(() => navigator.mediaDevices.dispatchEvent(new Event('devicechange')));
 
-  expect(await page.evaluate(() => window.__loads)).toBe(0);
+  expect(await page.evaluate(() => window.__loads)).toBe(1);
   expect(await page.evaluate(() => window.__plays)).toBe(0);
+  expect(await page.evaluate(() => window.__pos)).toBe(42);
+
+  await page.locator('#btn-play-pause').click();
+  expect(await page.evaluate(() => window.__plays)).toBe(1);
+  expect(await page.evaluate(() => window.__pos)).toBe(42);
 });
 
 // BUG-423 — a stalled stream (bytes stop arriving mid-`Content Download`, no
@@ -188,6 +200,32 @@ test('devicechange while playing remounts the video element and resumes at the s
 
   expect(await page.evaluate(() => window.__loads)).toBe(1);
   expect(await page.evaluate(() => window.__plays)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.__pos)).toBe(77);
+});
+
+test('devicechange while paused rebinds the video element silently, and play afterwards plays that same video (video twin, BUG-558)', async ({ page }) => {
+  await installQueuePlaybackBackend(page, 'film');
+  await page.goto('/app/homeview/video.html?video=bluey-s1e01&series=bluey&from=detail');
+  await expect(page.locator('#screen-video')).toBeVisible();
+
+  await page.locator('#video').evaluate(v => {
+    window.__loads = 0;
+    window.__plays = 0;
+    Object.defineProperty(v, 'readyState', { configurable: true, get: () => 1 });
+    Object.defineProperty(v, 'currentTime', { configurable: true, get: () => (window.__pos === undefined ? 77 : window.__pos), set: val => { window.__pos = val; } });
+    Object.defineProperty(v, 'paused', { configurable: true, get: () => true });
+    v.load = () => { window.__loads += 1; };
+    v.play = () => { window.__plays += 1; return Promise.resolve(); };
+  });
+
+  await page.evaluate(() => navigator.mediaDevices.dispatchEvent(new Event('devicechange')));
+
+  expect(await page.evaluate(() => window.__loads)).toBe(1);
+  expect(await page.evaluate(() => window.__plays)).toBe(0);
+  expect(await page.evaluate(() => window.__pos)).toBe(77);
+
+  await page.locator('#btn-play-pause').click();
+  expect(await page.evaluate(() => window.__plays)).toBe(1);
   expect(await page.evaluate(() => window.__pos)).toBe(77);
 });
 
