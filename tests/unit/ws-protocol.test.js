@@ -187,16 +187,18 @@ describe('createAppState', () => {
     expect(createAppState({}).type).toBe('app_state');
   });
 
-  it('passes through all snapshot fields (incl. FEAT-018 shuffle, FEAT-026 person, TASK-239 lyricsOn)', () => {
+  it('passes through all snapshot fields (incl. FEAT-018 shuffle, FEAT-026 person, TASK-239 lyricsOn, TASK-568 nightMode)', () => {
     const p = createAppState({
       screen: 'player', itemId: 'ootb', episodeId: 'ootb-02',
       positionSec: 42, durationSec: 380, playing: true,
-      profile: 'kids', person: 'mom', captionsOn: true, shuffle: true, lyricsOn: true
+      profile: 'kids', person: 'mom', captionsOn: true, shuffle: true, lyricsOn: true,
+      nightMode: 'strong'
     }).payload;
     expect(p).toEqual({
       screen: 'player', itemId: 'ootb', episodeId: 'ootb-02',
       positionSec: 42, durationSec: 380, playing: true,
-      profile: 'kids', person: 'mom', captionsOn: true, shuffle: true, lyricsOn: true
+      profile: 'kids', person: 'mom', captionsOn: true, shuffle: true, lyricsOn: true,
+      nightMode: 'strong'
     });
   });
 
@@ -213,6 +215,22 @@ describe('createAppState', () => {
     expect(p.captionsOn).toBe(false);
     expect(p.shuffle).toBe(false);
     expect(p.lyricsOn).toBe(false);
+  });
+
+  // TASK-568 — this builder's field list IS the wire contract: the TV's snapshot
+  // is rebuilt from it before it leaves, so a field buildSnapshot adds and this
+  // one doesn't carry never reaches the companion. Night Mode shipped that way
+  // once — the TV pill cycled through its levels while the phone read `Night:
+  // Off` forever, and the companion e2e couldn't see it because a mocked socket
+  // pushes app_state straight past this function.
+  it('carries the Night Mode level to the companion', () => {
+    expect(createAppState({ nightMode: 'soft' }).payload.nightMode).toBe('soft');
+    expect(createAppState({ nightMode: 'strong' }).payload.nightMode).toBe('strong');
+  });
+
+  it('defaults Night Mode to off rather than dropping the field', () => {
+    expect(createAppState().payload.nightMode).toBe('off');
+    expect(createAppState({ nightMode: null }).payload.nightMode).toBe('off');
   });
 });
 
