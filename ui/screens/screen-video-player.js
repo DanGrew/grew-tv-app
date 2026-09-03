@@ -5,6 +5,8 @@ import { createHeartbeat } from '../../core/ws-protocol.js';
 import { getCaptions, setCaptions, getPerson } from '../../core/state.js';
 import { readVolume, writeVolume } from '../../core/volume-store.js';
 import { progressPct, clampTime, wrapIndex, frameDrop } from '../../core/player-math.js';
+import { nightLabel } from '../../core/night-mode.js';
+import { createNightMode } from './night-mode-audio.js';
 
 // Graduated relative skips (FEAT-017): ±10s / 30s / 2m / 10m / 30m. The Jump
 // popup is a 5-column grid: back row then forward row. No absolute seek / scrub.
@@ -23,7 +25,7 @@ var STALL_RECOVERY_MS = 6000;   // BUG-429: waiting -> canplay/playing longer th
 // TASK-499 / not film mode, TASK-503) — a disabled-but-visible film-shuffle/
 // film-repeat stays in the list (only .hidden gates focus here; the real
 // `disabled` attribute already makes a click/Enter on it a no-op).
-var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-mv-shuffle', 'btn-mv-repeat', 'btn-hm-shuffle', 'btn-hm-repeat', 'btn-film-shuffle', 'btn-film-repeat', 'btn-jump', 'btn-cc', 'btn-queue', 'btn-reset'];
+var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-mv-shuffle', 'btn-mv-repeat', 'btn-hm-shuffle', 'btn-hm-repeat', 'btn-film-shuffle', 'btn-film-repeat', 'btn-jump', 'btn-cc', 'btn-queue', 'btn-night', 'btn-reset'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 var CC_MODE       = { 'true': 'showing', 'false': 'hidden' };
 // App-side log (TASK-213): a fresh start logs `play`, a start from a saved
@@ -57,6 +59,9 @@ export function setup(config) {
   var captionsOn        = false;
   var pendingResume     = false;
   var _currentDisplay   = {};
+  // TASK-568: Night Mode owns the element's audio path from its first press on
+  // (see night-mode-audio.js) — the level lives there, for this page load only.
+  var night             = createNightMode(video);
 
   var VIDEO_TOGGLE = {
     'true':  function() { video.play().catch(function() {}); },
@@ -141,7 +146,11 @@ export function setup(config) {
       positionSec: video.currentTime,
       durationSec: [video.duration].filter(function(d) { return !isNaN(d); }).concat([null])[0],
       playing: !video.paused,
-      captionsOn: captionsOn
+      captionsOn: captionsOn,
+      // TASK-568: the phone reads its own Night Mode label off this, and the
+      // player emits immediately on every change (below) as well as on the
+      // 1 Hz heartbeat — so the two surfaces agree within a second, story 3.
+      nightMode: night.current()
     };
   }
   function emitState() { emitSnapshot(buildSnapshot()); }
@@ -498,6 +507,22 @@ export function setup(config) {
     emitState();
   }
 
+  // ── Night Mode (TASK-568) ─────────────────────────────────────────────────
+  // One control, three levels, live over whatever is playing — the file on disk
+  // is never touched. The pill reads the level it is on, so a glance from the
+  // couch says which. `emitState` carries it to the phone straight away, and the
+  // phone's own press arrives back here as the `nightMode` intent (remote below),
+  // so either surface can change it and both follow.
+  function renderNight() {
+    document.getElementById('btn-night').textContent = nightLabel(night.current());
+  }
+  function cycleNight() {
+    night.cycle();
+    renderNight();
+    showControls();
+    emitState();
+  }
+
   // record: a full /api/video record. startSec is resolved by the page from the
   // backend (FEAT-017 source of truth) — resume by default, 0 on restart. No
   // localStorage read or write; series auto-advance is driven by the page.
@@ -542,6 +567,7 @@ export function setup(config) {
   remote.vol_down = function() { video.volume = Math.max(0, video.volume - 0.1); writeVolume(video.volume); showControls(); };
   remote.toggleCaptions = function() { [ccVisible()].filter(Boolean).forEach(toggleSubtitles); };
   remote.cc       = function() { [ccVisible()].filter(Boolean).forEach(toggleSubtitles); };
+  remote.nightMode = function() { cycleNight(); };   // companion Night Mode press (TASK-568)
   remote.reset    = function() { resetAndExit(); };   // companion Reset intent (TASK-142)
 
   video.addEventListener('timeupdate', function() {
@@ -633,7 +659,11 @@ export function setup(config) {
     });
   }
 
-  function remountOnDeviceChange() { remount(!video.paused); }
+  // TASK-568: the remount rebinds the ELEMENT to the current output; a Night
+  // Mode graph holds its own binding and has to be moved too, or the fix goes
+  // silent on the couch the first time the speaker reconnects mid-film. Both
+  // acts, on the one event — see night-mode-audio.js's own note.
+  function remountOnDeviceChange() { night.rebindSink(); remount(!video.paused); }
   [navigator.mediaDevices].filter(Boolean).forEach(function(md) { md.addEventListener('devicechange', remountOnDeviceChange); });
 
   document.getElementById('btn-play-pause').addEventListener('click', togglePlayPause);
@@ -641,6 +671,8 @@ export function setup(config) {
   document.getElementById('btn-next').addEventListener('click', function() { emit('next'); onNext(); });
   document.getElementById('btn-jump').addEventListener('click', openJumpPopup);
   document.getElementById('btn-cc').addEventListener('click', toggleSubtitles);
+  document.getElementById('btn-night').addEventListener('click', cycleNight);
+  renderNight();
   document.getElementById('btn-reset').addEventListener('click', function() { fireReset(document.getElementById('btn-reset')); });
   document.getElementById('btn-reset').addEventListener('blur', disarmReset);
   document.getElementById('btn-upnext-cancel').addEventListener('click', cancelUpNext);
