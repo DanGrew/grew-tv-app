@@ -1,3 +1,5 @@
+import { NIGHT_OFF } from './night-mode.js';
+
 export const MESSAGE_TYPES = {
   CONTEXT: 'context',
   INTENT: 'intent',
@@ -79,6 +81,12 @@ export function isStaleContext(incoming, current) {
 
 // app -> companion full state snapshot (last-wins, never a delta). Missing
 // fields normalise so a partial caller can't leak undefined onto the wire.
+// ⛔ This field list IS the app -> companion wire contract. The TV's snapshot is
+// REBUILT from it, not forwarded, so a field a player adds to its own
+// buildSnapshot and not to this list is silently dropped before it leaves the
+// TV — the phone renders the default forever while the TV looks correct. A
+// companion e2e cannot catch that on its own: a mocked socket pushes app_state
+// straight past this function. Add the field here, and assert it here.
 export function createAppState(state) {
   var s = state != null ? state : {};
   return createMessage(MESSAGE_TYPES.APP_STATE, {
@@ -97,7 +105,12 @@ export function createAppState(state) {
     shuffle: !!s.shuffle,
     // TASK-239: the ambient-lyrics pref rides the snapshot so the companion audio
     // player's Lyrics pill seeds + stays in sync with the TV (mirrors shuffle).
-    lyricsOn: !!s.lyricsOn
+    lyricsOn: !!s.lyricsOn,
+    // TASK-568: the Night Mode level rides the snapshot so the companion's own
+    // control seeds + stays in sync with the TV (mirrors lyricsOn). Off is the
+    // default rather than null, so a companion talking to a TV that predates
+    // this task still reads a level it knows.
+    nightMode: s.nightMode != null ? s.nightMode : NIGHT_OFF
   });
 }
 

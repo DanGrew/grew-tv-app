@@ -35,6 +35,8 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 .transport .cc { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
 .transport .cc.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
 .transport .rp.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
+.transport .nm { font-size: 15px; flex: 2; }
+.transport .nm.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
 .transport button.single { opacity: 0.35; pointer-events: none; }
 .footer-row { display: flex; gap: 8px; align-items: stretch; margin-top: 12px; }
 .reset-btn { flex: 1; min-width: 0; padding: 14px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-size: 16px; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
@@ -109,6 +111,7 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 <div class="transport">
   <button id="c-vol-down" aria-label="Volume down">🔉</button>
   <button id="c-vol-up" aria-label="Volume up">🔊</button>
+  <button id="c-night" class="nm" aria-label="Night Mode">Night: Off</button>
 </div>
 <div class="jump" id="jump"></div>
 <div id="upnext" class="bignext"></div>

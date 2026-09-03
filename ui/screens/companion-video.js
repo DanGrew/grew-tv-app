@@ -7,6 +7,7 @@ import { percent } from '../../core/progress.js';
 import { buildCrumbs, trailCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
 import { trimOnCrumb, entries as entriesTrail } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
+import { nightLabel, isNightOn } from '../../core/night-mode.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { playlistCards } from '../../core/playlist-pick.js';
 import { mountCompanionBreadcrumb } from './companion-breadcrumb.js';
@@ -60,6 +61,7 @@ export function initPage() {
     jump: document.getElementById('jump'),
     upnext: document.getElementById('upnext'),
     reset: document.getElementById('c-reset'),
+    night: document.getElementById('c-night'),
     queue: document.getElementById('c-queue'),
     addPlaylist: document.getElementById('c-add-playlist')
   };
@@ -158,10 +160,19 @@ export function initPage() {
     });
   }
 
+  // TASK-568 — Night Mode is a PLANE A control: the level lives on the TV (one
+  // level for the whole TV, held for its current player page), so the phone
+  // never keeps a copy. It renders whatever the app_state snapshot says and
+  // sends a press as an intent — which is what makes the two agree within a
+  // second whichever surface changed it (stories 2 and 3), by construction
+  // rather than by two copies being kept in step. The label itself is
+  // core/night-mode.js's own, the same string the TV pill shows.
   function renderControls() {
     [state.snap].filter(Boolean).forEach(function(s) {
       els.toggle.textContent = PLAY_ICON[s.playing + ''];
       els.cc.classList.toggle('on', !!s.captionsOn);
+      els.night.textContent = nightLabel(s.nightMode);
+      els.night.classList.toggle('on', isNightOn(s.nightMode));
     });
   }
 
@@ -464,6 +475,7 @@ export function initPage() {
 
   els.toggle.addEventListener('click', function() { api.sendIntent('toggle'); });
   els.cc.addEventListener('click', function() { api.toggleCaptions(); });
+  els.night.addEventListener('click', function() { api.sendIntent('nightMode'); });
   els.prev.addEventListener('click', function() { PREV_ACTION[engineMode()](); });
   els.next.addEventListener('click', function() { NEXT_ACTION[engineMode()](); });
   els.repeat.addEventListener('click', function() { REPEAT_ACTION[engineMode()](); });
