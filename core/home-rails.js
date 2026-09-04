@@ -7,6 +7,7 @@
 // progress: { id: { resumePositionSec, lastPlayed } } (from /api/continue-watching)
 
 import { continueWatching } from './progress.js';
+import { channelRails, CHANNELS_TAB } from './channels.js';
 
 // Normalize a browse card's `duration` (seconds, the backend's name) to the
 // `durationSec` the tile/progress model expects. Non-mutating shallow copy.
@@ -92,7 +93,10 @@ export function sectionOf(card) { return card.section || 'films'; }
 // no new branch below — a Play All tile's own `kind: 'play-all'` already falls
 // through the final `card.kind || 'video'` line, same as 'series'/'artist'
 // would if their own earlier checks were removed.
-export var CARD_ROUTES = ['artist', 'playlist', 'music-video', 'album', 'video', 'series', 'track', 'play-all'];
+// TASK-563: 'channel' needs no new branch below either — a channel tile's own
+// `kind: 'channel'` (core/channels.js) falls through the final `card.kind ||
+// 'video'` line, exactly as 'play-all' does.
+export var CARD_ROUTES = ['artist', 'playlist', 'music-video', 'album', 'video', 'series', 'track', 'play-all', 'channel'];
 
 export function cardRoute(card) {
   if (card.kind === 'artist') return 'artist';
@@ -646,4 +650,16 @@ export function railsForSection(sectionId, cards, cwRows, genreLabels, recents) 
   var rails = buildTabRails(sectionId, cards, cwRows, genreLabels, recents);
   var guarantee = [RAIL_GUARANTEE[sectionId]].filter(Boolean).concat([function(r) { return r; }])[0];
   return guarantee(rails);
+}
+
+// FEAT-560/TASK-563 — the rails for any browse section, INCLUDING Channels.
+//
+// Channels is the one section whose rails don't come from the catalog: a
+// channel is not in the library and the app never holds the pool (decision 2),
+// so its strip arrives from /api/channels instead. Both surfaces resolve a
+// section's rails through here so the TV tab and the phone's dock can never
+// disagree about what a section holds.
+export function railsForBrowseSection(sectionId, cards, cwRows, genreLabels, recents, channels) {
+  if (sectionId === CHANNELS_TAB.id) return channelRails(channels);
+  return railsForSection(sectionId, cards, cwRows, genreLabels, recents);
 }

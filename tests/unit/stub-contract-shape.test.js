@@ -36,7 +36,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const {
   browseResponse, videoResponse, albumResponse, playlistResponse,
-  continueWatchingResponse, midWatchRows, MUSIC_CARDS, PLAYLIST_CARDS, PLAYLISTS
+  continueWatchingResponse, midWatchRows, MUSIC_CARDS, PLAYLIST_CARDS, PLAYLISTS,
+  channelsResponse, CHANNEL_ON_AIR, CHANNEL_OFF_AIR_TIMED
 } = require('../fixtures/api.js');
 
 const CONTRACT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.contract');
@@ -90,13 +91,14 @@ const AUDIO_VIDEO = {
 };
 
 describe.skipIf(!HAS_CONTRACT)('stub ⇄ backend contract shape (SYS-017 / TASK-326)', () => {
-  let browse, cw, video, album, playlist;
+  let browse, cw, video, album, playlist, channels;
   beforeAll(() => {
     browse = load('browse');
     cw = load('continue-watching');
     video = load('video');
     album = load('album');
     playlist = load('playlist');
+    channels = load('channels');
   });
 
   describe('/api/browse (browseResponse)', () => {
@@ -258,6 +260,38 @@ describe.skipIf(!HAS_CONTRACT)('stub ⇄ backend contract shape (SYS-017 / TASK-
     it('a playlist member video record matches the contract track video', () => {
       const stub = playlistResponse(PLAYLISTS, 'pl-roadtrip');
       expectShape('playlist item video', stub.items[0].video, playlist.items[0].video, AUDIO_VIDEO);
+    });
+  });
+
+  // TASK-563 — the Channels strip. installApi serves it EMPTY by default (so the
+  // rest of the suite runs with no Channels tab), which leaves no stub ELEMENT in
+  // the response to bind. The lines the tab test overrides the route with are the
+  // thing that can drift, so those are what get bound here.
+  describe('/api/channels (channelsResponse)', () => {
+    it('envelope shape matches (channels)', () => {
+      expectShape('channels envelope', channelsResponse('kids'), channels);
+    });
+
+    it('the on-air line matches the contract line', () => {
+      expectShape('channel line (on air)', CHANNEL_ON_AIR, channels.channels[0]);
+    });
+
+    it('the off-air line matches the contract line', () => {
+      // Off air is the same line with no item and no position — the backend sends
+      // one shape whether a channel is on or not, so it binds to the same object.
+      expectShape('channel line (off air)', CHANNEL_OFF_AIR_TIMED, channels.channels[0]);
+    });
+
+    it('the on-air item matches the contract item', () => {
+      expectShape('channel item', CHANNEL_ON_AIR.item, channels.channels[0].item, {
+        contractOnly: {
+          artist: 'backend field, null for video; the card names the item and nothing else',
+          duration: 'backend duration; the card times itself off the line runtime_seconds, not this',
+          ext: 'backend file extension; the card never plays the item, TASK-564 does',
+          subtitles: 'backend subtitles ref; the card never plays the item',
+          type: 'backend genre-type; the card shows no genre'
+        }
+      });
     });
   });
 });

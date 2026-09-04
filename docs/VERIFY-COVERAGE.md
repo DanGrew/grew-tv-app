@@ -40,6 +40,7 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 |---------|------------------|---------|--------|----------------|
 | browse | sections + rails nav (TV Series / Films / Music) | companion, music, playlists | ✅ | |
 | browse | film tile ＋Queue in-row control | — | ❌ | TASK-286 (state on browse, unsnapped) |
+| browse | Channels tab — on-air / off-air cards | — | ❌ | TASK-563 (new tab, and the section browse now LANDS on whenever any channel exists) |
 | browse | Continue Watching/Listening rail (mid-play) | — | ❌ | FEAT-044 (TASK-285) |
 | detail | TV-series tracklist | companion | ⚠️ | list snaps; NEXT tag not asserted — BUG-033 |
 | detail | album tracklist | music | ✅ | |
@@ -63,6 +64,7 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 | profile | profile pick + PIN | tv-app | ✅ | |
 | browse | film tiles + rails | tv-app | ✅ | |
 | browse | Continue Watching rail (mid-play) | tv-app | ✅ | FEAT-044; tv-app seeks a video to ~30% then snaps the rail (Continue **Listening** / playlist tiles still ❌ — TASK-285) |
+| browse | Channels tab — on-air / off-air cards | — | ❌ | TASK-563. A flow here needs a frozen clock: the card's bar and its `2m/8m` advance every second off wall time, so an unpinned snap differs from itself between runs — a determinism case `VERIFY-STORIES.md` has no anchor for yet |
 | detail | TV-series detail + NEXT tag | tv-app | ✅ | |
 | album-detail | album detail (music) | tv-music | ✅ | |
 | audio | TV music player controls | tv-music | ✅ | TASK-288 (two-row), BUG-034 (volume), TASK-283 (startAt/endAt) |

@@ -54,6 +54,7 @@ module or a screen** — this index rots otherwise (it did).
 **Model / view helpers (pure markup + view-models)**
 - `tile-model.js` — shared card view-model (TASK-116)
 - `home-rails.js` — group `/api/browse` cards into titled rails (TASK-117)
+- `channels.js` — the FEAT-560 Channels tab (TASK-563): the tab itself and where browse lands (Channels whenever the backend serves any, otherwise exactly where it landed before), one card per channel and its three states (on air; off air with a return time; off air naming nothing), and the arithmetic under the card — minutes as `2m/8m`, the bar's fill, and the offset ticked forward from the one the strip was fetched with. ⛔ **The bar is the CHANNEL's position, not the viewer's** — a channel plays to a clock nobody's watch history feeds, so nothing here may reach `progress.js`; the two look alike on screen and mean opposite things. `landingTab` is the only place the tab order and the landing choice are decided, so the TV and the phone cannot disagree about which section opens, and `tileVariant` the only place a card's renderer is chosen. Picking a channel is inert until TASK-564 brings the player entry
 - `detail-view.js` / `series-detail.js` / `seasons.js` — series-detail logic (TASK-118/123)
 - `artist-tracks.js` — artist page's album-grouped song model (TASK-322)
 - `search-rank.js` — search overlay: build Video/Music candidates (cards + `/api/tracks`), rank a query (exact>prefix>substring, field-weighted), render result rows (TASK-324)

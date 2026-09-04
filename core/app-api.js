@@ -12,6 +12,18 @@ export function loadBrowse(serverUrl, profile) {
   return getJson(serverUrl + '/api/browse?profile=' + encodeURIComponent(profile));
 }
 
+// One on-now line per channel this profile may see (FEAT-560/TASK-562), for the
+// Channels strip. `profile` is REQUIRED — the backend 400s without it, on
+// purpose: a default would be a way to see every channel by leaving the
+// parameter off, and a channel declares who may see it (TASK-569), so the kids
+// profile must never be able to reach Date Night by omission.
+//
+// An empty `channels` list is a normal answer, not an error — grew-tv ran
+// without channels before this feature and a profile may have none of its own.
+export function loadChannels(serverUrl, profile) {
+  return getJson(serverUrl + '/api/channels?profile=' + encodeURIComponent(profile));
+}
+
 // Mid-watch videos for a profile, newest first (FEAT-017). Backs the Home
 // Continue Watching rail and the companion shortcut. Backend is the source of
 // truth for progress, so this — not localStorage — drives cross-device CW.

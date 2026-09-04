@@ -1,15 +1,59 @@
 import { registerScreen } from '../../core/screen-registry.js';
-import { createTile } from '../../components/tile.js';
-import { buildTabs, railsForSection, clampIndex } from '../../core/home-rails.js';
+import { createTile, createChannelTile, applyChannelView } from '../../components/tile.js';
+import { buildTabs, railsForBrowseSection, clampIndex } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
 import { personGlyph } from '../../core/profile-config.js';
+import { withChannelsTab, channelsById, channelCardView, landingTab, tileVariant } from '../../core/channels.js';
 
 // FEAT-020 (TASK-138): the browse screen is a content-type sidebar plus a
 // rail area. Selecting a sidebar tab swaps the rails to that content type's
 // rails. Pure grouping/ordering lives in core/home-rails.js; this module owns
 // the DOM and the two-zone (sidebar / rails) d-pad focus model. Module state
 // holds the last-rendered data so a tab switch can rebuild the rails.
-var STATE = { server: null, cards: [], cw: [], recents: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null, onTabChange: null };
+var STATE = { server: null, cards: [], cw: [], recents: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null, onTabChange: null, channels: [], channelsById: {}, channelsAt: 0 };
+
+// FEAT-560/TASK-563 — the Channels strip ticks (decision 14): a card baked at
+// fetch time is wrong within a minute of render. Every second the rendered
+// cards re-derive their position from the clock; the strip itself is re-fetched
+// by the page, which is what rolls a card on to the next programme entry.
+var TICK_MS = 1000;
+var tickTimer = null;
+
+function elapsedSeconds() {
+  return (Date.now() - STATE.channelsAt) / 1000;
+}
+
+function channelTileEls() {
+  return Array.from(document.querySelectorAll('.channel-tile'));
+}
+
+// Re-apply each rendered card's view in place. In place, not a rebuild: the
+// strip is on screen while someone is browsing it, and replacing the elements
+// every second would throw focus back to the start of the rail once a second.
+function tickChannels() {
+  var elapsed = elapsedSeconds();
+  channelTileEls().forEach(function(el) {
+    [STATE.channelsById[el.getAttribute('data-channel')]].filter(Boolean).forEach(function(line) {
+      applyChannelView(el, channelCardView(line, elapsed));
+    });
+  });
+}
+
+function startTick() {
+  clearInterval(tickTimer);
+  tickTimer = setInterval(tickChannels, TICK_MS);
+}
+
+// The page's poll landed: swap the lines in and let the next tick redraw. Kept
+// separate from renderBrowse so a refresh never rebuilds the sidebar or moves
+// focus — a channel rolling over to its next programme entry should change what
+// a card says and nothing else.
+export function updateChannels(lines) {
+  STATE.channels = lines;
+  STATE.channelsById = channelsById(lines);
+  STATE.channelsAt = Date.now();
+  tickChannels();
+}
 
 function tilesIn(railEl) {
   return Array.from(railEl.querySelectorAll('.film-tile'));
@@ -177,6 +221,22 @@ function createPlaylistBtn() {
 
 var PLUS_RAIL = { playlists: true, 'mv-playlists': true };
 
+// A channel card is built by its own renderer (components/tile.js), never
+// createTile — createTile's bar comes from watch progress, and a channel's comes
+// from the schedule. core's tileVariant picks, so this is a plain lookup.
+var TILE_BUILDER = {
+  channel: function(card) {
+    return createChannelTile(STATE.server, card, { elapsedSeconds: elapsedSeconds(), onSelect: STATE.onSelect });
+  },
+  library: function(card) {
+    return createTile(STATE.server, card, { progress: STATE.progress, onSelect: STATE.onSelect, onQueue: STATE.onQueue });
+  }
+};
+
+function buildTile(card) {
+  return TILE_BUILDER[tileVariant(card)](card);
+}
+
 function railSection(rail) {
   var section = document.createElement('div');
   section.className = 'rail';
@@ -191,9 +251,7 @@ function railSection(rail) {
   // Music tiles are square (taller) — give their rail extra vertical room so the
   // focus scale (1.05) isn't clipped by the row's overflow.
   row.classList.toggle('rail-row-music', rail.items.some(function(card) { return card.section === 'music'; }));
-  rail.items.forEach(function(card) {
-    row.appendChild(createTile(STATE.server, card, { progress: STATE.progress, onSelect: STATE.onSelect, onQueue: STATE.onQueue }));
-  });
+  rail.items.forEach(function(card) { row.appendChild(buildTile(card)); });
   section.appendChild(row);
   return section;
 }
@@ -219,10 +277,17 @@ function markActive(tabId) {
 // TASK-445 — onTabChange lets the page show/hide a tab-scoped control (Play
 // All) without this module knowing what Play All is; fires on every select,
 // including the initial one, so the page's first render is already correct.
+// TASK-563 — core resolves which rails a tab holds, because Channels' come
+// from the /api/channels strip rather than the catalog. Reads the active tab
+// selectTab has just set, so this screen keeps no section branch of its own.
+function railsFor() {
+  return railsForBrowseSection(STATE.activeTab, STATE.cards, STATE.cw, STATE.labels, STATE.recents, STATE.channels);
+}
+
 function selectTab(tabId) {
   STATE.activeTab = tabId;
   markActive(tabId);
-  renderRailRows(railsForSection(tabId, STATE.cards, STATE.cw, STATE.labels, STATE.recents));
+  renderRailRows(railsFor());
   [STATE.onTabChange].filter(Boolean).forEach(function(fn) { fn(tabId); });
 }
 
@@ -275,7 +340,12 @@ export function getActiveTab() {
 // rows feed both the per-tab Continue Watching rail and the tiles' progress bars
 // (via progressMapFromCW). `recents` (FEAT-045/TASK-318, from the same
 // continue-watching response) feeds the Music tab's Recently Played rail.
-export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, initialTab, onQueue, onCreatePlaylist, recents, onTabChange) {
+// TASK-563 — `channels` is the /api/channels strip (possibly empty). It adds
+// the Channels tab, first in the sidebar and the tab browse lands on; with none
+// there is no tab and browse behaves exactly as it did (story 6). `requestedTab`
+// is an explicit ?tab= and `lastTab` the remembered one — core's landingTab
+// settles which of the three wins.
+export function renderBrowse(server, cards, cwRows, labels, profile, person, onSelect, requestedTab, onQueue, onCreatePlaylist, recents, onTabChange, channels, lastTab) {
   STATE.server = server;
   STATE.cards = cards;
   STATE.cw = cwRows;
@@ -287,11 +357,15 @@ export function renderBrowse(server, cards, cwRows, labels, profile, person, onS
   STATE.onQueue = onQueue;
   STATE.onCreatePlaylist = onCreatePlaylist;
   STATE.onTabChange = onTabChange;
+  STATE.channels = channels;
+  STATE.channelsById = channelsById(channels);
+  STATE.channelsAt = Date.now();
   document.getElementById('profile-label').textContent = personGlyph(person) + ' ' + person.name + ' ▸';
-  var tabs = buildTabs(cards);
+  var tabs = withChannelsTab(buildTabs(cards), channels);
   var ids = tabs.map(function(t) { return t.id; });
   renderSidebar(tabs);
-  selectTab([initialTab].filter(function(t) { return ids.indexOf(t) >= 0; }).concat(ids).concat(['films'])[0]);
+  selectTab([landingTab(ids, requestedTab, lastTab, channels)].filter(Boolean).concat(['films'])[0]);
+  startTick();
   focusFirstTile();
 }
 

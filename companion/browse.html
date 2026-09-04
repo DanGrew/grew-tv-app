@@ -20,6 +20,10 @@
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
   --dock-h: 64px;
+  /* FEAT-560/TASK-563 — the channel's position, the TV's own --live token
+     (#ffce6b, already the palette's only warm — the .reset-btn.confirm here and
+     on companion/video.html). */
+  --live: #ffce6b;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; background: var(--bg); background-attachment: fixed; color: var(--text); font-family: var(--font); }
@@ -57,6 +61,19 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
 .ph-txt-cell { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); transition: border-color var(--dur) var(--ease); }
 .ph-txt-cell:has(.ph-txt:active), .ph-txt-cell:has(.ph-txt:focus) { border-color: var(--focus); }
 .ph-txt-cell .ph-txt { flex: 1; min-width: 0; min-height: 0; border: none; background: none; border-radius: 0; padding: 6px 4px; }
+/* FEAT-560/TASK-563 — the channel card, the mirror's own shape: the TV card's
+   three lines with no artwork (the phone's tiles are text by design). Two rows
+   inside one tile, so the channel name and its position share a line and what's
+   on sits under them. */
+.ph-chan { flex-wrap: wrap; align-items: baseline; row-gap: 4px; cursor: default; }
+.ph-chan .nm { flex: 1; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+/* ⚠️ Amber, not the white .pct above: that badge is how far the VIEWER got and
+   this is how far the CHANNEL has got. The two sit on the same screen. */
+.ph-chan .chan-time { flex: 0 0 auto; color: var(--live); font-variant-numeric: tabular-nums; }
+.ph-chan .chan-now { flex: 0 0 100%; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-chan .chan-bar { flex: 0 0 100%; height: 3px; border-radius: 2px; background: rgba(0,0,0,0.45); overflow: hidden; }
+.ph-chan .chan-bar i { display: block; height: 100%; background: var(--live); transition: width var(--dur) linear; }
+.ph-chan.off-air .chan-now { color: var(--text-muted); }
 .ph-cell-queue { flex: 0 0 auto; align-self: center; padding: 6px 14px; background: var(--surface-hi); border: 2px solid var(--border); border-radius: var(--radius-sm); font-size: 20px; color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .ph-cell-queue:active, .ph-cell-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); }
 #queue-status { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 11; padding: 12px 22px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; box-shadow: 0 12px 36px rgba(0,0,0,0.5); }

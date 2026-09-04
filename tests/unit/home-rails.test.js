@@ -1,4 +1,28 @@
-import { buildRails, buildTabs, buildTabRails, railsForSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail, homeMoviesPlayAllRail, homeMoviesMonthRail, homeMoviesListItems, homeMoviesListTitle, homeMoviesSourceLabel, homeMoviesListPlayParams } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, railsForSection, railsForBrowseSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail, homeMoviesPlayAllRail, homeMoviesMonthRail, homeMoviesListItems, homeMoviesListTitle, homeMoviesSourceLabel, homeMoviesListPlayParams } from '../../core/home-rails.js';
+
+// FEAT-560/TASK-563 — Channels is the one section whose rails don't come from
+// the catalog. Both surfaces resolve a section's rails through here, so the TV
+// tab and the phone's dock can never disagree about what a section holds.
+describe('railsForBrowseSection', () => {
+  const CHANNELS = [{ channel_id: 'cartoon-club', name: 'Cartoon Club', on_air: true, item: { item_id: 'b', title: 'Bluey' }, offset_seconds: 60, runtime_seconds: 480 }];
+
+  it('serves the Channels section its strip, not catalog rails', () => {
+    const rails = railsForBrowseSection('channels', [], [], {}, [], CHANNELS);
+    expect(rails.length).toBe(1);
+    expect(rails[0].title).toBe('On now');
+    expect(rails[0].items[0].kind).toBe('channel');
+  });
+
+  it('serves any other section exactly what railsForSection does', () => {
+    const cards = [{ kind: 'video', id: 'toy-story', title: 'Toy Story', section: 'films', genres: ['animation'] }];
+    expect(railsForBrowseSection('films', cards, [], {}, [], CHANNELS))
+      .toEqual(railsForSection('films', cards, [], {}, []));
+  });
+
+  it('gives the Channels section no rails when there are no channels', () => {
+    expect(railsForBrowseSection('channels', [], [], {}, [], [])).toEqual([]);
+  });
+});
 
 // TASK-235 — the create affordance is the Playlists rail-heading ＋ button (in the
 // browse screen), not a synthetic card. withPlaylistsRail just GUARANTEES the rail
@@ -654,10 +678,13 @@ describe('cardRoute (browse navigation, FEAT-027)', () => {
 // the set cardRoute()'s branches above actually produce.
 describe('CARD_ROUTES', () => {
   it('lists every value cardRoute() can return', () => {
-    expect(CARD_ROUTES).toEqual(['artist', 'playlist', 'music-video', 'album', 'video', 'series', 'track', 'play-all']);
+    expect(CARD_ROUTES).toEqual(['artist', 'playlist', 'music-video', 'album', 'video', 'series', 'track', 'play-all', 'channel']);
   });
   it('cardRoute maps a TASK-486 Play All tile to "play-all" via the fallback branch', () => {
     expect(cardRoute({ kind: 'play-all', id: 'play-all:All' })).toBe('play-all');
+  });
+  it('cardRoute maps a TASK-563 channel tile to "channel" via the same fallback', () => {
+    expect(cardRoute({ kind: 'channel', id: 'channel:cartoon-club' })).toBe('channel');
   });
 });
 

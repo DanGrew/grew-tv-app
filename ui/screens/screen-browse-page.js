@@ -1,8 +1,8 @@
 import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
-import { browseArrow, renderBrowse, getActiveTab } from './screen-browse.js';
+import { browseArrow, renderBrowse, getActiveTab, updateChannels } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadBrowse, loadContinueWatching, loadConfig, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadConfig, loadTracks, loadEpisodes, loadChannels } from '../../core/app-api.js';
 import { queueAdd, queueAddStatus, itemMediaType } from '../../core/queue-shell-config.js';
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
@@ -228,7 +228,16 @@ export function initBrowsePage() {
     // exact home-movies-list.html query params (home-rails.js playAllTile);
     // this route is a plain lookup, no branch, same shape as every other
     // entry here.
-    'play-all': function(card) { navTo('home-movies-list.html', Object.assign({ from: 'browse' }, card.navParams)); }
+    'play-all': function(card) { navTo('home-movies-list.html', Object.assign({ from: 'browse' }, card.navParams)); },
+    // TASK-563 — a channel card is DELIBERATELY INERT until TASK-564 (owner,
+    // 2026-09-04: unwired is fine, broken is not). Picking one does nothing yet.
+    //
+    // It is a row here rather than an omission for two reasons: arch-check's
+    // no-missing-card-route requires every CARD_ROUTES value to be dispatched,
+    // and leaving it out would make a press fall through the unknown-route guard
+    // below — indistinguishable from a bug. TASK-564 replaces this body with the
+    // navigation; `navParams` (core/channels.js) already carries what it needs.
+    channel: function() {}
   };
 
   // cardRoute (core) gives 'album' for a music card else the card's kind;
@@ -239,10 +248,32 @@ export function initBrowsePage() {
     [SELECT[cardRoute(card)]].filter(Boolean).forEach(function(fn) { fn(card); });
   }
 
+  // FEAT-560/TASK-563 — the Channels strip. Its own poll, because a channel is a
+  // clock: the per-second tick inside screen-browse moves a card's position, but
+  // only a re-read rolls it on to the next programme entry when an item ends.
+  // Thirty seconds is well inside the shortest thing the library airs (a
+  // sub-minute home movie is not channel material; the shortest real pool item
+  // is a 7-minute Hey Duggee), so a card is never more than half a minute behind
+  // what is actually on.
+  //
+  // A failed poll leaves the last good strip on screen and lets the next one try
+  // — the tab going blank because one request lost the LAN is worse than a card
+  // that is thirty seconds stale.
+  var CHANNEL_POLL_MS = 30000;
+  function pollChannels() {
+    loadChannels(SERVER, profile)
+      .then(function(res) { updateChannels([res.channels].filter(Boolean).concat([[]])[0]); })
+      .catch(function() {});
+  }
+
   Promise.all([
     loadBrowse(SERVER, profile),
     loadContinueWatching(SERVER, profile, getPerson()).catch(function() { return { content: [] }; }),
-    loadConfig(SERVER).catch(function() { return null; })
+    loadConfig(SERVER).catch(function() { return null; }),
+    // Story 6 — no channels is a normal answer, and so is a backend too old to
+    // serve the route: browse falls back to the tab it used to land on and shows
+    // no Channels tab, rather than failing the whole page over a strip.
+    loadChannels(SERVER, profile).catch(function() { return { channels: [] }; })
   ])
     .then(function(res) {
       var browse = res[0];
@@ -266,10 +297,15 @@ export function initBrowsePage() {
       var labels = [browse.genreLabels].filter(Boolean).concat([{}])[0];
       // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) wins
       // over the last-visited tab; renderBrowse falls back when neither matches.
-      var initialTab = [getParam('tab')].filter(Boolean).concat([sessionStorage.getItem(LAST_TAB_KEY)]).filter(Boolean)[0];
-      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, initialTab, onQueue, createPlaylist, recents, showPlayAll);
+      // A deep-link / breadcrumb ?tab= (FEAT-028 rail-grid section crumb) and the
+      // last-visited tab now go to core's landingTab separately, because Channels
+      // sits between them: an explicit crumb still wins, but "opening the TV shows
+      // what's on" (decision 10) outranks a remembered tab.
+      var channels = [res[3].channels].filter(Boolean).concat([[]])[0];
+      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, getParam('tab'), onQueue, createPlaylist, recents, showPlayAll, channels, sessionStorage.getItem(LAST_TAB_KEY));
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
       continueMenu.refresh();
+      setInterval(pollChannels, CHANNEL_POLL_MS);
     })
     .catch(function() { navTo('error.html'); });
 }
