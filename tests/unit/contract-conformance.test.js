@@ -25,6 +25,7 @@ import { progressMapFromCW } from '../../core/progress.js';
 import { collectionMetaLine, episodeLabel } from '../../core/detail-view.js';
 import { primaryAction } from '../../core/series-detail.js';
 import { progressPct } from '../../core/player-math.js';
+import { hasChannels, channelTiles, channelCardView } from '../../core/channels.js';
 
 const CONTRACT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.contract');
 const HAS_CONTRACT = fs.existsSync(CONTRACT_DIR);
@@ -45,13 +46,14 @@ function findItem(rails, id) {
 const VIDEO_READER_FIELDS = ['id', 'title', 'ext', 'duration', 'subtitles', 'startAt', 'endAt', 'lyrics', 'available', 'poster', 'type'];
 
 describe.skipIf(!HAS_CONTRACT)('backend contract conformance (SYS-017 / TASK-311)', () => {
-  let browse, cw, video, album, playlist;
+  let browse, cw, video, album, playlist, channels;
   beforeAll(() => {
     browse = load('browse');
     cw = load('continue-watching');
     video = load('video');
     album = load('album');
     playlist = load('playlist');
+    channels = load('channels');
   });
 
   describe('/api/browse → core/home-rails + core/tile-model', () => {
@@ -165,6 +167,45 @@ describe.skipIf(!HAS_CONTRACT)('backend contract conformance (SYS-017 / TASK-311
       // track-foo-01 recurs as the playlist's LAST member, so a finished resume
       // wraps to 'again' (still ≠ 'continue' — a renamed .duration would flip it).
       expect(primaryAction(playlist.items, { 'track-foo-01': { resumePositionSec: 210, lastPlayed: 5 } }).kind).toBe('again');
+    });
+  });
+
+  // TASK-563 — the channel strip is the one place a card's bar comes from the
+  // SCHEDULE rather than from watch progress, so every field under it is read
+  // nowhere else in the app and nothing else would notice it being renamed.
+  describe('/api/channels → core/channels', () => {
+    it('hasChannels reads the envelope (proves `channels`)', () => {
+      expect(hasChannels(channels.channels)).toBe(true);
+    });
+
+    it('channelTile names the channel and carries its id (proves `channel_id`,`name`)', () => {
+      const tile = channelTiles(channels.channels)[0];
+      expect(tile.title).toBe('Comfort');
+      expect(tile.channelId).toBe('comfort');
+      expect(tile.navParams).toEqual({ channel: 'comfort' });
+    });
+
+    it('channelCardView reads the on-air flag (proves `on_air`)', () => {
+      // A renamed on_air reads undefined — every channel goes dark, and the
+      // strip says "Off air" over a library that is playing perfectly well.
+      expect(channelCardView(channels.channels[0], 0).onAir).toBe(true);
+    });
+
+    it('channelCardView names what is on (proves `item.title`)', () => {
+      expect(channelCardView(channels.channels[0], 0).title).toBe("Millie's First Walk");
+    });
+
+    it('channelCardView reads position and runtime (proves `offset_seconds`,`runtime_seconds`)', () => {
+      // 330s into a 4800s film: 5m/80m, and a bar 6.875% along. Renaming either
+      // field collapses the label to 0m/0m and the bar to empty.
+      const view = channelCardView(channels.channels[1], 0);
+      expect(view.time).toBe('5m/80m');
+      expect(view.percent).toBeCloseTo(6.875, 3);
+    });
+
+    it('channelCardView carries the artwork the bar is drawn on (proves `item.poster`)', () => {
+      expect(channelCardView(channels.channels[1], 0).poster).toBe('toy-story-main.jpg');
+      expect(channelCardView(channels.channels[0], 0).poster).toBe(null);
     });
   });
 });

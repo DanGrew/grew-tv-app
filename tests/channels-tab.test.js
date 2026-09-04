@@ -1,5 +1,10 @@
 const { test, expect } = require('@playwright/test');
-const { installApi } = require('./fixtures/api.js');
+const {
+  installApi,
+  CHANNEL_ON_AIR: ON_AIR,
+  CHANNEL_OFF_AIR_TIMED: OFF_AIR_TIMED,
+  CHANNEL_OFF_AIR_PLAIN: OFF_AIR_PLAIN
+} = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
 // FEAT-560/TASK-563 — the Channels tab: opening the TV shows what's on. The
@@ -11,24 +16,9 @@ const { pickPerson } = require('./fixtures/nav.js');
 // runs with no Channels tab — which is also story 6's first case, asserted
 // below. A test wanting channels overrides the route itself.
 
-const ON_AIR = {
-  channel_id: 'cartoon-club', name: 'Cartoon Club', item_type: 'episode',
-  on_air: true,
-  item: { item_id: 'bluey-s1e22', title: 'Bluey', poster: null, itemType: 'episode' },
-  offset_seconds: 120, runtime_seconds: 480, next_on_air: null
-};
-
-const OFF_AIR_TIMED = {
-  channel_id: 'after-dark', name: 'After Dark', item_type: 'film',
-  on_air: false, item: null, offset_seconds: null, runtime_seconds: null,
-  next_on_air: '2026-09-04T21:00:00'
-};
-
-// A channel between slots with nothing left, one nobody has regenerated, and
-// one whose window has run out are ONE state on the wire and one card here.
-const OFF_AIR_PLAIN = Object.assign({}, OFF_AIR_TIMED, {
-  channel_id: 'matinee', name: 'Matinee', next_on_air: null
-});
+// The three states come from tests/fixtures/api.js, where the stub<->contract
+// shape gate can see them (TASK-326) — a channel line written inline here would
+// drift off the backend with nothing to notice.
 
 async function withChannels(page, channels) {
   await page.route('**/api/channels**', function(route) {

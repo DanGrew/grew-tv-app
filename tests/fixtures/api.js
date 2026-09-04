@@ -341,6 +341,28 @@ function playlistResponse(store, id) { return store[id]; }
 function channelsResponse() {
   return { channels: [] };
 }
+// The three channel states, as the endpoint sends them. They live HERE rather
+// than in the test that overrides the route (tests/channels-tab.test.js) so the
+// stub<->contract shape test can bind them: a hand-written line in a test file
+// is exactly the thing that drifts off the backend unwatched (TASK-326).
+//
+// A channel between slots with nothing left, one nobody has regenerated, and one
+// whose programme has run out are ONE state on the wire, so there are three here
+// and never a fourth.
+const CHANNEL_ON_AIR = {
+  channel_id: 'cartoon-club', name: 'Cartoon Club', item_type: 'episode',
+  on_air: true,
+  item: { item_id: 'bluey-s1e22', title: 'Bluey', poster: null, itemType: 'episode' },
+  offset_seconds: 120, runtime_seconds: 480, next_on_air: null
+};
+const CHANNEL_OFF_AIR_TIMED = {
+  channel_id: 'after-dark', name: 'After Dark', item_type: 'film',
+  on_air: false, item: null, offset_seconds: null, runtime_seconds: null,
+  next_on_air: '2026-09-04T21:00:00'
+};
+const CHANNEL_OFF_AIR_PLAIN = Object.assign({}, CHANNEL_OFF_AIR_TIMED, {
+  channel_id: 'matinee', name: 'Matinee', next_on_air: null
+});
 function continueWatchingResponse(person, store) {
   // FEAT-045/TASK-317: `recents` (last 5 opened music sources, newest-first) rides
   // this response. Empty by default — the Recently Played rail is then omitted; a
@@ -1303,5 +1325,5 @@ module.exports = {
   // TASK-326: pure response builders + the CW row builder, so the stub<->contract
   // shape test can exercise the exact objects the routes above emit.
   browseResponse, videoResponse, albumResponse, playlistResponse, continueWatchingResponse, midWatchRows,
-  channelsResponse
+  channelsResponse, CHANNEL_ON_AIR, CHANNEL_OFF_AIR_TIMED, CHANNEL_OFF_AIR_PLAIN
 };
