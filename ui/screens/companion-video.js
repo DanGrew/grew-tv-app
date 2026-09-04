@@ -402,21 +402,27 @@ export function initPage() {
     ({ true: function() { followToOtherPage(page); }, false: function() { onVideoContext(payload); } })[page !== 'video']();
   }
 
-  // Reset progress (TASK-142): two-tap confirm (tap -> "Reset progress?" -> tap)
+  // Clear progress (TASK-142): two-tap confirm (tap -> "Clear progress?" -> tap)
   // then send the `reset` intent — the TV player clears this item's progress and
   // exits, and the companion follows the echoed context. Auto-disarms after 4s so
   // an armed button never stays stuck on touch.
+  //
+  // TASK-564 renamed the LABEL on all four surfaces at once (both players, both
+  // mirrors) — "Reset" never said what it reset, and the TV's video player now
+  // carries a Restart pill a word away from it. The intent stays `reset`: the
+  // wire name is not what a viewer reads, and renaming it would be churn on both
+  // sides of the socket for nothing.
   var resetArmed = false;
   var resetTimer = null;
   function disarmReset() {
     resetArmed = false;
     els.reset.classList.remove('confirm');
-    els.reset.textContent = '↻ Reset';
+    els.reset.textContent = '↻ Clear progress';
   }
   function armReset() {
     resetArmed = true;
     els.reset.classList.add('confirm');
-    els.reset.textContent = '↻ Reset?';
+    els.reset.textContent = '↻ Clear progress?';
     clearTimeout(resetTimer);
     resetTimer = setTimeout(disarmReset, 4000);
   }

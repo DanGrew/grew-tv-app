@@ -23,8 +23,8 @@ var BACKEND_SAVE_MS = 5000;
 var STALL_RECOVERY_MS = 6000;   // BUG-423: waiting -> canplay/playing longer than this reloads
 
 // BUG-016: d-pad up/down follows the new visual order — transport (prev/play/next)
-// then the pill row beneath the progress bar (queue, jump, lyrics, reset).
-var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-queue', 'btn-jump', 'btn-lyrics', 'btn-reset'];
+// then the pill row beneath the progress bar (queue, jump, lyrics, clear progress).
+var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-queue', 'btn-jump', 'btn-lyrics', 'btn-clear-progress'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 // App-side log (TASK-213): start from a saved position logs `resume`, else `play`.
 var PLAY_EVENT    = { 'true': 'resume', 'false': 'play' };
@@ -280,19 +280,22 @@ export function setup(config) {
     stopPlayback();
   }
 
-  // Two-press confirm guards a mis-tap: first press arms (label -> "Reset?"),
-  // second resets + exits; blurring disarms.
+  // Two-press confirm guards a mis-tap: first press arms (label -> "Clear
+  // progress?"), second clears + exits; blurring disarms. TASK-564 renamed the
+  // pill on BOTH players together: the video player's version had to stop being
+  // a word away from Restart, and leaving the music player saying "Reset" would
+  // have made one control read two ways depending on which player you were on.
   function fireReset(btn) {
     ({
-      'false': function() { btn.classList.add('confirm'); btn.textContent = 'Reset?'; btn.setAttribute('data-armed', '1'); },
+      'false': function() { btn.classList.add('confirm'); btn.textContent = 'Clear progress?'; btn.setAttribute('data-armed', '1'); },
       'true':  function() { resetAndExit(); }
     })[String(btn.getAttribute('data-armed') === '1')]();
   }
 
   function disarmReset() {
-    var btn = document.getElementById('btn-reset');
+    var btn = document.getElementById('btn-clear-progress');
     btn.classList.remove('confirm');
-    btn.textContent = 'Reset';
+    btn.textContent = 'Clear progress';
     btn.removeAttribute('data-armed');
   }
 
@@ -467,8 +470,8 @@ export function setup(config) {
   document.getElementById('btn-queue').addEventListener('click', openQueue);
   document.getElementById('btn-lyrics').addEventListener('click', toggleLyrics);
   document.getElementById('btn-jump').addEventListener('click', openJumpPopup);
-  document.getElementById('btn-reset').addEventListener('click', function() { fireReset(document.getElementById('btn-reset')); });
-  document.getElementById('btn-reset').addEventListener('blur', disarmReset);
+  document.getElementById('btn-clear-progress').addEventListener('click', function() { fireReset(document.getElementById('btn-clear-progress')); });
+  document.getElementById('btn-clear-progress').addEventListener('blur', disarmReset);
 
   return { playTrack, handleAudioKey, setLyrics, currentTrackDisplay, stop: stopPlayback, remote };
 }

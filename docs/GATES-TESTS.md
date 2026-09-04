@@ -83,10 +83,11 @@ mechanisms — the first two fixed in `player-reset` / `playlist-bulk-add`, the 
 swept repo-wide by TASK-329:
 - **Auto-hide timer disarms a control mid-test.** The video player hides
   `#controls` 3s after the last input (`screen-video-player.js showControls`);
-  when they hide, a focused button blurs. The video Reset tests armed `#btn-reset`
-  then asserted `Reset?` — under load the 3s elapsed first, blur fired, the button
-  disarmed back to `Reset`. **Fix: press a d-pad key (`ArrowDown`) right before
-  arming** to re-kick the timer — exactly what the audio Reset tests already do.
+  when they hide, a focused button blurs. The video Clear progress tests armed
+  `#btn-clear-progress` (`#btn-reset` until TASK-564 renamed it) then asserted
+  `Clear progress?` — under load the 3s elapsed first, blur fired, the button
+  disarmed back. **Fix: press a d-pad key (`ArrowDown`) right before arming** to
+  re-kick the timer — exactly what the audio tests already do.
 - **Interacting before init wires the handlers.** A nav helper that awaits only
   `toHaveURL` lets the test click a header button (`#btn-add-all`) before the
   page's async load → `buildDetailList` has attached its click listener; the click
