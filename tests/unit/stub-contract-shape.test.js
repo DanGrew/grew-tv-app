@@ -37,7 +37,7 @@ const require = createRequire(import.meta.url);
 const {
   browseResponse, videoResponse, albumResponse, playlistResponse,
   continueWatchingResponse, midWatchRows, MUSIC_CARDS, PLAYLIST_CARDS, PLAYLISTS,
-  channelsResponse, CHANNEL_ON_AIR, CHANNEL_OFF_AIR_TIMED
+  channelsResponse, CHANNEL_ON_AIR, CHANNEL_OFF_AIR_TIMED, CHANNEL_DETAIL
 } = require('../fixtures/api.js');
 
 const CONTRACT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.contract');
@@ -283,15 +283,29 @@ describe.skipIf(!HAS_CONTRACT)('stub ⇄ backend contract shape (SYS-017 / TASK-
     });
 
     it('the on-air item matches the contract item', () => {
+      // TASK-564 — `ext` and `subtitles` came off this exclusion list when the
+      // player started reading them: the channel answer is the only place a
+      // channel play learns which file to fetch, so a rename there is a channel
+      // that shows its chrome and plays nothing.
       expectShape('channel item', CHANNEL_ON_AIR.item, channels.channels[0].item, {
         contractOnly: {
-          artist: 'backend field, null for video; the card names the item and nothing else',
-          duration: 'backend duration; the card times itself off the line runtime_seconds, not this',
-          ext: 'backend file extension; the card never plays the item, TASK-564 does',
-          subtitles: 'backend subtitles ref; the card never plays the item',
+          artist: 'backend field, null for video; neither the card nor the player names an artist',
+          duration: 'backend duration; the card times itself off the line runtime_seconds, and the player off the file',
           type: 'backend genre-type; the card shows no genre'
         }
       });
+    });
+
+    // TASK-564 — the DETAIL route's own extra keys. There is no separate
+    // contract fixture for it (the backend freezes one per route and
+    // /api/channels/{id} has none yet), so what CAN be bound is bound: the
+    // detail answer is the strip's line plus five keys (api/channels.py
+    // `_detail`), which means the shared half must still match the contract
+    // line exactly.
+    it('the detail answer still matches the contract line where they overlap', () => {
+      expectShape('channel detail (shared half)', CHANNEL_ON_AIR, channels.channels[0]);
+      const extra = Object.keys(CHANNEL_DETAIL).filter(k => !(k in CHANNEL_ON_AIR)).sort();
+      expect(extra).toEqual(['bed', 'ends_at', 'next', 'started_at', 'tag']);
     });
   });
 });
