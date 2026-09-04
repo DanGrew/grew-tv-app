@@ -1,12 +1,13 @@
 import { connect } from '../../core/companion-ws.js';
-import { loadBrowse, loadContinueWatching, loadTracks, loadEpisodes } from '../../core/app-api.js';
+import { loadBrowse, loadContinueWatching, loadTracks, loadEpisodes, loadChannels } from '../../core/app-api.js';
+import { withChannelsTab, channelsById, channelCardView, tileVariant } from '../../core/channels.js';
 import { queueAdd, queueAddStatus, itemMediaType } from '../../core/queue-shell-config.js';
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { CONTINUE_TYPES, continueTarget } from '../../core/browse-continue.js';
 import { mountContinueMenu } from './continue-menu.js';
 import { screenPage, tileHint, queryString } from '../../core/companion-utils.js';
 import { progressMapFromCW } from '../../core/progress.js';
-import { buildTabs, railsForSection } from '../../core/home-rails.js';
+import { buildTabs, railsForBrowseSection } from '../../core/home-rails.js';
 import { firstRailId, pageOffset, settleIndex, stepIndex, arrowDisabled, shouldActivateDrag, isRealDrag, isTapRelease } from '../../core/rail-pager.js';
 import { push as pushTrail, clear as clearTrail, entries as entriesTrail } from '../../core/nav-trail.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
@@ -72,7 +73,10 @@ export function initPage() {
     profile: null, person: null,
     cards: [], cw: [], recents: [], labels: {}, progress: {},
     level: 'sections', section: null, rail: null,
-    tracks: [], episodes: [], searchDomain: 'videos', searchItems: []
+    tracks: [], episodes: [], searchDomain: 'videos', searchItems: [],
+    // FEAT-560/TASK-563 — the Channels strip and the moment it was read, so a
+    // card's position can be carried forward by the clock between polls.
+    channels: [], channelsAt: 0, channelsById: {}
   };
   var api = {};
   var updateBar = null;
@@ -87,6 +91,7 @@ export function initPage() {
   // only, keyed by the same section ids buildTabs() returns; no per-section
   // plumbing needed for a new section, just an entry here.
   var SECTION_ICON = {
+    'channels': '📡',
     'series': '📺',
     'films': '🎬',
     'home-movies': '🏠',
@@ -127,7 +132,57 @@ export function initPage() {
   // already guaranteed itself, TASK-234/378) rather than bare buildTabRails —
   // otherwise a zero-playlist Music/Music Videos section never has a
   // 'playlists'/'mv-playlists' rail to land ＋ on at all.
-  function railList() { return railsForSection(state.section, state.cards, state.cw, state.labels, state.recents); }
+  // TASK-563 — the channel card ticks on the phone exactly as it does on the TV
+  // (decision 14): the strip is read on a poll, and between polls the clock
+  // carries each card's position forward from the moment it was read.
+  var CHANNEL_TICK_MS = 1000;
+  var CHANNEL_POLL_MS = 30000;
+
+  function elapsedChannelSeconds() {
+    return (Date.now() - state.channelsAt) / 1000;
+  }
+
+  function applyChannels(res) {
+    state.channels = [[res].filter(Boolean).map(function(r) { return r.channels; })[0]]
+      .filter(Boolean).concat([[]])[0];
+    state.channelsById = channelsById(state.channels);
+    state.channelsAt = Date.now();
+  }
+
+  // Re-apply the rendered cards in place rather than repainting the grid: a
+  // repaint every second would fight the pager's swipe transform and reset a
+  // scroll position mid-browse.
+  function tickChannelTiles() {
+    Array.from(document.querySelectorAll('.ph-chan')).forEach(function(el) {
+      [state.channelsById[el.getAttribute('data-channel')]].filter(Boolean).forEach(function(line) {
+        var view = channelCardView(line, elapsedChannelSeconds());
+        el.classList.toggle('off-air', !view.onAir);
+        el.querySelector('.chan-time').textContent = [view.time].filter(Boolean).concat([''])[0];
+        el.querySelector('.chan-now').textContent = view.title;
+        el.querySelector('.chan-bar i').style.width = view.percent + '%';
+      });
+    });
+  }
+
+  // A failed poll leaves the last good strip up and lets the next one try — a
+  // dropped LAN request should not blank the tab.
+  function pollChannels() {
+    [state.profile].filter(Boolean).forEach(function(profile) {
+      loadChannels(server, profile)
+        .then(function(res) { applyChannels(res); render(); })
+        .catch(function() {});
+    });
+  }
+
+  setInterval(tickChannelTiles, CHANNEL_TICK_MS);
+  setInterval(pollChannels, CHANNEL_POLL_MS);
+
+  // TASK-563 — the Channels section's one rail comes from the /api/channels
+  // strip, not from browse cards. Same shape as every other rail so the pager,
+  // the dots and the grid need no channel knowledge at all.
+  // core resolves it, because the Channels section's rails come from the
+  // /api/channels strip rather than the catalog (TASK-563).
+  function railList() { return railsForBrowseSection(state.section, state.cards, state.cw, state.labels, state.recents, state.channels); }
 
   // The picked rail (its tiles), or an empty stand-in so callers stay branch-free.
   function activeRail() {
@@ -271,11 +326,57 @@ export function initPage() {
   // queue per-episode from the detail screen). cardRoute(card) marks which.
   var QUEUEABLE_ROUTE = { video: true, 'music-video': true };
   var CELL = { 'true': filmCell, 'false': nameTile };
-  function txtTile(card) { return CELL[String(!!QUEUEABLE_ROUTE[cardRoute(card)])](card); }
+  function libraryTile(card) { return CELL[String(!!QUEUEABLE_ROUTE[cardRoute(card)])](card); }
+
+  // TASK-563 — the channel card, in the mirror's own shape. The phone's tiles
+  // are bare text by design (zero <img>, so browsing it fires no poster
+  // requests), so this is the TV card's three lines without the artwork: the
+  // channel's name and its position on one row, what's on beneath, and the
+  // channel's position as a hairline bar under both.
+  //
+  // ⚠️ Same warning as the TV's: that bar is the CHANNEL's position. It sits
+  // beside `tileHint`'s resume badge — which IS watch progress — on the same
+  // screen, so the two must never be wired to each other.
+  //
+  // Inert on tap until TASK-564, like the TV card (owner, 2026-09-04): unwired
+  // is fine, broken is not. No click handler at all, so a tap does nothing
+  // rather than driving the TV somewhere that cannot draw a channel yet.
+  function channelTxtTile(card) {
+    var view = channelCardView(card.line, elapsedChannelSeconds());
+    var el = document.createElement('button');
+    el.className = 'ph-txt ph-chan';
+    el.setAttribute('data-id', card.id);
+    el.setAttribute('data-channel', card.channelId);
+    el.classList.toggle('off-air', !view.onAir);
+    var nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = view.name;
+    var time = document.createElement('span');
+    time.className = 'pct chan-time';
+    time.textContent = [view.time].filter(Boolean).concat([''])[0];
+    var now = document.createElement('span');
+    now.className = 'chan-now';
+    now.textContent = view.title;
+    var bar = document.createElement('span');
+    bar.className = 'chan-bar';
+    var fill = document.createElement('i');
+    fill.style.width = view.percent + '%';
+    bar.appendChild(fill);
+    el.appendChild(nm);
+    el.appendChild(time);
+    el.appendChild(now);
+    el.appendChild(bar);
+    return el;
+  }
+
+  var TXT_TILE = { channel: channelTxtTile, library: libraryTile };
+  function txtTile(card) { return TXT_TILE[tileVariant(card)](card); }
+
+  function sectionTabs() { return withChannelsTab(buildTabs(state.cards), state.channels); }
 
   function renderSections() {
     els.sectionDock.innerHTML = '';
-    buildTabs(state.cards).forEach(function(s) { els.sectionDock.appendChild(dockTab(s)); });
+    sectionTabs().forEach(function(s) { els.sectionDock.appendChild(dockTab(s)); });
   }
 
   // TASK-424 — ＋ shows only on the section's own Playlists rail (playlists /
@@ -306,7 +407,7 @@ export function initPage() {
   }
 
   function sectionTitle() {
-    return [buildTabs(state.cards).filter(function(t) { return t.id === state.section; })[0]]
+    return [sectionTabs().filter(function(t) { return t.id === state.section; })[0]]
       .filter(Boolean).map(function(t) { return t.title; }).concat([state.section])[0];
   }
 
@@ -478,9 +579,26 @@ export function initPage() {
     true:  function(id, railId) { navigate('rail-grid.html', { section: id, rail: railId }); },
     false: function(id) { navigate('browse.html', { tab: id }); }
   };
-  function selectSection(id) {
-    var railId = firstRailId(railsForSection(id, state.cards, state.cw, state.labels, state.recents));
+
+  // TASK-563 — Channels is the one section whose two surfaces are not the same
+  // screen. On the TV it is a browse TAB (decision 10); there is no rail-grid
+  // page for it, and sending the TV to one would land it on an empty grid.
+  // So the intent points the TV at its Channels tab while the companion drills
+  // to its own grid locally — the two stay on the same content, by their own
+  // routes. The mirror invariant is that both surfaces carry the feature, not
+  // that they navigate identically.
+  function selectChannels() {
+    api.sendIntent('navigate', { page: 'browse.html', params: { tab: 'channels' } });
+    applyGrid('channels', 'channels');
+  }
+
+  var SECTION_ROUTE = { channels: selectChannels };
+  function selectBySection(id) {
+    var railId = firstRailId(railsForBrowseSection(id, state.cards, state.cw, state.labels, state.recents, state.channels));
     SELECT_SECTION[Boolean(railId)](id, railId);
+  }
+  function selectSection(id) {
+    [SECTION_ROUTE[id]].filter(Boolean).concat([selectBySection])[0](id);
   }
   function selectRail(id) { navigate('rail-grid.html', { section: state.section, rail: id }); }
 
@@ -708,7 +826,7 @@ export function initPage() {
   // Render ONCE after both browse + continue-watching settle (the FEAT-020
   // double-render request storm is moot here — text-only — but a single render
   // keeps the optimistic level intact when reconcile drilled ahead of the load).
-  function applyCatalog(b, c) {
+  function applyCatalog(b, c, ch) {
     state.cards = [b.content].filter(Boolean).concat([[]])[0];
     state.labels = [b.genreLabels].filter(Boolean).concat([{}])[0];
     state.cw = [c.content].filter(Boolean).concat([[]])[0];
@@ -716,6 +834,7 @@ export function initPage() {
     // continue-watching response (TASK-317 serves `recents` there).
     state.recents = [c.recents].filter(Boolean).concat([[]])[0];
     state.progress = progressMapFromCW(state.cw);
+    applyChannels(ch);
     render();
   }
 
@@ -723,8 +842,11 @@ export function initPage() {
     state.profile = profile;
     Promise.all([
       loadBrowse(server, profile).catch(function() { return {}; }),
-      loadContinueWatching(server, profile, state.person).catch(function() { return {}; })
-    ]).then(function(r) { applyCatalog(r[0], r[1]); });
+      loadContinueWatching(server, profile, state.person).catch(function() { return {}; }),
+      // Story 6 — no channels, or a backend too old to answer, is a normal
+      // answer: no Channels tab in the dock and the phone behaves as it did.
+      loadChannels(server, profile).catch(function() { return {}; })
+    ]).then(function(r) { applyCatalog(r[0], r[1], r[2]); });
   }
 
   // While the companion targets no live screen, hide the drill content and let

@@ -5,7 +5,7 @@ import {
   loadMusicVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
   addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
   deletePlaylist, renamePlaylist, queuePlaybackAction, loadQueuePlayback, loadMusicSourceTitle,
-  loadMusicVideoSourceTitle
+  loadMusicVideoSourceTitle, loadChannels
 } from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
@@ -28,6 +28,26 @@ describe('loadBrowse', () => {
   it('rejects on non-ok response', async () => {
     fakeFetch({}, false);
     await expect(loadBrowse('http://s', 'kids')).rejects.toBe(500);
+  });
+});
+
+// FEAT-560/TASK-562 — the Channels strip. `profile` rides the query because a
+// channel declares who may see it (TASK-569) and the backend 400s without one:
+// a default would be a way to see every channel by leaving it off.
+describe('loadChannels', () => {
+  it('GETs /api/channels with the profile query, no-store', async () => {
+    var calls = fakeFetch({ channels: [] });
+    await loadChannels('http://s', 'adults');
+    expect(calls[0].url).toBe('http://s/api/channels?profile=adults');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('resolves the strip', async () => {
+    fakeFetch({ channels: [{ channel_id: 'cartoon-club', on_air: true }] });
+    expect(await loadChannels('http://s', 'kids')).toEqual({ channels: [{ channel_id: 'cartoon-club', on_air: true }] });
+  });
+  it('rejects on non-ok response, so the caller can fall back to no tab', async () => {
+    fakeFetch({}, false);
+    await expect(loadChannels('http://s', 'kids')).rejects.toBe(500);
   });
 });
 

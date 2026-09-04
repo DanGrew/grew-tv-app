@@ -330,6 +330,17 @@ function browseResponse(profile) {
 function videoResponse(id) { return VIDEOS[id]; }
 function albumResponse(id) { return ALBUMS[id]; }
 function playlistResponse(store, id) { return store[id]; }
+// FEAT-560/TASK-562 — the Channels strip. EMPTY by default, which is the
+// state most of the suite runs in: browse then shows no Channels tab and
+// behaves exactly as it did before the feature (story 6). A test wanting the
+// tab overrides this route with its own channels — tests/channels-tab.test.js
+// does, and is the only place that needs to.
+//
+// A channel declares who may see it (TASK-569), so this is keyed on profile the
+// way the real route is: the kids strip and the adults strip differ.
+function channelsResponse() {
+  return { channels: [] };
+}
 function continueWatchingResponse(person, store) {
   // FEAT-045/TASK-317: `recents` (last 5 opened music sources, newest-first) rides
   // this response. Empty by default — the Recently Played rail is then omitted; a
@@ -360,6 +371,13 @@ async function installApi(page) {
   await page.route('**/api/browse**', function(route) {
     var profile = new URL(route.request().url()).searchParams.get('profile');
     return json(route, 200, browseResponse(profile));
+  });
+  await page.route('**/api/channels**', function(route) {
+    var profile = new URL(route.request().url()).searchParams.get('profile');
+    // The real route REFUSES without a profile rather than defaulting — a
+    // default would be a way to see every channel by leaving it off.
+    if (!profile) return json(route, 400, { error: "profile must be 'kids' or 'adults'" });
+    return json(route, 200, channelsResponse(profile));
   });
   await page.route('**/api/continue-watching**', function(route) {
     var person = new URL(route.request().url()).searchParams.get('person');
@@ -1284,5 +1302,6 @@ module.exports = {
   installApi, installPlaybackBackend, installVideoPlaybackBackend, installQueuePlaybackBackend,
   // TASK-326: pure response builders + the CW row builder, so the stub<->contract
   // shape test can exercise the exact objects the routes above emit.
-  browseResponse, videoResponse, albumResponse, playlistResponse, continueWatchingResponse, midWatchRows
+  browseResponse, videoResponse, albumResponse, playlistResponse, continueWatchingResponse, midWatchRows,
+  channelsResponse
 };

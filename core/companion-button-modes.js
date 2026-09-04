@@ -44,7 +44,10 @@ export function actionEnabled(action, desynced) {
 // boxset/series), not playback directly — so it gets a desync page too, same
 // as series/album/artist. Its navParams (home-rails.js playAllTile), not a
 // bare id, is what openItemLocal must send on (companion-browse.js).
-// @card-route-table unhandled: video, music-video, track
+// TASK-563: a `channel` card opens nothing at all yet — it has no click handler
+// on either surface until TASK-564 wires the player — so it has no desync page
+// either, and never reaches openItemLocal to ask for one.
+// @card-route-table unhandled: video, music-video, track, channel
 var DESYNC_PAGE = { series: 'detail.html', album: 'detail.html', playlist: 'playlist.html', artist: 'artist.html', 'play-all': 'home-movies-list.html' };
 export function desyncOpenPage(route) { return DESYNC_PAGE[route] || null; }
 export function tileOpenableDesynced(route) { return desyncOpenPage(route) != null; }

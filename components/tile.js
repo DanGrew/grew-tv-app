@@ -7,6 +7,7 @@
 import { mediaUrl } from '../core/app-api.js';
 import { tileModel } from '../core/tile-model.js';
 import { coverMosaicHtml } from '../core/cover-mosaic.js';
+import { channelCardView } from '../core/channels.js';
 
 var PLAY_KEYS = { Enter: true, ' ': true };
 
@@ -114,6 +115,105 @@ export function createTile(server, card, opts) {
     tile.appendChild(q);
   }
   [o.onQueue].filter(Boolean).filter(function() { return m.queueable; }).forEach(appendQueueBadge);
+
+  [o.onSelect].filter(Boolean).forEach(function(fn) {
+    tile.addEventListener('click', function() { fn(card); });
+    tile.addEventListener('keydown', function(e) {
+      [card].filter(function() { return PLAY_KEYS[e.key]; }).forEach(function(c) {
+        e.preventDefault();
+        fn(c);
+      });
+    });
+  });
+
+  return tile;
+}
+
+// FEAT-560/TASK-563 — the Channels strip's card. A separate builder from
+// createTile above, deliberately: that one derives its bar from core/progress.js
+// (how far the VIEWER got), and this one's bar is how far the CHANNEL has got.
+// Same shape, opposite meaning (decision 14) — keeping them apart is what stops
+// the two ever being wired to each other's source.
+//
+// It still carries `.film-tile`, because that class is what the browse screen's
+// d-pad model treats as a focus stop (screen-browse.js tilesIn) — a channel card
+// is a normal left/right stop on its rail, it just draws differently.
+
+// The three text lines and the bar, applied to an already-built tile. Split out
+// because the card TICKS: the strip is fetched once and re-applied on a timer,
+// and rebuilding the element every second would throw away focus mid-browse.
+export function applyChannelView(tile, view) {
+  tile.classList.toggle('off-air', !view.onAir);
+  tile.querySelector('.channel-name').textContent = view.name;
+  tile.querySelector('.tile-title').textContent = view.title;
+  tile.querySelector('.channel-time').textContent = view.time || '';
+  tile.querySelector('.channel-progress-fill').style.width = view.percent + '%';
+  return tile;
+}
+
+function channelArt(server, view) {
+  var art = document.createElement('div');
+  art.className = 'channel-art';
+  var img = document.createElement('img');
+  img.className = 'film-poster';
+  img.alt = '';
+  var placeholder = document.createElement('div');
+  placeholder.className = 'film-poster-placeholder';
+  placeholder.textContent = '📺';
+  var src = mediaUrl(server, view.poster);
+  ({
+    true: function() {
+      img.src = src;
+      placeholder.style.display = 'none';
+      img.addEventListener('error', function() {
+        img.style.display = 'none';
+        placeholder.style.display = 'flex';
+      });
+    },
+    false: function() {
+      img.style.display = 'none';
+      placeholder.style.display = 'flex';
+    }
+  })[String(!!src)]();
+  art.appendChild(img);
+  art.appendChild(placeholder);
+  var bar = document.createElement('div');
+  bar.className = 'channel-progress';
+  var fill = document.createElement('div');
+  fill.className = 'channel-progress-fill';
+  bar.appendChild(fill);
+  art.appendChild(bar);
+  return art;
+}
+
+function channelLine(className) {
+  var el = document.createElement('div');
+  el.className = className;
+  return el;
+}
+
+// createChannelTile(server, card, opts) -> focusable element.
+// card is core/channels.js's channel tile (kind:'channel', carrying its own
+// on-now `line`); opts: { elapsedSeconds, onSelect }.
+export function createChannelTile(server, card, opts) {
+  var o = opts || {};
+  var view = channelCardView(card.line, o.elapsedSeconds);
+
+  var tile = document.createElement('div');
+  tile.className = 'film-tile channel-tile';
+  tile.tabIndex = 0;
+  tile.setAttribute('data-id', card.id);
+  tile.setAttribute('data-kind', card.kind);
+  tile.setAttribute('data-channel', card.channelId);
+
+  tile.appendChild(channelArt(server, view));
+  var meta = document.createElement('div');
+  meta.className = 'channel-meta';
+  meta.appendChild(channelLine('channel-name'));
+  meta.appendChild(channelLine('tile-title'));
+  meta.appendChild(channelLine('channel-time'));
+  tile.appendChild(meta);
+  applyChannelView(tile, view);
 
   [o.onSelect].filter(Boolean).forEach(function(fn) {
     tile.addEventListener('click', function() { fn(card); });

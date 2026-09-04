@@ -28,6 +28,11 @@
   --fs-2xl: 52px;
   --fs-3xl: 64px;
   --heading-ls: -0.5px;
+  /* FEAT-560/TASK-563 — the channel's own position, as distinct from the
+     viewer's. #ffce6b is already the palette's only warm (the .ctrl-btn.pill
+     .confirm on video.html and audio.html); naming it here rather than pasting
+     a fifth copy of the hex, since it now carries a second meaning. */
+  --live: #ffce6b;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); background-attachment: fixed; background-size: cover; color: var(--text); font-family: var(--font); height: 100vh; overflow: hidden; }
@@ -74,6 +79,26 @@ button:hover { background: var(--surface-hi); }
 .tile-queue:hover, .tile-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 .tile-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,0.45); }
 .tile-progress-fill { height: 100%; background: var(--focus); }
+/* FEAT-560/TASK-563 — the Channels strip. A wider tile than the library's 372px
+   because it carries three lines of its own, so the row reads as a different
+   mode without needing a second visual language. */
+.channel-tile { flex-basis: 420px; width: 420px; display: flex; flex-direction: column; text-align: left; }
+.channel-art { position: relative; width: 100%; }
+/* The bar sits on the ARTWORK, not the tile's bottom edge, and is amber rather
+   than white: .tile-progress-fill above is how far the VIEWER got, this is how
+   far the CHANNEL has got (decision 14). Same shape, opposite meaning — the
+   colour is what stops the two reading as the same fact. */
+.channel-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,0.45); }
+.channel-progress-fill { height: 100%; background: var(--live); transition: width var(--dur) linear; }
+.channel-meta { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.channel-name { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.channel-tile .tile-title { padding: 0; }
+.channel-time { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; min-height: calc(var(--fs-xs) * 1.2); }
+/* Off air is the same card with its time line swapped, never a third state
+   (decision 8) — an empty .channel-time keeps the card the same height whether
+   or not the programme names a return time. */
+.channel-tile.off-air .film-poster, .channel-tile.off-air .film-poster-placeholder { opacity: 0.45; }
+.channel-tile.off-air .tile-title { color: var(--text-muted); }
 #queue-actions { position: fixed; bottom: 32px; right: 32px; z-index: 6; display: flex; align-items: center; gap: 12px; }
 #queue-menu-mount { position: relative; }
 #btn-queue-menu { font-size: var(--fs-sm); padding: 12px 22px; min-width: auto; border: 2px solid var(--focus); background: var(--surface-hi); color: var(--focus); border-radius: 999px; }

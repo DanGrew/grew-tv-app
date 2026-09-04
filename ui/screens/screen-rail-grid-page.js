@@ -33,7 +33,12 @@ export function initRailGridPage() {
   // navTo drops them. `track` is search-only
   // (TASK-383) — a rail-grid tile's card always comes from /api/browse or
   // continue-watching, never search, so it can never be handed one.
-  // @card-route-table unhandled: track
+  // TASK-563: a `channel` card can never reach this grid. The TV's channels
+  // surface is the browse TAB, not a rail grid — so the companion sends the TV
+  // to browse.html?tab=channels for that section rather than here (see
+  // companion-browse.js selectSection), and this page's rails come from
+  // buildTabRails, which only ever groups /api/browse cards.
+  // @card-route-table unhandled: track, channel
   var SELECT = {
     artist:   function(card) { navTo('artist.html', { artist: card.artist }); },
     album:    function(card) { navTo('album-detail.html', { album: card.id }); },
