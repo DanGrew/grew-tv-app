@@ -24,6 +24,19 @@ export function loadChannels(serverUrl, profile) {
   return getJson(serverUrl + '/api/channels?profile=' + encodeURIComponent(profile));
 }
 
+// ONE channel in full (FEAT-560/TASK-564) — the same on-now line plus what the
+// player needs beyond it: the item's `ext`/`subtitles` so it can actually play,
+// where the channel has got to, and the schedule's own next items.
+//
+// The player asks for this EVERY time it tunes in or rejoins, and never carries
+// a position forward through a URL: a channel is a clock, and an offset a
+// moment old is already wrong. `profile` is required here for the same reason
+// it is on the strip — the same 400, and the same channel a profile may not see
+// answering as not found.
+export function loadChannel(serverUrl, channelId, profile) {
+  return getJson(serverUrl + '/api/channels/' + encodeURIComponent(channelId) + '?profile=' + encodeURIComponent(profile));
+}
+
 // Mid-watch videos for a profile, newest first (FEAT-017). Backs the Home
 // Continue Watching rail and the companion shortcut. Backend is the source of
 // truth for progress, so this — not localStorage — drives cross-device CW.

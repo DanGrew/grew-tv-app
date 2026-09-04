@@ -53,10 +53,17 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
 .ctrl-btn.pill.on { border-color: var(--focus); color: var(--focus); background: var(--surface-hi); }
 .ctrl-btn.pill.confirm { border-color: #ffce6b; color: #ffce6b; }
 .ctrl-btn.is-disabled { opacity: 0.35; pointer-events: none; }
-#btn-cc.hidden, #btn-prev.hidden, #btn-next.hidden, #btn-queue.hidden, #btn-add-playlist.hidden, #btn-mv-shuffle.hidden, #btn-mv-repeat.hidden, #btn-hm-shuffle.hidden, #btn-hm-repeat.hidden, #btn-film-shuffle.hidden, #btn-film-repeat.hidden, #btn-series-shuffle.hidden, #btn-series-repeat.hidden { display: none; }
+#btn-cc.hidden, #btn-prev.hidden, #btn-next.hidden, #btn-queue.hidden, #btn-add-playlist.hidden, #btn-mv-shuffle.hidden, #btn-mv-repeat.hidden, #btn-hm-shuffle.hidden, #btn-hm-repeat.hidden, #btn-film-shuffle.hidden, #btn-film-repeat.hidden, #btn-series-shuffle.hidden, #btn-series-repeat.hidden, #btn-live.hidden, #btn-restart.hidden, #btn-clear-progress.hidden { display: none; }
 #btn-cc.cc-off { opacity: 0.45; }
-#progress { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+#btn-live { border-color: var(--focus); color: var(--focus); }
+#progress { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; position: relative; }
 #progress-fill { height: 100%; background: var(--focus); border-radius: 3px; width: 0; }
+#live-marker { display: none; }
+#controls.channel-mode #progress { overflow: visible; }
+#controls.channel-mode #live-marker { display: block; position: absolute; top: 50%; left: 0; width: 11px; height: 11px; margin-left: -6px; background: rgba(255,255,255,0.42); border: 1.5px solid rgba(255,255,255,0.85); transform: translateY(-50%) rotate(45deg); border-radius: 2px; }
+#channel-ident { position: fixed; top: 24px; left: 28px; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: var(--surface); border: 2px solid var(--focus); border-radius: 999px; font-size: var(--fs-sm); font-weight: 700; letter-spacing: 1px; color: var(--text); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); pointer-events: none; transition: opacity 0.3s; }
+#channel-ident.hidden { display: none; }
+#controls.hidden ~ #channel-ident { opacity: 0; }
 #time-display { font-size: var(--fs-sm); color: var(--text-muted); min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
 .jump-popup { position: fixed; background: var(--surface); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); border: 2.5px solid var(--border); border-radius: var(--radius); padding: 18px; z-index: 100; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
 .jump-title { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); text-align: center; margin-bottom: 12px; }
@@ -196,11 +203,13 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
       <button id="btn-prev" class="ctrl-btn" aria-label="Previous">&#9198;</button>
       <button id="btn-play-pause" class="ctrl-btn" aria-label="Play/Pause">&#9208;</button>
       <button id="btn-next" class="ctrl-btn" aria-label="Next">&#9197;</button>
-      <div id="progress"><div id="progress-fill"></div></div>
+      <div id="progress"><div id="progress-fill"></div><i id="live-marker"></i></div>
       <div id="time-display">0:00 / 0:00</div>
     </div>
     <div id="pill-row">
       <button id="btn-jump" class="ctrl-btn pill">Jump</button>
+      <button id="btn-live" class="ctrl-btn pill hidden" aria-label="Back to live">&#9679; Back to live</button>
+      <button id="btn-restart" class="ctrl-btn pill hidden" aria-label="Restart this programme">Restart</button>
       <button id="btn-cc" class="ctrl-btn pill hidden" aria-label="Subtitles">CC</button>
       <button id="btn-mv-shuffle" class="ctrl-btn pill hidden" aria-label="Shuffle">&#128256;</button>
       <button id="btn-mv-repeat" class="ctrl-btn pill hidden" aria-label="Repeat">&#128257;</button>
@@ -213,7 +222,7 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
       <button id="btn-queue" class="ctrl-btn pill" aria-label="Queue">&#9776;</button>
       <button id="btn-night" class="ctrl-btn pill" aria-label="Night Mode">Night: Off</button>
       <button id="btn-add-playlist" class="ctrl-btn pill hidden" aria-label="Add to playlist">&#65291; Playlist</button>
-      <button id="btn-reset" class="ctrl-btn pill" aria-label="Reset progress">Reset</button>
+      <button id="btn-clear-progress" class="ctrl-btn pill" aria-label="Clear watch progress">Clear progress</button>
     </div>
   </div>
   <div id="upnext-overlay" class="hidden">
@@ -221,6 +230,7 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
     <div id="upnext-count"></div>
     <button id="btn-upnext-cancel">Cancel</button>
   </div>
+  <div id="channel-ident" class="hidden"></div>
   <div id="device-badge" title="This screen"></div>
 </div>
 <div id="queue-overlay">
@@ -239,9 +249,11 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
 <div id="error-msg"></div>
 <script type="module">
 import { initVideoPage } from '../../ui/screens/screen-video-page.js';
+import { initChannelPage } from '../../ui/screens/screen-channel-player.js';
 import { mountDeviceBadge } from '../../ui/screens/device-badge.js';
+import { getParam } from '../../core/state.js';
 mountDeviceBadge();
-initVideoPage();
+({ 'true': initChannelPage, 'false': initVideoPage })[!!getParam('channel') + '']();
 </script>
 </body>
 </html>

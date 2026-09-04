@@ -338,9 +338,16 @@ export function initPage() {
   // beside `tileHint`'s resume badge — which IS watch progress — on the same
   // screen, so the two must never be wired to each other.
   //
-  // Inert on tap until TASK-564, like the TV card (owner, 2026-09-04): unwired
-  // is fine, broken is not. No click handler at all, so a tap does nothing
-  // rather than driving the TV somewhere that cannot draw a channel yet.
+  // TASK-564 — a tap now drives the TV into the channel, through the SAME
+  // `openItem` funnel every other tile uses: the phone sends the tile's id and
+  // the TV runs its own card-route table on it, so the two surfaces cannot
+  // disagree about what picking a channel does (including refusing an off-air
+  // one — that rule lives once, on the TV).
+  //
+  // Greyed while DESYNCED, like a bare film and for the same reason: playing is
+  // a TV act with no phone-local page to open on its own
+  // (core/companion-button-modes.js has no desync page for a channel), and a
+  // dead tap is worse than a dimmed one.
   function channelTxtTile(card) {
     var view = channelCardView(card.line, elapsedChannelSeconds());
     var el = document.createElement('button');
@@ -348,6 +355,8 @@ export function initPage() {
     el.setAttribute('data-id', card.id);
     el.setAttribute('data-channel', card.channelId);
     el.classList.toggle('off-air', !view.onAir);
+    el.classList.toggle('desync-off', tileOffDesynced(cardRoute(card), mode.isDesynced()));
+    el.addEventListener('click', function() { openItem(card); });
     var nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = view.name;

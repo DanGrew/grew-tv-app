@@ -217,15 +217,20 @@ export function sourceIdFor(mode, params) {
   return params[key];
 }
 
-// The companion context push (FEAT-017/TASK-499/503/505/517/542). The page
-// drives exactly ONE rail per load, so every other type's keys go out at their
-// empty values — which is what three snapshot vars, two of them permanently
-// {}, used to produce by accident. Building it from one live snapshot makes
-// that explicit instead.
-export function videoContext(engine, snapshot, sourceCrumb, display) {
-  var config = VIDEO_PAGE_CONFIG[engine];
+// The push with EVERY rail off and every transport dead.
+//
+// TASK-564 — this is what a video surface with no queue engine behind it sends:
+// channel mode plays off the schedule, not a queue, so the phone must be told
+// that every engine control has nothing to act on rather than being left with
+// whatever the last rail lit. Leaving a control live there is the mirror
+// pointing at the wrong engine, which TASK-542's own note calls worse than
+// showing nothing.
+//
+// videoContext below is this plus exactly one rail turned on, so the two can
+// never disagree about which keys ride the push.
+export function emptyVideoContext(display) {
   var empty = transportState({});
-  var context = {
+  return {
     context_id: 'video',
     display: display,
     musicVideo: false,
@@ -233,7 +238,7 @@ export function videoContext(engine, snapshot, sourceCrumb, display) {
     musicVideoRepeat: false,
     // Only ever set in music-video mode, so it rides the push unconditionally
     // exactly as it did when it was a bare var read straight off the closure.
-    musicVideoSource: sourceCrumb,
+    musicVideoSource: null,
     musicVideoTransport: empty,
     homeMovie: false,
     homeMovieShuffle: false,
@@ -252,6 +257,17 @@ export function videoContext(engine, snapshot, sourceCrumb, display) {
     seriesRepeat: false,
     seriesTransport: empty
   };
+}
+
+// The companion context push (FEAT-017/TASK-499/503/505/517/542). The page
+// drives exactly ONE rail per load, so every other type's keys go out at their
+// empty values — which is what three snapshot vars, two of them permanently
+// {}, used to produce by accident. Building it from one live snapshot makes
+// that explicit instead.
+export function videoContext(engine, snapshot, sourceCrumb, display) {
+  var config = VIDEO_PAGE_CONFIG[engine];
+  var context = emptyVideoContext(display);
+  context.musicVideoSource = sourceCrumb;
   context[config.context.flag] = true;
   context[config.context.shuffle] = !!snapshot.shuffle;
   context[config.context.repeat] = !!snapshot.repeat;
