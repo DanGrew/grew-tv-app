@@ -68,23 +68,40 @@ export function tickedOffset(line, elapsedSeconds) {
 // How full the bar is, 0-100. Zero rather than a throw when the runtime is
 // missing or nonsensical: a channel with no runtime still draws a card, it just
 // draws an empty bar.
+//
+// One guard, not three. A runtime of zero has to be caught before the division
+// (it would otherwise divide to Infinity and draw a FULL bar for an item with no
+// stated length), but everything else the earlier guards checked for — a
+// negative runtime, a missing offset — the clamp already answers with 0. So the
+// runtime is asked one question, `> 0`, which null, zero, a negative and a
+// non-number all fail; and a missing offset falls through to `|| 0`, which is
+// what turns NaN into an empty bar rather than a NaN width.
 export function channelPercent(offsetSeconds, runtimeSeconds) {
-  if (!runtimeSeconds || runtimeSeconds <= 0) return 0;
-  if (offsetSeconds == null) return 0;
-  return Math.max(0, Math.min(100, (offsetSeconds / runtimeSeconds) * 100));
+  var runtime = Number(runtimeSeconds);
+  if (!(runtime > 0)) return 0;
+  var percent = (Number(offsetSeconds) / runtime) * 100;
+  return Math.max(0, Math.min(100, percent || 0));
 }
 
 // `next_on_air` as the wire carries it: a naive local wall-clock ISO string
 // ("2026-09-04T21:00:00"), or null.
 //
-// Read by slicing, never by `new Date` — the programme promises 15:30 means
-// 15:30 (grammar call 3: DST is not modelled, and the backend deliberately
-// stamps no zone). Parsing to a Date and formatting back is the one way to turn
-// that promise into an hour's drift, so this never constructs one.
+// Read by matching the stamp whole, never by `new Date` — the programme promises
+// 15:30 means 15:30 (grammar call 3: DST is not modelled, and the backend
+// deliberately stamps no zone). Parsing to a Date and formatting back is the one
+// way to turn that promise into an hour's drift, so this never constructs one.
+//
+// The pattern is anchored and covers the date too, so the hours and minutes are
+// only read out of something shaped like the whole stamp: a string carrying a
+// clock somewhere inside it is not a return time, and reads as no return time at
+// all. Anything that isn't a stamp — null, a number, a bare date — stringifies
+// to something the pattern refuses, so there is no separate type guard to keep
+// in step with it.
+var RETURN_AT = /^\d\d\d\d-\d\d-\d\dT(\d\d:\d\d)/;
+
 export function returnTimeLabel(nextOnAir) {
-  if (!nextOnAir || typeof nextOnAir !== 'string') return null;
-  var t = nextOnAir.slice(11, 16);
-  return /^\d\d:\d\d$/.test(t) ? 'Back at ' + t : null;
+  var stamp = RETURN_AT.exec(String(nextOnAir));
+  return stamp ? 'Back at ' + stamp[1] : null;
 }
 
 // What the item on air is called. An id the catalog no longer knows still draws

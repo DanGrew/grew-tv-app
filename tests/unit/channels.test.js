@@ -93,11 +93,17 @@ describe('channelPercent', () => {
     expect(channelPercent(120, -5)).toBe(0);
     expect(channelPercent(null, 480)).toBe(0);
   });
+
+  // An absent offset is a number away from a NaN bar width — the bar would be
+  // drawn at `width: NaN%` and simply not appear, with nothing saying why.
+  it('draws an empty bar rather than a NaN width when the offset is absent', () => {
+    expect(channelPercent(undefined, 480)).toBe(0);
+  });
 });
 
 describe('returnTimeLabel', () => {
   // Grammar call 3 — the programme promises 15:30 means 15:30, so the wire
-  // carries a naive local wall clock and this reads it by slicing. Parsing to a
+  // carries a naive local wall clock and this reads it as written. Parsing to a
   // Date and formatting back is the one way to turn that into an hour's drift.
   it('names the hour and minute the channel is back', () => {
     expect(returnTimeLabel('2026-09-04T21:00:00')).toBe('Back at 21:00');
@@ -114,6 +120,13 @@ describe('returnTimeLabel', () => {
     expect(returnTimeLabel('not-a-time')).toBe(null);
     expect(returnTimeLabel('2026-09-04')).toBe(null);
     expect(returnTimeLabel(21)).toBe(null);
+  });
+
+  // A clock buried inside some other string is not a return time. Reading one
+  // out of it would put a confident "Back at 21:00" on a card off the back of
+  // whatever the field actually held.
+  it('is null for a stamp that does not start where the string does', () => {
+    expect(returnTimeLabel('scheduled 2026-09-04T21:00:00')).toBe(null);
   });
 });
 
