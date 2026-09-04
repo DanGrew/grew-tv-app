@@ -83,7 +83,9 @@ export function shouldRetune(detail, elapsedSeconds, behind) {
 // the strip's card: a six-month programme outlives the library under it, and a
 // removed item should read as a gap rather than blank the line.
 export function upNextTitle(detail) {
-  var next = (((detail || {}).next) || [])[0];
+  var schedule = (detail || {}).next;
+  if (!schedule) return null;
+  var next = schedule[0];
   if (!next) return null;
   var title = itemTitle(next.item);
   if (!title) return null;
