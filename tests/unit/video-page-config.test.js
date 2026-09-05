@@ -1,7 +1,7 @@
 import {
   MUSIC_VIDEO_PAGE, HOME_MOVIE_PAGE, FILM_PAGE, SERIES_PAGE,
   VIDEO_PAGE_CONFIG, MODE_ENGINE, SOURCE_TYPE, SOURCE_ID_PARAM,
-  sourceIdFor, videoContext, videoRecord
+  sourceIdFor, videoContext, videoRecord, channelVideoContext
 } from '../../core/video-page-config.js';
 import { HOME_MOVIE, FILM, SERIES, MUSIC_VIDEO } from '../../core/queue-shell-config.js';
 import { entryMode } from '../../core/music-video-playthrough.js';
@@ -308,6 +308,7 @@ describe('videoContext', () => {
     expect(videoContext('film', live, null, display)).toEqual({
       context_id: 'video',
       display: display,
+      channel: false, channelSource: null,
       musicVideo: false, musicVideoShuffle: false, musicVideoRepeat: false,
       musicVideoSource: null, musicVideoTransport: DEAD,
       homeMovie: false, homeMovieShuffle: false, homeMovieRepeat: false, homeMovieTransport: DEAD,
@@ -325,6 +326,7 @@ describe('videoContext', () => {
     expect(videoContext('series', live, null, display)).toEqual({
       context_id: 'video',
       display: display,
+      channel: false, channelSource: null,
       musicVideo: false, musicVideoShuffle: false, musicVideoRepeat: false,
       musicVideoSource: null, musicVideoTransport: DEAD,
       homeMovie: false, homeMovieShuffle: false, homeMovieRepeat: false, homeMovieTransport: DEAD,
@@ -339,6 +341,7 @@ describe('videoContext', () => {
     expect(videoContext('mv', live, crumb, display)).toEqual({
       context_id: 'video',
       display: display,
+      channel: false, channelSource: null,
       musicVideo: true, musicVideoShuffle: true, musicVideoRepeat: true,
       musicVideoSource: crumb,
       musicVideoTransport: { previous: true, next: true, shuffle: true, repeat: true },
@@ -356,6 +359,7 @@ describe('videoContext', () => {
     expect(videoContext('hm', live, null, display)).toEqual({
       context_id: 'video',
       display: display,
+      channel: false, channelSource: null,
       musicVideo: false, musicVideoShuffle: false, musicVideoRepeat: false,
       musicVideoSource: null, musicVideoTransport: DEAD,
       homeMovie: true, homeMovieShuffle: true, homeMovieRepeat: true,
@@ -391,5 +395,47 @@ describe('videoContext', () => {
     var queued = { source_type: null, source_id: null, queue: [{ item_id: 'q' }] };
     expect(videoContext('film', queued, null, display).filmTransport)
       .toEqual({ previous: false, next: true, shuffle: false, repeat: false });
+  });
+});
+
+// TASK-564 — what a CHANNEL pushes the phone. The two things it must say are
+// that this is a channel (so the phone offers Restart and Back to live, and
+// neither Queue nor Clear progress) and which channel (so its breadcrumb names
+// the channel and returns to the Channels tab).
+describe('channelVideoContext', () => {
+  var DEAD = { previous: false, next: false, shuffle: false, repeat: false };
+  var display = { id: 'film-8-mile-main', title: '8 Mile' };
+  var source = { label: 'After Dark', page: 'browse.html', params: { tab: 'channels' } };
+
+  it('names the channel and carries its crumb target', () => {
+    var context = channelVideoContext(display, source);
+    expect(context.channel).toBe(true);
+    expect(context.channelSource).toEqual(source);
+    expect(context.display).toEqual(display);
+    expect(context.context_id).toBe('video');
+  });
+
+  // Every rail off and every control dead, asserted as an exact object: a
+  // channel that left one rail lit would point the phone's ⏮/⏭/🔀/🔁 at a queue
+  // engine the TV is not playing, which is the mirror pointing at the wrong
+  // thing rather than at nothing.
+  it('leaves every queue rail off and every transport dead', () => {
+    expect(channelVideoContext(display, source)).toEqual({
+      context_id: 'video',
+      display: display,
+      channel: true, channelSource: source,
+      musicVideo: false, musicVideoShuffle: false, musicVideoRepeat: false,
+      musicVideoSource: null, musicVideoTransport: DEAD,
+      homeMovie: false, homeMovieShuffle: false, homeMovieRepeat: false, homeMovieTransport: DEAD,
+      film: false, filmShuffle: false, filmRepeat: false, filmTransport: DEAD,
+      series: false, seriesShuffle: false, seriesRepeat: false, seriesTransport: DEAD
+    });
+  });
+
+  // A queue rail never claims to be a channel — what keeps the phone's channel
+  // row and its Back to live button off every other page.
+  it('is the one push that sets the channel flag', () => {
+    expect(videoContext('film', {}, null, display).channel).toBe(false);
+    expect(videoContext('mv', {}, null, display).channelSource).toBeNull();
   });
 });

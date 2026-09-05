@@ -110,7 +110,14 @@ export function createAppState(state) {
     // control seeds + stays in sync with the TV (mirrors lyricsOn). Off is the
     // default rather than null, so a companion talking to a TV that predates
     // this task still reads a level it knows.
-    nightMode: s.nightMode != null ? s.nightMode : NIGHT_OFF
+    nightMode: s.nightMode != null ? s.nightMode : NIGHT_OFF,
+    // TASK-564: is the viewer behind the CHANNEL? It rides the snapshot for the
+    // same reason nightMode does — the phone's Back to live has to appear and
+    // disappear with the TV's own pill, and this is the beat both already read.
+    // False for every queue rail: a queue waits for the viewer, so there is
+    // nothing to be behind, and the phone's button stays hidden with no mode
+    // check of its own.
+    channelBehind: !!s.channelBehind
   });
 }
 

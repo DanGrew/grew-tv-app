@@ -724,5 +724,10 @@ export function setup(config) {
   document.getElementById('btn-upnext-cancel').addEventListener('click', cancelUpNext);
   document.getElementById('screen-video').addEventListener('click', showControls);
 
-  return { playVideo, handleVideoKey, openJumpPopup, showControls, setUpNext, startUpNext, setSeriesMode, currentVideoDisplay, seekTo, position, stop: stopPlayback, remote };
+  // `emitState` is exposed for TASK-564's channel mode alone. The heartbeat
+  // stops on pause, which is right for a queue — nothing moves while it is
+  // paused. A channel moves anyway, so a viewer paused on one falls further
+  // behind every second, and the phone would sit on whatever the last beat said
+  // until playback resumed. Channel mode beats this from its own 1 Hz tick.
+  return { playVideo, handleVideoKey, openJumpPopup, showControls, setUpNext, startUpNext, setSeriesMode, currentVideoDisplay, seekTo, position, emitState, stop: stopPlayback, remote };
 }

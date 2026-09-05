@@ -187,18 +187,18 @@ describe('createAppState', () => {
     expect(createAppState({}).type).toBe('app_state');
   });
 
-  it('passes through all snapshot fields (incl. FEAT-018 shuffle, FEAT-026 person, TASK-239 lyricsOn, TASK-568 nightMode)', () => {
+  it('passes through all snapshot fields (incl. FEAT-018 shuffle, FEAT-026 person, TASK-239 lyricsOn, TASK-568 nightMode, TASK-564 channelBehind)', () => {
     const p = createAppState({
       screen: 'player', itemId: 'ootb', episodeId: 'ootb-02',
       positionSec: 42, durationSec: 380, playing: true,
       profile: 'kids', person: 'mom', captionsOn: true, shuffle: true, lyricsOn: true,
-      nightMode: 'strong'
+      nightMode: 'strong', channelBehind: true
     }).payload;
     expect(p).toEqual({
       screen: 'player', itemId: 'ootb', episodeId: 'ootb-02',
       positionSec: 42, durationSec: 380, playing: true,
       profile: 'kids', person: 'mom', captionsOn: true, shuffle: true, lyricsOn: true,
-      nightMode: 'strong'
+      nightMode: 'strong', channelBehind: true
     });
   });
 
@@ -231,6 +231,19 @@ describe('createAppState', () => {
   it('defaults Night Mode to off rather than dropping the field', () => {
     expect(createAppState().payload.nightMode).toBe('off');
     expect(createAppState({ nightMode: null }).payload.nightMode).toBe('off');
+  });
+
+  // TASK-564 — the same trap as Night Mode above, and the reason that comment is
+  // there: the channel player adds `channelBehind` to its snapshot, and without
+  // a line here it is dropped on the way out, leaving the phone's Back to live
+  // hidden for good while the TV's own pill comes and goes.
+  it('carries whether the viewer is behind the channel', () => {
+    expect(createAppState({ channelBehind: true }).payload.channelBehind).toBe(true);
+  });
+
+  it('is not behind anything by default — a queue never sets it', () => {
+    expect(createAppState().payload.channelBehind).toBe(false);
+    expect(createAppState({ channelBehind: null }).payload.channelBehind).toBe(false);
   });
 });
 

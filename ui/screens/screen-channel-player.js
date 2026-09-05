@@ -5,7 +5,7 @@ import { connectApp } from '../../core/app-ws.js';
 import { loadChannel, loadChannels } from '../../core/app-api.js';
 import { tickedOffset, channelPercent } from '../../core/channels.js';
 import { isBehindLive, shouldRetune, upNextTitle, channelRecord, identLabel, flipTarget, channelIds } from '../../core/channel-player.js';
-import { emptyVideoContext } from '../../core/video-page-config.js';
+import { channelVideoContext } from '../../core/video-page-config.js';
 import { playerCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
@@ -102,16 +102,20 @@ export function initChannelPage() {
     [upNextTitle(detail)].filter(Boolean).forEach(function(title) { player.setUpNext('Up next: ', title); });
   }
   // Home › <channel> › <what's on>. The channel's own crumb returns to the
-  // Channels tab, the way a music video's crumb returns to its playlist.
+  // Channels tab, the way a music video's crumb returns to its playlist. The
+  // phone is handed this SAME target on the context push (below), so both
+  // surfaces name the channel and neither falls back to a browse rail.
+  function crumbSource() {
+    return { label: identLabel(detail), page: 'browse.html', params: { tab: 'channels' } };
+  }
   function mountCrumbs() {
-    mountBreadcrumb('breadcrumb', playerCrumbs(null, {
-      label: identLabel(detail), page: 'browse.html', params: { tab: 'channels' }
-    }, [channelRecord(detail)].filter(Boolean).concat([{}])[0].title));
+    mountBreadcrumb('breadcrumb', playerCrumbs(null, crumbSource(),
+      [channelRecord(detail)].filter(Boolean).concat([{}])[0].title));
   }
 
   function sendChannelContext() {
     [wsApp].filter(Boolean).forEach(function(ws) {
-      ws.sendContext(emptyVideoContext(player.currentVideoDisplay()));
+      ws.sendContext(channelVideoContext(player.currentVideoDisplay(), crumbSource()));
     });
   }
 
@@ -138,6 +142,10 @@ export function initChannelPage() {
     TUNE[(record.id !== loadedId) + '']();
     loadedId = record.id;
     mountCrumbs();
+    // The phone learns it is on a channel the moment the TV tunes in, not when
+    // something happens to fire a play intent — until it knows, its mirror is
+    // the last queue rail's and its crumb names a browse rail.
+    sendChannelContext();
     renderUpNext();
     renderMarker();
     renderLivePill();
@@ -187,6 +195,10 @@ export function initChannelPage() {
   function tick() {
     renderMarker();
     renderLivePill();
+    // The phone's own Back to live, in step with the pill above. Driven from
+    // HERE rather than from the player's heartbeat because that beat stops on
+    // pause — and a channel does not, so a paused viewer goes on falling behind.
+    player.emitState();
     RETUNE[[shouldRetune(detail, elapsedSeconds(), behind()), !retuning].every(Boolean) + '']();
   }
 
@@ -214,7 +226,16 @@ export function initChannelPage() {
     // previous or next ITEM to step to on a schedule.
     onNext: noop,
     onPrev: noop,
-    emitState: function(snap) { [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(snap); }); },
+    // The 1 Hz heartbeat the phone already draws its progress bar from, carrying
+    // one extra fact: whether the viewer is behind the channel. It is what shows
+    // and hides the phone's Back to live button, in step with the TV pill and
+    // off the same answer — story 4 is a rule about the viewer's position, not
+    // about which screen is asking. No new traffic: the snapshot goes out every
+    // second regardless.
+    emitState: function(snap) {
+      var payload = Object.assign({}, snap, { channelBehind: behind() });
+      [wsApp].filter(Boolean).forEach(function(ws) { ws.sendAppState(payload); });
+    },
     appContext: function() {
       return { screen: 'player', itemId: loadedId, episodeId: loadedId, profile: profile };
     },
@@ -238,8 +259,24 @@ export function initChannelPage() {
   keys[FLIP_UP_KEY] = function(e) { e.preventDefault(); flip(1); };
   initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote });
 
+  // The phone's own channel controls (the mirror of the two pills above) and the
+  // one intent channel mode has to REFUSE.
+  //
+  // ⛔ `reset` is inert here. The shared player's reset clears the item's stored
+  // progress and exits — on a channel that would wipe a resume position the
+  // viewer set deliberately in their own time, for an item the channel merely
+  // happens to be airing, and drop them out of the channel for it. Decision 16
+  // says a channel play touches watch_progress not at all, in either direction.
+  // The phone hides its Clear progress button in channel mode; this is what
+  // makes a stray press from a page that connected before the tune-in harmless.
+  var CHANNEL_INTENTS = {
+    channelRestart: restart,
+    channelLive: rejoin,
+    reset: noop
+  };
+
   function appIntent(intent, params) {
-    var EXTRA = { navigate: function() { navTo(params.page, params.params); } };
+    var EXTRA = Object.assign({ navigate: function() { navTo(params.page, params.params); } }, CHANNEL_INTENTS);
     var fn = [EXTRA[intent]].filter(Boolean).concat([player.remote[intent]]).filter(Boolean)[0];
     [fn].filter(Boolean).forEach(function(f) { f(params); });
   }

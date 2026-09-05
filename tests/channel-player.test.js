@@ -73,6 +73,30 @@ async function withChannel(page, detail) {
   });
 }
 
+// The phone's rail into the TV. installApi's own socket answers the person
+// handshake the profile picker waits on, so this one answers it too — it
+// REPLACES that route (Playwright matches most-recent-first) rather than sitting
+// beside it — and hands back a function that delivers an intent on demand, which
+// is how a press on the phone is reproduced here without a second page.
+async function intentRail(page) {
+  var sockets = [];
+  await page.routeWebSocket(/:8766/, function(ws) {
+    sockets.push(ws);
+    ws.onMessage(function(raw) {
+      var m = JSON.parse(raw);
+      [m].filter(function(msg) { return msg.type === 'activate_person' && msg.payload.person_id; })
+        .forEach(function(msg) {
+          ws.send(JSON.stringify({ type: 'person_active', payload: { person_id: msg.payload.person_id, device_id: msg.payload.device_id } }));
+        });
+    });
+  });
+  return function deliver(intent) {
+    sockets.forEach(function(ws) {
+      ws.send(JSON.stringify({ type: 'intent', payload: { intent: intent } }));
+    });
+  };
+}
+
 async function openChannel(page, id) {
   await page.goto('/app/homeview/profile.html');
   await pickPerson(page, 'kids');
@@ -221,6 +245,41 @@ test.describe('tuned into a channel', () => {
     });
     await page.waitForTimeout(200);
     expect(writes).toEqual([]);
+  });
+
+  // Decision 16's other half, found in use: the phone's Clear progress was still
+  // live while the TV was on a channel, and pressing it cleared the on-air
+  // item's real watch progress and dropped the TV out of the channel for it. The
+  // phone hides the button in channel mode now (tests/companion-channel.test.js)
+  // and the intent itself is inert here, which is what makes a page that
+  // connected before the tune-in harmless.
+  test('a Clear progress press from a phone neither clears nor leaves the channel', async ({ page }) => {
+    const deletes = [];
+    page.on('request', function(req) {
+      [req].filter(r => r.url().includes('/api/progress/')).filter(r => r.method() === 'DELETE')
+        .forEach(r => deletes.push(r.url()));
+    });
+    const deliver = await intentRail(page);
+    await openChannel(page, 'cartoon-club');
+    deliver('reset');
+    await page.waitForTimeout(300);
+    expect(deletes).toEqual([]);
+    await expect(page.locator('#channel-ident')).toHaveText('Cartoon Club');
+    await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e22/);
+  });
+
+  // The phone's own Restart and Back to live, which drive the TV's — the mirror
+  // of the two pills, over the intent rail (the row's own controls are proved on
+  // the phone in tests/companion-channel.test.js).
+  test('the phone\'s Restart and Back to live drive the channel player', async ({ page }) => {
+    const deliver = await intentRail(page);
+    await openChannel(page, 'cartoon-club');
+    await atPosition(page, 300);
+    deliver('channelRestart');
+    await expect.poll(async () => page.evaluate(() => window.__pos), { timeout: 5000 }).toBe(0);
+    deliver('channelLive');
+    await expect.poll(async () => page.evaluate(() => window.__pos), { timeout: 5000 })
+      .toBeGreaterThanOrEqual(120);
   });
 
   // Story 5 — the channel does not wait. Finishing the item asks what is on NOW

@@ -233,6 +233,13 @@ export function emptyVideoContext(display) {
   return {
     context_id: 'video',
     display: display,
+    // TASK-564 — channel mode's own two keys, false/null for every queue rail.
+    // The phone needs to know it is mirroring a CHANNEL and not a queue with an
+    // empty snapshot: the two look identical from a dead transport alone, and
+    // they differ in what the phone must offer (Restart and Back to live, not
+    // Queue and Clear progress) and in what its breadcrumb says.
+    channel: false,
+    channelSource: null,
     musicVideo: false,
     musicVideoShuffle: false,
     musicVideoRepeat: false,
@@ -257,6 +264,22 @@ export function emptyVideoContext(display) {
     seriesRepeat: false,
     seriesTransport: empty
   };
+}
+
+// The push a CHANNEL sends (TASK-564). Every queue rail stays off — a channel
+// has no engine, so ⏮/⏭/🔀/🔁 have nothing to act on and go out dead rather
+// than live-looking and silently posting to whichever engine played last.
+//
+// `source` is the channel's own crumb target ({ label, page, params }), the same
+// one the TV player builds, so the phone's breadcrumb reads Home › <channel> ›
+// <what's on> and its middle crumb returns to the Channels tab. Without it the
+// phone falls back to the recorded browse rail, which names the RAIL ("On now")
+// and points the TV at a rail-grid page channels do not have.
+export function channelVideoContext(display, source) {
+  var context = emptyVideoContext(display);
+  context.channel = true;
+  context.channelSource = source;
+  return context;
 }
 
 // The companion context push (FEAT-017/TASK-499/503/505/517/542). The page

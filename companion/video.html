@@ -75,6 +75,9 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 .seg-opt:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
 #topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; position: relative; }
 #c-repeat.hidden, #c-shuffle.hidden, #c-queue.hidden, #c-add-playlist.hidden { display: none; }
+/* TASK-564 — channel mode's row, and the queue row it stands in for. */
+#channel-row.hidden, #queue-row.hidden, #c-live.hidden { display: none; }
+#c-live { border-color: var(--focus); color: var(--focus); }
 .desync-off { opacity: 0.35; pointer-events: none; }
 .browsing .transport, .browsing #jump, .browsing #c-reset, .browsing #switch-profile { opacity: 0.35; pointer-events: none; }
 #add-sheet { display: none; position: fixed; inset: 0; z-index: 10; align-items: center; justify-content: center; background: rgba(0,0,0,0.62); }
@@ -115,7 +118,15 @@ body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
 </div>
 <div class="jump" id="jump"></div>
 <div id="upnext" class="bignext"></div>
-<div class="footer-row">
+<!-- TASK-564: channel mode's own row, the mirror of the TV player's two channel
+     pills. Hidden for every queue rail; the Queue / Clear progress row hides in
+     its place on a channel, which has neither a queue to open nor anything
+     recorded to clear. -->
+<div class="footer-row hidden" id="channel-row">
+  <button id="c-restart" class="reset-btn" aria-label="Restart this programme">&#8635; Restart</button>
+  <button id="c-live" class="reset-btn hidden" aria-label="Back to live">&#9679; Back to live</button>
+</div>
+<div class="footer-row" id="queue-row">
   <button id="c-queue" class="reset-btn" aria-label="Queue">☰ Queue</button>
   <button id="c-add-playlist" class="reset-btn hidden" aria-label="Add to playlist">＋ Playlist</button>
   <button id="c-reset" class="reset-btn" aria-label="Clear watch progress">&#8635; Clear progress</button>
