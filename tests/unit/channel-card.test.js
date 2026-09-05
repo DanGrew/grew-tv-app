@@ -219,6 +219,19 @@ describe('cardView — between items', () => {
     expect(view.returnAt).toBe(null);
   });
 
+  it('⚠️ never promises a return time while the channel is ON air', () => {
+    // The answer can carry `next_on_air` alongside a live programme — the
+    // backend fills in the next on-air moment whether or not anything is off.
+    // A card in the GAP that read it would say "Back at 21:00" over a
+    // programme starting in eight seconds: the channel contradicting itself in
+    // the one place a viewer is looking. Only the holding card names a return.
+    const view = cardView(detail({ next_on_air: '2026-09-04T21:00:00' }));
+    expect(view.returnAt).toBe(null);
+    expect(view.headline).toBe(null);
+    expect(cardStatus(detail({ next_on_air: '2026-09-04T21:00:00' })).line)
+      .toBe('Next: Hey Duggee at 17:08');
+  });
+
   it('names the channel by its id when its config forgot to name it', () => {
     expect(cardView(detail({ name: null })).label).toBe('cartoon-club');
     expect(cardView(detail({ name: '' })).label).toBe('cartoon-club');

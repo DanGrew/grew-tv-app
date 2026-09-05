@@ -24,8 +24,14 @@
 // rather than defaulting — a track with no stated length would either stall the
 // walk or need a made-up duration, and a made-up duration puts every later track
 // at the wrong time for as long as the album loops.
+// An absent album is read as an album with nothing in it rather than defaulted
+// to an empty list: `[album].filter(Boolean)` drops the absence before anything
+// asks it for items, so there is no `|| []` standing in for a case that never
+// reaches the map. A default nobody can observe is a branch nothing can test.
 export function bedTracks(album) {
-  return ((album || {}).items || [])
+  return [album]
+    .filter(Boolean)
+    .flatMap(function(entry) { return entry.items; })
     .map(function(item) { return (item || {}).video; })
     .filter(Boolean)
     .filter(function(video) { return video.id && video.ext && Number(video.duration) > 0; })
@@ -50,9 +56,13 @@ export function bedTotal(tracks) {
 // shows. A negative clock folds back into the loop rather than answering null:
 // it cannot happen from Date.now(), and answering "no bed" for an arithmetic
 // slip would silence the card for a reason nobody could see.
+//
+// Absence is read through bedTotal, which is the ONE place that tolerates it —
+// no list to walk means no length, and no length is already the silent answer.
+// Defaulting here as well would be a second guard on the same case, and a guard
+// standing behind another guard can never be shown to do anything.
 export function bedAt(tracks, epochSeconds) {
-  var list = tracks || [];
-  var total = bedTotal(list);
+  var total = bedTotal(tracks);
   if (!(total > 0)) return null;
   var seconds = Number(epochSeconds);
   if (!isFinite(seconds)) return null;
@@ -63,15 +73,15 @@ export function bedAt(tracks, epochSeconds) {
   // return value for — `into` is inside the loop by construction, and a branch
   // that can only be reached by breaking that construction is a branch nothing
   // can ever test.
-  var found = list[0];
+  var found = tracks[0];
   var offset = into;
   var starts = 0;
-  for (var i = 0; i < list.length; i++) {
+  for (var i = 0; i < tracks.length; i++) {
     if (into >= starts) {
-      found = list[i];
+      found = tracks[i];
       offset = into - starts;
     }
-    starts += list[i].duration;
+    starts += tracks[i].duration;
   }
   return { track: found, offset: offset };
 }

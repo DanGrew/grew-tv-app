@@ -47,8 +47,16 @@ export var CARD_LOOKAHEAD = TIMED_LINES + LATER_LINES;
 // The lookahead the answer actually carries. Everything below reads the
 // schedule through here, so an absent list and a list with a hole in it are
 // dealt with ONCE rather than guarded at every use.
+//
+// No answer at all is dropped rather than defaulted to an empty one: the
+// absence leaves at the first filter, so nothing downstream needs a stand-in
+// list to ask questions of. A default the code can never be caught using is a
+// branch no test can reach.
 function entries(detail) {
-  return ((detail || {}).next || []).filter(Boolean);
+  return [detail]
+    .filter(Boolean)
+    .flatMap(function(line) { return line.next; })
+    .filter(Boolean);
 }
 
 // One entry as a timed line. Null when it carries no clock — an entry that
@@ -115,7 +123,10 @@ export function cardKind(detail) {
 // you are looking at without making you find the pill.
 function cardLabel(detail) {
   var line = detail || {};
-  return [line.name].filter(Boolean).concat([line.channel_id]).filter(Boolean).concat([''])[0];
+  // One filter, after both candidates are on the list — filtering the name on
+  // its own first as well changes nothing, because whichever of the two is the
+  // first truthy value is the same either way.
+  return [line.name].concat([line.channel_id]).filter(Boolean).concat([''])[0];
 }
 
 var OFF_AIR = 'Off air';
