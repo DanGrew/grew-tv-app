@@ -74,6 +74,7 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 | playlist-create | create form | — | ➖ | companion create covers the path |
 | video | TV player play / pause | tv-app | ✅ | video frame hidden for determinism |
 | video | channel mode — ident, live marker, Back to live, Restart | — | ❌ | TASK-564. Same frozen-clock problem as the Channels tab above, and worse: the marker's position and whether the Back to live pill is even shown both move every second off wall time, so two of the three things worth snapping are the non-deterministic ones |
+| video | channel mode — the card in the gap, and the off-air holding card | — | ❌ | TASK-565. The one channel surface a frozen clock would actually make snappable: the card is a fixed layout over black, and its three timed lines come out of the programme rather than off the wall clock. What still moves is the bed's track credit, which is a function of real time by design — so a flow here needs the clock pinned for the credit alone, not for the card |
 | queue-shell | FEAT-497 Queue overlay + dimmed non-repeatable controls | — | ❌ | TASK-525: the `tv-video-queue` flow went with the legacy Queue overlay it drove. The shell that replaced it (`screen-queue-shell.js`, all three video types) has never had a flow of its own — the TASK-289 `(surface, state)` pair is open again on the shell |
 | error | error state | — | ➖ | |
 

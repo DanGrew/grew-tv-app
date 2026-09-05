@@ -74,6 +74,30 @@ describe('loadChannel', () => {
     fakeFetch({}, false);
     await expect(loadChannel('http://s', 'after-dark', 'kids')).rejects.toBe(500);
   });
+  // TASK-565 — the interstitial card draws three timed lines AND an untimed
+  // later list out of ONE answer, which is more than the endpoint's own default
+  // of three. A caller that only wants what is on asks for nothing extra.
+  it('asks for a lookahead when the caller names one', async () => {
+    var calls = fakeFetch({});
+    await loadChannel('http://s', 'cartoon-club', 'kids', 7);
+    expect(calls[0].url).toBe('http://s/api/channels/cartoon-club?profile=kids&lookahead=7');
+  });
+  it('omits it entirely when the caller does not, leaving the backend default', async () => {
+    var calls = fakeFetch({});
+    await loadChannel('http://s', 'cartoon-club', 'kids');
+    expect(calls[0].url).not.toContain('lookahead');
+    await loadChannel('http://s', 'cartoon-club', 'kids', null);
+    expect(calls[1].url).not.toContain('lookahead');
+    await loadChannel('http://s', 'cartoon-club', 'kids', 'seven');
+    expect(calls[2].url).not.toContain('lookahead');
+  });
+  it('asks for none as a real answer, not as no answer', async () => {
+    // Zero is a legitimate ask — the tune-in itself needs nothing beyond what
+    // is on — and `0 || default` would have silently turned it into three.
+    var calls = fakeFetch({});
+    await loadChannel('http://s', 'cartoon-club', 'kids', 0);
+    expect(calls[0].url).toBe('http://s/api/channels/cartoon-club?profile=kids&lookahead=0');
+  });
 });
 
 describe('loadVideo', () => {

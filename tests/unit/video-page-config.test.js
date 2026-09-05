@@ -1,7 +1,7 @@
 import {
   MUSIC_VIDEO_PAGE, HOME_MOVIE_PAGE, FILM_PAGE, SERIES_PAGE,
   VIDEO_PAGE_CONFIG, MODE_ENGINE, SOURCE_TYPE, SOURCE_ID_PARAM,
-  sourceIdFor, videoContext, videoRecord, channelVideoContext
+  sourceIdFor, videoContext, videoRecord, channelVideoContext, emptyVideoContext
 } from '../../core/video-page-config.js';
 import { HOME_MOVIE, FILM, SERIES, MUSIC_VIDEO } from '../../core/queue-shell-config.js';
 import { entryMode } from '../../core/music-video-playthrough.js';
@@ -308,7 +308,7 @@ describe('videoContext', () => {
     expect(videoContext('film', live, null, display)).toEqual({
       context_id: 'video',
       display: display,
-      channel: false, channelSource: null,
+      channel: false, channelSource: null, channelCard: null,
       musicVideo: false, musicVideoShuffle: false, musicVideoRepeat: false,
       musicVideoSource: null, musicVideoTransport: DEAD,
       homeMovie: false, homeMovieShuffle: false, homeMovieRepeat: false, homeMovieTransport: DEAD,
@@ -326,7 +326,7 @@ describe('videoContext', () => {
     expect(videoContext('series', live, null, display)).toEqual({
       context_id: 'video',
       display: display,
-      channel: false, channelSource: null,
+      channel: false, channelSource: null, channelCard: null,
       musicVideo: false, musicVideoShuffle: false, musicVideoRepeat: false,
       musicVideoSource: null, musicVideoTransport: DEAD,
       homeMovie: false, homeMovieShuffle: false, homeMovieRepeat: false, homeMovieTransport: DEAD,
@@ -341,7 +341,7 @@ describe('videoContext', () => {
     expect(videoContext('mv', live, crumb, display)).toEqual({
       context_id: 'video',
       display: display,
-      channel: false, channelSource: null,
+      channel: false, channelSource: null, channelCard: null,
       musicVideo: true, musicVideoShuffle: true, musicVideoRepeat: true,
       musicVideoSource: crumb,
       musicVideoTransport: { previous: true, next: true, shuffle: true, repeat: true },
@@ -359,7 +359,7 @@ describe('videoContext', () => {
     expect(videoContext('hm', live, null, display)).toEqual({
       context_id: 'video',
       display: display,
-      channel: false, channelSource: null,
+      channel: false, channelSource: null, channelCard: null,
       musicVideo: false, musicVideoShuffle: false, musicVideoRepeat: false,
       musicVideoSource: null, musicVideoTransport: DEAD,
       homeMovie: true, homeMovieShuffle: true, homeMovieRepeat: true,
@@ -423,7 +423,7 @@ describe('channelVideoContext', () => {
     expect(channelVideoContext(display, source)).toEqual({
       context_id: 'video',
       display: display,
-      channel: true, channelSource: source,
+      channel: true, channelSource: source, channelCard: null,
       musicVideo: false, musicVideoShuffle: false, musicVideoRepeat: false,
       musicVideoSource: null, musicVideoTransport: DEAD,
       homeMovie: false, homeMovieShuffle: false, homeMovieRepeat: false, homeMovieTransport: DEAD,
@@ -437,5 +437,21 @@ describe('channelVideoContext', () => {
   it('is the one push that sets the channel flag', () => {
     expect(videoContext('film', {}, null, display).channel).toBe(false);
     expect(videoContext('mv', {}, null, display).channelSource).toBeNull();
+  });
+
+  // TASK-565 — what the TV is SHOWING while a card is up. Without it the phone
+  // sits on the title of the programme that just finished, which is the one
+  // thing on the television that has stopped being true — and stays there for
+  // the whole of an off-air hold.
+  it('carries the card the TV is holding, and nothing while one plays', () => {
+    var card = { label: 'Between programmes', line: 'Next: Hey Duggee at 17:08' };
+    expect(channelVideoContext(display, source, card).channelCard).toEqual(card);
+    expect(channelVideoContext(display, source, null).channelCard).toBe(null);
+    expect(channelVideoContext(display, source).channelCard).toBe(null);
+  });
+
+  it('never leaves a queue rail claiming to be holding a card', () => {
+    expect(videoContext('film', {}, null, display).channelCard).toBe(null);
+    expect(emptyVideoContext(display).channelCard).toBe(null);
   });
 });

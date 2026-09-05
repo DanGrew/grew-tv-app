@@ -100,9 +100,18 @@ export function channelPercent(offsetSeconds, runtimeSeconds) {
 // in step with it.
 var RETURN_AT = /^\d\d\d\d-\d\d-\d\dT(\d\d:\d\d)/;
 
+// The clock a stamp names, or null for anything that is not one. THE one reader
+// of a wall-clock stamp in the app (TASK-565): the interstitial's timed lines
+// read `starts_at` exactly as the off-air card reads `next_on_air`, and a second
+// copy of this pattern is how one of them would quietly start parsing to a Date.
+export function clockLabel(stamp) {
+  var at = RETURN_AT.exec(String(stamp));
+  return at ? at[1] : null;
+}
+
 export function returnTimeLabel(nextOnAir) {
-  var stamp = RETURN_AT.exec(String(nextOnAir));
-  return stamp ? 'Back at ' + stamp[1] : null;
+  var at = clockLabel(nextOnAir);
+  return at ? 'Back at ' + at : null;
 }
 
 // What the item on air is called. An id the catalog no longer knows still draws

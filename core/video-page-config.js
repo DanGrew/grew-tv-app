@@ -240,6 +240,11 @@ export function emptyVideoContext(display) {
     // Queue and Clear progress) and in what its breadcrumb says.
     channel: false,
     channelSource: null,
+    // TASK-565 — what the TV is showing while a card is up, or null while a
+    // programme is playing. The phone's now-playing line would otherwise sit on
+    // the title of the item that just finished, which is the one thing on screen
+    // that has stopped being true.
+    channelCard: null,
     musicVideo: false,
     musicVideoShuffle: false,
     musicVideoRepeat: false,
@@ -275,10 +280,14 @@ export function emptyVideoContext(display) {
 // <what's on> and its middle crumb returns to the Channels tab. Without it the
 // phone falls back to the recorded browse rail, which names the RAIL ("On now")
 // and points the TV at a rail-grid page channels do not have.
-export function channelVideoContext(display, source) {
+// `card` (TASK-565) is the one line the phone shows while the TV is holding a
+// card — core/channel-card.js's cardStatusLine — and null while a programme is
+// actually playing, which is what puts the item's own title back.
+export function channelVideoContext(display, source, card) {
   var context = emptyVideoContext(display);
   context.channel = true;
   context.channelSource = source;
+  context.channelCard = [card].filter(Boolean).concat([null])[0];
   return context;
 }
 

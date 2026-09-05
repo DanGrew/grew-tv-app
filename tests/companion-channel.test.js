@@ -42,6 +42,10 @@ async function installChannelTv(page, opts) {
               context_id: 'video', version: 1,
               display: { id: 'film-8-mile-main', title: '8 Mile' },
               channel: true, channelSource: CHANNEL_SOURCE,
+              // TASK-565 — what the TV is HOLDING, when it is holding a card.
+              // Absent while a programme plays, which is every case but the two
+              // at the bottom of this file.
+              channelCard: [o.card].filter(Boolean).concat([null])[0],
               musicVideo: false, homeMovie: false, film: false, series: false,
               filmTransport: { previous: false, next: false, shuffle: false, repeat: false }
             }
@@ -133,5 +137,38 @@ test.describe('the phone while the TV is on a channel', () => {
     await expect(page.locator('#c-live')).toBeVisible();
     await page.locator('#c-live').click();
     expect(pressedIntents(backend).map(function(p) { return p.intent; })).toContain('channelLive');
+  });
+
+  // TASK-565 — the phone while the TV is holding a card. Without this it sits on
+  // the title of the programme that just finished, which is the one thing on the
+  // television that has stopped being true — and for an off-air hold it sits
+  // there indefinitely, saying a film is playing over a card saying Off air.
+  test('says what the TV is showing in the gap, not the programme that ended', async ({ page }) => {
+    await installApi(page);
+    await installChannelTv(page, { card: { label: 'Between programmes', line: 'Next: Hey Duggee at 17:08' } });
+    await page.goto('/companion/video.html');
+    await expect(page.locator('#ctx-label')).toHaveText('Between programmes');
+    await expect(page.locator('#now-title')).toHaveText('Next: Hey Duggee at 17:08');
+    await expect(page.locator('#now-title')).not.toHaveText('8 Mile');
+    // Still a channel — the phone's own controls do not go anywhere.
+    await expect(page.locator('#c-restart')).toBeVisible();
+  });
+
+  test('says off air, and when the channel is back', async ({ page }) => {
+    await installApi(page);
+    await installChannelTv(page, { card: { label: 'Off air', line: 'Back at 21:00' } });
+    await page.goto('/companion/video.html');
+    await expect(page.locator('#ctx-label')).toHaveText('Off air');
+    await expect(page.locator('#now-title')).toHaveText('Back at 21:00');
+  });
+
+  // The breadcrumb's leaf is the same answer, so the phone does not name the
+  // finished programme in one place while denying it in another.
+  test('the crumb stops naming the programme that ended, and still names the channel', async ({ page }) => {
+    await installApi(page);
+    await installChannelTv(page, { card: { label: 'Off air', line: 'Back at 21:00' } });
+    await page.goto('/companion/video.html');
+    await expect(page.locator('#breadcrumb')).toContainText('After Dark');
+    await expect(page.locator('#breadcrumb')).not.toContainText('8 Mile');
   });
 });

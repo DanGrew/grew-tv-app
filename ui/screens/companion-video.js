@@ -408,10 +408,26 @@ export function initPage() {
     [on].filter(Boolean).forEach(function() { applyTransport(TRANSPORT_DEFAULT); });
   }
 
+  // TASK-565 — what the header says. Normally the item that is playing; while
+  // the TV is holding a channel card, what the CARD says instead
+  // (core/channel-card.js cardStatus, built on the TV and pushed whole, so the
+  // phone never re-derives a schedule it cannot see). Without this the phone sits
+  // on the title of the programme that just finished, which is the one thing on
+  // the television that has stopped being true — and stays there for the whole
+  // of an off-air hold.
+  var CONTEXT_HEAD = {
+    'true': function(payload) { return payload.channelCard; },
+    'false': function(payload) { return { label: 'Now playing', line: displayTitle(payload) }; }
+  };
+  function applyContextHead(payload) {
+    var head = CONTEXT_HEAD[!!payload.channelCard + ''](payload);
+    els.ctxLabel.textContent = head.label;
+    els.title.textContent = head.line;
+    state.crumb.videoTitle = head.line;
+  }
+
   function onVideoContext(payload) {
-    els.ctxLabel.textContent = 'Now playing';
-    els.title.textContent = displayTitle(payload);
-    state.crumb.videoTitle = displayTitle(payload);
+    applyContextHead(payload);
     state.channel = !!payload.channel;
     state.crumb.channelSource = [payload.channelSource].filter(Boolean).concat([null])[0];
     applyChannelMode(state.channel);
