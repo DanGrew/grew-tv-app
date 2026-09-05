@@ -25,7 +25,7 @@ python3 /Users/dan/dan-grew-repos/<your-grew-tv-worktree-dir>/media-manager/core
   --app-dir         /Users/dan/dan-grew-repos/<your-app-worktree-dir> \
   --manifest-dir    ~/dan-grew-repos/grew-tv-state/manifests \
   --content-root    ~/rips \
-  --state-repo-dir  /tmp/grew-state
+  --state-repo-dir  ~/dan-grew-repos/grew-tv-state
 ```
 
 Always pass all four flags (this exact shape):
@@ -34,15 +34,38 @@ Always pass all four flags (this exact shape):
   (the defaults point at the Mini's `~/grew-tv/...`, which is empty on the dev
   mac → no content, no repro).
 - `--content-root ~/rips` — the media files.
-- `--state-repo-dir /tmp/grew-state` — a THROWAWAY state checkout so the boot
-  progress round-trip can't pollute the user's real `grew-tv-state`.
+- `--state-repo-dir ~/dan-grew-repos/grew-tv-state` — the REAL state repo. It is
+  not only where progress is written: `channel_store` reads channels and
+  programmes out of it (`channels/<id>.json`, `programmes/<id>.json`), so a
+  throwaway dir serves an empty channel list and every channel screen comes up
+  blank. That reads like a broken build and is a missing flag value — it wasted
+  a hand-off on TASK-565. The trade is that the run pulls on boot and commits +
+  pushes watch-progress snapshots there every few minutes, exactly as the Mini
+  does; `/tmp/grew-state` is only for a run that must not touch real progress
+  AND has nothing to do with channels.
 
 NEVER hand the user a `git pull`/`git checkout`/"run from primary on updated
 main" step. If the backend lives in a worktree, serve from that worktree — even
-after it merges, because primary may be stale. Always note: stop the live
-:8765/:8766 server first; then the app URL is
+after it merges, because primary may be stale. Then the app URL is
 `http://localhost:8765/app/homeview/profile.html` (companion at
 `http://localhost:8765/companion/`).
+
+### Stop what's already on the ports first
+
+A second media-manager just fails to bind, so the run command is useless on its
+own — hand over these three lines above it. One process holds BOTH 8765 and
+8766, so there is one PID to kill, not two:
+
+```bash
+lsof -nP -iTCP:8765 -sTCP:LISTEN   # the PID holding both ports
+ps -o pid=,command= -p <pid>       # whose run is it? another session's worktree, or the deployed one?
+kill <pid>                         # then re-run lsof; media-manager often ignores SIGTERM
+kill -9 <pid>                      # zombie instances need this
+```
+
+The `ps` line is not optional politeness — the port is as likely to hold another
+session's `--app-dir <their worktree>` run as your own, and killing it takes
+their browser with it.
 
 Preferred — use `media-manager.py` from the `grew-tv` repo (serves app + WebSocket server together):
 ```bash

@@ -1,6 +1,6 @@
 import {
   CHANNEL_KIND, CHANNELS_TAB,
-  minutesLabel, positionLabel, tickedOffset, channelPercent, returnTimeLabel,
+  minutesLabel, positionLabel, tickedOffset, channelPercent, returnTimeLabel, clockLabel,
   itemTitle, channelCardView, channelTile, channelTiles, channelRails,
   channelsById, hasChannels, withChannelsTab, landingTab, browseRestore,
   tileVariant, CHANNEL_TILE, LIBRARY_TILE, CHANNELS_RAIL
@@ -127,6 +127,35 @@ describe('returnTimeLabel', () => {
   // whatever the field actually held.
   it('is null for a stamp that does not start where the string does', () => {
     expect(returnTimeLabel('scheduled 2026-09-04T21:00:00')).toBe(null);
+  });
+});
+
+// TASK-565 — the same read, without the wording. THE one place a wall-clock
+// stamp is read in the app: the interstitial's timed lines go through this
+// exactly as the off-air card's return time does, so a second copy cannot
+// quietly start parsing to a Date and drifting an hour.
+describe('clockLabel', () => {
+  it('is the hour and minute, as written', () => {
+    expect(clockLabel('2026-09-04T21:00:00')).toBe('21:00');
+    expect(clockLabel('2026-12-25T06:30:00')).toBe('06:30');
+  });
+
+  it('reads a stamp with no seconds on it just the same', () => {
+    expect(clockLabel('2026-09-04T21:00')).toBe('21:00');
+  });
+
+  it('is null for anything that is not a whole stamp', () => {
+    expect(clockLabel(null)).toBe(null);
+    expect(clockLabel('')).toBe(null);
+    expect(clockLabel('21:00')).toBe(null);
+    expect(clockLabel('2026-09-04')).toBe(null);
+    expect(clockLabel('scheduled 2026-09-04T21:00:00')).toBe(null);
+    expect(clockLabel(21)).toBe(null);
+  });
+
+  it('is what returnTimeLabel is built on, so the two cannot disagree', () => {
+    expect(returnTimeLabel('2026-09-04T21:00:00'))
+      .toBe('Back at ' + clockLabel('2026-09-04T21:00:00'));
   });
 });
 

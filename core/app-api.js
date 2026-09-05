@@ -33,8 +33,16 @@ export function loadChannels(serverUrl, profile) {
 // moment old is already wrong. `profile` is required here for the same reason
 // it is on the strip — the same 400, and the same channel a profile may not see
 // answering as not found.
-export function loadChannel(serverUrl, channelId, profile) {
-  return getJson(serverUrl + '/api/channels/' + encodeURIComponent(channelId) + '?profile=' + encodeURIComponent(profile));
+// TASK-565 — `lookahead` is how many items past the one playing the answer
+// carries, and it is the interstitial card that needs more than the default 3:
+// the card draws three timed lines AND an untimed later list out of one answer
+// (core/channel-card.js CARD_LOOKAHEAD). Omitted, the backend serves its own
+// default, so a caller that only wants what is on — the strip, and the tune-in
+// itself — asks for nothing extra. The backend clamps rather than refuses, so an
+// over-large ask can never cost a viewer what is on.
+export function loadChannel(serverUrl, channelId, profile, lookahead) {
+  var ask = [lookahead].filter(Number.isFinite).map(function(n) { return '&lookahead=' + encodeURIComponent(n); }).concat([''])[0];
+  return getJson(serverUrl + '/api/channels/' + encodeURIComponent(channelId) + '?profile=' + encodeURIComponent(profile) + ask);
 }
 
 // Mid-watch videos for a profile, newest first (FEAT-017). Backs the Home

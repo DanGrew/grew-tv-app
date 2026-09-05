@@ -2,9 +2,11 @@ import { getParam, getProfile, navTo, initCaptions } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadChannel, loadChannels } from '../../core/app-api.js';
+import { loadChannel, loadChannels, loadAlbum, mediaUrl } from '../../core/app-api.js';
 import { tickedOffset, channelPercent } from '../../core/channels.js';
 import { isBehindLive, shouldRetune, upNextTitle, channelRecord, identLabel, flipTarget, channelIds } from '../../core/channel-player.js';
+import { cardView, cardStatus, laterText, CARD_SECONDS, CARD_LOOKAHEAD } from '../../core/channel-card.js';
+import { bedTracks, bedAt, bedCredit, bedSrcName } from '../../core/channel-bed.js';
 import { channelVideoContext } from '../../core/video-page-config.js';
 import { playerCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
@@ -38,11 +40,22 @@ import { mountBreadcrumb } from './breadcrumb.js';
 // here POSTs /api/progress, and `#btn-clear-progress` is hidden — a channel
 // writes nothing, so there is nothing to clear, and offering it would let a
 // tune-in wipe the deliberate resume position the viewer has in that same item.
+//
+// TASK-565 adds THE GAP — the card between items, the same card holding an
+// off-air channel, and the music bed under both (decisions 8, 12 and 13). The
+// card's own model is core/channel-card.js and the bed's is core/channel-bed.js;
+// what lives here is when the card goes up, when it comes down, and the DOM.
 
 var SERVER = window.location.origin;
 // The chrome re-renders every second: the marker is wrong within a second of
 // paint otherwise, which is the same reason the strip's own card ticks.
 var TICK_MS = 1000;
+// How often a HELD channel asks whether it is back. Only the off-air card waits
+// on this — everything else moves on its own event — so it is sized for a viewer
+// sitting in front of a holding card rather than for the clock: half a minute is
+// soon enough not to feel stuck, and rare enough that a channel left off air
+// overnight is not polling every second until morning.
+var OFF_AIR_POLL_MS = 30000;
 // The volume rocker, and nothing else (decision 15). Claimed HERE rather than in
 // the shared player because they are printable characters: unclaimed they type
 // into a focused field, so only channel mode may take them. TASK-556 allocates
@@ -72,6 +85,18 @@ export function initChannelPage() {
   var loadedId = null;
   var retuning = false;
   var ids = [];
+  // Whether a card is on screen. Read by the context push, so the phone's
+  // now-playing line says what the TV is actually showing rather than the title
+  // of the programme that just finished.
+  var cardUp = false;
+  // The bed's tracks, and the album they came from. A channel names its bed once
+  // in its config, and a flip is a fresh page, so this is loaded once and never
+  // swapped — but the guard is on the ID rather than on emptiness, so a channel
+  // whose album resolves to nothing playable does not re-fetch on every card.
+  var bedList = [];
+  var bedAlbum = null;
+  var bedSeek = 0;
+  var bedEl = document.getElementById('channel-bed');
 
   function elapsedSeconds() { return (Date.now() - detailAt) / 1000; }
   // Where the CHANNEL is, right now. Same clock the strip's cards run on.
@@ -113,19 +138,135 @@ export function initChannelPage() {
       [channelRecord(detail)].filter(Boolean).concat([{}])[0].title));
   }
 
+  // TASK-565 — the phone is told what the CARD says while one is up, and
+  // nothing while a programme plays. Two answers from one place, so the two
+  // surfaces cannot disagree about what the television is showing.
+  var CARD_LINE = {
+    'true': function() { return cardStatus(detail); },
+    'false': function() { return null; }
+  };
   function sendChannelContext() {
     [wsApp].filter(Boolean).forEach(function(ws) {
-      ws.sendContext(channelVideoContext(player.currentVideoDisplay(), crumbSource()));
+      ws.sendContext(channelVideoContext(player.currentVideoDisplay(), crumbSource(), CARD_LINE[cardUp + '']()));
     });
   }
 
-  // Nothing on. The strip's card already says "Off air" and when the channel is
-  // back, and browse refuses to open an off-air card at all — so this is the
-  // race (a channel that went off air in the thirty seconds since its card was
-  // drawn) and the end of the night's programme. Both land the viewer back on
-  // the Channels tab rather than on a black screen. The card between items and
-  // the music bed that will one day fill dead air are TASK-565.
-  function leaveOffAir() { navTo('browse.html', { tab: 'channels' }); }
+  // ── THE BED (decision 13, stories 3 and 4) ────────────────────────────────
+  //
+  // ⚠️ IT RUNS ON ITS OWN WALL CLOCK AND IS NEVER RESTARTED PER CARD. Every
+  // start is a lookup of where the album is RIGHT NOW (core/channel-bed.js),
+  // never a play from zero — otherwise you hear the first eight seconds of the
+  // same track forever, which is the jingle problem in disguise. Story 4 is how
+  // that is observable: two cards in a row, and the second carries on.
+  // A track that is already loaded is SEEKED, never re-sourced: re-setting the
+  // same src restarts the fetch and audibly gaps the bed when two cards land
+  // inside one track. A different track sets the src and lets `loadedmetadata`
+  // do the seek, because a position set before the metadata lands does not stick.
+  var BED_LOAD = {
+    'true': function(url) { bedEl.src = url; },
+    'false': function() { bedEl.currentTime = bedSeek; }
+  };
+  function renderCredit(track) {
+    var el = document.getElementById('card-credit');
+    el.textContent = '♪ ' + bedCredit(track);
+    el.classList.remove('hidden');
+  }
+  function playBed(spot) {
+    var url = mediaUrl(SERVER, bedSrcName(spot.track));
+    bedSeek = spot.offset;
+    BED_LOAD[(bedEl.src !== url) + ''](url);
+    bedEl.play().catch(noop);
+    renderCredit(spot.track);
+  }
+  // Where the album is RIGHT NOW — never a play from zero. An empty bed answers
+  // nothing and the card stays silent, which is what a channel that names no
+  // album is entitled to.
+  function startBed() {
+    [bedAt(bedList, Date.now() / 1000)].filter(Boolean).forEach(playBed);
+  }
+  function stopBed() {
+    bedEl.pause();
+    document.getElementById('card-credit').classList.add('hidden');
+  }
+  // The album landing while a card is ALREADY up — the first gap of a short
+  // opening item can beat the fetch. Without this that card is silent for no
+  // reason the viewer could see, and only the next one has a bed.
+  var BED_LATE = { 'true': startBed, 'false': noop };
+  function applyBed(album) {
+    bedList = bedTracks(album);
+    BED_LATE[cardUp + '']();
+  }
+  function loadBed(id) {
+    bedAlbum = id;
+    loadAlbum(SERVER, id).then(applyBed).catch(noop);
+  }
+  // A channel without a bed is legal and shows a silent card — that is what the
+  // empty filter answers, not an error.
+  function ensureBed() {
+    [detail.bed].filter(Boolean)
+      .filter(function(id) { return id !== bedAlbum; })
+      .forEach(loadBed);
+  }
+
+  // ── THE CARD ──────────────────────────────────────────────────────────────
+  //
+  // One component, two callers (decision 8): the gap between two items, and a
+  // channel with nothing on. What differs is which fields the view carries, so
+  // the render hides what is absent rather than branching on which card it is.
+  function appendRow(line) {
+    var rows = document.getElementById('card-rows');
+    var time = document.createElement('div');
+    time.className = 'card-time';
+    time.textContent = line.time;
+    var title = document.createElement('div');
+    title.className = 'card-title';
+    title.textContent = line.title;
+    rows.appendChild(time);
+    rows.appendChild(title);
+  }
+  function renderCard(view) {
+    document.getElementById('card-label').textContent = view.label;
+    var headline = document.getElementById('card-headline');
+    headline.textContent = [view.headline].filter(Boolean).concat([''])[0];
+    headline.classList.toggle('hidden', !view.headline);
+    var back = document.getElementById('card-return');
+    back.textContent = [view.returnAt].filter(Boolean).concat([''])[0];
+    back.classList.toggle('hidden', !view.returnAt);
+    var rows = document.getElementById('card-rows');
+    rows.textContent = '';
+    view.timed.forEach(appendRow);
+    document.getElementById('card-rule').classList.toggle('hidden', !view.later.length);
+    document.getElementById('card-later-block').classList.toggle('hidden', !view.later.length);
+    document.getElementById('card-later').textContent = laterText(view.later);
+  }
+  function showCard() {
+    cardUp = true;
+    renderCard(cardView(detail));
+    document.getElementById('channel-card').classList.remove('hidden');
+    startBed();
+    sendChannelContext();
+  }
+  function hideCard() {
+    cardUp = false;
+    document.getElementById('channel-card').classList.add('hidden');
+    stopBed();
+  }
+
+  // Stop, and only stop. Escape/Backspace and the phone's own back leave the
+  // channel the way they leave any play — an off-air channel HOLDS on its card
+  // now (below) rather than bouncing the viewer out from under themselves.
+  function leaveChannel() { navTo('browse.html', { tab: 'channels' }); }
+
+  // Nothing on (story 5). The card names when the channel is back, or says off
+  // air and names nothing — a channel between slots with nothing left, one
+  // nobody has regenerated, and one whose programme has run out all arrive here
+  // and there is deliberately no fourth card. The hold is what the viewer sees
+  // when a channel goes off air under them, and when browse's own thirty-second-
+  // old card loses the race; it polls, so the channel coming back tunes itself in.
+  function holdOffAir() {
+    loadedId = null;
+    showCard();
+  }
 
   // A live channel plays the item on air FROM WHERE THE CHANNEL IS — that is
   // what tuning in means, and it is the only start position this mode has.
@@ -138,6 +279,7 @@ export function initChannelPage() {
     'false': function() { player.seekTo(channelSeconds()); }
   };
   function startOnAir() {
+    hideCard();
     var record = channelRecord(detail);
     TUNE[(record.id !== loadedId) + '']();
     loadedId = record.id;
@@ -151,21 +293,26 @@ export function initChannelPage() {
     renderLivePill();
   }
 
-  var ON_AIR = { 'true': startOnAir, 'false': leaveOffAir };
+  var ON_AIR = { 'true': startOnAir, 'false': holdOffAir };
   function applyChannel(answer) {
     retuning = false;
     detail = answer;
     detailAt = Date.now();
     renderIdent();
+    ensureBed();
     ON_AIR[!!channelRecord(answer) + '']();
   }
 
   // THE one way in and the one way on — the first tune-in, the rejoin when an
   // item ends, and Back to live are the same act: ask the channel what is on NOW
   // and start there. Nothing computes where the channel got to on its own.
+  //
+  // The lookahead is the CARD's (TASK-565): three timed lines and an untimed
+  // later list come out of this one answer, so the request asks for both halves
+  // rather than the endpoint's own default of three.
   function rejoin() {
     retuning = true;
-    loadChannel(SERVER, channelId, profile)
+    loadChannel(SERVER, channelId, profile, CARD_LOOKAHEAD)
       .then(applyChannel)
       .catch(function() { retuning = false; });
   }
@@ -174,9 +321,27 @@ export function initChannelPage() {
   // silent black screen. A later failure just leaves the viewer watching and
   // lets the next tick try again.
   function tuneIn() {
-    loadChannel(SERVER, channelId, profile)
+    loadChannel(SERVER, channelId, profile, CARD_LOOKAHEAD)
       .then(applyChannel)
       .catch(function() { navTo('error.html'); });
+  }
+
+  // THE GAP (story 1). The card goes up on the schedule the player is already
+  // holding — which is why it can be drawn the instant an item ends, with
+  // nothing to fetch first — and the player rejoins when it clears.
+  //
+  // ⚠️ THE CHANNEL RUNS THROUGH THE CARD. Nothing is paused: the next programme
+  // is already airing behind it, and the rejoin lands at whatever position the
+  // channel has reached, a few seconds in. That is what a continuity
+  // announcement is, and holding the schedule instead would make the channel a
+  // queue that waits.
+  //
+  // `retuning` is what stops the tick asking again while the card is up; the
+  // rejoin clears it.
+  function interstitial() {
+    retuning = true;
+    showCard();
+    setTimeout(rejoin, CARD_SECONDS * 1000);
   }
 
   // ⚠️ RESTART DOES NOT PAUSE THE CHANNEL (decision 11) — this seeks the VIEWER
@@ -185,7 +350,7 @@ export function initChannelPage() {
   // re-watched. That is the whole point: a clock, not a queue that waits.
   function restart() { player.seekTo(0); }
 
-  var RETUNE = { 'true': rejoin, 'false': noop };
+  var RETUNE = { 'true': interstitial, 'false': noop };
   // Story 5 — the rejoin. Two things ask for it and they are deliberately
   // different questions: the file ENDING always rejoins (that is what a viewer
   // who restarted gets), while the channel's own entry finishing only rejoins a
@@ -202,6 +367,14 @@ export function initChannelPage() {
     RETUNE[[shouldRetune(detail, elapsedSeconds(), behind()), !retuning].every(Boolean) + '']();
   }
 
+  // The one thing that waits on a poll rather than an event: a channel HELD on
+  // its off-air card has no clock of its own to run out, so nothing else would
+  // ever ask whether it is back.
+  var POLL = { 'true': rejoin, 'false': noop };
+  function pollOffAir() {
+    POLL[[cardUp, !detail.on_air, !retuning].every(Boolean) + '']();
+  }
+
   // The rocker flips (decision 15). A flip is a fresh page load of the same
   // player on another channel, so it tunes in from that channel's own answer —
   // there is no state to carry across, which is what makes it a lookup and not a
@@ -216,11 +389,11 @@ export function initChannelPage() {
     // Decision 16 — a channel play records nothing. No position, no completion,
     // no clobbering a deliberate resume with a tune-in fragment.
     savesProgress: false,
-    onStop: leaveOffAir,
-    // The end of the item the viewer was actually watching. Always a rejoin,
+    onStop: leaveChannel,
+    // The end of the item the viewer was actually watching. Always the gap,
     // whether they sat through it level with the channel or restarted it and
-    // finished late.
-    onEnded: rejoin,
+    // finished late — and the card is what covers the join either way.
+    onEnded: interstitial,
     // ⏮/⏭ are hidden in channel mode (setSeriesMode below), so nothing fires
     // these — the rocker is what moves between channels, and there is no
     // previous or next ITEM to step to on a schedule.
@@ -251,6 +424,13 @@ export function initChannelPage() {
   player.setSeriesMode(false);
   document.getElementById('btn-restart').addEventListener('click', restart);
   document.getElementById('btn-live').addEventListener('click', rejoin);
+  // A position set before the metadata lands does not stick, so the seek the bed
+  // needs happens once the track is actually loaded.
+  bedEl.addEventListener('loadedmetadata', function() { bedEl.currentTime = bedSeek; });
+  // The bed track running out under a card that is still up. Asking the clock
+  // again lands at the start of the next track, so the album carries on rather
+  // than the card falling silent.
+  bedEl.addEventListener('ended', startBed);
 
   var KEY_TARGET = function(e) { player.handleVideoKey(e); };
   var keys = {};
@@ -296,4 +476,5 @@ export function initChannelPage() {
 
   initCaptions(SERVER).then(tuneIn);
   setInterval(tick, TICK_MS);
+  setInterval(pollOffAir, OFF_AIR_POLL_MS);
 }

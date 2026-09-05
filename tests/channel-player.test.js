@@ -284,6 +284,12 @@ test.describe('tuned into a channel', () => {
 
   // Story 5 — the channel does not wait. Finishing the item asks what is on NOW
   // and joins that, which is what makes restarting cost you the difference.
+  //
+  // TASK-565 put the interstitial card in that join, so the rejoin lands when
+  // the card clears rather than on the `ended` event itself — the clock is faked
+  // so the wait costs no test time. The card's own behaviour is
+  // tests/channel-interstitial.test.js; what matters here is that the join still
+  // happens and still asks the endpoint rather than stepping a list.
   test('the end of the item rejoins wherever the channel has got to', async ({ page }) => {
     await openChannel(page, 'cartoon-club');
     await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e22/);
@@ -293,7 +299,9 @@ test.describe('tuned into a channel', () => {
       item: { item_id: 'duggee-s1e04', title: 'Hey Duggee', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null },
       offset_seconds: 40, runtime_seconds: 420
     })));
+    await page.clock.install();
     await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
+    await page.clock.fastForward(8000);
     await expect(page.locator('#video')).toHaveAttribute('src', /duggee-s1e04/);
   });
 
@@ -322,13 +330,19 @@ test.describe('a channel with nothing on', () => {
   // The player never sits on a black screen. Browse refuses to open an off-air
   // card at all (below), so this is the race — a channel that went off air in
   // the thirty seconds since its card was drawn — and the end of the night.
-  test('an off-air channel returns to the Channels tab', async ({ page }) => {
+  //
+  // ⚠️ TASK-564 dropped the viewer back to browse here; TASK-565 HOLDS on the
+  // off-air card instead (story 5, decision 8's one component with two callers),
+  // and the card's own behaviour is tests/channel-interstitial.test.js. What is
+  // asserted here is only that the player stays put and says why.
+  test('an off-air channel holds on its card rather than emptying the player', async ({ page }) => {
     await withChannel(page, DETAIL_OFF_AIR);
     await page.goto('/app/homeview/profile.html');
     await pickPerson(page, 'kids');
     await expect(page.locator('#screen-browse')).toBeVisible();
     await page.goto('/app/homeview/video.html?channel=after-dark');
-    await expect(page).toHaveURL(/browse\.html\?tab=channels/);
+    await expect(page.locator('#channel-card')).toBeVisible();
+    await expect(page).toHaveURL(/video\.html/);
   });
 
   // A channel nobody wrote, or one this profile may not see — one refusal on

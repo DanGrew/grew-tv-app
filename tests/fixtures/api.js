@@ -371,16 +371,38 @@ const CHANNEL_OFF_AIR_PLAIN = Object.assign({}, CHANNEL_OFF_AIR_TIMED, {
 // player needs beyond it. Built by extending the line rather than restating it,
 // so the two routes cannot drift apart here the way they cannot on the backend
 // (api/channels.py `_detail` is literally `_on_now` plus these five keys).
+// TASK-565 — the card needs a lookahead the strip never asks for: three timed
+// lines and an untimed later list come out of ONE answer
+// (core/channel-card.js CARD_LOOKAHEAD), so there are seven entries here rather
+// than the one the player alone needed. Seven-minute slots, back to back, the
+// way channel_schedule actually writes them out — an item is pulled when the
+// previous one ENDS, so each `starts_at` is the one before it's `ends_at`.
+function channelEntry(id, title, startsAt, endsAt) {
+  return {
+    item: { item_id: id, title: title, poster: null, itemType: 'episode', ext: 'mp4', subtitles: null },
+    tag: 'preschool', starts_at: startsAt, ends_at: endsAt
+  };
+}
+const CHANNEL_NEXT = [
+  channelEntry('duggee-s1e04', 'Hey Duggee',          '2026-09-04T17:08:00', '2026-09-04T17:15:00'),
+  channelEntry('bluey-s1e12',  'Bob Bilby',           '2026-09-04T17:15:00', '2026-09-04T17:22:00'),
+  channelEntry('bluey-s1e21',  'Neighbours',          '2026-09-04T17:22:00', '2026-09-04T17:29:00'),
+  channelEntry('bluey-s1e01',  'The Magic Xylophone', '2026-09-04T17:29:00', '2026-09-04T17:36:00'),
+  channelEntry('bluey-s1e03',  'Keepy Uppy',          '2026-09-04T17:36:00', '2026-09-04T17:43:00'),
+  channelEntry('bluey-s1e04',  'Daddy Robot',         '2026-09-04T17:43:00', '2026-09-04T17:50:00'),
+  channelEntry('bluey-s1e05',  'Shadowlands',         '2026-09-04T17:50:00', '2026-09-04T17:57:00')
+];
 function channelDetailResponse(line) {
   return Object.assign({}, line, {
-    bed: null,
+    // TASK-565 — a channel that names an album as its bed, because a card with a
+    // bed is the shipping shape and a silent one the exception. `ootb` is the
+    // one album with a resolvable /api/album detail here, so the bed's tracks
+    // resolve through the same route the music player already uses.
+    bed: 'ootb',
     tag: 'preschool',
     started_at: '2026-09-04T17:00:00',
     ends_at: '2026-09-04T17:08:00',
-    next: [{
-      item: { item_id: 'duggee-s1e04', title: 'Hey Duggee', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null },
-      tag: 'preschool', starts_at: '2026-09-04T17:08:00', ends_at: '2026-09-04T17:15:00'
-    }]
+    next: CHANNEL_NEXT
   });
 }
 const CHANNEL_DETAIL = channelDetailResponse(CHANNEL_ON_AIR);
@@ -1361,5 +1383,5 @@ module.exports = {
   // shape test can exercise the exact objects the routes above emit.
   browseResponse, videoResponse, albumResponse, playlistResponse, continueWatchingResponse, midWatchRows,
   channelsResponse, CHANNEL_ON_AIR, CHANNEL_OFF_AIR_TIMED, CHANNEL_OFF_AIR_PLAIN,
-  channelDetailResponse, CHANNEL_DETAIL, CHANNEL_DETAIL_OFF_AIR
+  channelDetailResponse, CHANNEL_DETAIL, CHANNEL_DETAIL_OFF_AIR, CHANNEL_NEXT
 };
