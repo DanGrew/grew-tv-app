@@ -2,8 +2,8 @@ import {
   CHANNEL_KIND, CHANNELS_TAB,
   minutesLabel, positionLabel, tickedOffset, channelPercent, returnTimeLabel,
   itemTitle, channelCardView, channelTile, channelTiles, channelRails,
-  channelsById, hasChannels, withChannelsTab, landingTab,
-  tileVariant, CHANNEL_TILE, LIBRARY_TILE
+  channelsById, hasChannels, withChannelsTab, landingTab, browseRestore,
+  tileVariant, CHANNEL_TILE, LIBRARY_TILE, CHANNELS_RAIL
 } from '../../core/channels.js';
 
 // FEAT-560/TASK-563 — the Channels tab's model. The card TICKS and the strip's
@@ -341,5 +341,36 @@ describe('landingTab', () => {
   it('is undefined with no tabs at all', () => {
     expect(landingTab([], null, null, [])).toBe(undefined);
     expect(landingTab(null, null, null, [])).toBe(undefined);
+  });
+});
+
+// TASK-564 — reopening the companion's browse drill from a recorded trail
+// entry. Channels is the section where the recorded entry and the phone's own
+// screen disagree: the entry names the tab alone, because it is also what a
+// later breadcrumb press sends the TV to, and the TV's channels screen is a
+// browse tab rather than a rail-grid. The phone's is a grid, so the tab has to
+// name the rail back — otherwise the phone reopens on the rail level and draws
+// the pager's dots over no title and no cards.
+describe('browseRestore', () => {
+  it('reopens Channels on its cards, from the tab alone', () => {
+    expect(browseRestore({ tab: 'channels' })).toEqual({ section: 'channels', rail: CHANNELS_RAIL, level: 'grid' });
+  });
+
+  it('names the channels rail even when the entry recorded one', () => {
+    expect(browseRestore({ tab: 'channels', rail: 'channels' }).level).toBe('grid');
+  });
+
+  it('reopens any other section on its recorded rail', () => {
+    expect(browseRestore({ tab: 'series', rail: 'genre:animation' }))
+      .toEqual({ section: 'series', rail: 'genre:animation', level: 'grid' });
+  });
+
+  it('reopens a tab with no rail on that section rails', () => {
+    expect(browseRestore({ tab: 'films' })).toEqual({ section: 'films', rail: null, level: 'rails' });
+  });
+
+  it('reopens an empty entry at the sections root', () => {
+    expect(browseRestore({})).toEqual({ section: null, rail: null, level: 'sections' });
+    expect(browseRestore(null)).toEqual({ section: null, rail: null, level: 'sections' });
   });
 });
