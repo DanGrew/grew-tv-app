@@ -29,6 +29,7 @@ export var CHANNELS_TAB = { id: 'channels', title: 'Channels' };
 
 // The one rail on that tab. Not a catalog rail — a small fixed strip that needs
 // no paging (decision 17), which is why FEAT-547 doesn't gate this.
+export var CHANNELS_RAIL = 'channels';
 var RAIL_TITLE = 'On now';
 
 var OFF_AIR = 'Off air';
@@ -162,7 +163,7 @@ export function channelTiles(lines) {
 // The Channels tab's rails: one strip, or none at all.
 export function channelRails(lines) {
   var tiles = channelTiles(lines);
-  return tiles.length ? [{ id: 'channels', title: RAIL_TITLE, items: tiles }] : [];
+  return tiles.length ? [{ id: CHANNELS_RAIL, title: RAIL_TITLE, items: tiles }] : [];
 }
 
 // Which renderer a browse card takes. A channel card has its own on both
@@ -214,4 +215,26 @@ export function landingTab(tabIds, requestedTab, lastTab, lines) {
   if (hasChannels(lines) && known(CHANNELS_TAB.id)) return CHANNELS_TAB.id;
   if (known(lastTab)) return lastTab;
   return ids[0];
+}
+
+// TASK-564 — where the companion's browse drill reopens from a recorded trail
+// entry. A recorded entry is TWO things at once: the position the phone reopens
+// at, and the target a later breadcrumb press sends the TV to. For every other
+// section those agree, because both surfaces show a rail's items on a
+// `rail-grid` page. Channels is the one section where they don't (decision 10 —
+// it is a browse TAB on the TV, with no rail-grid behind it), so its entry
+// names the tab alone; restoring that literally left the phone on the rail
+// level, showing the pager's dots over no title and no cards.
+//
+// The tab is enough to name the rail back, because the section has exactly one.
+// Every other entry restores as it always did: a rail means the grid, a tab
+// alone means that section's rails, neither means the sections root.
+export function browseRestore(params) {
+  var p = params || {};
+  var tab = p.tab || null;
+  var rail = p.rail || null;
+  if (tab === CHANNELS_TAB.id) return { section: tab, rail: CHANNELS_RAIL, level: 'grid' };
+  if (rail) return { section: tab, rail: rail, level: 'grid' };
+  if (tab) return { section: tab, rail: null, level: 'rails' };
+  return { section: null, rail: null, level: 'sections' };
 }

@@ -213,6 +213,29 @@ test.describe('the companion mirror', () => {
     expect(intents.find(i => i.intent === 'select').params.id).toBe('channel:cartoon-club');
   });
 
+  // TASK-564 — pressing the player's "Channels" crumb on the phone. The crumb
+  // trims the trail to the recorded channels entry and both surfaces reload
+  // onto browse; the phone rebuilds its position from that entry, which names
+  // the tab and no rail (the TV's channels screen is a browse tab, so the crumb
+  // cannot name a rail-grid). The phone's own channels screen is a grid, and it
+  // has to come back with the cards on it — it came back on the rail level,
+  // drawing the pager's dots over an empty screen with no title.
+  test('coming back to Channels lands on the cards, not an empty rail', async ({ page }) => {
+    await installApi(page);
+    await withChannels(page, [ON_AIR, OFF_AIR_TIMED]);
+    await mockApp(page);
+    await page.addInitScript(() => {
+      sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
+        { page: 'browse.html', params: { tab: 'channels' }, label: 'Channels' }
+      ]));
+    });
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('.ph-chan')).toHaveCount(2);
+    await expect(page.locator('#pager-name')).toHaveText('On now');
+    await expect(page.locator('#grid-wrap')).toBeVisible();
+    await expect(page.locator('.dock-tab[data-section="channels"]')).toHaveClass(/active/);
+  });
+
   test('no channels means no Channels tab on the phone either', async ({ page }) => {
     await installApi(page);
     await withChannels(page, []);

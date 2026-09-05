@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadBrowse, loadContinueWatching, loadTracks, loadEpisodes, loadChannels } from '../../core/app-api.js';
-import { withChannelsTab, channelsById, channelCardView, tileVariant, CHANNELS_TAB } from '../../core/channels.js';
+import { withChannelsTab, channelsById, channelCardView, tileVariant, browseRestore, CHANNELS_TAB, CHANNELS_RAIL } from '../../core/channels.js';
 import { queueAdd, queueAddStatus, itemMediaType } from '../../core/queue-shell-config.js';
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { CONTINUE_TYPES, continueTarget } from '../../core/browse-continue.js';
@@ -470,10 +470,16 @@ export function initPage() {
   function browseTrailEntry() {
     return entriesTrail().filter(function(e) { return e.page === 'browse.html'; }).slice(-1)[0];
   }
+  // TASK-564 — core decides which level a recorded entry reopens at, because
+  // Channels records its position without a rail (its crumb has to point the TV
+  // at a browse tab, not a rail-grid it does not have) while the phone's own
+  // channels screen IS a grid. Reading the entry literally landed the phone on
+  // the rail level: the pager's dots over no title and no cards.
   function seedFromTrail(entry) {
-    state.section = [entry.params.tab].filter(Boolean).concat([null])[0];
-    state.rail = [entry.params.rail].filter(Boolean).concat([null])[0];
-    state.level = ({ true: 'grid', false: SECTION_LEVEL[Boolean(entry.params.tab)] })[Boolean(entry.params.rail)];
+    var pos = browseRestore(entry.params);
+    state.section = pos.section;
+    state.rail = pos.rail;
+    state.level = pos.level;
   }
 
   // Seeding the level locally is not enough: a tile tap emits `select`, which the
@@ -610,8 +616,8 @@ export function initPage() {
   // routes. The mirror invariant is that both surfaces carry the feature, not
   // that they navigate identically.
   function selectChannels() {
-    api.sendIntent('navigate', { page: 'browse.html', params: { tab: 'channels' } });
-    applyGrid('channels', 'channels');
+    api.sendIntent('navigate', { page: 'browse.html', params: { tab: CHANNELS_TAB.id } });
+    applyGrid(CHANNELS_TAB.id, CHANNELS_RAIL);
   }
 
   var SECTION_ROUTE = { channels: selectChannels };
