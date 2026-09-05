@@ -8,6 +8,7 @@ import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute, artistTiles } from '../../core/home-rails.js';
+import { channelTiles } from '../../core/channels.js';
 import { mountSearch } from './screen-search.js';
 import { mountContinueMenu } from './continue-menu.js';
 import { continueTarget } from '../../core/browse-continue.js';
@@ -18,6 +19,8 @@ var SERVER = window.location.origin;
 var LAST_TILE_KEY = 'grew-tv:last-tile';
 var LAST_TAB_KEY = 'grew-tv:last-tab';
 var ACTIVATE_KEYS = { Enter: true, ' ': true };
+
+function noop() {}
 
 export function initBrowsePage() {
   // TASK-501 (FEAT-497) — Continue, one button per media type, in a play menu
@@ -229,15 +232,21 @@ export function initBrowsePage() {
     // this route is a plain lookup, no branch, same shape as every other
     // entry here.
     'play-all': function(card) { navTo('home-movies-list.html', Object.assign({ from: 'browse' }, card.navParams)); },
-    // TASK-563 — a channel card is DELIBERATELY INERT until TASK-564 (owner,
-    // 2026-09-04: unwired is fine, broken is not). Picking one does nothing yet.
+    // FEAT-560/TASK-564 — picking a channel tunes the player into it.
+    // `navParams` (core/channels.js) carries the channel id and nothing else:
+    // the player asks the endpoint itself where the channel has got to, so a
+    // position that was true when this card was drawn can never be handed on
+    // through a URL and played as if it were still true.
     //
-    // It is a row here rather than an omission for two reasons: arch-check's
-    // no-missing-card-route requires every CARD_ROUTES value to be dispatched,
-    // and leaving it out would make a press fall through the unknown-route guard
-    // below — indistinguishable from a bug. TASK-564 replaces this body with the
-    // navigation; `navParams` (core/channels.js) already carries what it needs.
-    channel: function() {}
+    // An OFF-AIR channel goes nowhere. Its card already says "Off air" and when
+    // the channel is back, so the press has nothing to add and a player with
+    // nothing to play would only bounce the viewer straight back. The card
+    // between items, which is what will eventually fill dead air, is TASK-565.
+    channel: function(card) { CHANNEL_PRESS[!!card.line.on_air + ''](card); }
+  };
+  var CHANNEL_PRESS = {
+    'true':  function(card) { navTo('video.html', Object.assign({ from: 'browse' }, card.navParams)); },
+    'false': noop
   };
 
   // cardRoute (core) gives 'album' for a music card else the card's kind;
@@ -260,9 +269,22 @@ export function initBrowsePage() {
   // — the tab going blank because one request lost the LAN is worse than a card
   // that is thirty seconds stale.
   var CHANNEL_POLL_MS = 30000;
+  // TASK-564 — a channel tile has to be in the catalog like every other card the
+  // companion can press: the phone's tap carries an id and the TV resolves it
+  // here, and a channel tile is not a browse card so nothing else registers one.
+  // Re-registered on every poll rather than once, because the LINE is what a
+  // press reads (whether the channel is on air, above), and that goes stale in
+  // exactly the thirty seconds the poll exists to close.
+  function registerChannels(lines) {
+    channelTiles(lines).forEach(function(tile) { catalog[tile.id] = tile; });
+  }
+  function applyChannels(lines) {
+    registerChannels(lines);
+    updateChannels(lines);
+  }
   function pollChannels() {
     loadChannels(SERVER, profile)
-      .then(function(res) { updateChannels([res.channels].filter(Boolean).concat([[]])[0]); })
+      .then(function(res) { applyChannels([res.channels].filter(Boolean).concat([[]])[0]); })
       .catch(function() {});
   }
 
@@ -302,6 +324,7 @@ export function initBrowsePage() {
       // sits between them: an explicit crumb still wins, but "opening the TV shows
       // what's on" (decision 10) outranks a remembered tab.
       var channels = [res[3].channels].filter(Boolean).concat([[]])[0];
+      registerChannels(channels);
       renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, getParam('tab'), onQueue, createPlaylist, recents, showPlayAll, channels, sessionStorage.getItem(LAST_TAB_KEY));
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
       continueMenu.refresh();

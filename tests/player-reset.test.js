@@ -2,16 +2,22 @@ const { test, expect } = require('@playwright/test');
 const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
-// TASK-142: a single Reset control in the player clears this item's backend
+// TASK-142: a single Clear progress control in the player clears this item's backend
 // progress for the active person, then exits. Covers films/episodes (video
 // player) and tracks (audio player) — everything direct-play goes through a
 // player, so one button per player covers it all. Two-press confirm (arm ->
-// "Reset?" -> fire) guards a mis-tap; the reset DELETEs and navigates away.
+// "Clear progress?" -> fire) guards a mis-tap; it DELETEs and navigates away.
+//
+// TASK-564 renamed the control from "Reset" (`#btn-reset`): the video player now
+// carries a Restart pill for channel mode, and two pills a word apart in the
+// same row is exactly the confusion story 8 was about. "Reset" never said what
+// it reset — only its aria-label did — so the label is what changed, on both
+// players and both mirrors at once.
 //
 // A film is engine-driven now (FEAT-040/TASK-251: play-video -> video_playback
-// snapshot -> playVideo sets the <video> src AND currentVideo, the record Reset
+// snapshot -> playVideo sets the <video> src AND currentVideo, the record Clear progress
 // DELETEs). So the video tests install the VIDEO playback backend; without it the
-// film never loads, currentVideo stays null, and Reset exits WITHOUT a DELETE
+// film never loads, currentVideo stays null, and Clear progress exits WITHOUT a DELETE
 // (the failure this suite hit). Its WS route is registered after the beforeEach
 // ones, so it wins for these tests (Playwright matches most-recent-first).
 
@@ -48,15 +54,15 @@ async function captureProgress(page) {
   return () => calls;
 }
 
-test('video player shows a Reset control', async ({ page }) => {
+test('video player shows a Clear progress control', async ({ page }) => {
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="films"]').click();
   await page.locator(`.film-tile[data-id="${FILM}"]`).first().click();
   await expect(page.locator('#screen-video')).toBeVisible();
-  await expect(page.locator('#btn-reset')).toBeVisible();
+  await expect(page.locator('#btn-clear-progress')).toBeVisible();
 });
 
-test('video Reset needs two presses, DELETEs progress, then exits the player', async ({ page }) => {
+test('video Clear progress needs two presses, DELETEs progress, then exits the player', async ({ page }) => {
   await installQueuePlaybackBackend(page, 'film');
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="films"]').click();
@@ -64,20 +70,20 @@ test('video Reset needs two presses, DELETEs progress, then exits the player', a
   await expect(page.locator('#screen-video')).toBeVisible();
   // #screen-video is in the static HTML, so toBeVisible passes before the film
   // loads. Wait for the <video> src to land: that proves the play-video snapshot
-  // ran playVideo, which sets currentVideo — the record Reset DELETEs (without it
-  // Reset exits with nothing to delete). It also means init's onEnter focus has
-  // already happened, so it can't blur-disarm the Reset later (BUG-019: await the
+  // ran playVideo, which sets currentVideo — the record Clear progress DELETEs (without it
+  // Clear progress exits with nothing to delete). It also means init's onEnter focus has
+  // already happened, so it can't blur-disarm the pill later (BUG-019: await the
   // real post-load settle signal, not a static element).
   await expect(page.locator('#video')).toHaveAttribute('src', /toy-story-main\.mp4/);
   const methods = await captureProgress(page);
   // Keep the controls up before arming (they auto-hide 3s after the last input). A
-  // d-pad key re-kicks that timer right before we arm (an armed Reset also
+  // d-pad key re-kicks that timer right before we arm (an armed Clear progress also
   // suppresses the hide), so the auto-hide can't blur-disarm it mid-test.
   await page.locator('#screen-video').click();
   await page.keyboard.press('ArrowDown');
-  const reset = page.locator('#btn-reset');
+  const reset = page.locator('#btn-clear-progress');
   await reset.click();
-  await expect(reset).toHaveText('Reset?');
+  await expect(reset).toHaveText('Clear progress?');
   expect(methods()).not.toContain('DELETE');
   // The second press fires the DELETE then immediately navigates away
   // (resetAndExit doesn't await resetProgress before stopPlayback's nav). The nav
@@ -86,11 +92,11 @@ test('video Reset needs two presses, DELETEs progress, then exits the player', a
   const deleteFired = page.waitForRequest(r => r.url().includes('/api/progress/') && r.method() === 'DELETE');
   await reset.click();
   await deleteFired;
-  // Reset exits the player back to where it came from.
+  // Clear progress exits the player back to where it came from.
   await expect(page.locator('#screen-video')).not.toBeVisible();
 });
 
-test('blurring an armed video Reset disarms it', async ({ page }) => {
+test('blurring an armed video Clear progress disarms it', async ({ page }) => {
   await installQueuePlaybackBackend(page, 'film');
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="films"]').click();
@@ -101,18 +107,18 @@ test('blurring an armed video Reset disarms it', async ({ page }) => {
   // below; we want OUR focus(play-pause) to be the blur that disarms it (BUG-019).
   await expect(page.locator('#video')).toHaveAttribute('src', /toy-story-main\.mp4/);
   // Re-kick the 3s controls auto-hide before arming so it can't blur-disarm the
-  // Reset under us — we want the BLUR from focusing play-pause to be the only
+  // pill under us — we want the BLUR from focusing play-pause to be the only
   // thing that disarms it (BUG-019).
   await page.locator('#screen-video').click();
   await page.keyboard.press('ArrowDown');
-  const reset = page.locator('#btn-reset');
+  const reset = page.locator('#btn-clear-progress');
   await reset.click();
-  await expect(reset).toHaveText('Reset?');
+  await expect(reset).toHaveText('Clear progress?');
   await page.locator('#btn-play-pause').focus();
-  await expect(reset).toHaveText('Reset');
+  await expect(reset).toHaveText('Clear progress');
 });
 
-test('audio player shows a Reset control', async ({ page }) => {
+test('audio player shows a Clear progress control', async ({ page }) => {
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();
@@ -121,10 +127,10 @@ test('audio player shows a Reset control', async ({ page }) => {
   // TASK-187: entry is now two async `playback` actions — wait for the track to
   // land so a late snapshot can't repaint over the assert.
   await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
-  await expect(page.locator('#btn-reset')).toBeVisible();
+  await expect(page.locator('#btn-clear-progress')).toBeVisible();
 });
 
-test('audio Reset needs two presses, DELETEs progress, then exits the player', async ({ page }) => {
+test('audio Clear progress needs two presses, DELETEs progress, then exits the player', async ({ page }) => {
   await enterKids(page);
   await page.locator('.sidebar-tab[data-tab="music"]').click();
   await page.locator('.film-tile[data-id="ootb"]').click();
@@ -132,14 +138,14 @@ test('audio Reset needs two presses, DELETEs progress, then exits the player', a
   await expect(page.locator('#screen-audio')).toBeVisible();
   // TASK-187: entry is now two async `playback` actions. Wait for the track to
   // land (so a late snapshot can't repaint mid-interaction), then summon the
-  // transport — a d-pad key resets the auto-hide timer so the armed Reset button
+  // transport — a d-pad key resets the auto-hide timer so the armed Clear progress button
   // isn't blurred, and silently disarmed, by the controls hiding under us.
   await expect(page.locator('#audio-title')).toHaveText('Mr. Blue Sky');
   await page.keyboard.press('ArrowDown');
   const methods = await captureProgress(page);
-  const reset = page.locator('#btn-reset');
+  const reset = page.locator('#btn-clear-progress');
   await reset.click();
-  await expect(reset).toHaveText('Reset?');
+  await expect(reset).toHaveText('Clear progress?');
   expect(methods()).not.toContain('DELETE');
   // Wait for the DELETE request event — reset exits immediately, so the nav can
   // abort the in-flight request before our route records the method (as in video).

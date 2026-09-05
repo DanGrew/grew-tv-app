@@ -1,8 +1,10 @@
 const { test, expect } = require('@playwright/test');
 const { installApi } = require('./fixtures/api.js');
 
-// TASK-142 companion mirror: a Reset control on the companion player sends the
-// `reset` intent to the TV, which clears this item's progress and exits the
+// TASK-142 companion mirror: a Clear progress control on the companion player
+// (labelled "Reset" until TASK-564 renamed it on all four surfaces at once —
+// the TV video player now carries a Restart pill it must not read like) sends
+// the `reset` INTENT to the TV, which clears this item's progress and exits the
 // player. Two-tap confirm guards a mis-tap. The mock app answers `reset` by
 // teleporting the TV to browse (the real app exits the player), and the
 // companion follows the echoed context — so a successful reset navigates the
@@ -33,15 +35,15 @@ function mockApp(page, ctx0, st, title) {
 const VIDEO_ST = { screen: 'player', itemId: 'toy-story-main', episodeId: 'toy-story-main', positionSec: 120, durationSec: 4800, playing: true, profile: 'kids' };
 const AUDIO_ST = { screen: 'player', itemId: 'ootb', episodeId: 'ootb-02', positionSec: 110, durationSec: 245, playing: true, profile: 'kids', shuffle: false };
 
-test('companion video Reset: two-tap arms then sends reset; TV exits and companion follows', async ({ page }) => {
+test('companion video Clear progress: two-tap arms then sends reset; TV exits and companion follows', async ({ page }) => {
   await installApi(page);
   await mockApp(page, 'video', VIDEO_ST, 'Toy Story');
   await page.goto('/companion/video.html');
   const reset = page.locator('#c-reset');
-  await expect(reset).toHaveText('↻ Reset');
+  await expect(reset).toHaveText('↻ Clear progress');
   // First tap arms — confirm prompt, no navigation.
   await reset.click();
-  await expect(reset).toHaveText('↻ Reset?');
+  await expect(reset).toHaveText('↻ Clear progress?');
   await expect(reset).toHaveClass(/confirm/);
   await expect(page).toHaveURL(/video\.html/);
   // Second tap fires the reset intent — the TV exits and the companion follows.
@@ -49,14 +51,14 @@ test('companion video Reset: two-tap arms then sends reset; TV exits and compani
   await expect(page).toHaveURL(/browse\.html/);
 });
 
-test('companion audio Reset: two-tap arms then sends reset; TV exits and companion follows', async ({ page }) => {
+test('companion audio Clear progress: two-tap arms then sends reset; TV exits and companion follows', async ({ page }) => {
   await installApi(page);
   await mockApp(page, 'audio', AUDIO_ST, 'Mr. Blue Sky');
   await page.goto('/companion/audio.html');
   const reset = page.locator('#c-reset');
-  await expect(reset).toHaveText('↻ Reset');
+  await expect(reset).toHaveText('↻ Clear progress');
   await reset.click();
-  await expect(reset).toHaveText('↻ Reset?');
+  await expect(reset).toHaveText('↻ Clear progress?');
   await expect(reset).toHaveClass(/confirm/);
   await expect(page).toHaveURL(/audio\.html/);
   await reset.click();

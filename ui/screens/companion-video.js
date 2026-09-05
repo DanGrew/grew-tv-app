@@ -63,9 +63,14 @@ export function initPage() {
     reset: document.getElementById('c-reset'),
     night: document.getElementById('c-night'),
     queue: document.getElementById('c-queue'),
-    addPlaylist: document.getElementById('c-add-playlist')
+    addPlaylist: document.getElementById('c-add-playlist'),
+    // TASK-564 — channel mode's own row and its two controls.
+    channelRow: document.getElementById('channel-row'),
+    queueRow: document.getElementById('queue-row'),
+    restart: document.getElementById('c-restart'),
+    live: document.getElementById('c-live')
   };
-  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, homeMovie: false, film: false, series: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '', mvSource: null } };
+  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, homeMovie: false, film: false, series: false, channel: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '', mvSource: null, channelSource: null } };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -124,8 +129,16 @@ export function initPage() {
   // context (state.crumb.mvSource); null degrades to Home > leaf (story 4).
   function mvCrumbs() { return playerCrumbs(null, state.crumb.mvSource, state.crumb.videoTitle); }
   var CRUMBS_BY_MODE = { true: mvCrumbs, false: nonMvCrumbs };
+  function queueCrumbs() { return CRUMBS_BY_MODE[state.musicVideo](); }
+  // TASK-564 — a channel names the CHANNEL, off the target the TV pushed, and
+  // that crumb returns to the Channels tab. The recorded browse rail is not the
+  // fallback here it is for a queue: it names the rail ("On now") and its target
+  // is a rail-grid page the TV has no channels grid for, so a viewer pressing it
+  // landed on "Nothing here yet".
+  function channelCrumbs() { return playerCrumbs(null, state.crumb.channelSource, state.crumb.videoTitle); }
+  var CRUMBS_BY_SURFACE = { true: channelCrumbs, false: queueCrumbs };
   function mountVideoCrumbs() {
-    mountCompanionBreadcrumb('breadcrumb', CRUMBS_BY_MODE[state.musicVideo](), navigate);
+    mountCompanionBreadcrumb('breadcrumb', CRUMBS_BY_SURFACE[state.channel](), navigate);
   }
   function loadSeriesTitle(seriesId) {
     loadSeries(server, seriesId)
@@ -280,7 +293,16 @@ export function initPage() {
     capturePerson(snap);
     renderControls();
     renderBar();
+    renderLive(snap);
     captureSeries(snap);
+  }
+
+  // TASK-564 — Back to live appears on the phone exactly when it appears on the
+  // TV: while the viewer is behind the channel, off the same answer, carried on
+  // the 1 Hz snapshot the bar already reads. A queue rail never sets the flag,
+  // so the button stays hidden there without a mode check of its own.
+  function renderLive(snap) {
+    els.live.classList.toggle('hidden', !snap.channelBehind);
   }
 
   // TASK-503/505 — the ONE "disabled but visible" helper both the film and the
@@ -372,10 +394,27 @@ export function initPage() {
     },
     'false': function() {}
   };
+  // TASK-564 — CHANNEL MODE on the phone, the mirror of the TV's own
+  // (ui/screens/screen-channel-player.js). A channel has no engine behind it,
+  // so ⏮/⏭/🔀/🔁 go dim rather than sitting live and posting to whichever queue
+  // played last, and the row that offers Queue and Clear progress is replaced by
+  // the channel's own two controls: there is no queue to open, and a channel
+  // records no progress to clear (decision 16) — offering it let a phone wipe a
+  // resume position the viewer set deliberately in that same item, and drop the
+  // TV out of the channel doing it.
+  function applyChannelMode(on) {
+    els.channelRow.classList.toggle('hidden', !on);
+    els.queueRow.classList.toggle('hidden', on);
+    [on].filter(Boolean).forEach(function() { applyTransport(TRANSPORT_DEFAULT); });
+  }
+
   function onVideoContext(payload) {
     els.ctxLabel.textContent = 'Now playing';
     els.title.textContent = displayTitle(payload);
     state.crumb.videoTitle = displayTitle(payload);
+    state.channel = !!payload.channel;
+    state.crumb.channelSource = [payload.channelSource].filter(Boolean).concat([null])[0];
+    applyChannelMode(state.channel);
     state.musicVideo = !!payload.musicVideo;
     state.homeMovie = !!payload.homeMovie;
     state.film = !!payload.film;
@@ -402,21 +441,27 @@ export function initPage() {
     ({ true: function() { followToOtherPage(page); }, false: function() { onVideoContext(payload); } })[page !== 'video']();
   }
 
-  // Reset progress (TASK-142): two-tap confirm (tap -> "Reset progress?" -> tap)
+  // Clear progress (TASK-142): two-tap confirm (tap -> "Clear progress?" -> tap)
   // then send the `reset` intent — the TV player clears this item's progress and
   // exits, and the companion follows the echoed context. Auto-disarms after 4s so
   // an armed button never stays stuck on touch.
+  //
+  // TASK-564 renamed the LABEL on all four surfaces at once (both players, both
+  // mirrors) — "Reset" never said what it reset, and the TV's video player now
+  // carries a Restart pill a word away from it. The intent stays `reset`: the
+  // wire name is not what a viewer reads, and renaming it would be churn on both
+  // sides of the socket for nothing.
   var resetArmed = false;
   var resetTimer = null;
   function disarmReset() {
     resetArmed = false;
     els.reset.classList.remove('confirm');
-    els.reset.textContent = '↻ Reset';
+    els.reset.textContent = '↻ Clear progress';
   }
   function armReset() {
     resetArmed = true;
     els.reset.classList.add('confirm');
-    els.reset.textContent = '↻ Reset?';
+    els.reset.textContent = '↻ Clear progress?';
     clearTimeout(resetTimer);
     resetTimer = setTimeout(disarmReset, 4000);
   }
@@ -483,6 +528,13 @@ export function initPage() {
   document.getElementById('c-vol-down').addEventListener('click', function() { api.sendIntent('vol_down'); });
   document.getElementById('c-vol-up').addEventListener('click', function() { api.sendIntent('vol_up'); });
   els.reset.addEventListener('click', onResetTap);
+  // TASK-564 — the channel's two controls, straight through as intents: the TV
+  // owns what they mean (Restart seeks the viewer and leaves the channel
+  // running; Back to live asks the channel what is on NOW), exactly as its own
+  // pills do. No confirm on either — neither destroys anything, and both are
+  // undone by pressing the other.
+  els.restart.addEventListener('click', function() { api.sendIntent('channelRestart'); });
+  els.live.addEventListener('click', function() { api.sendIntent('channelLive'); });
   // FEAT-418 (TASK-420) / TASK-499/503: the queue link goes to whichever
   // queue matches the current mode.
   //

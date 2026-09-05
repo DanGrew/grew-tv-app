@@ -5,7 +5,7 @@ import {
   loadMusicVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
   addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
   deletePlaylist, renamePlaylist, queuePlaybackAction, loadQueuePlayback, loadMusicSourceTitle,
-  loadMusicVideoSourceTitle, loadChannels
+  loadMusicVideoSourceTitle, loadChannels, loadChannel
 } from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
@@ -48,6 +48,31 @@ describe('loadChannels', () => {
   it('rejects on non-ok response, so the caller can fall back to no tab', async () => {
     fakeFetch({}, false);
     await expect(loadChannels('http://s', 'kids')).rejects.toBe(500);
+  });
+});
+
+// FEAT-560/TASK-564 — ONE channel in full, for the player. Same profile scoping
+// as the strip, for the same reason.
+describe('loadChannel', () => {
+  it('GETs /api/channels/{id} with the profile query, no-store', async () => {
+    var calls = fakeFetch({ channel_id: 'cartoon-club', on_air: true });
+    await loadChannel('http://s', 'cartoon-club', 'kids');
+    expect(calls[0].url).toBe('http://s/api/channels/cartoon-club?profile=kids');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('encodes a channel id, so an id with a slash cannot escape the route', async () => {
+    var calls = fakeFetch({});
+    await loadChannel('http://s', 'date night/2', 'adults');
+    expect(calls[0].url).toBe('http://s/api/channels/date%20night%2F2?profile=adults');
+  });
+  it('resolves the full answer, lookahead and all', async () => {
+    fakeFetch({ channel_id: 'cartoon-club', on_air: true, next: [{ item: { item_id: 'x' } }] });
+    expect(await loadChannel('http://s', 'cartoon-club', 'kids'))
+      .toEqual({ channel_id: 'cartoon-club', on_air: true, next: [{ item: { item_id: 'x' } }] });
+  });
+  it('rejects a channel nobody wrote, or one this profile may not see', async () => {
+    fakeFetch({}, false);
+    await expect(loadChannel('http://s', 'after-dark', 'kids')).rejects.toBe(500);
   });
 });
 

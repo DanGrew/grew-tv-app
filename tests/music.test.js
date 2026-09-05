@@ -296,12 +296,13 @@ async function openPlayer(page) {
 }
 
 // BUG-016 (relayout): the pills live on their own row BELOW the progress bar, in
-// the order queue, jump, lyrics, reset (shuffle/repeat removed in TASK-237). The
-// transport row keeps only prev/play/next + the progress bar + time.
+// the order queue, jump, lyrics, clear progress (shuffle/repeat removed in
+// TASK-237; TASK-564 renamed the last one from `btn-reset`). The transport row
+// keeps only prev/play/next + the progress bar + time.
 test('the pills sit on their own row below the progress bar in the BUG-016 order', async ({ page }) => {
   await openPlayer(page);
   const ids = await page.locator('#pill-row button').evaluateAll(els => els.map(e => e.id));
-  expect(ids).toEqual(['btn-queue', 'btn-jump', 'btn-lyrics', 'btn-reset']);
+  expect(ids).toEqual(['btn-queue', 'btn-jump', 'btn-lyrics', 'btn-clear-progress']);
   // Progress bar + time stay on the transport row; no pills there.
   await expect(page.locator('#transport #progress')).toHaveCount(1);
   await expect(page.locator('#transport #time-display')).toHaveCount(1);

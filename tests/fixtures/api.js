@@ -349,10 +349,14 @@ function channelsResponse() {
 // A channel between slots with nothing left, one nobody has regenerated, and one
 // whose programme has run out are ONE state on the wire, so there are three here
 // and never a fourth.
+// TASK-564 — the item carries `ext` and `subtitles` because the PLAYER reads
+// them now: the channel answer is the only place a channel play learns which
+// file to fetch and whether it has captions, and there is no /api/video lookup
+// behind it. The strip's card still reads neither.
 const CHANNEL_ON_AIR = {
   channel_id: 'cartoon-club', name: 'Cartoon Club', item_type: 'episode',
   on_air: true,
-  item: { item_id: 'bluey-s1e22', title: 'Bluey', poster: null, itemType: 'episode' },
+  item: { item_id: 'bluey-s1e22', title: 'Bluey', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null },
   offset_seconds: 120, runtime_seconds: 480, next_on_air: null
 };
 const CHANNEL_OFF_AIR_TIMED = {
@@ -362,6 +366,27 @@ const CHANNEL_OFF_AIR_TIMED = {
 };
 const CHANNEL_OFF_AIR_PLAIN = Object.assign({}, CHANNEL_OFF_AIR_TIMED, {
   channel_id: 'matinee', name: 'Matinee', next_on_air: null
+});
+// FEAT-560/TASK-564 — GET /api/channels/{id}: the SAME on-now line plus what the
+// player needs beyond it. Built by extending the line rather than restating it,
+// so the two routes cannot drift apart here the way they cannot on the backend
+// (api/channels.py `_detail` is literally `_on_now` plus these five keys).
+function channelDetailResponse(line) {
+  return Object.assign({}, line, {
+    bed: null,
+    tag: 'preschool',
+    started_at: '2026-09-04T17:00:00',
+    ends_at: '2026-09-04T17:08:00',
+    next: [{
+      item: { item_id: 'duggee-s1e04', title: 'Hey Duggee', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null },
+      tag: 'preschool', starts_at: '2026-09-04T17:08:00', ends_at: '2026-09-04T17:15:00'
+    }]
+  });
+}
+const CHANNEL_DETAIL = channelDetailResponse(CHANNEL_ON_AIR);
+// Off air answers the same shape with nothing in it — one state, never three.
+const CHANNEL_DETAIL_OFF_AIR = Object.assign({}, CHANNEL_OFF_AIR_TIMED, {
+  bed: null, tag: null, started_at: null, ends_at: null, next: []
 });
 function continueWatchingResponse(person, store) {
   // FEAT-045/TASK-317: `recents` (last 5 opened music sources, newest-first) rides
@@ -400,6 +425,16 @@ async function installApi(page) {
     // default would be a way to see every channel by leaving it off.
     if (!profile) return json(route, 400, { error: "profile must be 'kids' or 'adults'" });
     return json(route, 200, channelsResponse(profile));
+  });
+  // TASK-564 — ONE channel in full, for the player. Registered AFTER the strip
+  // route so it wins for /api/channels/{id} (Playwright: last match first),
+  // which the strip's own `**/api/channels**` pattern would otherwise swallow.
+  // 404 by default like the strip is empty by default: a suite that has not
+  // asked for channels has none to tune into either.
+  await page.route('**/api/channels/*', function(route) {
+    var profile = new URL(route.request().url()).searchParams.get('profile');
+    if (!profile) return json(route, 400, { error: "profile must be 'kids' or 'adults'" });
+    return json(route, 404, { error: 'channel not found: ' + lastSegment(route.request().url(), '/api/channels/') });
   });
   await page.route('**/api/continue-watching**', function(route) {
     var person = new URL(route.request().url()).searchParams.get('person');
@@ -1325,5 +1360,6 @@ module.exports = {
   // TASK-326: pure response builders + the CW row builder, so the stub<->contract
   // shape test can exercise the exact objects the routes above emit.
   browseResponse, videoResponse, albumResponse, playlistResponse, continueWatchingResponse, midWatchRows,
-  channelsResponse, CHANNEL_ON_AIR, CHANNEL_OFF_AIR_TIMED, CHANNEL_OFF_AIR_PLAIN
+  channelsResponse, CHANNEL_ON_AIR, CHANNEL_OFF_AIR_TIMED, CHANNEL_OFF_AIR_PLAIN,
+  channelDetailResponse, CHANNEL_DETAIL, CHANNEL_DETAIL_OFF_AIR
 };

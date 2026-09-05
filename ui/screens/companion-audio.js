@@ -340,20 +340,22 @@ export function initPage() {
     ({ true: function() { followContext(payload); }, false: noop })[mode.drivesNav()]();
   }
 
-  // Reset progress (TASK-142): two-tap confirm then send the `reset` intent — the
+  // Clear progress (TASK-142): two-tap confirm then send the `reset` intent — the
   // TV player clears this track's progress and exits; the companion follows the
   // echoed context. Auto-disarms after 4s so an armed button never sticks.
+  // TASK-564 renamed the label on all four surfaces together — see
+  // companion-video.js for why the intent name stayed `reset`.
   var resetArmed = false;
   var resetTimer = null;
   function disarmReset() {
     resetArmed = false;
     els.reset.classList.remove('confirm');
-    els.reset.textContent = '↻ Reset';
+    els.reset.textContent = '↻ Clear progress';
   }
   function armReset() {
     resetArmed = true;
     els.reset.classList.add('confirm');
-    els.reset.textContent = '↻ Reset?';
+    els.reset.textContent = '↻ Clear progress?';
     clearTimeout(resetTimer);
     resetTimer = setTimeout(disarmReset, 4000);
   }

@@ -95,14 +95,13 @@ test.describe('with channels on air', () => {
     expect(after).not.toBe(before);
   });
 
-  // The card is DELIBERATELY inert until TASK-564 wires the player (owner,
-  // 2026-09-04). Unwired is fine; landing on a broken player is not — so a press
-  // must leave browse exactly where it is.
-  test('picking a channel does nothing yet, and never leaves browse', async ({ page }) => {
+  // TASK-564 wired the press. What that press DOES — the player it opens, and
+  // the off-air card that still goes nowhere — is tests/channel-player.test.js;
+  // all this tab needs to prove is that its own card reaches it.
+  test('picking a channel opens the player on that channel', async ({ page }) => {
     await openBrowse(page);
     await page.locator('.channel-tile[data-channel="cartoon-club"]').click();
-    await expect(page.locator('#screen-browse')).toBeVisible();
-    await expect(page).toHaveURL(/browse\.html/);
+    await expect(page).toHaveURL(/video\.html\?.*channel=cartoon-club/);
   });
 
   // The bar is the CHANNEL's position, not the viewer's — the same shape as
@@ -146,12 +145,15 @@ test.describe('with no channels', () => {
 //
 // The companion takes its profile off the app snapshot over the socket, so it
 // needs the same single-screen mock app the other companion suites use.
-function mockApp(page) {
+// `intents` (optional) collects every intent the phone sends, so a tap that
+// DRIVES the TV can be asserted here rather than only on the TV's own side.
+function mockApp(page, intents) {
   let version = 1;
   return page.routeWebSocket(/:8766/, (ws) => {
     function msg(type, payload) { return JSON.stringify({ type, payload }); }
     ws.onMessage(function(raw) {
       const m = JSON.parse(raw);
+      if (m.type === 'intent' && intents) intents.push(m.payload);
       if (m.type === 'list_devices') ws.send(msg('devices', { devices: [{ device_id: 'tv', label: 'TV', active_person: null }] }));
       if (m.type === 'snapshot_request') {
         version += 1;
@@ -192,6 +194,23 @@ test.describe('the companion mirror', () => {
     const card = page.locator('.ph-chan[data-channel="after-dark"]');
     await expect(card.locator('.chan-now')).toHaveText('Off air');
     await expect(card.locator('.chan-time')).toHaveText('Back at 21:00');
+  });
+
+  // TASK-564 — the tap drives the TV, through the SAME `select` funnel every
+  // other tile uses. What the TV then does with it (open the player, or refuse
+  // an off-air channel) is its own card-route table's business and lives in one
+  // place, so the two surfaces cannot disagree.
+  test('tapping a channel drives the TV into it', async ({ page }) => {
+    const intents = [];
+    await installApi(page);
+    await withChannels(page, [ON_AIR, OFF_AIR_TIMED]);
+    await mockApp(page, intents);
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="channels"]').click();
+    await page.locator('.ph-chan[data-channel="cartoon-club"]').click();
+    await expect.poll(() => intents.filter(i => i.intent === 'select').length, { timeout: 5000 })
+      .toBeGreaterThan(0);
+    expect(intents.find(i => i.intent === 'select').params.id).toBe('channel:cartoon-club');
   });
 
   test('no channels means no Channels tab on the phone either', async ({ page }) => {

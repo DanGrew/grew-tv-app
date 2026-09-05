@@ -217,23 +217,35 @@ export function sourceIdFor(mode, params) {
   return params[key];
 }
 
-// The companion context push (FEAT-017/TASK-499/503/505/517/542). The page
-// drives exactly ONE rail per load, so every other type's keys go out at their
-// empty values — which is what three snapshot vars, two of them permanently
-// {}, used to produce by accident. Building it from one live snapshot makes
-// that explicit instead.
-export function videoContext(engine, snapshot, sourceCrumb, display) {
-  var config = VIDEO_PAGE_CONFIG[engine];
+// The push with EVERY rail off and every transport dead.
+//
+// TASK-564 — this is what a video surface with no queue engine behind it sends:
+// channel mode plays off the schedule, not a queue, so the phone must be told
+// that every engine control has nothing to act on rather than being left with
+// whatever the last rail lit. Leaving a control live there is the mirror
+// pointing at the wrong engine, which TASK-542's own note calls worse than
+// showing nothing.
+//
+// videoContext below is this plus exactly one rail turned on, so the two can
+// never disagree about which keys ride the push.
+export function emptyVideoContext(display) {
   var empty = transportState({});
-  var context = {
+  return {
     context_id: 'video',
     display: display,
+    // TASK-564 — channel mode's own two keys, false/null for every queue rail.
+    // The phone needs to know it is mirroring a CHANNEL and not a queue with an
+    // empty snapshot: the two look identical from a dead transport alone, and
+    // they differ in what the phone must offer (Restart and Back to live, not
+    // Queue and Clear progress) and in what its breadcrumb says.
+    channel: false,
+    channelSource: null,
     musicVideo: false,
     musicVideoShuffle: false,
     musicVideoRepeat: false,
     // Only ever set in music-video mode, so it rides the push unconditionally
     // exactly as it did when it was a bare var read straight off the closure.
-    musicVideoSource: sourceCrumb,
+    musicVideoSource: null,
     musicVideoTransport: empty,
     homeMovie: false,
     homeMovieShuffle: false,
@@ -252,6 +264,33 @@ export function videoContext(engine, snapshot, sourceCrumb, display) {
     seriesRepeat: false,
     seriesTransport: empty
   };
+}
+
+// The push a CHANNEL sends (TASK-564). Every queue rail stays off — a channel
+// has no engine, so ⏮/⏭/🔀/🔁 have nothing to act on and go out dead rather
+// than live-looking and silently posting to whichever engine played last.
+//
+// `source` is the channel's own crumb target ({ label, page, params }), the same
+// one the TV player builds, so the phone's breadcrumb reads Home › <channel> ›
+// <what's on> and its middle crumb returns to the Channels tab. Without it the
+// phone falls back to the recorded browse rail, which names the RAIL ("On now")
+// and points the TV at a rail-grid page channels do not have.
+export function channelVideoContext(display, source) {
+  var context = emptyVideoContext(display);
+  context.channel = true;
+  context.channelSource = source;
+  return context;
+}
+
+// The companion context push (FEAT-017/TASK-499/503/505/517/542). The page
+// drives exactly ONE rail per load, so every other type's keys go out at their
+// empty values — which is what three snapshot vars, two of them permanently
+// {}, used to produce by accident. Building it from one live snapshot makes
+// that explicit instead.
+export function videoContext(engine, snapshot, sourceCrumb, display) {
+  var config = VIDEO_PAGE_CONFIG[engine];
+  var context = emptyVideoContext(display);
+  context.musicVideoSource = sourceCrumb;
   context[config.context.flag] = true;
   context[config.context.shuffle] = !!snapshot.shuffle;
   context[config.context.repeat] = !!snapshot.repeat;

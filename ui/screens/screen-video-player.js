@@ -25,7 +25,12 @@ var STALL_RECOVERY_MS = 6000;   // BUG-429: waiting -> canplay/playing longer th
 // TASK-499 / not film mode, TASK-503) — a disabled-but-visible film-shuffle/
 // film-repeat stays in the list (only .hidden gates focus here; the real
 // `disabled` attribute already makes a click/Enter on it a no-op).
-var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-mv-shuffle', 'btn-mv-repeat', 'btn-hm-shuffle', 'btn-hm-repeat', 'btn-film-shuffle', 'btn-film-repeat', 'btn-jump', 'btn-cc', 'btn-queue', 'btn-night', 'btn-reset'];
+// TASK-564: `btn-live`/`btn-restart` are the channel-mode pills — hidden on
+// every other entry, so they drop out of the cycle exactly as an unavailable
+// Shuffle pair does. `btn-clear-progress` is what `btn-reset` was called until
+// TASK-564: "Reset" never said what it reset, which is the whole of the
+// Restart-versus-Reset confusion story 8 is about.
+var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-mv-shuffle', 'btn-mv-repeat', 'btn-hm-shuffle', 'btn-hm-repeat', 'btn-film-shuffle', 'btn-film-repeat', 'btn-jump', 'btn-live', 'btn-restart', 'btn-cc', 'btn-queue', 'btn-night', 'btn-clear-progress'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 var CC_MODE       = { 'true': 'showing', 'false': 'hidden' };
 // App-side log (TASK-213): a fresh start logs `play`, a start from a saved
@@ -44,6 +49,14 @@ export function setup(config) {
   var onIntent = [config.onIntent].filter(Boolean).concat([function() {}])[0];
   var emitSnapshot = [config.emitState ].filter(Boolean).concat([function() {}])[0];
   var appContext   = [config.appContext].filter(Boolean).concat([function() { return {}; }])[0];
+  // TASK-564 (IDEA-CHANNELS decision 16) — whether this play is RECORDED. Every
+  // queue rail records; a channel play records nothing, so `watch_progress` is
+  // untouched and Continue Watching never picks up a tune-in fragment. It is
+  // expressed by the client not writing rather than by a descriptor flag,
+  // because it is a per-PLAY decision and not a per-type one: a channel plays
+  // episodes and films, both of which resume perfectly well on their own. Opt
+  // OUT, so every existing caller keeps writing without saying so.
+  var savesProgress = [config.savesProgress].filter(function(v) { return v !== undefined; }).concat([true])[0];
 
   var wakeLock          = null;
   var controlsTimer     = null;
@@ -116,12 +129,12 @@ export function setup(config) {
     [wakeLock].filter(Boolean).forEach(function(wl) { wl.release(); wakeLock = null; });
   }
 
-  // Auto-hide skips while the Reset is armed: a destructive two-press confirm must
-  // not vanish (and silently disarm via blur) under the viewer — it stays up until
-  // they act or move focus off it. While armed we just re-arm the timer instead of
-  // hiding (BUG-019: removes the controls-hide-vs-arm race for good).
+  // Auto-hide skips while Clear progress is armed: a destructive two-press confirm
+  // must not vanish (and silently disarm via blur) under the viewer — it stays up
+  // until they act or move focus off it. While armed we just re-arm the timer
+  // instead of hiding (BUG-019: removes the controls-hide-vs-arm race for good).
   function hideControls() {
-    var armed = document.getElementById('btn-reset').getAttribute('data-armed') === '1';
+    var armed = document.getElementById('btn-clear-progress').getAttribute('data-armed') === '1';
     ({ true: showControls, false: function() { document.getElementById('controls').classList.add('hidden'); } })[armed]();
   }
   function showControls() {
@@ -170,6 +183,21 @@ export function setup(config) {
   var executeSkip = function(delta) {
     [video.duration].filter(isFinite).forEach(function() {
       video.currentTime = clampTime(video.currentTime, delta, video.duration);
+    });
+    showControls();
+  };
+
+  // TASK-564 — an ABSOLUTE seek, which the graduated Jump grid deliberately has
+  // no equivalent of (FEAT-017: relative skips only, never a scrub). Channel
+  // mode needs one because both of its moves are to a place the clock names
+  // rather than a distance from here: Restart goes to the start of the item, and
+  // Back to live to wherever the channel has got to. Same NaN guard as
+  // executeSkip (BUG-439 — currentTime throws on it), and a function EXPRESSION
+  // for the same reason that one is: it touches no DOM token, so a declaration
+  // would read as a pure function belonging in core/.
+  var seekTo = function(seconds) {
+    [video.duration].filter(isFinite).forEach(function() {
+      video.currentTime = clampTime(0, seconds, video.duration);
     });
     showControls();
   };
@@ -438,7 +466,7 @@ export function setup(config) {
     onStop(rp);
   }
 
-  // Reset progress (TASK-142): wipe this video's backend progress for the active
+  // Clear progress (TASK-142): wipe this video's backend progress for the active
   // person, then leave. Pause first so the throttled timeupdate save stops firing
   // (stopPlayback itself never saves), so the DELETE is the last write — no race
   // where a stray save re-creates the row we just cleared.
@@ -451,18 +479,20 @@ export function setup(config) {
   }
 
   // Two-press confirm guards a mis-tap (the spec's anti-accident step): first
-  // press arms (label -> "Reset?"), second resets + exits; blurring disarms.
+  // press arms (label -> "Clear progress?"), second clears + exits; blurring
+  // disarms. TASK-564 spells the armed state out in full rather than shortening
+  // it — the one press that cannot be undone is the wrong place to save a word.
   function fireReset(btn) {
     ({
-      'false': function() { btn.classList.add('confirm'); btn.textContent = 'Reset?'; btn.setAttribute('data-armed', '1'); },
+      'false': function() { btn.classList.add('confirm'); btn.textContent = 'Clear progress?'; btn.setAttribute('data-armed', '1'); },
       'true':  function() { resetAndExit(); }
     })[String(btn.getAttribute('data-armed') === '1')]();
   }
 
   function disarmReset() {
-    var btn = document.getElementById('btn-reset');
+    var btn = document.getElementById('btn-clear-progress');
     btn.classList.remove('confirm');
-    btn.textContent = 'Reset';
+    btn.textContent = 'Clear progress';
     btn.removeAttribute('data-armed');
   }
 
@@ -541,6 +571,11 @@ export function setup(config) {
 
   function currentVideoDisplay() { return _currentDisplay; }
 
+  // Where the VIEWER is, which channel mode compares against where the channel
+  // is once a second (TASK-564). The player owns the element, so it answers for
+  // it rather than letting a mode controller read `currentTime` behind its back.
+  function position() { return video.currentTime; }
+
   // ⏮/⏭ are episode controls — meaningless for a standalone film, so hide them
   // when there is no series (they stay out of the d-pad focus cycle too).
   var SERIES_MODE = { 'true': 'remove', 'false': 'add' };
@@ -570,6 +605,17 @@ export function setup(config) {
   remote.nightMode = function() { cycleNight(); };   // companion Night Mode press (TASK-568)
   remote.reset    = function() { resetAndExit(); };   // companion Reset intent (TASK-142)
 
+  // THE progress writer — the one place this player touches watch_progress, so
+  // "a channel play records nothing" is one gate rather than a rule repeated at
+  // every call site (TASK-564).
+  var WRITE_PROGRESS = {
+    'true':  function(rec, position, duration) { saveProgress(server, rec.id, position, duration, getPerson()).catch(function() {}); },
+    'false': function() {}
+  };
+  function persistProgress(rec, position, duration) {
+    WRITE_PROGRESS[savesProgress + ''](rec, position, duration);
+  }
+
   video.addEventListener('timeupdate', function() {
     [video.duration].filter(Boolean).forEach(updateProgress);
     [currentVideo].filter(Boolean).forEach(function(rec) {
@@ -578,13 +624,13 @@ export function setup(config) {
       [rec].filter(function() { return video.currentTime > 0; })
         .filter(function() { return !isNaN(video.duration); })
         .filter(function() { return now - lastBackendSave > BACKEND_SAVE_MS; })
-        .forEach(function() { lastBackendSave = now; saveProgress(server, rec.id, video.currentTime, video.duration, getPerson()).catch(function() {}); });
+        .forEach(function() { lastBackendSave = now; persistProgress(rec, video.currentTime, video.duration); });
     });
   });
 
   video.addEventListener('ended', function() {
     heartbeat.stop();
-    [currentVideo].filter(Boolean).forEach(function(rec) { saveProgress(server, rec.id, video.duration, video.duration, getPerson()).catch(function() {}); });
+    [currentVideo].filter(Boolean).forEach(function(rec) { persistProgress(rec, video.duration, video.duration); });
     emit('complete');
     emitState();
     onEnded();
@@ -673,10 +719,15 @@ export function setup(config) {
   document.getElementById('btn-cc').addEventListener('click', toggleSubtitles);
   document.getElementById('btn-night').addEventListener('click', cycleNight);
   renderNight();
-  document.getElementById('btn-reset').addEventListener('click', function() { fireReset(document.getElementById('btn-reset')); });
-  document.getElementById('btn-reset').addEventListener('blur', disarmReset);
+  document.getElementById('btn-clear-progress').addEventListener('click', function() { fireReset(document.getElementById('btn-clear-progress')); });
+  document.getElementById('btn-clear-progress').addEventListener('blur', disarmReset);
   document.getElementById('btn-upnext-cancel').addEventListener('click', cancelUpNext);
   document.getElementById('screen-video').addEventListener('click', showControls);
 
-  return { playVideo, handleVideoKey, openJumpPopup, showControls, setUpNext, startUpNext, setSeriesMode, currentVideoDisplay, stop: stopPlayback, remote };
+  // `emitState` is exposed for TASK-564's channel mode alone. The heartbeat
+  // stops on pause, which is right for a queue — nothing moves while it is
+  // paused. A channel moves anyway, so a viewer paused on one falls further
+  // behind every second, and the phone would sit on whatever the last beat said
+  // until playback resumed. Channel mode beats this from its own 1 Hz tick.
+  return { playVideo, handleVideoKey, openJumpPopup, showControls, setUpNext, startUpNext, setSeriesMode, currentVideoDisplay, seekTo, position, emitState, stop: stopPlayback, remote };
 }

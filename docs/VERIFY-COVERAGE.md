@@ -73,6 +73,7 @@ Harness: `_harness.cjs` (`runFlow`, `bootTv`, `openCompanionBrowse`, `DEFAULT_MA
 | rail-grid | "see all" rail grid | tv-artist-playlist | ✅ | artist page renders via screen-rail-grid.js (same grid renderer) |
 | playlist-create | create form | — | ➖ | companion create covers the path |
 | video | TV player play / pause | tv-app | ✅ | video frame hidden for determinism |
+| video | channel mode — ident, live marker, Back to live, Restart | — | ❌ | TASK-564. Same frozen-clock problem as the Channels tab above, and worse: the marker's position and whether the Back to live pill is even shown both move every second off wall time, so two of the three things worth snapping are the non-deterministic ones |
 | queue-shell | FEAT-497 Queue overlay + dimmed non-repeatable controls | — | ❌ | TASK-525: the `tv-video-queue` flow went with the legacy Queue overlay it drove. The shell that replaced it (`screen-queue-shell.js`, all three video types) has never had a flow of its own — the TASK-289 `(surface, state)` pair is open again on the shell |
 | error | error state | — | ➖ | |
 

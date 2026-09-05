@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadBrowse, loadContinueWatching, loadTracks, loadEpisodes, loadChannels } from '../../core/app-api.js';
-import { withChannelsTab, channelsById, channelCardView, tileVariant } from '../../core/channels.js';
+import { withChannelsTab, channelsById, channelCardView, tileVariant, CHANNELS_TAB } from '../../core/channels.js';
 import { queueAdd, queueAddStatus, itemMediaType } from '../../core/queue-shell-config.js';
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { CONTINUE_TYPES, continueTarget } from '../../core/browse-continue.js';
@@ -338,9 +338,16 @@ export function initPage() {
   // beside `tileHint`'s resume badge — which IS watch progress — on the same
   // screen, so the two must never be wired to each other.
   //
-  // Inert on tap until TASK-564, like the TV card (owner, 2026-09-04): unwired
-  // is fine, broken is not. No click handler at all, so a tap does nothing
-  // rather than driving the TV somewhere that cannot draw a channel yet.
+  // TASK-564 — a tap now drives the TV into the channel, through the SAME
+  // `openItem` funnel every other tile uses: the phone sends the tile's id and
+  // the TV runs its own card-route table on it, so the two surfaces cannot
+  // disagree about what picking a channel does (including refusing an off-air
+  // one — that rule lives once, on the TV).
+  //
+  // Greyed while DESYNCED, like a bare film and for the same reason: playing is
+  // a TV act with no phone-local page to open on its own
+  // (core/companion-button-modes.js has no desync page for a channel), and a
+  // dead tap is worse than a dimmed one.
   function channelTxtTile(card) {
     var view = channelCardView(card.line, elapsedChannelSeconds());
     var el = document.createElement('button');
@@ -348,6 +355,8 @@ export function initPage() {
     el.setAttribute('data-id', card.id);
     el.setAttribute('data-channel', card.channelId);
     el.classList.toggle('off-air', !view.onAir);
+    el.classList.toggle('desync-off', tileOffDesynced(cardRoute(card), mode.isDesynced()));
+    el.addEventListener('click', function() { openItem(card); });
     var nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = view.name;
@@ -428,7 +437,20 @@ export function initPage() {
     ({ sections: clearTrail, rails: recordRails, grid: recordGrid })[state.level]();
   }
   function recordRails() { writeTrail({ tab: state.section }, sectionTitle()); }
-  function recordGrid() { writeTrail({ tab: state.section, rail: state.rail }, railTitle()); }
+  // TASK-564 — Channels records its position WITHOUT a rail, and named as the
+  // section rather than the rail. A recorded rail is what a later breadcrumb
+  // press navigates to, and for every other section that is `rail-grid.html`,
+  // which the TV has and channels do not (TASK-563's own note: there is no
+  // channels rail-grid, and sending the TV to one lands it on "Nothing here
+  // yet"). A viewer who tuned in from the phone and then pressed the crumb back
+  // got exactly that empty page, and a crumb reading "On now" rather than the
+  // channel. Recording the tab alone points that press at the TV's Channels tab,
+  // the screen the section actually has.
+  var GRID_TRAIL = {
+    'true':  function() { writeTrail({ tab: state.section }, sectionTitle()); },
+    'false': function() { writeTrail({ tab: state.section, rail: state.rail }, railTitle()); }
+  };
+  function recordGrid() { GRID_TRAIL[(state.section === CHANNELS_TAB.id) + ''](); }
   function writeTrail(params, label) {
     clearTrail();
     pushTrail({ page: 'browse.html', params: params, label: label });
