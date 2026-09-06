@@ -9,37 +9,30 @@ const {
 } = require('./fixtures/api.js');
 const { pickPerson } = require('./fixtures/nav.js');
 
-// FEAT-560/TASK-565 — the gap between items, on the real player. The card's own
-// model is proved in tests/unit/channel-card.js and the bed's clock in
-// tests/unit/channel-bed.js; this is the two of them on screen: the card going
-// up when an item ends and coming down when the next one starts, an off-air
-// channel holding on the same card, and the bed carrying on across two cards
-// instead of restarting.
+// FEAT-560/TASK-565 + TASK-574 — the gap between items, on the real player. The
+// card's own model is proved in tests/unit/channel-card.js; this is it on
+// screen: the card going up when an item ends, coming down when the next
+// programme actually starts, and an off-air channel holding on the same card.
 //
-// ⚠️ THE CLOCK IS FAKED, DELIBERATELY. The card holds for eight seconds and the
-// bed's position is a function of wall-clock time, so a test that waited would
-// be both slow and — for the bed — non-deterministic, since the album loops and
-// a run straddling the loop point would read a smaller number than the one
-// before it. `page.clock` (the idiom tests/audio-resume.test.js already uses)
-// makes both exact.
-
-// The bed and the video are BOTH <audio>/<video> off one prototype, so a single
-// faked currentTime would have them share a playhead — and every assertion below
-// about "the bed carried on" would actually be reading the video's position.
-// Keyed by element id, so the two move independently.
+// ⚠️ THE CLOCK IS FAKED, DELIBERATELY. The hold is eight seconds at its
+// shortest and a whole slot at its longest, so a test that waited would be slow
+// where it worked at all. `page.clock` (the idiom tests/audio-resume.test.js
+// already uses) makes it exact.
+//
+// TASK-574 took the music bed out — the card is SILENT and that is the intended
+// state, so there is nothing here about a bed, a credit or an <audio> element,
+// and a session finding a static, silent panel has not found a defect.
 async function fakeMedia(page) {
   await page.addInitScript(() => {
     window.__seeks = [];
     window.__pos = 0;
-    window.__bedPos = 0;
     const proto = HTMLMediaElement.prototype;
     Object.defineProperty(proto, 'readyState', { configurable: true, get() { return 1; } });
     Object.defineProperty(proto, 'duration', { configurable: true, get() { return 480; } });
     Object.defineProperty(proto, 'currentTime', {
       configurable: true,
-      get() { return this.id === 'channel-bed' ? window.__bedPos : window.__pos; },
+      get() { return window.__pos; },
       set(value) {
-        if (this.id === 'channel-bed') { window.__bedPos = value; return; }
         window.__seeks.push(value);
         window.__pos = value;
       }
@@ -66,6 +59,21 @@ async function withChannel(page, detail) {
   });
 }
 
+// How many times the player has asked the channel WHAT IS ON — the detail route
+// (`/api/channels/<id>?…`), never the strip's own `/api/channels?…`.
+//
+// It is the defect stated directly: dropping the viewer back into the item that
+// just ended is what asking too early looks like on screen, and the ask is the
+// thing that is either there or not. Counted from the moment it is armed, so a
+// test arms it after the tune-in and reads a clean zero.
+function countChannelAsks(page) {
+  var asks = { n: 0 };
+  page.on('request', function(req) {
+    asks.n += /\/api\/channels\/[^/?]+\?/.test(req.url()) ? 1 : 0;
+  });
+  return asks;
+}
+
 async function openChannel(page, id) {
   await page.goto('/app/homeview/profile.html');
   await pickPerson(page, 'kids');
@@ -80,31 +88,28 @@ async function endItem(page) {
   await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
 }
 
-// The bed's seek only lands once the element reports metadata, and the stubbed
-// /media/ body never gets there on its own — so the test says it did, the same
-// way the player suite dispatches `timeupdate` on the video.
-async function landBed(page) {
-  await page.evaluate(() => document.getElementById('channel-bed').dispatchEvent(new Event('loadedmetadata')));
-}
-
-// Where the BED has got to, as one number along the whole album — so "it carried
-// on" can be asserted across a track boundary. The offsets are the fixture
-// album's own running order (ootb: 227 + 245 + 228 = 700s), not a second copy of
-// the module's arithmetic.
-const ALBUM_STARTS = { 'ootb-01': 0, 'ootb-02': 227, 'ootb-03': 472 };
-const ALBUM_TOTAL = 700;
-async function albumPosition(page) {
-  const src = await page.locator('#channel-bed').getAttribute('src');
-  const pos = await page.evaluate(() => window.__bedPos);
-  return ALBUM_STARTS[src.match(/ootb-0\d/)[0]] + pos;
-}
-
 // The channel, one programme further on — what the endpoint answers by the time
 // the card clears, because the schedule ran while it was up.
 const ROLLED_ON = channelDetailResponse(Object.assign({}, ON_AIR, {
   item: { item_id: 'duggee-s1e04', title: 'Hey Duggee', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null },
   offset_seconds: 8, runtime_seconds: 420
 }));
+
+// ⚠️ THE TWO WAYS AN ITEM ENDS, and TASK-574 is the difference between them.
+//
+// ON SCHEDULE — the channel has reached the end of the slot, so the next
+// programme is already airing and the card holds for the eight-second floor
+// alone. Nothing dispatches `ended` for this one: the channel's own entry
+// finishing is what puts the card up (core/channel-player.js shouldRetune),
+// which is the path a viewer sitting through a programme actually takes.
+const ON_SCHEDULE = channelDetailResponse(Object.assign({}, ON_AIR, {
+  offset_seconds: 480, runtime_seconds: 480
+}));
+// EARLY — the shipping fixture: the channel is 120s into an eight-minute slot,
+// so a file that ends here leaves SIX MINUTES of that slot still to air. The old
+// card cleared after eight seconds and rejoined into the middle of the item that
+// had just finished; the hold now runs to the end of the slot.
+const EARLY_REMAINING_MS = (480 - 120) * 1000;
 
 test.describe('the gap between two items', () => {
   test.beforeEach(async ({ page }) => {
@@ -116,16 +121,19 @@ test.describe('the gap between two items', () => {
 
   // Story 1 — an item ending is a moment of broadcast, not a black screen.
   test('an item ending puts a card up, and the next programme takes it down', async ({ page }) => {
+    await withChannel(page, ON_SCHEDULE);
     await openChannel(page, 'cartoon-club');
-    await expect(page.locator('#channel-card')).toBeHidden();
 
+    // The channel reaching the end of its own slot is what raises the card here
+    // — no `ended` is dispatched, because a programme running out on time is the
+    // path a viewer who simply sat through it takes.
     await page.clock.install();
-    await endItem(page);
+    await withChannel(page, ROLLED_ON);
+    await page.clock.fastForward(1000);
     await expect(page.locator('#channel-card')).toBeVisible();
 
-    // The schedule has rolled on while the card was up — which is the point:
-    // nothing paused, so the rejoin lands in a programme already running.
-    await withChannel(page, ROLLED_ON);
+    // Nothing to wait for — the schedule has already rolled on, so the floor is
+    // the whole hold and the rejoin lands in a programme already running.
     await page.clock.fastForward(8000);
     await expect(page.locator('#channel-card')).toBeHidden();
     await expect(page.locator('#video')).toHaveAttribute('src', /duggee-s1e04/);
@@ -135,14 +143,92 @@ test.describe('the gap between two items', () => {
   // than starting the next item from zero — a card that held the schedule would
   // make the channel a queue that waits.
   test('the programme behind the card was already running when it cleared', async ({ page }) => {
+    await withChannel(page, ON_SCHEDULE);
     await openChannel(page, 'cartoon-club');
     await page.clock.install();
-    await endItem(page);
     await withChannel(page, ROLLED_ON);
+    // Two hops, not one: the first raises the card (and arms the hold), the
+    // second runs the hold out. A single jump past both leaves the rejoin's own
+    // fetch with no turn to settle in.
+    await page.clock.fastForward(1000);
+    await expect(page.locator('#channel-card')).toBeVisible();
     await page.clock.fastForward(8000);
     await expect(page.locator('#video')).toHaveAttribute('src', /duggee-s1e04/);
     const seeks = await page.evaluate(() => window.__seeks);
     expect(seeks[seeks.length - 1]).toBeGreaterThanOrEqual(8);
+  });
+
+  // ⭐ TASK-574 story 1 — THE DEFECT THIS ROW EXISTS FOR. The viewer skipped, or
+  // the file was shorter than the slot it was given, so the channel is STILL
+  // AIRING the item that just ended. The old card cleared after eight seconds
+  // and asked what was on now — and was told the very item that had finished, so
+  // the viewer was dropped back into the middle of it.
+  test('an item ending EARLY holds the card past the eight seconds', async ({ page }) => {
+    await openChannel(page, 'cartoon-club');
+    const asks = countChannelAsks(page);
+    await page.clock.install();
+    await endItem(page);
+    await expect(page.locator('#channel-card')).toBeVisible();
+
+    // Where the old behaviour cleared. Six minutes of the slot are still to air,
+    // so the player has not asked the channel what is on — asking here is what
+    // dropped the viewer into the middle of the item that had just finished,
+    // because that is what the channel would have answered.
+    //
+    // ⚠️ A REAL moment, not a faked one. `fastForward` returns with the rejoin's
+    // own fetch still in flight, so every assertion made at that instant passes
+    // whatever the hold does; this lets the request the old code would have sent
+    // actually land, and the card come down, before anything is claimed.
+    await page.clock.fastForward(8000);
+    await page.waitForTimeout(250);
+    expect(asks.n).toBe(0);
+    await expect(page.locator('#channel-card')).toBeVisible();
+    await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e22/);
+
+    // Still up most of the way through, not merely a longer fixed wait.
+    await page.clock.fastForward(EARLY_REMAINING_MS - 60000);
+    await page.waitForTimeout(250);
+    expect(asks.n).toBe(0);
+    await expect(page.locator('#channel-card')).toBeVisible();
+  });
+
+  // The other half of the same story: the hold ENDS, at the next programme.
+  test('the card comes down when the next programme actually starts', async ({ page }) => {
+    await openChannel(page, 'cartoon-club');
+    await page.clock.install();
+    await endItem(page);
+    await expect(page.locator('#channel-card')).toBeVisible();
+
+    await withChannel(page, ROLLED_ON);
+    await page.clock.fastForward(EARLY_REMAINING_MS + 30000);
+    await expect(page.locator('#channel-card')).toBeHidden();
+    await expect(page.locator('#video')).toHaveAttribute('src', /duggee-s1e04/);
+  });
+
+  // Story 2 — a hold that can run for minutes has to be leaveable, and it is
+  // leaveable the same way any play is.
+  test('Back leaves the channel from a long hold', async ({ page }) => {
+    await openChannel(page, 'cartoon-club');
+    await page.clock.install();
+    await endItem(page);
+    await expect(page.locator('#channel-card')).toBeVisible();
+    await page.clock.fastForward(60000);
+
+    await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(/browse\.html\?tab=channels/);
+  });
+
+  // Story 3 — the card is SILENT. TASK-565 played a music bed under it and
+  // credited the track bottom-right; no channel ever named an album, so it
+  // shipped without playing a note and TASK-574 took it out rather than leave it
+  // dormant. A card that is a static, silent panel is the intended state.
+  test('the card is silent — no bed, no credit', async ({ page }) => {
+    await openChannel(page, 'cartoon-club');
+    await endItem(page);
+    await expect(page.locator('#channel-card')).toBeVisible();
+
+    expect(await page.locator('#channel-bed').count()).toBe(0);
+    expect(await page.locator('#card-credit').count()).toBe(0);
   });
 
   // Story 2 — three things coming with clock times, then a shorter untimed list.
@@ -168,78 +254,6 @@ test.describe('the gap between two items', () => {
     await expect(page.locator('#card-later')).not.toContainText(':');
   });
 
-  // Story 3 — the bed is playing anyway, and "what's this song" is a real
-  // question, so the answer is in the corner.
-  test('the card plays the channel bed and credits the track by name', async ({ page }) => {
-    await openChannel(page, 'cartoon-club');
-    await endItem(page);
-    await expect(page.locator('#card-credit')).toBeVisible();
-
-    const src = await page.locator('#channel-bed').getAttribute('src');
-    expect(src).toMatch(/\/media\/ootb-0\d\.m4a$/);
-    const TITLES = { 'ootb-01': 'Turn to Stone', 'ootb-02': 'Mr. Blue Sky', 'ootb-03': 'Sweet Talkin Woman' };
-    await expect(page.locator('#card-credit')).toHaveText('♪ ' + TITLES[src.match(/ootb-0\d/)[0]] + ' · ELO');
-  });
-
-  // Story 4 — THE one that cannot be seen in a screenshot. A bed restarted per
-  // card plays the first eight seconds of the same track forever, which is the
-  // jingle problem in disguise; it runs on its own wall clock instead.
-  test('a second card carries the bed on rather than restarting it', async ({ page }) => {
-    await openChannel(page, 'cartoon-club');
-    await page.clock.install();
-
-    await endItem(page);
-    await expect(page.locator('#channel-card')).toBeVisible();
-    await landBed(page);
-    const first = await albumPosition(page);
-
-    // The card clears into a programme, which runs for seven minutes and ends.
-    await withChannel(page, ROLLED_ON);
-    await page.clock.fastForward(8000);
-    await expect(page.locator('#channel-card')).toBeHidden();
-    await page.clock.fastForward(420000);
-    await endItem(page);
-    await expect(page.locator('#channel-card')).toBeVisible();
-    await landBed(page);
-    const second = await albumPosition(page);
-
-    // 8s of card plus 7 minutes of programme, further into the album — modulo
-    // the album, so a run that crosses the loop point reads the same.
-    expect(((second - first) % ALBUM_TOTAL + ALBUM_TOTAL) % ALBUM_TOTAL).toBeCloseTo(428, 0);
-    // And, explicitly: not back at the beginning.
-    expect(second).not.toBe(0);
-  });
-
-  // The bed is for cards and dead air, not for playing under the programme.
-  test('the bed stops when the card does', async ({ page }) => {
-    await openChannel(page, 'cartoon-club');
-    await page.clock.install();
-    await endItem(page);
-    await expect(page.locator('#card-credit')).toBeVisible();
-    await withChannel(page, ROLLED_ON);
-    await page.clock.fastForward(8000);
-    await expect(page.locator('#channel-card')).toBeHidden();
-    await expect(page.locator('#card-credit')).toBeHidden();
-  });
-});
-
-test.describe('a channel with no bed', () => {
-  test.beforeEach(async ({ page }) => {
-    await fakeMedia(page);
-    await installApi(page);
-    await withStrip(page, [ON_AIR, OFF_AIR]);
-    // A channel may name an album as its bed; one that names none is legal.
-    await withChannel(page, Object.assign({}, DETAIL, { bed: null }));
-  });
-
-  test('still shows the card, silently and with no credit', async ({ page }) => {
-    await openChannel(page, 'cartoon-club');
-    await endItem(page);
-    await expect(page.locator('#channel-card')).toBeVisible();
-    await expect(page.locator('#card-rows .card-title')).toHaveText(['Hey Duggee', 'Bob Bilby', 'Neighbours']);
-    await expect(page.locator('#card-credit')).toBeHidden();
-    expect(await page.locator('#channel-bed').getAttribute('src')).toBe(null);
-  });
 });
 
 test.describe('a channel that is off air', () => {
@@ -316,6 +330,10 @@ test.describe('a channel that is off air', () => {
 
   // A programme running out mid-watch arrives at exactly the same card as a
   // channel that was off air when it was opened — one state, never three.
+  //
+  // The file ends early here, so the between-items card holds out the rest of
+  // the slot before the rejoin discovers the channel has gone off air under it
+  // (TASK-574) — and what it lands on is the same card, one state further on.
   test('a programme running out under the viewer lands on the same card', async ({ page }) => {
     await withChannel(page, DETAIL);
     await openChannel(page, 'cartoon-club');
@@ -323,7 +341,7 @@ test.describe('a channel that is off air', () => {
 
     await withChannel(page, Object.assign({}, DETAIL_OFF_AIR, { next_on_air: null }));
     await endItem(page);
-    await page.clock.fastForward(8000);
+    await page.clock.fastForward(EARLY_REMAINING_MS + 30000);
 
     await expect(page.locator('#card-headline')).toHaveText('Off air');
     await expect(page.locator('#card-return')).toBeHidden();

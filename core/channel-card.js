@@ -11,17 +11,57 @@
 // Fed by the answer core/channel-player.js documents: the on-now line plus
 // `next`, each entry { item, tag, starts_at, ends_at }.
 
-import { itemTitle, clockLabel, returnTimeLabel } from './channels.js';
+import { itemTitle, clockLabel, returnTimeLabel, tickedOffset } from './channels.js';
 
-// How long the card holds the screen. Decision 12 says five to ten seconds;
-// eight sits in the middle, long enough to read three lines at TV distance and
-// short enough that the next programme is not gone by the time it clears.
-//
-// ⚠️ THE CHANNEL RUNS THROUGH THIS. The card does not pause anything — the next
-// item is already airing behind it, and the player rejoins at whatever position
-// the channel has reached when the card clears. That is what a continuity
-// announcement is; a card that held the schedule would make the channel a queue.
+// The FLOOR under the hold, never the whole of it (TASK-574 — see holdSeconds
+// below). Decision 12 says five to ten seconds; eight sits in the middle, long
+// enough to read three lines at TV distance and short enough that the next
+// programme has barely started behind it.
 export var CARD_SECONDS = 8;
+
+// How long the card holds the screen: until the next programme actually starts,
+// and never less than CARD_SECONDS.
+//
+// ⚠️ THE FLOOR AND THE SCHEDULE ARE ONE RULE, not two competing timers — they
+// answer two different situations and each is the whole of its own:
+//
+//   the item ends ON SCHEDULE — the channel has already rolled on, the next
+//     programme is airing behind the card, and there is nothing to wait for.
+//     `left` is zero and the floor is the entire hold. The player rejoins eight
+//     seconds into a programme already running, which is what a continuity
+//     announcement is; a card that held the schedule here would make the channel
+//     a queue that waits.
+//   the item ends EARLY — the viewer skipped, or the file is shorter than the
+//     slot it was given, so the CHANNEL IS STILL AIRING IT. `left` is the real
+//     seconds of that slot remaining, and the card sits there for them. Without
+//     this the card cleared after eight seconds and the rejoin asked what was on
+//     now — which was still the item that just ended, so the viewer was dropped
+//     back into the middle of it (TASK-574 story 1).
+//
+// Read off the channel's OWN clock — the entry's airtime against `tickedOffset`,
+// the same reading the live marker is placed by — rather than by parsing
+// `next[0].starts_at`. The backend stamps no zone on purpose (channels.js
+// RETURN_AT), so a `new Date` here is how the promise of 17:08 quietly becomes an
+// hour's drift; and the clock needs no field the player is not already holding.
+//
+// One guard, not three, the way channelPercent has one. `tickedOffset` clamps at
+// the runtime, so `left` can never come back negative, and every answer that is
+// not a slot still running lands on the floor without a guard of its own:
+//
+//   off air        — runtime and offset are BOTH null (they only ever arrive
+//                    together), so the subtraction is `0 - null`, which is 0
+//   no answer yet  — an empty detail subtracts to NaN, which `|| 0` reads as
+//                    nothing to wait for
+//
+// There is deliberately no guard for an offset missing while a runtime is
+// present: the endpoint never sends one without the other — an on-air answer
+// carries both and an off-air answer nulls both — so it would be a branch
+// nothing could reach and nothing could test.
+export function holdSeconds(detail, elapsedSeconds) {
+  var line = detail || {};
+  var left = Number(line.runtime_seconds) - tickedOffset(line, elapsedSeconds);
+  return Math.max(CARD_SECONDS, left || 0);
+}
 
 // Three lines with clock times, then an untimed list (decision 12).
 //

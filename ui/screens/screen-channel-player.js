@@ -2,11 +2,10 @@ import { getParam, getProfile, navTo, initCaptions } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
-import { loadChannel, loadChannels, loadAlbum, mediaUrl } from '../../core/app-api.js';
+import { loadChannel, loadChannels } from '../../core/app-api.js';
 import { tickedOffset, channelPercent } from '../../core/channels.js';
 import { isBehindLive, shouldRetune, upNextTitle, channelRecord, identLabel, flipTarget, channelIds } from '../../core/channel-player.js';
-import { cardView, cardStatus, laterText, CARD_SECONDS, CARD_LOOKAHEAD } from '../../core/channel-card.js';
-import { bedTracks, bedAt, bedCredit, bedSrcName } from '../../core/channel-bed.js';
+import { cardView, cardStatus, laterText, holdSeconds, CARD_LOOKAHEAD } from '../../core/channel-card.js';
 import { channelVideoContext } from '../../core/video-page-config.js';
 import { playerCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
@@ -41,10 +40,18 @@ import { mountBreadcrumb } from './breadcrumb.js';
 // writes nothing, so there is nothing to clear, and offering it would let a
 // tune-in wipe the deliberate resume position the viewer has in that same item.
 //
-// TASK-565 adds THE GAP — the card between items, the same card holding an
-// off-air channel, and the music bed under both (decisions 8, 12 and 13). The
-// card's own model is core/channel-card.js and the bed's is core/channel-bed.js;
-// what lives here is when the card goes up, when it comes down, and the DOM.
+// TASK-565 adds THE GAP — the card between items, and the same card holding an
+// off-air channel (decisions 8 and 12). The card's own model is
+// core/channel-card.js; what lives here is when the card goes up, when it comes
+// down, and the DOM.
+//
+// TASK-574 settles WHEN IT COMES DOWN — when the next programme actually starts,
+// never before (core/channel-card.js holdSeconds) — and takes the music bed out
+// entirely. Decision 13 specified a per-channel bed and it was built, but no
+// channel ever named an album, so it shipped without playing a note; the owner
+// would rather come back to it fresh than carry a feature nobody has heard. The
+// card is SILENT, and that is now the intended state — a session finding a
+// static, silent panel has not found a defect.
 
 var SERVER = window.location.origin;
 // The chrome re-renders every second: the marker is wrong within a second of
@@ -89,14 +96,12 @@ export function initChannelPage() {
   // now-playing line says what the TV is actually showing rather than the title
   // of the programme that just finished.
   var cardUp = false;
-  // The bed's tracks, and the album they came from. A channel names its bed once
-  // in its config, and a flip is a fresh page, so this is loaded once and never
-  // swapped — but the guard is on the ID rather than on emptiness, so a channel
-  // whose album resolves to nothing playable does not re-fetch on every card.
-  var bedList = [];
-  var bedAlbum = null;
-  var bedSeek = 0;
-  var bedEl = document.getElementById('channel-bed');
+  // The pending end of a hold. Kept so a rejoin from anywhere else — Back to
+  // live, the off-air poll — cancels it: a hold now runs as long as the slot the
+  // viewer skipped out of, so a stale timer firing minutes later would yank a
+  // viewer who had already rejoined, where the old fixed eight seconds gave it
+  // almost no window to happen in.
+  var holdTimer = null;
 
   function elapsedSeconds() { return (Date.now() - detailAt) / 1000; }
   // Where the CHANNEL is, right now. Same clock the strip's cards run on.
@@ -151,63 +156,6 @@ export function initChannelPage() {
     });
   }
 
-  // ── THE BED (decision 13, stories 3 and 4) ────────────────────────────────
-  //
-  // ⚠️ IT RUNS ON ITS OWN WALL CLOCK AND IS NEVER RESTARTED PER CARD. Every
-  // start is a lookup of where the album is RIGHT NOW (core/channel-bed.js),
-  // never a play from zero — otherwise you hear the first eight seconds of the
-  // same track forever, which is the jingle problem in disguise. Story 4 is how
-  // that is observable: two cards in a row, and the second carries on.
-  // A track that is already loaded is SEEKED, never re-sourced: re-setting the
-  // same src restarts the fetch and audibly gaps the bed when two cards land
-  // inside one track. A different track sets the src and lets `loadedmetadata`
-  // do the seek, because a position set before the metadata lands does not stick.
-  var BED_LOAD = {
-    'true': function(url) { bedEl.src = url; },
-    'false': function() { bedEl.currentTime = bedSeek; }
-  };
-  function renderCredit(track) {
-    var el = document.getElementById('card-credit');
-    el.textContent = '♪ ' + bedCredit(track);
-    el.classList.remove('hidden');
-  }
-  function playBed(spot) {
-    var url = mediaUrl(SERVER, bedSrcName(spot.track));
-    bedSeek = spot.offset;
-    BED_LOAD[(bedEl.src !== url) + ''](url);
-    bedEl.play().catch(noop);
-    renderCredit(spot.track);
-  }
-  // Where the album is RIGHT NOW — never a play from zero. An empty bed answers
-  // nothing and the card stays silent, which is what a channel that names no
-  // album is entitled to.
-  function startBed() {
-    [bedAt(bedList, Date.now() / 1000)].filter(Boolean).forEach(playBed);
-  }
-  function stopBed() {
-    bedEl.pause();
-    document.getElementById('card-credit').classList.add('hidden');
-  }
-  // The album landing while a card is ALREADY up — the first gap of a short
-  // opening item can beat the fetch. Without this that card is silent for no
-  // reason the viewer could see, and only the next one has a bed.
-  var BED_LATE = { 'true': startBed, 'false': noop };
-  function applyBed(album) {
-    bedList = bedTracks(album);
-    BED_LATE[cardUp + '']();
-  }
-  function loadBed(id) {
-    bedAlbum = id;
-    loadAlbum(SERVER, id).then(applyBed).catch(noop);
-  }
-  // A channel without a bed is legal and shows a silent card — that is what the
-  // empty filter answers, not an error.
-  function ensureBed() {
-    [detail.bed].filter(Boolean)
-      .filter(function(id) { return id !== bedAlbum; })
-      .forEach(loadBed);
-  }
-
   // ── THE CARD ──────────────────────────────────────────────────────────────
   //
   // One component, two callers (decision 8): the gap between two items, and a
@@ -243,13 +191,11 @@ export function initChannelPage() {
     cardUp = true;
     renderCard(cardView(detail));
     document.getElementById('channel-card').classList.remove('hidden');
-    startBed();
     sendChannelContext();
   }
   function hideCard() {
     cardUp = false;
     document.getElementById('channel-card').classList.add('hidden');
-    stopBed();
   }
 
   // Stop, and only stop. Escape/Backspace and the phone's own back leave the
@@ -299,7 +245,6 @@ export function initChannelPage() {
     detail = answer;
     detailAt = Date.now();
     renderIdent();
-    ensureBed();
     ON_AIR[!!channelRecord(answer) + '']();
   }
 
@@ -311,6 +256,7 @@ export function initChannelPage() {
   // later list come out of this one answer, so the request asks for both halves
   // rather than the endpoint's own default of three.
   function rejoin() {
+    clearTimeout(holdTimer);
     retuning = true;
     loadChannel(SERVER, channelId, profile, CARD_LOOKAHEAD)
       .then(applyChannel)
@@ -326,22 +272,25 @@ export function initChannelPage() {
       .catch(function() { navTo('error.html'); });
   }
 
-  // THE GAP (story 1). The card goes up on the schedule the player is already
-  // holding — which is why it can be drawn the instant an item ends, with
-  // nothing to fetch first — and the player rejoins when it clears.
+  // THE GAP (TASK-565 story 1). The card goes up on the schedule the player is
+  // already holding — which is why it can be drawn the instant an item ends,
+  // with nothing to fetch first — and the player rejoins when it clears.
   //
-  // ⚠️ THE CHANNEL RUNS THROUGH THE CARD. Nothing is paused: the next programme
-  // is already airing behind it, and the rejoin lands at whatever position the
-  // channel has reached, a few seconds in. That is what a continuity
-  // announcement is, and holding the schedule instead would make the channel a
-  // queue that waits.
+  // ⚠️ THE CHANNEL STILL RUNS THROUGH THE CARD. Nothing is paused: the hold is
+  // read off the channel's own clock, so the card comes down when the schedule
+  // says the next programme has started and never sooner (TASK-574 —
+  // core/channel-card.js holdSeconds says why the eight seconds is a floor and
+  // not the whole answer). An item that ended on time is followed within eight
+  // seconds by a programme already running; an item the viewer skipped out of
+  // holds for the rest of its slot, rather than clearing into the middle of the
+  // thing that just finished.
   //
   // `retuning` is what stops the tick asking again while the card is up; the
   // rejoin clears it.
   function interstitial() {
     retuning = true;
     showCard();
-    setTimeout(rejoin, CARD_SECONDS * 1000);
+    holdTimer = setTimeout(rejoin, holdSeconds(detail, elapsedSeconds()) * 1000);
   }
 
   // ⚠️ RESTART DOES NOT PAUSE THE CHANNEL (decision 11) — this seeks the VIEWER
@@ -424,13 +373,6 @@ export function initChannelPage() {
   player.setSeriesMode(false);
   document.getElementById('btn-restart').addEventListener('click', restart);
   document.getElementById('btn-live').addEventListener('click', rejoin);
-  // A position set before the metadata lands does not stick, so the seek the bed
-  // needs happens once the track is actually loaded.
-  bedEl.addEventListener('loadedmetadata', function() { bedEl.currentTime = bedSeek; });
-  // The bed track running out under a card that is still up. Asking the clock
-  // again lands at the start of the next track, so the album carries on rather
-  // than the card falling silent.
-  bedEl.addEventListener('ended', startBed);
 
   var KEY_TARGET = function(e) { player.handleVideoKey(e); };
   var keys = {};

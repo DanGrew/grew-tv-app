@@ -287,9 +287,12 @@ test.describe('tuned into a channel', () => {
   //
   // TASK-565 put the interstitial card in that join, so the rejoin lands when
   // the card clears rather than on the `ended` event itself — the clock is faked
-  // so the wait costs no test time. The card's own behaviour is
-  // tests/channel-interstitial.test.js; what matters here is that the join still
-  // happens and still asks the endpoint rather than stepping a list.
+  // so the wait costs no test time. TASK-574 made that hold run until the next
+  // programme actually starts, so the wait here is the rest of the slot (the
+  // fixture is 120s into 480) rather than a flat eight seconds. The card's own
+  // behaviour is tests/channel-interstitial.test.js; what matters here is that
+  // the join still happens and still asks the endpoint rather than stepping a
+  // list.
   test('the end of the item rejoins wherever the channel has got to', async ({ page }) => {
     await openChannel(page, 'cartoon-club');
     await expect(page.locator('#video')).toHaveAttribute('src', /bluey-s1e22/);
@@ -301,7 +304,7 @@ test.describe('tuned into a channel', () => {
     })));
     await page.clock.install();
     await page.evaluate(() => document.getElementById('video').dispatchEvent(new Event('ended')));
-    await page.clock.fastForward(8000);
+    await page.clock.fastForward((480 - 120) * 1000 + 30000);
     await expect(page.locator('#video')).toHaveAttribute('src', /duggee-s1e04/);
   });
 

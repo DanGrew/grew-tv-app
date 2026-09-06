@@ -1,7 +1,7 @@
 import {
   CARD_SECONDS, TIMED_LINES, LATER_LINES, CARD_LOOKAHEAD,
   NEXT_CARD, OFF_AIR_CARD, LATER_SEPARATOR, BETWEEN,
-  timedLines, laterTitles, laterText, cardKind, cardView, cardStatus
+  timedLines, laterTitles, laterText, cardKind, cardView, cardStatus, holdSeconds
 } from '../../core/channel-card.js';
 
 // FEAT-560/TASK-565 — the card in the gap, and the same card holding an off-air
@@ -37,7 +37,7 @@ function detail(over) {
     on_air: true,
     item: { item_id: 'bluey-s1e22', title: 'Hammerbarn' },
     offset_seconds: 120, runtime_seconds: 480, next_on_air: null,
-    bed: 'ootb', next: NEXT
+    next: NEXT
   }, over || {});
 }
 
@@ -49,9 +49,10 @@ function offAir(over) {
 }
 
 describe('the numbers the card is drawn to', () => {
-  it('holds the card for five to ten seconds', () => {
+  it('floors the hold at five to ten seconds', () => {
     // Decision 12's window. Long enough to read three lines at TV distance,
-    // short enough that the next programme has barely started behind it.
+    // short enough that the next programme has barely started behind it. It is
+    // the FLOOR under the hold, not the whole of it — see holdSeconds below.
     expect(CARD_SECONDS).toBe(8);
     expect(CARD_SECONDS).toBeGreaterThanOrEqual(5);
     expect(CARD_SECONDS).toBeLessThanOrEqual(10);
@@ -72,6 +73,55 @@ describe('the numbers the card is drawn to', () => {
     expect(CARD_LOOKAHEAD).toBe(TIMED_LINES + LATER_LINES);
     expect(CARD_LOOKAHEAD).toBe(7);
     expect(CARD_LOOKAHEAD).toBeLessThanOrEqual(10);
+  });
+});
+
+// TASK-574 — how long the card holds. The floor and the schedule are ONE rule
+// answering two situations, and the tests below are the two situations: an item
+// that ended on schedule has nothing to wait for, and one that ended early
+// leaves the channel still airing it.
+describe('holdSeconds', () => {
+  it('holds only the floor when the channel has already rolled on', () => {
+    // The slot is 480s and the channel has reached 480 — the next programme is
+    // airing behind the card, so waiting for it would be waiting for nothing.
+    expect(holdSeconds(detail({ offset_seconds: 480 }), 0)).toBe(CARD_SECONDS);
+  });
+
+  it('holds the rest of the slot when the item ended early', () => {
+    // 120s into an eight-minute slot: the channel has SIX MINUTES of it still to
+    // air, and clearing the card before then drops the viewer back into the
+    // middle of the item that just ended — the whole of story 1.
+    expect(holdSeconds(detail(), 0)).toBe(360);
+  });
+
+  it('counts the seconds since the answer was served, not just the offset', () => {
+    // The answer is only true at the moment it arrived. Two minutes later the
+    // channel is two minutes further into the slot, so the hold is shorter.
+    expect(holdSeconds(detail(), 120)).toBe(240);
+  });
+
+  it('never goes under the floor as the slot runs out', () => {
+    // A second before the slot ends there is nothing worth holding for, and a
+    // card up for one second is a flicker.
+    expect(holdSeconds(detail({ offset_seconds: 479 }), 0)).toBe(CARD_SECONDS);
+  });
+
+  it('holds the floor for a channel that is off air', () => {
+    // No slot running means nothing to wait for — the off-air card is held by
+    // its own poll, not by this.
+    expect(holdSeconds(offAir(), 0)).toBe(CARD_SECONDS);
+  });
+
+  it('holds the floor when the answer states no runtime', () => {
+    // A channel with no runtime still shows a card; it just has no slot to run
+    // the hold out against. There is no companion case for a missing OFFSET:
+    // the endpoint never sends one without the other, so a test for it would be
+    // asserting on a shape nothing produces.
+    expect(holdSeconds(detail({ runtime_seconds: null }), 0)).toBe(CARD_SECONDS);
+  });
+
+  it('holds the floor with no answer at all', () => {
+    expect(holdSeconds(null, 0)).toBe(CARD_SECONDS);
   });
 });
 
