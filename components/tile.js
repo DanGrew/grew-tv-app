@@ -147,6 +147,8 @@ export function applyChannelView(tile, view) {
   tile.querySelector('.channel-name').textContent = view.name;
   tile.querySelector('.tile-title').textContent = view.title;
   tile.querySelector('.channel-time').textContent = view.time || '';
+  tile.querySelector('.channel-next').textContent = view.next || '';
+  tile.querySelector('.channel-next').hidden = !view.next;
   tile.querySelector('.channel-progress-fill').style.width = view.percent + '%';
   return tile;
 }
@@ -212,6 +214,7 @@ export function createChannelTile(server, card, opts) {
   meta.appendChild(channelLine('channel-name'));
   meta.appendChild(channelLine('tile-title'));
   meta.appendChild(channelLine('channel-time'));
+  meta.appendChild(channelLine('channel-next'));
   tile.appendChild(meta);
   applyChannelView(tile, view);
 

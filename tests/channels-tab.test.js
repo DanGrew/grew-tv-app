@@ -68,16 +68,37 @@ test.describe('with channels on air', () => {
     expect(width).toBeLessThan(30);
   });
 
-  // Story 4, both halves.
+  // TASK-570 story 1 — the card says what follows, beside what is on now, so a
+  // channel nearly over still tells you whether to sit down.
+  test('a card names what is on after this one', async ({ page }) => {
+    await openBrowse(page);
+    const card = page.locator('.channel-tile[data-channel="cartoon-club"]');
+    await expect(card.locator('.tile-title')).toHaveText('Bluey');
+    await expect(card.locator('.channel-next')).toHaveText('Next: Bluey: Keepy Uppy');
+  });
+
+  // TASK-570 story 3 — the line goes, rather than leaving a gap where it was.
+  test('a channel with nothing after it loses the line rather than blanking it', async ({ page }) => {
+    await withChannels(page, [Object.assign({}, ON_AIR, { following: null })]);
+    await openBrowse(page);
+    const card = page.locator('.channel-tile[data-channel="cartoon-club"]');
+    await expect(card.locator('.tile-title')).toHaveText('Bluey');
+    await expect(card.locator('.channel-next')).toBeHidden();
+  });
+
+  // Story 4, both halves — plus TASK-570 story 2: the return time is not
+  // replaced, and no following line appears beside it.
   test('an off-air channel says so, and names its return when there is one', async ({ page }) => {
     await openBrowse(page);
     const timed = page.locator('.channel-tile[data-channel="after-dark"]');
     await expect(timed.locator('.tile-title')).toHaveText('Off air');
     await expect(timed.locator('.channel-time')).toHaveText('Back at 21:00');
+    await expect(timed.locator('.channel-next')).toBeHidden();
 
     const plain = page.locator('.channel-tile[data-channel="matinee"]');
     await expect(plain.locator('.tile-title')).toHaveText('Off air');
     await expect(plain.locator('.channel-time')).toHaveText('');
+    await expect(plain.locator('.channel-next')).toBeHidden();
   });
 
   // Story 3 — the card ticks, and it is wrong within a minute of render if it
@@ -183,6 +204,8 @@ test.describe('the companion mirror', () => {
     await expect(card.locator('.nm')).toHaveText('Cartoon Club');
     await expect(card.locator('.chan-now')).toHaveText('Bluey');
     await expect(card.locator('.chan-time')).toHaveText('2m/8m');
+    // TASK-570 — the mirror invariant: the phone says what the TV says.
+    await expect(card.locator('.chan-next')).toHaveText('Next: Bluey: Keepy Uppy');
   });
 
   test('an off-air channel reads the same on the phone', async ({ page }) => {
@@ -194,6 +217,18 @@ test.describe('the companion mirror', () => {
     const card = page.locator('.ph-chan[data-channel="after-dark"]');
     await expect(card.locator('.chan-now')).toHaveText('Off air');
     await expect(card.locator('.chan-time')).toHaveText('Back at 21:00');
+    await expect(card.locator('.chan-next')).toBeHidden();
+  });
+
+  test('a channel with nothing after it drops the line on the phone too', async ({ page }) => {
+    await installApi(page);
+    await withChannels(page, [Object.assign({}, ON_AIR, { following: null })]);
+    await mockApp(page);
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="channels"]').click();
+    const card = page.locator('.ph-chan[data-channel="cartoon-club"]');
+    await expect(card.locator('.chan-now')).toHaveText('Bluey');
+    await expect(card.locator('.chan-next')).toBeHidden();
   });
 
   // TASK-564 — the tap drives the TV, through the SAME `select` funnel every
