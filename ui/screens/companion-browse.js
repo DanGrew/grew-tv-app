@@ -159,6 +159,8 @@ export function initPage() {
         el.classList.toggle('off-air', !view.onAir);
         el.querySelector('.chan-time').textContent = [view.time].filter(Boolean).concat([''])[0];
         el.querySelector('.chan-now').textContent = view.title;
+        el.querySelector('.chan-next').textContent = view.next;
+        el.querySelector('.chan-next').hidden = !view.next;
         el.querySelector('.chan-bar i').style.width = view.percent + '%';
       });
     });
@@ -366,6 +368,12 @@ export function initPage() {
     var now = document.createElement('span');
     now.className = 'chan-now';
     now.textContent = view.title;
+    // The mirror of the TV's fourth line (TASK-570), hidden rather than blank
+    // when the channel names nothing after this one.
+    var next = document.createElement('span');
+    next.className = 'chan-next';
+    next.textContent = view.next;
+    next.hidden = !view.next;
     var bar = document.createElement('span');
     bar.className = 'chan-bar';
     var fill = document.createElement('i');
@@ -374,6 +382,7 @@ export function initPage() {
     el.appendChild(nm);
     el.appendChild(time);
     el.appendChild(now);
+    el.appendChild(next);
     el.appendChild(bar);
     return el;
   }
