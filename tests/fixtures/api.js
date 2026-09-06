@@ -398,10 +398,11 @@ const CHANNEL_NEXT = [
 ];
 function channelDetailResponse(line) {
   return Object.assign({}, line, {
-    // TASK-565 — a channel that names an album as its bed, because a card with a
-    // bed is the shipping shape and a silent one the exception. `ootb` is the
-    // one album with a resolvable /api/album detail here, so the bed's tracks
-    // resolve through the same route the music player already uses.
+    // ⚠️ `bed` is on the WIRE and the app no longer reads it. TASK-574 removed
+    // the music bed from the card; this is an app-only change, so
+    // api/channels.py `_detail` still sends the album id and this fixture still
+    // has to carry it — the stub is what the backend answers, not what the app
+    // consumes, and tests/unit/stub-contract-shape.test.js binds it to that.
     bed: 'ootb',
     tag: 'preschool',
     started_at: '2026-09-04T17:00:00',

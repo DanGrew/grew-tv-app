@@ -65,7 +65,7 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
 #channel-ident.hidden { display: none; }
 #controls.hidden ~ #channel-ident { opacity: 0; }
 /* TASK-565 — the card in the gap, and the same card holding an off-air channel
-   (IDEA-CHANNELS decisions 8/12/13). Sits ABOVE the video and the controls but
+   (IDEA-CHANNELS decisions 8/12). Sits ABOVE the video and the controls but
    BELOW #channel-ident and #device-badge, which keep saying which channel and
    which screen while it is up, and is pointer-transparent because nothing on it
    is interactive — it is a thing to read, not to operate. The timed lines keep
@@ -86,8 +86,7 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
 #card-rule { height: 1px; background: var(--border); width: 880px; }
 #card-later-block { display: flex; flex-direction: column; gap: 12px; }
 #card-later { font-size: var(--fs-md); color: var(--text-muted); }
-#card-credit { position: fixed; right: 40px; bottom: 35px; z-index: 4; font-size: var(--fs-xs); color: var(--text-muted); pointer-events: none; }
-#card-headline.hidden, #card-return.hidden, #card-rule.hidden, #card-later-block.hidden, #card-credit.hidden { display: none; }
+#card-headline.hidden, #card-return.hidden, #card-rule.hidden, #card-later-block.hidden { display: none; }
 #time-display { font-size: var(--fs-sm); color: var(--text-muted); min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
 .jump-popup { position: fixed; background: var(--surface); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); border: 2.5px solid var(--border); border-radius: var(--radius); padding: 18px; z-index: 100; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
 .jump-title { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); text-align: center; margin-bottom: 12px; }
@@ -269,8 +268,6 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
       </div>
     </div>
   </div>
-  <div id="card-credit" class="hidden"></div>
-  <audio id="channel-bed" preload="none"></audio>
   <div id="channel-ident" class="hidden"></div>
   <div id="device-badge" title="This screen"></div>
 </div>

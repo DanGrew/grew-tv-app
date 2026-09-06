@@ -10,7 +10,9 @@
 // Fed by GET /api/channels/{id}?profile= (grew-tv api/channels.py) — the on-now
 // line plus what the player needs beyond it:
 //   { channel_id, name, item_type, on_air, item, offset_seconds,
-//     runtime_seconds, next_on_air, bed, tag, started_at, ends_at, next }
+//     runtime_seconds, next_on_air, tag, started_at, ends_at, next }
+// (the answer also carries `bed`, an album id the app no longer reads — TASK-574
+// removed the music bed from the card and left the backend field alone)
 // `next` is the items after the one playing, each { item, tag, starts_at,
 // ends_at }.
 //
