@@ -6,9 +6,10 @@
 // Fed by GET /api/channels?profile= (grew-tv api/channels.py), one on-now line
 // per channel this profile may see:
 //   { channel_id, name, item_type, on_air, item, offset_seconds,
-//     runtime_seconds, next_on_air }
+//     runtime_seconds, next_on_air, following }
 // `item` is a resolved catalog entry, a minimal { item_id } for an id the
-// catalog no longer knows, or null when nothing is on.
+// catalog no longer knows, or null when nothing is on. `following` is the one
+// programme after it, in the same shape, or null (TASK-570).
 //
 // ⚠️ THE BAR IS THE CHANNEL'S POSITION, NOT THE VIEWER'S (decision 14). It
 // wears the same shape as core/tile-model.js's watch-progress bar and means the
@@ -123,9 +124,26 @@ export function itemTitle(item) {
   return item.title || item.item_id || '';
 }
 
+// What the card says comes after the one playing — the fourth line, so a
+// channel two minutes from the end still says whether it is worth sitting down
+// (TASK-570).
+//
+// Empty rather than a placeholder when the channel names nothing after this:
+// story 3 is that the card loses the line, never that it grows a blank row
+// where the line would be. Off air never reaches here at all — what follows is
+// the return time the card already draws, and saying it twice was the thing
+// the owner ruled out.
+var NEXT_PREFIX = 'Next: ';
+
+export function nextLabel(following) {
+  var title = itemTitle(following);
+  if (!title) return '';
+  return NEXT_PREFIX + title;
+}
+
 // One channel's card, fully resolved for render. Three states, never more:
 //
-//   on air        — what's playing, `2m/8m`, and a bar that fills
+//   on air        — what's playing, `2m/8m`, what's after it, and a bar that fills
 //   off air, timed— "Off air" and when it's back
 //   off air, plain— "Off air", naming nothing
 //
@@ -137,13 +155,15 @@ export function channelCardView(line, elapsedSeconds) {
   var offset = tickedOffset(line, elapsedSeconds);
   if (!line.on_air) {
     return { onAir: false, name: line.name || '', title: OFF_AIR,
-             time: returnTimeLabel(line.next_on_air), percent: 0, poster: null };
+             time: returnTimeLabel(line.next_on_air), next: '', percent: 0,
+             poster: null };
   }
   return {
     onAir: true,
     name: line.name || '',
     title: itemTitle(line.item),
     time: positionLabel(offset, line.runtime_seconds),
+    next: nextLabel(line.following),
     percent: channelPercent(offset, line.runtime_seconds),
     poster: (line.item || {}).poster || null
   };

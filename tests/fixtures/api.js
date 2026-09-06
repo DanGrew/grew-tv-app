@@ -357,12 +357,16 @@ const CHANNEL_ON_AIR = {
   channel_id: 'cartoon-club', name: 'Cartoon Club', item_type: 'episode',
   on_air: true,
   item: { item_id: 'bluey-s1e22', title: 'Bluey', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null },
-  offset_seconds: 120, runtime_seconds: 480, next_on_air: null
+  offset_seconds: 120, runtime_seconds: 480, next_on_air: null,
+  // TASK-570 — the one programme after this one, resolved as `item` is. The
+  // card draws it as a fourth line; null off air and null when the channel has
+  // nothing after the current programme.
+  following: { item_id: 'bluey-s1e23', title: 'Bluey: Keepy Uppy', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null }
 };
 const CHANNEL_OFF_AIR_TIMED = {
   channel_id: 'after-dark', name: 'After Dark', item_type: 'film',
   on_air: false, item: null, offset_seconds: null, runtime_seconds: null,
-  next_on_air: '2026-09-04T21:00:00'
+  next_on_air: '2026-09-04T21:00:00', following: null
 };
 const CHANNEL_OFF_AIR_PLAIN = Object.assign({}, CHANNEL_OFF_AIR_TIMED, {
   channel_id: 'matinee', name: 'Matinee', next_on_air: null

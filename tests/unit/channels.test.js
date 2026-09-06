@@ -1,7 +1,7 @@
 import {
   CHANNEL_KIND, CHANNELS_TAB,
   minutesLabel, positionLabel, tickedOffset, channelPercent, returnTimeLabel, clockLabel,
-  itemTitle, channelCardView, channelTile, channelTiles, channelRails,
+  itemTitle, nextLabel, channelCardView, channelTile, channelTiles, channelRails,
   channelsById, hasChannels, withChannelsTab, landingTab, browseRestore,
   tileVariant, CHANNEL_TILE, LIBRARY_TILE, CHANNELS_RAIL
 } from '../../core/channels.js';
@@ -15,7 +15,8 @@ function onAir(over) {
   return Object.assign({
     channel_id: 'cartoon-club', name: 'Cartoon Club', item_type: 'episode',
     on_air: true, item: { item_id: 'bluey-s1e22', title: 'Bluey', poster: 'bluey.jpg' },
-    offset_seconds: 120, runtime_seconds: 480, next_on_air: null
+    offset_seconds: 120, runtime_seconds: 480, next_on_air: null,
+    following: { item_id: 'bluey-s1e23', title: 'Keepy Uppy', poster: 'keepy.jpg' }
   }, over || {});
 }
 
@@ -23,7 +24,7 @@ function offAir(over) {
   return Object.assign({
     channel_id: 'after-dark', name: 'After Dark', item_type: 'film',
     on_air: false, item: null, offset_seconds: null, runtime_seconds: null,
-    next_on_air: '2026-09-04T21:00:00'
+    next_on_air: '2026-09-04T21:00:00', following: null
   }, over || {});
 }
 
@@ -178,6 +179,26 @@ describe('itemTitle', () => {
   });
 });
 
+// TASK-570 — the fourth line, so a channel nearly over still says whether it is
+// worth sitting down.
+describe('nextLabel', () => {
+  it('names the programme after this one', () => {
+    expect(nextLabel({ item_id: 'bluey-s1e23', title: 'Keepy Uppy' }))
+      .toBe('Next: Keepy Uppy');
+  });
+
+  it('falls back to the id the catalog no longer knows, as the card above does', () => {
+    expect(nextLabel({ item_id: 'gone' })).toBe('Next: gone');
+  });
+
+  it('is empty when the channel names nothing after this — no blank row', () => {
+    expect(nextLabel(null)).toBe('');
+    expect(nextLabel(undefined)).toBe('');
+    expect(nextLabel({})).toBe('');
+    expect(nextLabel({ title: '' })).toBe('');
+  });
+});
+
 describe('channelCardView', () => {
   it('on air: what is playing, its position and a bar that has moved', () => {
     var v = channelCardView(onAir(), 60);
@@ -189,6 +210,18 @@ describe('channelCardView', () => {
     expect(v.poster).toBe('bluey.jpg');
   });
 
+  // Story 1 — the line sits BESIDE what is on now, never in place of it.
+  it('on air: says what is on after this, alongside what is on now', () => {
+    var v = channelCardView(onAir(), 60);
+    expect(v.title).toBe('Bluey');
+    expect(v.next).toBe('Next: Keepy Uppy');
+  });
+
+  // Story 3.
+  it('on air with nothing after it: the card loses the line', () => {
+    expect(channelCardView(onAir({ following: null }), 60).next).toBe('');
+  });
+
   // Story 4, first half — the endpoint gave a return time, so the card names it.
   it('off air with a return time: says so, and when it is back', () => {
     var v = channelCardView(offAir(), 60);
@@ -198,6 +231,15 @@ describe('channelCardView', () => {
     expect(v.time).toBe('Back at 21:00');
     expect(v.percent).toBe(0);
     expect(v.poster).toBe(null);
+  });
+
+  // Story 2 — the return time is not replaced, and not said twice. Even handed
+  // a following item, an off-air card draws no fourth line.
+  it('off air: the return time stands alone, with no following line', () => {
+    expect(channelCardView(offAir(), 60).next).toBe('');
+    expect(channelCardView(
+      offAir({ following: { item_id: 'x', title: 'Later Thing' } }), 60).next)
+      .toBe('');
   });
 
   // Story 4, second half, and the owner's 2026-09-03 call: a channel between
