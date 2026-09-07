@@ -93,7 +93,7 @@ button:hover { background: var(--surface-hi); }
 .channel-meta { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .channel-name { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .channel-tile .tile-title { padding: 0; }
-.channel-time { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; min-height: calc(var(--fs-xs) * 1.2); }
+.channel-time { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; min-height: calc(var(--fs-xs) * 1.2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* What's on after this (TASK-570). Unlike .channel-time this reserves NO
    height: a channel with nothing after the current programme loses the line
    outright rather than leaving a gap where it would be (story 3), and off air

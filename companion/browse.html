@@ -71,6 +71,10 @@ body { display: flex; flex-direction: column; padding: 12px 12px calc(12px + var
    this is how far the CHANNEL has got. The two sit on the same screen. */
 .ph-chan .chan-time { flex: 0 0 auto; color: var(--live); font-variant-numeric: tabular-nums; }
 .ph-chan .chan-now { flex: 0 0 100%; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Which episode of it (TASK-588) — .chan-now above is the SHOW, and this is
+   where it sits in it. Muted and smaller, because the recognisable half leads;
+   hidden outright for a film, which has no episode to name. */
+.ph-chan .chan-ep { flex: 0 0 100%; line-height: 1.2; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* What's on after this (TASK-570) — the phone's mirror of the TV's fourth
    line. Hidden outright, never a reserved blank row, when the channel names
    nothing after the current programme. */

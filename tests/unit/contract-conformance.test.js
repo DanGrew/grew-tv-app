@@ -191,8 +191,21 @@ describe.skipIf(!HAS_CONTRACT)('backend contract conformance (SYS-017 / TASK-311
       expect(channelCardView(channels.channels[0], 0).onAir).toBe(true);
     });
 
-    it('channelCardView names what is on (proves `item.title`)', () => {
-      expect(channelCardView(channels.channels[0], 0).title).toBe("Millie's First Walk");
+    it('channelCardView names the SHOW an episode is of (proves `item.series`)', () => {
+      // TASK-588. `channels[0]` is the episode channel: the backend places
+      // m-walk in the Millie series, so the card leads with the show and the
+      // episode's own title moves one line down. A renamed or dropped `series`
+      // block reads undefined here and the card falls back to "Millie's First
+      // Walk" — which is exactly the un-fixed bug, so this goes red.
+      const view = channelCardView(channels.channels[0], 0);
+      expect(view.title).toBe('Millie');
+      expect(view.episode).toBe("Millie's First Walk · S1 E1");
+    });
+
+    it('channelCardView leaves a film naming itself (proves `series` is null, not absent)', () => {
+      const view = channelCardView(channels.channels[1], 0);
+      expect(view.title).toBe('Toy Story');
+      expect(view.episode).toBe('');
     });
 
     it('channelCardView reads position and runtime (proves `offset_seconds`,`runtime_seconds`)', () => {

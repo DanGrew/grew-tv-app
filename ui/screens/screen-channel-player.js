@@ -4,7 +4,7 @@ import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadChannel, loadChannels } from '../../core/app-api.js';
 import { tickedOffset, channelPercent } from '../../core/channels.js';
-import { isBehindLive, shouldRetune, upNextTitle, channelRecord, identLabel, flipTarget, channelIds } from '../../core/channel-player.js';
+import { isBehindLive, shouldRetune, upNextParts, channelRecord, identLabel, flipTarget, channelIds } from '../../core/channel-player.js';
 import { cardView, cardStatus, laterText, holdSeconds, CARD_LOOKAHEAD } from '../../core/channel-card.js';
 import { channelVideoContext } from '../../core/video-page-config.js';
 import { playerCrumbs } from '../../core/breadcrumb.js';
@@ -127,9 +127,11 @@ export function initChannelPage() {
     document.getElementById('btn-live').classList.toggle('hidden', !behind());
   }
   // Story 6 — up next is the PROGRAMME. The line is the one the player already
-  // renders for a queue; only what fills it changes.
+  // renders for a queue; only what fills it changes. TASK-588 — the show is the
+  // emphasised half and the episode trails it, so the line says the same thing
+  // the channel's own card does.
   function renderUpNext() {
-    [upNextTitle(detail)].filter(Boolean).forEach(function(title) { player.setUpNext('Up next: ', title); });
+    [upNextParts(detail)].filter(Boolean).forEach(function(p) { player.setUpNext(p.prefix, p.label, p.suffix); });
   }
   // Home › <channel> › <what's on>. The channel's own crumb returns to the
   // Channels tab, the way a music video's crumb returns to its playlist. The

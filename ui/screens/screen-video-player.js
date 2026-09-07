@@ -317,14 +317,22 @@ export function setup(config) {
 
   // ── inline up-next line under the title (FEAT-017) ─────────────────────────
   // prefix is the muted lead ("Up next: " mid-series, "" at the wrapping end);
-  // label is the emphasised episode title (or "Start again"). The page resolves
-  // both from the next-episode lookup (series-detail.upNextParts).
-  function setUpNext(prefix, label) {
+  // label is the emphasised title (or "Start again"). The page resolves both
+  // from the next-episode lookup (series-detail.upNextParts).
+  //
+  // TASK-588 — suffix is a second muted part after the label, so a channel can
+  // emphasise the SHOW and trail the episode under it: "Up next: **The
+  // Inbetweeners** · The Field Trip · S2 E1". Optional, and the queue callers
+  // pass none: their bold half is already the whole answer.
+  function setUpNext(prefix, label, suffix) {
     var el = document.getElementById('video-upnext');
     el.textContent = prefix;
     var b = document.createElement('b');
     b.textContent = label;
     el.appendChild(b);
+    var rest = document.createElement('span');
+    rest.textContent = [suffix].filter(Boolean).concat([''])[0];
+    el.appendChild(rest);
   }
 
   function clearUpNext() {

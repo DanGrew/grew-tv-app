@@ -1,7 +1,8 @@
 import {
   CHANNEL_KIND, CHANNELS_TAB,
   minutesLabel, positionLabel, tickedOffset, channelPercent, returnTimeLabel, clockLabel,
-  itemTitle, nextLabel, channelCardView, channelTile, channelTiles, channelRails,
+  itemTitle, seriesTitle, episodeSlot, leadTitle, channelSubLine,
+  nextLabel, channelCardView, channelTile, channelTiles, channelRails,
   channelsById, hasChannels, withChannelsTab, landingTab, browseRestore,
   tileVariant, CHANNEL_TILE, LIBRARY_TILE, CHANNELS_RAIL
 } from '../../core/channels.js';
@@ -18,6 +19,15 @@ function onAir(over) {
     offset_seconds: 120, runtime_seconds: 480, next_on_air: null,
     following: { item_id: 'bluey-s1e23', title: 'Keepy Uppy', poster: 'keepy.jpg' }
   }, over || {});
+}
+
+// TASK-588 — a resolved episode as api/channels.py sends it: its own title, and
+// the show it belongs to beside it. "Blood" is a real Black Books episode title
+// and names nothing on its own, which is the whole reason this task exists.
+function episodeOf(show, season, episode) {
+  return { item_id: 'bb-s2e4', title: 'Blood', poster: 'bb.jpg',
+           series: { id: 'series-black-books', title: show,
+                     season: season, episode: episode } };
 }
 
 function offAir(over) {
@@ -179,12 +189,87 @@ describe('itemTitle', () => {
   });
 });
 
+// TASK-588 — an episode says what show it is. api/channels.py sends the `series`
+// block on an episode it can place and null on everything else, so nothing here
+// asks what kind of item it is looking at.
+describe('seriesTitle', () => {
+  it('names the show', () => {
+    expect(seriesTitle(episodeOf('Black Books', 2, 4))).toBe('Black Books');
+  });
+
+  it('is empty for anything with no show — a film, a track, a home movie', () => {
+    expect(seriesTitle({ item_id: 'alien', title: 'Alien', series: null })).toBe('');
+    expect(seriesTitle({ item_id: 'alien', title: 'Alien' })).toBe('');
+    expect(seriesTitle(null)).toBe('');
+    expect(seriesTitle(undefined)).toBe('');
+  });
+
+  it('is empty for a show the catalog never named', () => {
+    expect(seriesTitle({ title: 'Blood', series: { id: 'black-books' } })).toBe('');
+    expect(seriesTitle({ title: 'Blood', series: { id: 'x', title: '' } })).toBe('');
+  });
+});
+
+describe('episodeSlot', () => {
+  it('is the episode and where it sits in the show', () => {
+    expect(episodeSlot(episodeOf('Black Books', 2, 4))).toBe('Blood · S2 E4');
+  });
+
+  // A show that numbered nothing still reads — the missing half costs the
+  // numbers, never the episode's own name.
+  it('drops the numbers rather than the name when the show numbers nothing', () => {
+    expect(episodeSlot(episodeOf('By Age', null, null))).toBe('Blood');
+    expect(episodeSlot(episodeOf('By Age', 2, null))).toBe('Blood');
+    expect(episodeSlot(episodeOf('By Age', null, 4))).toBe('Blood');
+  });
+
+  // Season and episode zero are real numbers — a Christmas special is S0 E1 —
+  // so the check is against null, never falsiness.
+  it('draws a season or episode of zero, which is a real number', () => {
+    expect(episodeSlot(episodeOf('Black Books', 0, 1))).toBe('Blood · S0 E1');
+    expect(episodeSlot(episodeOf('Black Books', 2, 0))).toBe('Blood · S2 E0');
+  });
+
+  it('names the id when the catalog forgot the episode but still places it', () => {
+    expect(episodeSlot({ item_id: 'gone', series: { title: 'Black Books', season: 1, episode: 2 } }))
+      .toBe('gone · S1 E2');
+  });
+
+  it('is empty for anything with no show — a film draws no second line', () => {
+    expect(episodeSlot({ item_id: 'alien', title: 'Alien', series: null })).toBe('');
+    expect(episodeSlot(null)).toBe('');
+    expect(episodeSlot({})).toBe('');
+  });
+});
+
+// THE principle — the recognisable half leads.
+describe('leadTitle', () => {
+  it('is the show when there is one, because a viewer recognises the show', () => {
+    expect(leadTitle(episodeOf('Black Books', 2, 4))).toBe('Black Books');
+  });
+
+  it('is the item itself when there is no show — every film, track and clip', () => {
+    expect(leadTitle({ item_id: 'alien', title: 'Alien' })).toBe('Alien');
+  });
+
+  it('still falls back to the id the catalog no longer knows', () => {
+    expect(leadTitle({ item_id: 'gone-2019' })).toBe('gone-2019');
+    expect(leadTitle(null)).toBe('');
+  });
+});
+
 // TASK-570 — the fourth line, so a channel nearly over still says whether it is
 // worth sitting down.
 describe('nextLabel', () => {
   it('names the programme after this one', () => {
     expect(nextLabel({ item_id: 'bluey-s1e23', title: 'Keepy Uppy' }))
       .toBe('Next: Keepy Uppy');
+  });
+
+  // TASK-588 — "Next: Librarian" answers nothing. The show, not the episode:
+  // this line exists to say whether it is worth sitting down.
+  it('names the SHOW after this one, not its episode', () => {
+    expect(nextLabel(episodeOf('Not Going Out', 2, 3))).toBe('Next: Not Going Out');
   });
 
   it('falls back to the id the catalog no longer knows, as the card above does', () => {
@@ -222,6 +307,31 @@ describe('channelCardView', () => {
     expect(channelCardView(onAir({ following: null }), 60).next).toBe('');
   });
 
+  // TASK-588 story 1 — the card leads with Black Books and puts Blood under it.
+  it('on air with an episode: the SHOW is the title, the episode sits under it', () => {
+    var v = channelCardView(onAir({ item: episodeOf('Black Books', 2, 4) }), 60);
+    expect(v.title).toBe('Black Books');
+    expect(v.episode).toBe('Blood · S2 E4');
+    expect(channelSubLine(v)).toBe('Blood · S2 E4 · 3m/8m');
+  });
+
+  // TASK-588 story 3 — a film, a home movie, a track or a music video draws
+  // exactly as it did before this task.
+  it('on air with no show: the card is unchanged, with no second line', () => {
+    var v = channelCardView(onAir(), 60);
+    expect(v.title).toBe('Bluey');
+    expect(v.episode).toBe('');
+    expect(channelSubLine(v)).toBe('3m/8m');
+  });
+
+  // TASK-588 story 4.
+  it('on air with an episode the catalog knows no show for: its own title, nothing else', () => {
+    var v = channelCardView(
+      onAir({ item: { item_id: 'orphan', title: 'Blood', series: null } }), 60);
+    expect(v.title).toBe('Blood');
+    expect(v.episode).toBe('');
+  });
+
   // Story 4, first half — the endpoint gave a return time, so the card names it.
   it('off air with a return time: says so, and when it is back', () => {
     var v = channelCardView(offAir(), 60);
@@ -251,6 +361,14 @@ describe('channelCardView', () => {
     expect(v.title).toBe('Off air');
     expect(v.time).toBe(null);
     expect(v.percent).toBe(0);
+  });
+
+  // TASK-588 — off air has no episode to name, so the sub line is the return
+  // time alone, exactly what that line has always carried.
+  it('off air: the sub line is the return time and nothing else', () => {
+    expect(channelSubLine(channelCardView(offAir(), 60))).toBe('Back at 21:00');
+    expect(channelSubLine(channelCardView(offAir({ next_on_air: null }), 60))).toBe('');
+    expect(channelCardView(offAir(), 60).episode).toBe('');
   });
 
   it('draws an unnamed channel off air too', () => {
