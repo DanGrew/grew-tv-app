@@ -55,12 +55,14 @@ test.describe('with channels on air', () => {
   });
 
   // Story 2 — position over runtime in minutes, and a bar on the artwork.
+  // TASK-588 — the title line is the SHOW, and the episode joins the position
+  // on the line below it.
   test('a card names the channel, what is on, and how far in', async ({ page }) => {
     await openBrowse(page);
     const card = page.locator('.channel-tile[data-channel="cartoon-club"]');
     await expect(card.locator('.channel-name')).toHaveText('Cartoon Club');
     await expect(card.locator('.tile-title')).toHaveText('Bluey');
-    await expect(card.locator('.channel-time')).toHaveText('2m/8m');
+    await expect(card.locator('.channel-time')).toHaveText('Sleepytime · S1 E22 · 2m/8m');
     // 120s into 480s. A RANGE, not 25% exactly: the bar is already ticking by
     // the time this runs, which is the point of it (story 3).
     const width = parseFloat(await card.locator('.channel-progress-fill').evaluate(function(el) { return el.style.width; }));
@@ -70,11 +72,25 @@ test.describe('with channels on air', () => {
 
   // TASK-570 story 1 — the card says what follows, beside what is on now, so a
   // channel nearly over still tells you whether to sit down.
+  // TASK-588 — it names the SHOW: "Next: Keepy Uppy" tells a viewer nothing.
   test('a card names what is on after this one', async ({ page }) => {
     await openBrowse(page);
     const card = page.locator('.channel-tile[data-channel="cartoon-club"]');
     await expect(card.locator('.tile-title')).toHaveText('Bluey');
-    await expect(card.locator('.channel-next')).toHaveText('Next: Bluey: Keepy Uppy');
+    await expect(card.locator('.channel-next')).toHaveText('Next: Bluey');
+  });
+
+  // TASK-588 story 3 — a film has no show, so its card is exactly what it was:
+  // its own title on the title line and the bare position beneath.
+  test('a film card is unchanged — its own title, and no episode line', async ({ page }) => {
+    await withChannels(page, [Object.assign({}, ON_AIR, {
+      item: { item_id: 'alien', title: 'Alien', poster: null, itemType: 'film', ext: 'mp4', subtitles: null, series: null },
+      following: null
+    })]);
+    await openBrowse(page);
+    const card = page.locator('.channel-tile[data-channel="cartoon-club"]');
+    await expect(card.locator('.tile-title')).toHaveText('Alien');
+    await expect(card.locator('.channel-time')).toHaveText('2m/8m');
   });
 
   // TASK-570 story 3 — the line goes, rather than leaving a gap where it was.
@@ -109,9 +125,9 @@ test.describe('with channels on air', () => {
     await withChannels(page, [Object.assign({}, ON_AIR, { offset_seconds: 118 })]);
     await openBrowse(page);
     const card = page.locator('.channel-tile[data-channel="cartoon-club"]');
-    await expect(card.locator('.channel-time')).toHaveText('1m/8m');
+    await expect(card.locator('.channel-time')).toHaveText('Sleepytime · S1 E22 · 1m/8m');
     const before = await card.locator('.channel-progress-fill').getAttribute('style');
-    await expect(card.locator('.channel-time')).toHaveText('2m/8m');
+    await expect(card.locator('.channel-time')).toHaveText('Sleepytime · S1 E22 · 2m/8m');
     const after = await card.locator('.channel-progress-fill').getAttribute('style');
     expect(after).not.toBe(before);
   });
@@ -204,8 +220,27 @@ test.describe('the companion mirror', () => {
     await expect(card.locator('.nm')).toHaveText('Cartoon Club');
     await expect(card.locator('.chan-now')).toHaveText('Bluey');
     await expect(card.locator('.chan-time')).toHaveText('2m/8m');
+    // TASK-588 — the mirror invariant, and story 5: the show leads and the
+    // episode sits under it here exactly as it does on the TV. The phone lays
+    // the two out in its own shape (the position rides the name row up top),
+    // but it says the same thing.
+    await expect(card.locator('.chan-ep')).toHaveText('Sleepytime · S1 E22');
     // TASK-570 — the mirror invariant: the phone says what the TV says.
-    await expect(card.locator('.chan-next')).toHaveText('Next: Bluey: Keepy Uppy');
+    await expect(card.locator('.chan-next')).toHaveText('Next: Bluey');
+  });
+
+  // TASK-588 story 3, on the phone — a film has no episode line to draw.
+  test('a film drops the episode line on the phone too', async ({ page }) => {
+    await installApi(page);
+    await withChannels(page, [Object.assign({}, ON_AIR, {
+      item: { item_id: 'alien', title: 'Alien', poster: null, itemType: 'film', ext: 'mp4', subtitles: null, series: null }
+    })]);
+    await mockApp(page);
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="channels"]').click();
+    const card = page.locator('.ph-chan[data-channel="cartoon-club"]');
+    await expect(card.locator('.chan-now')).toHaveText('Alien');
+    await expect(card.locator('.chan-ep')).toBeHidden();
   });
 
   test('an off-air channel reads the same on the phone', async ({ page }) => {
@@ -217,6 +252,7 @@ test.describe('the companion mirror', () => {
     const card = page.locator('.ph-chan[data-channel="after-dark"]');
     await expect(card.locator('.chan-now')).toHaveText('Off air');
     await expect(card.locator('.chan-time')).toHaveText('Back at 21:00');
+    await expect(card.locator('.chan-ep')).toBeHidden();
     await expect(card.locator('.chan-next')).toBeHidden();
   });
 

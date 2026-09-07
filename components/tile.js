@@ -7,7 +7,7 @@
 import { mediaUrl } from '../core/app-api.js';
 import { tileModel } from '../core/tile-model.js';
 import { coverMosaicHtml } from '../core/cover-mosaic.js';
-import { channelCardView } from '../core/channels.js';
+import { channelCardView, channelSubLine } from '../core/channels.js';
 
 var PLAY_KEYS = { Enter: true, ' ': true };
 
@@ -139,14 +139,18 @@ export function createTile(server, card, opts) {
 // d-pad model treats as a focus stop (screen-browse.js tilesIn) — a channel card
 // is a normal left/right stop on its rail, it just draws differently.
 
-// The three text lines and the bar, applied to an already-built tile. Split out
+// The four text lines and the bar, applied to an already-built tile. Split out
 // because the card TICKS: the strip is fetched once and re-applied on a timer,
 // and rebuilding the element every second would throw away focus mid-browse.
+//
+// TASK-588 — `.tile-title` is the SHOW where there is one (Black Books), and the
+// episode moves one line down into `.channel-time` beside the position: "Blood ·
+// S2 E4 · 8m/22m". The line count is unchanged; what each line carries is not.
 export function applyChannelView(tile, view) {
   tile.classList.toggle('off-air', !view.onAir);
   tile.querySelector('.channel-name').textContent = view.name;
   tile.querySelector('.tile-title').textContent = view.title;
-  tile.querySelector('.channel-time').textContent = view.time || '';
+  tile.querySelector('.channel-time').textContent = channelSubLine(view);
   tile.querySelector('.channel-next').textContent = view.next || '';
   tile.querySelector('.channel-next').hidden = !view.next;
   tile.querySelector('.channel-progress-fill').style.width = view.percent + '%';

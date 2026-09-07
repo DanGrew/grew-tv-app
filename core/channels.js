@@ -35,6 +35,9 @@ var RAIL_TITLE = 'On now';
 
 var OFF_AIR = 'Off air';
 
+// One separator, everywhere an episode's facts are strung together (TASK-588).
+var DOT = ' · ';
+
 // Minutes, never a percentage (decision 14): 28% is two minutes into a Bluey or
 // thirty-three into a film, and the question at the strip is "do I sit down".
 // The percentage appears as geometry instead — the bar below.
@@ -124,6 +127,42 @@ export function itemTitle(item) {
   return item.title || item.item_id || '';
 }
 
+// TASK-588 — the show an item belongs to, when the catalog holds one.
+// api/channels.py sends `series: {id, title, season, episode}` on an episode it
+// can place, and null on everything else: a film, a track, a music video, a home
+// movie, and an episode belonging to no series. So nothing here asks what kind of
+// item this is — the block is present or it is not.
+export function seriesTitle(item) {
+  var series = (item || {}).series;
+  if (!series) return '';
+  return series.title || '';
+}
+
+// Where an episode sits in its show — "Blood · S2 E4". The episode's own title
+// leads, because the show has already been said above it.
+//
+// A show that numbers nothing still reads: "Blood" alone, rather than "Blood ·
+// S undefined". Both halves are optional and independently so — the catalog is
+// the authority on what it knows, and a gap in it should cost the missing half
+// and nothing else.
+//
+// Empty for anything with no show at all: a film's card has no second line to
+// draw, and never had one.
+export function episodeSlot(item) {
+  if (!seriesTitle(item)) return '';
+  var series = item.series;
+  if (series.season == null || series.episode == null) return itemTitle(item);
+  return itemTitle(item) + DOT + 'S' + series.season + ' E' + series.episode;
+}
+
+// THE PRINCIPLE, in one function: the recognisable half leads. A viewer scanning
+// the strip recognises Black Books and never "Blood", so the show is the title
+// line whenever there is one — and the item's own title otherwise, which is every
+// film, track, music video and home movie, drawing exactly as it always did.
+export function leadTitle(item) {
+  return seriesTitle(item) || itemTitle(item);
+}
+
 // What the card says comes after the one playing — the fourth line, so a
 // channel two minutes from the end still says whether it is worth sitting down
 // (TASK-570).
@@ -133,10 +172,15 @@ export function itemTitle(item) {
 // where the line would be. Off air never reaches here at all — what follows is
 // the return time the card already draws, and saying it twice was the thing
 // the owner ruled out.
+// TASK-588 — it names the SHOW, for the same reason the title line does: "Next:
+// Librarian" answers nothing, and this line exists to say whether it is worth
+// sitting down. Just the show, not its episode: the card's one detail line
+// belongs to what is on NOW, and a 420px tile with two episode subtitles on it
+// reads as neither.
 var NEXT_PREFIX = 'Next: ';
 
 export function nextLabel(following) {
-  var title = itemTitle(following);
+  var title = leadTitle(following);
   if (!title) return '';
   return NEXT_PREFIX + title;
 }
@@ -154,19 +198,31 @@ export function nextLabel(following) {
 export function channelCardView(line, elapsedSeconds) {
   var offset = tickedOffset(line, elapsedSeconds);
   if (!line.on_air) {
-    return { onAir: false, name: line.name || '', title: OFF_AIR,
+    return { onAir: false, name: line.name || '', title: OFF_AIR, episode: '',
              time: returnTimeLabel(line.next_on_air), next: '', percent: 0,
              poster: null };
   }
   return {
     onAir: true,
     name: line.name || '',
-    title: itemTitle(line.item),
+    title: leadTitle(line.item),
+    episode: episodeSlot(line.item),
     time: positionLabel(offset, line.runtime_seconds),
     next: nextLabel(line.following),
     percent: channelPercent(offset, line.runtime_seconds),
     poster: (line.item || {}).poster || null
   };
+}
+
+// The card's sub line, composed: "Blood · S2 E4 · 8m/22m" for an episode, and
+// the bare "8m/22m" a film has always drawn. Off air it is the return time
+// alone, which is what that line has always been there for.
+//
+// It lives HERE rather than in the tile because a composed string is logic, and
+// the two surfaces that draw this card must not each carry their own idea of
+// what order the facts go in.
+export function channelSubLine(view) {
+  return [view.episode, view.time].filter(Boolean).join(DOT);
 }
 
 // A channel as an action tile. `navParams` carries what opening it needs and

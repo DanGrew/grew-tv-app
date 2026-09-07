@@ -140,10 +140,15 @@ test.describe('tuned into a channel', () => {
     expect(seeks[0]).toBeLessThan(150);
   });
 
-  // Story 6 — up next reads the SCHEDULE, not a queue.
+  // Story 6 — up next reads the SCHEDULE, not a queue. TASK-588 story 2 — it
+  // names the SHOW first and the episode after it, so a viewer told what is next
+  // has actually been told something.
   test('up next is the next thing the schedule plays', async ({ page }) => {
     await openChannel(page, 'cartoon-club');
-    await expect(page.locator('#video-upnext')).toHaveText('Up next: Hey Duggee');
+    await expect(page.locator('#video-upnext'))
+      .toHaveText('Up next: Hey Duggee · The Tidying Up Badge · S1 E4');
+    // The show is the emphasised half; the episode trails it muted.
+    await expect(page.locator('#video-upnext b')).toHaveText('Hey Duggee');
   });
 
   // Story 2 — the marker on the existing 5px bar, at the CHANNEL's position.
@@ -299,7 +304,7 @@ test.describe('tuned into a channel', () => {
     // The channel has moved on to the next programme entry by the time the
     // restarted item ends.
     await withChannel(page, channelDetailResponse(Object.assign({}, ON_AIR, {
-      item: { item_id: 'duggee-s1e04', title: 'Hey Duggee', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null },
+      item: { item_id: 'duggee-s1e04', title: 'The Tidying Up Badge', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null, series: { id: 'series-hey-duggee', title: 'Hey Duggee', season: 1, episode: 4 } },
       offset_seconds: 40, runtime_seconds: 420
     })));
     await page.clock.install();

@@ -4,8 +4,9 @@
 //
 // The strip's own model is core/channels.js and stays there; this is the half
 // the player needs, and it reuses that module rather than re-deriving anything
-// (`tickedOffset` is the clock both surfaces run on, `itemTitle` the one way an
-// item the catalog has forgotten still reads).
+// (`tickedOffset` is the clock both surfaces run on, `leadTitle`/`episodeSlot`
+// the one place that decides an episode leads with its show — so the player and
+// the strip's card cannot name the same programme two different ways).
 //
 // Fed by GET /api/channels/{id}?profile= (grew-tv api/channels.py) — the on-now
 // line plus what the player needs beyond it:
@@ -23,8 +24,14 @@
 // rewinds or otherwise moves the channel — the viewer moves, the channel does
 // not.
 
-import { tickedOffset, itemTitle } from './channels.js';
+import { tickedOffset, leadTitle, episodeSlot } from './channels.js';
 import { wrapIndex } from './player-math.js';
+
+// The up-next line's own two constants. The prefix is the muted lead the shared
+// player already draws; the dot is what separates the show from the episode
+// under it, the same separator the strip's card uses.
+var UP_NEXT_PREFIX = 'Up next: ';
+var UP_NEXT_DOT = ' · ';
 
 // How far behind the channel the viewer may be before they are told about it.
 //
@@ -77,21 +84,34 @@ export function shouldRetune(detail, elapsedSeconds, behind) {
   return entryFinished(detail, elapsedSeconds) && !behind;
 }
 
-// What the SCHEDULE plays next, or null when the answer carries no lookahead.
-// Story 6 — up next on a channel is the programme, never a queue, so this is
-// the only thing that fills that line in channel mode.
+// What the SCHEDULE plays next, in the three parts the player's up-next line
+// draws — `{prefix, label, suffix}`, or null when the answer carries no
+// lookahead. Story 6 — up next on a channel is the programme, never a queue, so
+// this is the only thing that fills that line in channel mode.
+//
+// TASK-588 — the SHOW is the emphasised half: "Up next: **The Inbetweeners** ·
+// The Field Trip · S2 E1". It matches the strip's card exactly, and for the same
+// reason: a viewer told "The Field Trip" is next has been told nothing. A film
+// keeps the line it always had, its own title bold and no suffix.
+//
+// Shaped `{prefix, label, suffix}` like core/series-detail.js's `upNextParts`
+// and the two routers' `upNextLine`, so the screen hands the player three parts
+// in one go rather than asking the same schedule entry two separate questions
+// that could disagree.
 //
 // An id the catalog no longer knows still names itself, exactly as it does on
 // the strip's card: a six-month programme outlives the library under it, and a
 // removed item should read as a gap rather than blank the line.
-export function upNextTitle(detail) {
+export function upNextParts(detail) {
   var schedule = (detail || {}).next;
   if (!schedule) return null;
   var next = schedule[0];
   if (!next) return null;
-  var title = itemTitle(next.item);
-  if (!title) return null;
-  return title;
+  var label = leadTitle(next.item);
+  if (!label) return null;
+  var slot = episodeSlot(next.item);
+  return { prefix: UP_NEXT_PREFIX, label: label,
+           suffix: slot ? UP_NEXT_DOT + slot : '' };
 }
 
 // The record the player loads for what is on air — the same four fields

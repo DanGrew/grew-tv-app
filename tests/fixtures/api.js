@@ -353,15 +353,23 @@ function channelsResponse() {
 // them now: the channel answer is the only place a channel play learns which
 // file to fetch and whether it has captions, and there is no /api/video lookup
 // behind it. The strip's card still reads neither.
+// TASK-588 — an episode carries the SHOW it belongs to: `series`, or null on
+// anything the catalog holds no show for. The titles here are now what an
+// episode manifest actually holds — "Sleepytime", not "Bluey" — because the
+// whole point of the field is that an episode title names nothing on its own,
+// and a fixture that hides that proves nothing about the card that draws it.
+function channelSeries(season, episode) {
+  return { id: 'series-bluey', title: 'Bluey', season: season, episode: episode };
+}
 const CHANNEL_ON_AIR = {
   channel_id: 'cartoon-club', name: 'Cartoon Club', item_type: 'episode',
   on_air: true,
-  item: { item_id: 'bluey-s1e22', title: 'Bluey', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null },
+  item: { item_id: 'bluey-s1e22', title: 'Sleepytime', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null, series: channelSeries(1, 22) },
   offset_seconds: 120, runtime_seconds: 480, next_on_air: null,
   // TASK-570 — the one programme after this one, resolved as `item` is. The
   // card draws it as a fourth line; null off air and null when the channel has
   // nothing after the current programme.
-  following: { item_id: 'bluey-s1e23', title: 'Bluey: Keepy Uppy', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null }
+  following: { item_id: 'bluey-s1e23', title: 'Keepy Uppy', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null, series: channelSeries(1, 23) }
 };
 const CHANNEL_OFF_AIR_TIMED = {
   channel_id: 'after-dark', name: 'After Dark', item_type: 'film',
@@ -381,20 +389,25 @@ const CHANNEL_OFF_AIR_PLAIN = Object.assign({}, CHANNEL_OFF_AIR_TIMED, {
 // than the one the player alone needed. Seven-minute slots, back to back, the
 // way channel_schedule actually writes them out — an item is pulled when the
 // previous one ENDS, so each `starts_at` is the one before it's `ends_at`.
-function channelEntry(id, title, startsAt, endsAt) {
+// TASK-588 — `series` names the show the entry's episode belongs to, or null for
+// an item the catalog holds no show for. Hey Duggee is its own show, so the
+// lookahead spans two, which is what a Cartoon Club afternoon actually looks
+// like.
+function channelEntry(id, title, startsAt, endsAt, series) {
   return {
-    item: { item_id: id, title: title, poster: null, itemType: 'episode', ext: 'mp4', subtitles: null },
+    item: { item_id: id, title: title, poster: null, itemType: 'episode', ext: 'mp4', subtitles: null, series: series },
     tag: 'preschool', starts_at: startsAt, ends_at: endsAt
   };
 }
+const DUGGEE = { id: 'series-hey-duggee', title: 'Hey Duggee', season: 1, episode: 4 };
 const CHANNEL_NEXT = [
-  channelEntry('duggee-s1e04', 'Hey Duggee',          '2026-09-04T17:08:00', '2026-09-04T17:15:00'),
-  channelEntry('bluey-s1e12',  'Bob Bilby',           '2026-09-04T17:15:00', '2026-09-04T17:22:00'),
-  channelEntry('bluey-s1e21',  'Neighbours',          '2026-09-04T17:22:00', '2026-09-04T17:29:00'),
-  channelEntry('bluey-s1e01',  'The Magic Xylophone', '2026-09-04T17:29:00', '2026-09-04T17:36:00'),
-  channelEntry('bluey-s1e03',  'Keepy Uppy',          '2026-09-04T17:36:00', '2026-09-04T17:43:00'),
-  channelEntry('bluey-s1e04',  'Daddy Robot',         '2026-09-04T17:43:00', '2026-09-04T17:50:00'),
-  channelEntry('bluey-s1e05',  'Shadowlands',         '2026-09-04T17:50:00', '2026-09-04T17:57:00')
+  channelEntry('duggee-s1e04', 'The Tidying Up Badge', '2026-09-04T17:08:00', '2026-09-04T17:15:00', DUGGEE),
+  channelEntry('bluey-s1e12',  'Bob Bilby',           '2026-09-04T17:15:00', '2026-09-04T17:22:00', channelSeries(1, 12)),
+  channelEntry('bluey-s1e21',  'Neighbours',          '2026-09-04T17:22:00', '2026-09-04T17:29:00', channelSeries(1, 21)),
+  channelEntry('bluey-s1e01',  'The Magic Xylophone', '2026-09-04T17:29:00', '2026-09-04T17:36:00', channelSeries(1, 1)),
+  channelEntry('bluey-s1e03',  'Keepy Uppy',          '2026-09-04T17:36:00', '2026-09-04T17:43:00', channelSeries(1, 3)),
+  channelEntry('bluey-s1e04',  'Daddy Robot',         '2026-09-04T17:43:00', '2026-09-04T17:50:00', channelSeries(1, 4)),
+  channelEntry('bluey-s1e05',  'Shadowlands',         '2026-09-04T17:50:00', '2026-09-04T17:57:00', channelSeries(1, 5))
 ];
 function channelDetailResponse(line) {
   return Object.assign({}, line, {

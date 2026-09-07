@@ -238,7 +238,11 @@ test.describe('the gap between two items', () => {
     await expect(page.locator('#channel-card')).toBeVisible();
 
     await expect(page.locator('#card-rows .card-time')).toHaveText(['17:08', '17:15', '17:22']);
-    await expect(page.locator('#card-rows .card-title')).toHaveText(['Hey Duggee', 'Bob Bilby', 'Neighbours']);
+    // TASK-588 gave the fixture the episode titles a manifest actually holds
+    // ("The Tidying Up Badge", not "Hey Duggee") and the show beside them. This
+    // card still draws the episode alone — it was not in that task's two
+    // surfaces — so what it names is unchanged in kind, only more honest.
+    await expect(page.locator('#card-rows .card-title')).toHaveText(['The Tidying Up Badge', 'Bob Bilby', 'Neighbours']);
     await expect(page.locator('#card-later')).toHaveText('The Magic Xylophone · Keepy Uppy · Daddy Robot · Shadowlands');
     await expect(page.locator('#card-label')).toHaveText('Cartoon Club');
   });

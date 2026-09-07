@@ -1,6 +1,6 @@
 import {
   LIVE_TOLERANCE_SECONDS,
-  isBehindLive, entryFinished, shouldRetune, upNextTitle,
+  isBehindLive, entryFinished, shouldRetune, upNextParts,
   channelRecord, identLabel, flipTarget, channelIds
 } from '../../core/channel-player.js';
 
@@ -117,9 +117,27 @@ describe('shouldRetune', () => {
   });
 });
 
-describe('upNextTitle', () => {
+describe('upNextParts', () => {
   it('names what the SCHEDULE plays next', () => {
-    expect(upNextTitle(detail())).toBe('Hey Duggee');
+    expect(upNextParts(detail())).toEqual(
+      { prefix: 'Up next: ', label: 'Hey Duggee', suffix: '' });
+  });
+
+  // TASK-588 story 2 — the show is the emphasised half and the episode trails
+  // it, the same order the channel's own card uses.
+  it('names the SHOW, with the episode trailing it', () => {
+    expect(upNextParts(detail({ next: [{ item: {
+      item_id: 'inb-s2e1', title: 'The Field Trip',
+      series: { id: 'series-inbetweeners', title: 'The Inbetweeners', season: 2, episode: 1 }
+    } }] }))).toEqual({ prefix: 'Up next: ', label: 'The Inbetweeners',
+                        suffix: ' · The Field Trip · S2 E1' });
+  });
+
+  // TASK-588 story 3 — a film's line is the one it always had.
+  it('leaves a film with its own title and no trailing half', () => {
+    expect(upNextParts(detail({ next: [{ item:
+      { item_id: 'alien', title: 'Alien', series: null } }] })))
+      .toEqual({ prefix: 'Up next: ', label: 'Alien', suffix: '' });
   });
 
   it('reads the FIRST lookahead entry, not a later one', () => {
@@ -127,23 +145,24 @@ describe('upNextTitle', () => {
       { item: { item_id: 'a', title: 'First' } },
       { item: { item_id: 'b', title: 'Second' } }
     ] });
-    expect(upNextTitle(two)).toBe('First');
+    expect(upNextParts(two).label).toBe('First');
   });
 
   it('names an id the catalog has forgotten rather than blanking the line', () => {
-    expect(upNextTitle(detail({ next: [{ item: { item_id: 'gone-s1e01' } }] }))).toBe('gone-s1e01');
+    expect(upNextParts(detail({ next: [{ item: { item_id: 'gone-s1e01' } }] })).label)
+      .toBe('gone-s1e01');
   });
 
   it('is null when the answer carries no lookahead at all', () => {
-    expect(upNextTitle(detail({ next: [] }))).toBe(null);
-    expect(upNextTitle(detail({ next: null }))).toBe(null);
-    expect(upNextTitle(offAir())).toBe(null);
-    expect(upNextTitle(null)).toBe(null);
+    expect(upNextParts(detail({ next: [] }))).toBe(null);
+    expect(upNextParts(detail({ next: null }))).toBe(null);
+    expect(upNextParts(offAir())).toBe(null);
+    expect(upNextParts(null)).toBe(null);
   });
 
   it('is null when the next entry resolves to nothing nameable', () => {
-    expect(upNextTitle(detail({ next: [{ item: null }] }))).toBe(null);
-    expect(upNextTitle(detail({ next: [{ item: { item_id: '' } }] }))).toBe(null);
+    expect(upNextParts(detail({ next: [{ item: null }] }))).toBe(null);
+    expect(upNextParts(detail({ next: [{ item: { item_id: '' } }] }))).toBe(null);
   });
 });
 
