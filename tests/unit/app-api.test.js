@@ -5,7 +5,7 @@ import {
   loadMusicVideoPlayback, loadPlayback, loadAlbum, loadPlaylist, loadTracks, loadEpisodes, createPlaylist,
   addToPlaylist, addSourceToPlaylist, movePlaylistTrack, removeFromPlaylist,
   deletePlaylist, renamePlaylist, queuePlaybackAction, loadQueuePlayback, loadMusicSourceTitle,
-  loadMusicVideoSourceTitle, loadChannels, loadChannel
+  loadMusicVideoSourceTitle, loadChannels, loadChannel, loadChannelSchedule
 } from '../../core/app-api.js';
 
 function fakeFetch(body, ok) {
@@ -97,6 +97,41 @@ describe('loadChannel', () => {
     var calls = fakeFetch({});
     await loadChannel('http://s', 'cartoon-club', 'kids', 0);
     expect(calls[0].url).toBe('http://s/api/channels/cartoon-club?profile=kids&lookahead=0');
+  });
+});
+
+// FEAT-560/TASK-589 — one channel's LISTING, for the Guide. Its own route
+// rather than bounds on the detail route above, and it asks for NEITHER bound:
+// the backend's defaults are exactly the span the page shows.
+describe('loadChannelSchedule', () => {
+  it('GETs the schedule route with the profile query, no-store', async () => {
+    var calls = fakeFetch({ channel_id: 'cartoon-club', entries: [] });
+    await loadChannelSchedule('http://s', 'cartoon-club', 'kids');
+    expect(calls[0].url).toBe('http://s/api/channels/cartoon-club/schedule?profile=kids');
+    expect(calls[0].opts).toEqual({ cache: 'no-store' });
+  });
+  it('sends no from/to at all, so the app never puts its own clock in the question', async () => {
+    var calls = fakeFetch({});
+    await loadChannelSchedule('http://s', 'cartoon-club', 'kids');
+    expect(calls[0].url).not.toContain('from');
+    expect(calls[0].url).not.toContain('to=');
+  });
+  it('encodes a channel id, so an id with a slash cannot escape the route', async () => {
+    var calls = fakeFetch({});
+    await loadChannelSchedule('http://s', 'date night/2', 'adults');
+    expect(calls[0].url).toBe('http://s/api/channels/date%20night%2F2/schedule?profile=adults');
+  });
+  it('resolves the listing whole — the span it settled on, and its rows', async () => {
+    fakeFetch({ channel_id: 'cartoon-club', from: '2026-09-06T17:02:00', to: '2026-09-08T17:02:00',
+                entries: [{ kind: 'off_air', starts_at: '2026-09-06T17:02:00', next_on_air: null }] });
+    expect(await loadChannelSchedule('http://s', 'cartoon-club', 'kids')).toEqual({
+      channel_id: 'cartoon-club', from: '2026-09-06T17:02:00', to: '2026-09-08T17:02:00',
+      entries: [{ kind: 'off_air', starts_at: '2026-09-06T17:02:00', next_on_air: null }]
+    });
+  });
+  it('rejects a channel nobody wrote, so the Guide draws that column off the strip alone', async () => {
+    fakeFetch({}, false);
+    await expect(loadChannelSchedule('http://s', 'after-dark', 'kids')).rejects.toBe(500);
   });
 });
 

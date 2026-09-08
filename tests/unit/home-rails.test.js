@@ -13,6 +13,15 @@ describe('railsForBrowseSection', () => {
     expect(rails[0].items[0].kind).toBe('channel');
   });
 
+  // TASK-590 — the strip is channels and NOTHING else. It briefly carried a
+  // Guide tile on the end; the owner's call is that a strip of channels is a
+  // strip of things that are on, so the Guide moved to each surface's own
+  // furniture (a floating button on the TV, a ☰ row on the phone).
+  it('puts nothing but channels in the strip', () => {
+    const rails = railsForBrowseSection('channels', [], [], {}, [], CHANNELS);
+    expect(rails[0].items.every(t => t.kind === 'channel')).toBe(true);
+  });
+
   it('serves any other section exactly what railsForSection does', () => {
     const cards = [{ kind: 'video', id: 'toy-story', title: 'Toy Story', section: 'films', genres: ['animation'] }];
     expect(railsForBrowseSection('films', cards, [], {}, [], CHANNELS))
@@ -685,6 +694,11 @@ describe('CARD_ROUTES', () => {
   });
   it('cardRoute maps a TASK-563 channel tile to "channel" via the same fallback', () => {
     expect(cardRoute({ kind: 'channel', id: 'channel:cartoon-club' })).toBe('channel');
+  });
+  // TASK-590 deliberately adds nothing here: the Guide is a control on each
+  // surface's own furniture, never a card, so no route reaches it.
+  it('has no route for the Guide — it is not a card', () => {
+    expect(CARD_ROUTES).not.toContain('guide');
   });
 });
 

@@ -13,6 +13,7 @@
 //   rail-grid -> { sectionId, sectionTitle, railTitle }  (FEAT-028 / TASK-167)
 //   artist    -> { artistName }                          (FEAT-029)
 //   home-movies-list -> { title }                         (TASK-486 revision)
+//   guide     -> {}                                       (TASK-590)
 
 var HOME_PAGE = 'browse.html';
 var DETAIL_PAGE = 'detail.html';
@@ -77,13 +78,27 @@ function homeMoviesListCrumbs(ctx) {
   return [home(), homeMoviesTabLink(), leaf(ctx.title)];
 }
 
+// TASK-590 — the Guide: Home › Channels › Guide. The Channels crumb returns to
+// the browse page on that tab (browse honours ?tab=), the same shape the Music
+// and Home Movies crumbs take. Drawn as a page with a breadcrumb rather than a
+// browse section on purpose: TASK-550 moves section grouping to the server, and
+// a section would have collided with it.
+function channelsTabLink() {
+  return link('Channels', HOME_PAGE, { tab: 'channels' });
+}
+
+function guideCrumbs() {
+  return [home(), channelsTabLink(), leaf('Guide')];
+}
+
 var BUILDERS = {
   browse: browseCrumbs,
   detail: detailCrumbs,
   video: videoCrumbs,
   'rail-grid': railGridCrumbs,
   artist: artistCrumbs,
-  'home-movies-list': homeMoviesListCrumbs
+  'home-movies-list': homeMoviesListCrumbs,
+  guide: guideCrumbs
 };
 
 // Build the crumb trail for a screen + context. Unknown screen -> [] so a caller

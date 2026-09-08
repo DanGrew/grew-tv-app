@@ -8,7 +8,7 @@ import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { cardRoute, artistTiles } from '../../core/home-rails.js';
-import { channelTiles } from '../../core/channels.js';
+import { channelRails, CHANNELS_TAB } from '../../core/channels.js';
 import { mountSearch } from './screen-search.js';
 import { mountContinueMenu } from './continue-menu.js';
 import { continueTarget } from '../../core/browse-continue.js';
@@ -66,6 +66,32 @@ export function initBrowsePage() {
       .forEach(function(params) { navTo('video.html', Object.assign({ from: 'browse' }, params)); });
   }
 
+  // TASK-590 — the Guide's entry point on the TV: a floating button in the
+  // bottom-right cluster, beside Search and the play menu, NOT a tile in the
+  // strip (owner, 2026-09-08). A strip of channels is a strip of things that are
+  // ON; a tile among them that is not a channel reads as one until it is pressed.
+  //
+  // Shown only on the Channels tab, the same way Play All is shown only on a tab
+  // that has one — this cluster is where a tab-scoped control belongs, and a
+  // Guide button over the Music tab would be furniture for a feature that tab
+  // has nothing to do with. A profile with no channels never sees the tab at all
+  // (story 6 of TASK-563), so it never sees the button either.
+  //
+  // It carries no id and no channel: the Guide asks the endpoint for every
+  // channel this profile can see, exactly as the strip behind it does.
+  function showGuide(tabId) {
+    var btn = document.getElementById('btn-guide');
+    btn.style.display = ({ 'true': 'inline-flex', 'false': 'none' })[(tabId === CHANNELS_TAB.id) + ''];
+  }
+  function onGuide() { navTo('guide.html'); }
+
+  // One callback is what renderBrowse takes, so the two tab-scoped controls are
+  // applied together rather than the screen learning about either of them.
+  function onTabChange(tabId) {
+    showPlayAll(tabId);
+    showGuide(tabId);
+  }
+
   // Transient ＋Queue confirmation toast (films queued from a tile badge).
   var statusTimer = null;
   function hideStatus() { document.getElementById('queue-status').style.display = 'none'; }
@@ -115,6 +141,7 @@ export function initBrowsePage() {
 
   document.getElementById('btn-queue-menu').addEventListener('click', toggleQueueMenu);
   document.getElementById('btn-play-all').addEventListener('click', onPlayAll);
+  document.getElementById('btn-guide').addEventListener('click', onGuide);
   document.addEventListener('keydown', dispatchKey);
   mountBreadcrumb('breadcrumb', buildCrumbs('browse'));
 
@@ -276,7 +303,9 @@ export function initBrowsePage() {
   // press reads (whether the channel is on air, above), and that goes stale in
   // exactly the thirty seconds the poll exists to close.
   function registerChannels(lines) {
-    channelTiles(lines).forEach(function(tile) { catalog[tile.id] = tile; });
+    channelRails(lines).forEach(function(rail) {
+      rail.items.forEach(function(tile) { catalog[tile.id] = tile; });
+    });
   }
   function applyChannels(lines) {
     registerChannels(lines);
@@ -325,7 +354,7 @@ export function initBrowsePage() {
       // what's on" (decision 10) outranks a remembered tab.
       var channels = [res[3].channels].filter(Boolean).concat([[]])[0];
       registerChannels(channels);
-      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, getParam('tab'), onQueue, createPlaylist, recents, showPlayAll, channels, sessionStorage.getItem(LAST_TAB_KEY));
+      renderBrowse(SERVER, browse.content, cw, labels, profile, person, onSelect, getParam('tab'), onQueue, createPlaylist, recents, onTabChange, channels, sessionStorage.getItem(LAST_TAB_KEY));
       [sessionStorage.getItem(LAST_TILE_KEY)].filter(Boolean).map(function(id) { return document.querySelector('.film-tile[data-id="' + id + '"]'); }).filter(Boolean).forEach(function(t) { t.focus(); });
       continueMenu.refresh();
       setInterval(pollChannels, CHANNEL_POLL_MS);

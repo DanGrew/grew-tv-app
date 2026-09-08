@@ -53,6 +53,19 @@ describe('buildCrumbs', () => {
     expect(crumbs[2]).toMatchObject({ label: 'Millie', current: true });
   });
 
+  // TASK-590 — the Guide is a PAGE with a trail rather than a browse section
+  // (TASK-550 moves section grouping to the server, and a section would have
+  // collided with it), so it names the tab it came from the way Music and Home
+  // Movies do. It takes no context: the Guide is every channel the profile can
+  // see, so there is nothing to name in the leaf but itself.
+  it('guide is Home > Channels (clickable, ?tab=channels) > Guide leaf', () => {
+    var crumbs = buildCrumbs('guide');
+    expect(crumbs).toHaveLength(3);
+    expect(crumbs[0]).toMatchObject({ label: 'Home', page: 'browse.html', current: false });
+    expect(crumbs[1]).toMatchObject({ label: 'Channels', page: 'browse.html', params: { tab: 'channels' }, current: false });
+    expect(crumbs[2]).toMatchObject({ label: 'Guide', current: true });
+  });
+
   it('unknown screen yields an empty trail', () => {
     expect(buildCrumbs('mystery')).toEqual([]);
   });

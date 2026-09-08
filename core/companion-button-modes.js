@@ -44,9 +44,13 @@ export function actionEnabled(action, desynced) {
 // boxset/series), not playback directly — so it gets a desync page too, same
 // as series/album/artist. Its navParams (home-rails.js playAllTile), not a
 // bare id, is what openItemLocal must send on (companion-browse.js).
-// TASK-563: a `channel` card opens nothing at all yet — it has no click handler
-// on either surface until TASK-564 wires the player — so it has no desync page
-// either, and never reaches openItemLocal to ask for one.
+// TASK-563: a `channel` card tunes the TV into the channel (TASK-564), which is
+// a TV action like playing a film — so it has no desync page, the same way a
+// bare video has none.
+// TASK-590 adds nothing here: the Guide is not a card. It is reached from the
+// phone's ☰ menu (companion-status-menu.js), which is local navigation and so
+// works desynced without needing a route — the Guide reads the schedule and
+// nothing else, and has no way to drive the TV even when it wanted to.
 // @card-route-table unhandled: video, music-video, track, channel
 var DESYNC_PAGE = { series: 'detail.html', album: 'detail.html', playlist: 'playlist.html', artist: 'artist.html', 'play-all': 'home-movies-list.html' };
 export function desyncOpenPage(route) { return DESYNC_PAGE[route] || null; }
