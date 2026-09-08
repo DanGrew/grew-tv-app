@@ -40,6 +40,22 @@ var ROW_EL = {
     var el = document.createElement('div');
     el.id = 'row-step';
     return el;
+  },
+  // TASK-590 — the Guide's entry point on the phone. A menu row rather than a
+  // tile in the Channels dock (owner, 2026-09-08): the dock lists things that
+  // are ON, and the Guide is not one of them. It is also not Channels-only from
+  // here — the menu is on every screen, so the page that says what is on every
+  // channel is one tap away wherever the phone happens to be.
+  //
+  // Built as bare markup, wired by its page, exactly like #switch-profile — but
+  // unlike that one it stays live while desynced: opening the Guide is local
+  // navigation, and reading a schedule cannot move the TV.
+  guide: function() {
+    var el = document.createElement('button');
+    el.id = 'open-guide';
+    el.type = 'button';
+    el.textContent = '📺 TV Guide';
+    return el;
   }
 };
 
@@ -48,8 +64,8 @@ var STATUS_MENU_CSS = '\n' +
   '#btn-status:active, #btn-status:focus { outline: none; border-color: var(--focus); color: var(--focus); }\n' +
   '#status-menu { display: none; flex-direction: column; gap: 14px; position: absolute; top: calc(100% + 8px); right: 0; z-index: 15; width: max-content; max-width: min(320px, calc(100vw - 24px)); padding: 16px; background: #1f2d50; border: 2px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 36px rgba(0,0,0,0.5); }\n' +
   '#status-menu.open { display: flex; }\n' +
-  '#switch-profile { width: 100%; text-align: left; font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }\n' +
-  '#switch-profile:active, #switch-profile:focus { outline: none; border-color: var(--focus); color: var(--focus); }\n' +
+  '#switch-profile, #open-guide { width: 100%; text-align: left; font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; touch-action: manipulation; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }\n' +
+  '#switch-profile:active, #switch-profile:focus, #open-guide:active, #open-guide:focus { outline: none; border-color: var(--focus); color: var(--focus); }\n' +
   '#row-step { display: flex; align-items: center; justify-content: space-between; gap: 10px; }\n' +
   '#row-step.desync-off { opacity: 0.35; }\n' +
   '.row-step-label { font-size: 14px; }\n' +

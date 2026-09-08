@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grew TV</title>
+<style>
+:root {
+  --bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+  --surface: rgba(255,255,255,0.06);
+  --surface-hi: rgba(255,255,255,0.11);
+  --border: rgba(255,255,255,0.13);
+  --focus: #fff;
+  --focus-glow: 0 0 0 1px rgba(255,255,255,0.6), 0 4px 24px rgba(255,255,255,0.15);
+  --text: rgba(255,255,255,0.95);
+  --text-muted: rgba(255,255,255,0.4);
+  --live: #ffce6b;
+  --radius: 16px;
+  --radius-sm: 8px;
+  --dur: 0.18s;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --fs-xs: 20px;
+  --fs-sm: 22px;
+  --fs-md: 26px;
+  --fs-lg: 32px;
+  --fs-2xl: 52px;
+  --heading-ls: -0.5px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); background-attachment: fixed; background-size: cover; color: var(--text); font-family: var(--font); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+button { background: var(--surface); color: var(--text); border: 2.5px solid var(--border); border-radius: var(--radius); font-size: var(--fs-md); padding: 14px 26px; cursor: pointer; text-align: center; transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease); }
+button:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
+.breadcrumb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.crumb { font-size: var(--fs-md); color: var(--text-muted); }
+.crumb-current { color: var(--text); font-weight: 600; }
+.crumb-link { background: none; border: 2px solid transparent; border-radius: var(--radius-sm); padding: 4px 12px; font-size: var(--fs-md); color: var(--text-muted); }
+.crumb-link:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
+.crumb-sep { color: var(--text-muted); font-size: var(--fs-md); }
+.guide-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; padding: 20px 48px 26px; flex-shrink: 0; }
+#guide-title { font-size: var(--fs-2xl); letter-spacing: var(--heading-ls); }
+#day-tabs { display: flex; gap: 12px; }
+.guide-day { font-size: var(--fs-sm); padding: 11px 24px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.guide-day.on { background: var(--surface-hi); border-color: rgba(255,255,255,0.5); color: var(--text); }
+/* The grid scrolls BOTH ways, and it is the only thing on the page that
+   scrolls. Down: a channel's day runs past the bottom on anything shorter than
+   the living-room screen, and there is no reading it if the page cannot move.
+   Across: columns hold their own minimum width instead of dividing whatever is
+   there, so a sixth channel scrolls into view rather than squeezing all six
+   into slivers. Scrollbar hidden the way every other list here hides it —
+   ◀ ▶ ▲ ▼ move the page (screen-guide-page.js), the bars are desk furniture. */
+#guide-grid { flex: 1; display: grid; grid-auto-rows: min-content; column-gap: 26px; align-content: start; padding: 0 48px 40px; overflow: auto; scrollbar-width: none; -ms-overflow-style: none; scroll-behavior: smooth; }
+#guide-grid::-webkit-scrollbar { display: none; }
+.guide-colhead { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.guide-chname { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.3px; }
+.guide-chmeta { font-size: var(--fs-xs); color: var(--text-muted); letter-spacing: 1.2px; text-transform: uppercase; padding-top: 4px; }
+#now-line { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 22px 0 16px; }
+#now-tag { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 2px; color: var(--live); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#now-rule { flex: 1; height: 2px; background: linear-gradient(90deg, var(--live), rgba(255,206,107,0.18)); }
+#now-line.quiet #now-tag { color: var(--text-muted); font-weight: 500; letter-spacing: 1.4px; }
+#now-line.quiet #now-rule { background: var(--border); height: 1px; }
+.guide-now { background: var(--surface-hi); border: 2.5px solid var(--border); border-radius: var(--radius); padding: 18px 20px 0; display: flex; flex-direction: column; gap: 7px; overflow: hidden; min-height: 172px; transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.guide-now:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); }
+.guide-now.off-air { background: none; border-style: dashed; justify-content: center; }
+.now-tag { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 2px; color: var(--live); }
+.guide-now.off-air .now-tag { color: var(--text-muted); }
+.now-title { font-size: var(--fs-lg); font-weight: 600; line-height: 1.15; }
+.guide-now.off-air .now-title { color: var(--text-muted); font-weight: 500; }
+.now-sub { font-size: var(--fs-sm); color: var(--text-muted); }
+.now-pos { font-size: var(--fs-sm); color: var(--live); font-variant-numeric: tabular-nums; margin-top: auto; padding-bottom: 14px; }
+.now-bar { height: 5px; background: rgba(0,0,0,0.45); margin: 0 -20px; }
+.now-bar-fill { display: block; height: 100%; background: var(--live); width: 0; }
+.guide-list { display: flex; flex-direction: column; padding-top: 4px; }
+.guide-row { display: grid; grid-template-columns: 100px 1fr; gap: 16px; padding: 13px 2px; border-bottom: 1px solid rgba(255,255,255,0.07); align-items: baseline; }
+.guide-time { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.guide-row-title { font-size: var(--fs-sm); line-height: 1.2; }
+.guide-row-sub { font-size: var(--fs-xs); color: var(--text-muted); padding-top: 3px; }
+.guide-more { font-size: var(--fs-xs); color: var(--text-muted); padding: 14px 2px 0; letter-spacing: 0.4px; }
+.guide-tail { font-size: var(--fs-xs); color: var(--text-muted); padding: 16px 2px 0; letter-spacing: 0.4px; }
+.guide-empty { grid-column: 1 / -1; font-size: var(--fs-md); color: var(--text-muted); padding: 48px 0; }
+#device-badge { position: fixed; top: 24px; right: 28px; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; font-size: var(--fs-xs); color: var(--text-muted); pointer-events: none; }
+#device-swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
+#error-msg { display: none; }
+</style>
+</head>
+<body id="screen-guide">
+<div id="breadcrumb" style="padding:22px 48px 0;flex-shrink:0"></div>
+<div class="guide-head">
+  <div id="guide-title">Guide</div>
+  <div id="day-tabs"></div>
+</div>
+<div id="guide-grid"></div>
+<div id="device-badge" title="This screen"></div>
+<div id="error-msg"></div>
+<script type="module">
+import { initGuidePage } from '../../ui/screens/screen-guide-page.js';
+import { mountDeviceBadge } from '../../ui/screens/device-badge.js';
+mountDeviceBadge();
+initGuidePage();
+</script>
+</body>
+</html>

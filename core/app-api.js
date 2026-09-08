@@ -45,6 +45,27 @@ export function loadChannel(serverUrl, channelId, profile, lookahead) {
   return getJson(serverUrl + '/api/channels/' + encodeURIComponent(channelId) + '?profile=' + encodeURIComponent(profile) + ask);
 }
 
+// ONE channel's LISTING (FEAT-560/TASK-589), for the Guide: every programme
+// starting in a stretch of clock and the off-air gaps it crosses, in one ordered
+// listing. Its own route rather than `from`/`to` on the detail route above — a
+// span is a third question, and one route answering two shapes depending on
+// which parameters arrived would be two routes wearing one path.
+//
+// Neither bound is sent, and that is the whole request: `from` defaults to now
+// (and is clamped forward to it either way — the programme is popped as it airs,
+// so the past is not there to ask for) and `to` to the widest span the backend
+// serves, which is the two days the Guide shows. So the app never puts its own
+// clock in the question, and the answer carries the `from` and `to` it settled
+// on — which is where the page reads what day it is (core/guide.js todayKey).
+//
+// ⛔ NOT PAGED. There is no `offset`/`limit` envelope here and nothing to ask a
+// second page of: the read is bounded by the CLOCK, and a listing that runs long
+// comes back covering less time rather than fewer rows. See docs/PAGINATION.md.
+export function loadChannelSchedule(serverUrl, channelId, profile) {
+  return getJson(serverUrl + '/api/channels/' + encodeURIComponent(channelId) +
+    '/schedule?profile=' + encodeURIComponent(profile));
+}
+
 // Mid-watch videos for a profile, newest first (FEAT-017). Backs the Home
 // Continue Watching rail and the companion shortcut. Backend is the source of
 // truth for progress, so this — not localStorage — drives cross-device CW.

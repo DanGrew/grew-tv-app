@@ -428,6 +428,78 @@ const CHANNEL_DETAIL = channelDetailResponse(CHANNEL_ON_AIR);
 const CHANNEL_DETAIL_OFF_AIR = Object.assign({}, CHANNEL_OFF_AIR_TIMED, {
   bed: null, tag: null, started_at: null, ends_at: null, next: []
 });
+// FEAT-560/TASK-589 — GET /api/channels/{id}/schedule: one channel's listing
+// over a stretch of clock, which is what the Guide (TASK-590) draws. Two row
+// kinds and no third: a programme the channel airs, and a stretch where it airs
+// nothing.
+//
+// The stamps are a Sunday evening, fixed rather than relative to the clock the
+// suite runs on: the page takes its idea of what day it is from the answer's own
+// `from` (core/guide.js todayKey), so a fixed listing is a deterministic page.
+//
+// ⚠️ An item here carries `series` (TASK-588) because the live route resolves
+// every item through the same projection the strip does. The FROZEN contract
+// fixture for this route predates that merge and does not, which is why the
+// shape binding excuses the key rather than dropping it from the stub — the stub
+// matches the backend, and the frozen fixture is what is behind.
+function scheduleItem(id, title, duration, series) {
+  return {
+    item_id: id, title: title, artist: null, poster: null, duration: duration,
+    subtitles: null, ext: 'mp4', type: null,
+    itemType: ({ true: 'episode', false: 'film' })[String(!!series)], series: series
+  };
+}
+function scheduleProgramme(id, title, startsAt, endsAt, duration, series) {
+  return {
+    kind: 'programme', item: scheduleItem(id, title, duration, series),
+    tag: 'preschool', starts_at: startsAt, ends_at: endsAt
+  };
+}
+function scheduleOffAir(startsAt, nextOnAir) {
+  return { kind: 'off_air', starts_at: startsAt, next_on_air: nextOnAir };
+}
+// Cartoon Club: two episodes to the end of the afternoon, off overnight, then
+// two more tomorrow — enough to draw both days, the gap between them, and a run
+// this profile can be shown leading with its SHOW rather than the episode.
+// The clock is the strip's own: CHANNEL_ON_AIR is 120s into a 480s item, so it
+// started at 17:00 and ends at 17:08, and the listing picks up exactly there —
+// the item playing when the read opens is not in it (the backend walks over it),
+// which is what makes the ON NOW band and the list below it two different reads.
+const CHANNEL_SCHEDULE_ENTRIES = [
+  scheduleProgramme('bluey-s1e23', 'Keepy Uppy', '2026-09-06T17:08:00', '2026-09-06T17:15:00', 420, channelSeries(1, 23)),
+  scheduleProgramme('bluey-s1e12', 'Bob Bilby', '2026-09-06T17:15:00', '2026-09-06T17:22:00', 420, channelSeries(1, 12)),
+  scheduleOffAir('2026-09-06T17:22:00', '2026-09-07T09:00:00'),
+  scheduleProgramme('bluey-s1e01', 'The Magic Xylophone', '2026-09-07T09:00:00', '2026-09-07T09:07:00', 420, channelSeries(1, 1)),
+  scheduleProgramme('paddington', 'Paddington', '2026-09-07T09:07:00', '2026-09-07T10:42:00', 5700, null),
+  scheduleOffAir('2026-09-07T10:42:00', '2026-09-08T09:00:00')
+];
+// The other two channels of the strip, so a Guide drawn from this stub carries
+// all three of the states a column can be in at once: on air now (Cartoon Club,
+// above), off air now but back later today (After Dark), and a channel with
+// nothing written at all (Matinee — one off-air row naming nothing, which is
+// what the backend answers for a channel nobody has regenerated).
+const CHANNEL_SCHEDULE_LATER = [
+  scheduleOffAir('2026-09-06T17:02:00', '2026-09-06T21:00:00'),
+  scheduleProgramme('alien', 'Alien', '2026-09-06T21:00:00', '2026-09-06T22:57:00', 7020, null),
+  scheduleOffAir('2026-09-06T22:57:00', '2026-09-07T21:00:00'),
+  scheduleProgramme('predator', 'Predator', '2026-09-07T21:00:00', '2026-09-07T22:47:00', 6420, null),
+  scheduleOffAir('2026-09-07T22:47:00', '2026-09-08T21:00:00')
+];
+const CHANNEL_SCHEDULE_NONE = [scheduleOffAir('2026-09-06T17:02:00', null)];
+const SCHEDULES = {
+  'cartoon-club': { name: 'Cartoon Club', item_type: 'episode', entries: CHANNEL_SCHEDULE_ENTRIES },
+  'after-dark': { name: 'After Dark', item_type: 'film', entries: CHANNEL_SCHEDULE_LATER },
+  'matinee': { name: 'Matinee', item_type: 'film', entries: CHANNEL_SCHEDULE_NONE }
+};
+function channelScheduleResponse(channelId) {
+  var one = SCHEDULES[channelId] || SCHEDULES['cartoon-club'];
+  return {
+    channel_id: channelId, name: one.name, item_type: one.item_type,
+    from: '2026-09-06T17:02:00', to: '2026-09-08T17:02:00',
+    entries: one.entries
+  };
+}
+
 function continueWatchingResponse(person, store) {
   // FEAT-045/TASK-317: `recents` (last 5 opened music sources, newest-first) rides
   // this response. Empty by default — the Recently Played rail is then omitted; a
@@ -475,6 +547,18 @@ async function installApi(page) {
     var profile = new URL(route.request().url()).searchParams.get('profile');
     if (!profile) return json(route, 400, { error: "profile must be 'kids' or 'adults'" });
     return json(route, 404, { error: 'channel not found: ' + lastSegment(route.request().url(), '/api/channels/') });
+  });
+  // TASK-589/590 — ONE channel's listing, for the Guide. Registered after the
+  // two above so it wins for `/api/channels/{id}/schedule` (Playwright: last
+  // match first), which their patterns would otherwise swallow. It ANSWERS by
+  // default, unlike the detail route: the strip is empty by default, so nothing
+  // reaches this unless a test has asked for channels — and a test that has
+  // wants a page with something on it.
+  await page.route('**/api/channels/*/schedule**', function(route) {
+    var url = new URL(route.request().url());
+    var profile = url.searchParams.get('profile');
+    if (!profile) return json(route, 400, { error: "profile must be 'kids' or 'adults'" });
+    return json(route, 200, channelScheduleResponse(url.pathname.split('/').slice(-2)[0]));
   });
   await page.route('**/api/continue-watching**', function(route) {
     var person = new URL(route.request().url()).searchParams.get('person');
@@ -1401,5 +1485,6 @@ module.exports = {
   // shape test can exercise the exact objects the routes above emit.
   browseResponse, videoResponse, albumResponse, playlistResponse, continueWatchingResponse, midWatchRows,
   channelsResponse, CHANNEL_ON_AIR, CHANNEL_OFF_AIR_TIMED, CHANNEL_OFF_AIR_PLAIN,
-  channelDetailResponse, CHANNEL_DETAIL, CHANNEL_DETAIL_OFF_AIR, CHANNEL_NEXT
+  channelDetailResponse, CHANNEL_DETAIL, CHANNEL_DETAIL_OFF_AIR, CHANNEL_NEXT,
+  channelScheduleResponse, CHANNEL_SCHEDULE_ENTRIES
 };

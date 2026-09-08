@@ -96,6 +96,8 @@ export function sectionOf(card) { return card.section || 'films'; }
 // TASK-563: 'channel' needs no new branch below either — a channel tile's own
 // `kind: 'channel'` (core/channels.js) falls through the final `card.kind ||
 // 'video'` line, exactly as 'play-all' does.
+// TASK-590 adds NO route: the Guide is a control on each surface's furniture,
+// not a card in a list (core/guide.js says why), so nothing routes to it.
 export var CARD_ROUTES = ['artist', 'playlist', 'music-video', 'album', 'video', 'series', 'track', 'play-all', 'channel'];
 
 export function cardRoute(card) {

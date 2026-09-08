@@ -139,6 +139,7 @@ what to fix this week, this one tells you what to guard.
 | Series detail | one season | ✅ **season chips** — a season is ~50 episodes however large the library gets | 52 rows | **52 rows** |
 | Album detail | one album | ✅ **album length** | 19 rows | **19 rows** |
 | Profile picker | the family | ✅ **five people** | 5 tiles | **5 tiles** |
+| Guide (TASK-590) | the channel line-up, not the catalog | ✅ **the clock, then a six-row cap** — two days per column and `GUIDE_MAX_ROWS` programmes drawn per day, the rest counted in one line; the read behind it is bounded by the clock rather than paged, and the backend shortens the span before it lengthens the list | 5 columns × ≤6 rows | **5 columns × ≤6 rows** |
 | Home Movies list · All | home movies | ❌ nothing | 1,035 rows | 5,175 rows |
 | Home Movies list · per kid | one kid's clips | ❌ nothing | 819 rows | 4,095 rows |
 | Queue View, Play All | a whole media type | ❌ nothing | 2,067 rows | 10,335 rows |
@@ -153,6 +154,21 @@ what to fix this week, this one tells you what to guard.
 | d-pad step (`verticalStops`) | rows on the page | ❌ nothing — a fresh `querySelectorAll` per keypress | 0.214 ms | ~1 ms |
 | `loader.py` ingest | the whole catalog | ❌ nothing — but a very small constant | 110–250 ms | ~1 s |
 | Companion Home Movies list | home movies | ❌ nothing | 1,035 rows | 5,175 rows |
+
+The Guide row is arithmetic off its own caps rather than a painted measurement —
+it shipped after this audit was run (2026-08-26) and has not been through the
+browser the rest of the table went through. It is listed because it is the first
+list screen added since, and the first that caps itself by construction: what it
+grows with is how many channels the family runs, and each column stops at six
+rows however long the evening is.
+
+Channel count is the axis to watch, and it is the one this page does not cap.
+Every channel is a column, every column is a listing request, and the columns
+now hold a minimum width and scroll sideways rather than dividing what is there
+— so an eighth channel costs an eighth request and an eighth column-worth of
+DOM, and is read by scrolling to it. That is a fine trade at the handful of
+channels the family runs and would not be at fifty, which is the number to bring
+this row back for.
 
 **Of seventeen: three capped, one partially, thirteen not at all.** The three
 sites in the recommendation are not the

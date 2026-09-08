@@ -26,6 +26,7 @@ import { collectionMetaLine, episodeLabel } from '../../core/detail-view.js';
 import { primaryAction } from '../../core/series-detail.js';
 import { progressPct } from '../../core/player-math.js';
 import { hasChannels, channelTiles, channelCardView } from '../../core/channels.js';
+import { guideColumn, guideHead, guideTailLine, todayKey } from '../../core/guide.js';
 
 const CONTRACT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.contract');
 const HAS_CONTRACT = fs.existsSync(CONTRACT_DIR);
@@ -46,7 +47,7 @@ function findItem(rails, id) {
 const VIDEO_READER_FIELDS = ['id', 'title', 'ext', 'duration', 'subtitles', 'startAt', 'endAt', 'lyrics', 'available', 'poster', 'type'];
 
 describe.skipIf(!HAS_CONTRACT)('backend contract conformance (SYS-017 / TASK-311)', () => {
-  let browse, cw, video, album, playlist, channels;
+  let browse, cw, video, album, playlist, channels, schedule;
   beforeAll(() => {
     browse = load('browse');
     cw = load('continue-watching');
@@ -54,6 +55,7 @@ describe.skipIf(!HAS_CONTRACT)('backend contract conformance (SYS-017 / TASK-311
     album = load('album');
     playlist = load('playlist');
     channels = load('channels');
+    schedule = load('channel-schedule');
   });
 
   describe('/api/browse → core/home-rails + core/tile-model', () => {
@@ -220,5 +222,54 @@ describe.skipIf(!HAS_CONTRACT)('backend contract conformance (SYS-017 / TASK-311
       expect(channelCardView(channels.channels[1], 0).poster).toBe('toy-story-main.jpg');
       expect(channelCardView(channels.channels[0], 0).poster).toBe(null);
     });
+  });
+
+  // TASK-589/590 — the LISTING route, which only the Guide reads. Every field
+  // here is read nowhere else in the app, so a rename on this route breaks one
+  // page and nothing would notice it: the strip would go on drawing perfectly
+  // while the page behind it emptied.
+  describe('/api/channels/{id}/schedule → core/guide', () => {
+    it('takes the day off the answer itself (proves `from`)', () => {
+      expect(todayKey([schedule])).toBe('2026-06-01');
+    });
+
+    it('lists the programmes in the day, timed (proves `entries`,`kind`,`starts_at`)', () => {
+      const column = guideColumn(schedule, '2026-06-01', true);
+      expect(column.rows.map(r => r.time)).toEqual(['08:58']);
+      expect(column.rows[0].title).toBe("Millie's First Walk");
+    });
+
+    it('says what a row IS and how long it runs (proves `item.itemType`,`item.duration`)', () => {
+      // A renamed duration reads undefined and every row loses its runtime —
+      // the listing then says what is on and never how long it is.
+      const column = guideColumn(schedule, '2026-06-01', true);
+      expect(column.rows[0].sub).toBe('Episode · 1m');
+    });
+
+    it('names the real stop and when the channel is back (proves `ends_at`,`next_on_air`)', () => {
+      const column = guideColumn(schedule, '2026-06-01', true);
+      expect(column.tail).toEqual({
+        stopAt: '2026-06-01T09:00:00', backAt: '2026-06-02T07:00:00', day: '2026-06-01'
+      });
+      expect(guideTailLine(column.tail)).toBe('Off air from 09:00 · back Tuesday 07:00');
+    });
+
+    it('keeps the next day in its own column (proves the off-air row splits the runs)', () => {
+      const tomorrow = guideColumn(schedule, '2026-06-02', false);
+      expect(tomorrow.lead.time).toBe('07:00');
+      expect(tomorrow.rows).toEqual([]);
+    });
+
+    it('heads the column with the channel and its hours (proves `name`,`item_type`)', () => {
+      const column = guideColumn(schedule, '2026-06-01', true);
+      expect(guideHead(schedule, column)).toEqual({ name: 'Comfort', meta: 'Episodes · On air until 09:00' });
+    });
+
+    // ⚠️ `item.series` is NOT proved here, and the gap is the fixture's rather
+    // than the app's: the live route resolves listed items through the same
+    // projection the strip does, which has carried `series` since TASK-588, but
+    // this fixture was frozen the day before that merged. The strip's own
+    // `item.series` conformance above covers the projection; refreezing this one
+    // is a backend change.
   });
 });

@@ -125,6 +125,12 @@ body.sidebar-collapsed #breadcrumb { display: none; }
 #device-badge { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--surface); border: 2px solid var(--border); border-radius: 999px; font-size: var(--fs-xs); color: var(--text-muted); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); pointer-events: none; }
 #device-swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.55); flex-shrink: 0; }
 #error-msg { display: none; }
+/* TASK-590 — the Guide button: the same icon-only pill as Search beside it, and
+   named for a screen reader by aria-label rather than by a word on the face.
+   Shown only on the Channels tab (screen-browse-page.js), so its default here
+   is hidden. */
+#btn-guide { flex: 0 0 auto; align-items: center; gap: 8px; min-width: auto; font-size: var(--fs-sm); padding: 12px 22px; background: var(--surface-hi); border: 2px solid var(--focus); border-radius: 999px; color: var(--focus); }
+#btn-guide:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 #btn-search { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-width: auto; font-size: var(--fs-sm); padding: 12px 22px; background: var(--surface-hi); border: 2px solid var(--focus); border-radius: 999px; color: var(--focus); }
 #btn-search:focus { outline: none; border-color: var(--focus); box-shadow: var(--focus-glow); color: var(--focus); }
 #search-panel { display: none; position: fixed; inset: 0; z-index: 30; background: rgba(6, 10, 22, 0.97); flex-direction: column; padding: 44px 64px 56px; gap: 26px; }
@@ -162,6 +168,7 @@ body.sidebar-collapsed #breadcrumb { display: none; }
   <div id="rails-container"><div id="rails"></div></div>
 </div>
 <div id="queue-actions">
+<button id="btn-guide" type="button" aria-label="Guide" title="Guide" style="display:none">📺</button>
 <button id="btn-search" type="button" aria-label="Search">🔍</button>
 <div id="queue-menu-mount">
   <button id="btn-queue-menu" type="button" aria-label="Play controls">&#9654;</button>

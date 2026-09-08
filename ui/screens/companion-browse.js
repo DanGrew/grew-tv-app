@@ -51,7 +51,7 @@ var SECTION_LEVEL = { true: 'rails', false: 'sections' };
 var DRILL_CTX = { browse: true, 'rail-grid': true };
 
 export function initPage() {
-  mountStatusMenu(['mode', 'row', 'screen', 'profile', 'atlas']);
+  mountStatusMenu(['mode', 'row', 'screen', 'guide', 'profile', 'atlas']);
   var server = window.location.origin;
   var els = {
     connStatus: document.getElementById('conn-status'),
@@ -642,6 +642,21 @@ export function initPage() {
     applyGrid(CHANNELS_TAB.id, CHANNELS_RAIL);
   }
 
+  // TASK-590 — the ☰ menu's Guide row. Both surfaces go, the same split
+  // selectChannels above uses: the intent points the TV at its own Guide page,
+  // and the phone walks to its own. Not the navigate() funnel, because that
+  // one's local half is a drill inside THIS page — the Guide is a page of its
+  // own on both surfaces, so the phone leaves rather than re-renders.
+  //
+  // Unconditional: a desynced phone's intent is dropped by the WS layer, and
+  // what is left — the phone opening its own Guide — is local navigation, which
+  // is valid in both modes. So the row is never greyed, unlike Switch profile
+  // beneath it.
+  function openGuide() {
+    api.sendIntent('navigate', { page: 'guide.html', params: {} });
+    window.location.href = 'guide.html';
+  }
+
   var SECTION_ROUTE = { channels: selectChannels };
   function selectBySection(id) {
     var railId = firstRailId(railsForBrowseSection(id, state.cards, state.cw, state.labels, state.recents, state.channels));
@@ -950,6 +965,7 @@ export function initPage() {
   // `profile` context, which onContext follows. One path.
   function switchProfile() { api.sendIntent('navigate', switchProfileTarget()); }
   document.getElementById('switch-profile').addEventListener('click', switchProfile);
+  document.getElementById('open-guide').addEventListener('click', openGuide);
 
   // Toggle handler: going DESYNCED re-renders to grey TV-driving controls and
   // switch the tile taps to local opens; going SYNCED re-runs the reconnect path

@@ -37,7 +37,8 @@ const require = createRequire(import.meta.url);
 const {
   browseResponse, videoResponse, albumResponse, playlistResponse,
   continueWatchingResponse, midWatchRows, MUSIC_CARDS, PLAYLIST_CARDS, PLAYLISTS,
-  channelsResponse, CHANNEL_ON_AIR, CHANNEL_OFF_AIR_TIMED, CHANNEL_DETAIL
+  channelsResponse, CHANNEL_ON_AIR, CHANNEL_OFF_AIR_TIMED, CHANNEL_DETAIL,
+  channelScheduleResponse, CHANNEL_SCHEDULE_ENTRIES
 } = require('../fixtures/api.js');
 
 const CONTRACT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.contract');
@@ -91,7 +92,7 @@ const AUDIO_VIDEO = {
 };
 
 describe.skipIf(!HAS_CONTRACT)('stub ⇄ backend contract shape (SYS-017 / TASK-326)', () => {
-  let browse, cw, video, album, playlist, channels;
+  let browse, cw, video, album, playlist, channels, schedule;
   beforeAll(() => {
     browse = load('browse');
     cw = load('continue-watching');
@@ -99,6 +100,7 @@ describe.skipIf(!HAS_CONTRACT)('stub ⇄ backend contract shape (SYS-017 / TASK-
     album = load('album');
     playlist = load('playlist');
     channels = load('channels');
+    schedule = load('channel-schedule');
   });
 
   describe('/api/browse (browseResponse)', () => {
@@ -306,6 +308,46 @@ describe.skipIf(!HAS_CONTRACT)('stub ⇄ backend contract shape (SYS-017 / TASK-
       expectShape('channel detail (shared half)', CHANNEL_ON_AIR, channels.channels[0]);
       const extra = Object.keys(CHANNEL_DETAIL).filter(k => !(k in CHANNEL_ON_AIR)).sort();
       expect(extra).toEqual(['bed', 'ends_at', 'next', 'started_at', 'tag']);
+    });
+  });
+
+  // TASK-589/590 — the LISTING route, which the Guide draws. This one has its
+  // own frozen fixture, so all three shapes bind: the envelope, a programme row
+  // and an off-air row.
+  describe('/api/channels/{id}/schedule (channelScheduleResponse)', () => {
+    it('envelope shape matches (channel_id / name / item_type / from / to / entries)', () => {
+      expectShape('schedule envelope', channelScheduleResponse('cartoon-club'), schedule);
+    });
+
+    it('a programme row matches the contract row', () => {
+      const stub = CHANNEL_SCHEDULE_ENTRIES.find(e => e.kind === 'programme');
+      const con = schedule.entries.find(e => e.kind === 'programme');
+      expectShape('schedule programme row', stub, con);
+    });
+
+    it('an off-air row names when the channel is back, and carries no item', () => {
+      const stub = CHANNEL_SCHEDULE_ENTRIES.find(e => e.kind === 'off_air');
+      const con = schedule.entries.find(e => e.kind === 'off_air');
+      expectShape('schedule off-air row', stub, con);
+    });
+
+    it('a listed item matches the contract item', () => {
+      const stub = CHANNEL_SCHEDULE_ENTRIES.find(e => e.kind === 'programme').item;
+      const con = schedule.entries.find(e => e.kind === 'programme').item;
+      expectShape('schedule item', stub, con, {
+        stubOnly: {
+          // The live route resolves every listed item through the SAME
+          // projection the strip does (api/channels.py `_resolve_item`), which
+          // has carried `series` since TASK-588 — and the Guide's rows lead with
+          // the show off exactly that field. This fixture was frozen by TASK-589,
+          // the day before TASK-588 merged, so the gap is the FIXTURE being
+          // behind the backend, not the stub being ahead of it. Refreezing it is
+          // a backend change; until then the key is excused here rather than
+          // dropped from the stub, which would leave the Guide's own rows
+          // untested against the shape they actually read.
+          series: 'contract fixture frozen at TASK-589, before TASK-588 put `series` on this projection'
+        }
+      });
     });
   });
 });
