@@ -95,6 +95,22 @@ const ROLLED_ON = channelDetailResponse(Object.assign({}, ON_AIR, {
   offset_seconds: 8, runtime_seconds: 420
 }));
 
+// TASK-592 story 4 — an After Dark line-up. A film carries no `series`, which is
+// what the live route sends for anything the catalog holds no show for, so every
+// row here draws one title and the episode element stays empty.
+function filmEntry(id, title, startsAt, endsAt) {
+  return {
+    item: { item_id: id, title: title, poster: null, itemType: 'film', ext: 'mp4', subtitles: null, series: null },
+    tag: 'horror', starts_at: startsAt, ends_at: endsAt
+  };
+}
+const FILM_NEXT = [
+  filmEntry('alien',     'Alien',     '2026-09-04T21:00:00', '2026-09-04T23:00:00'),
+  filmEntry('the-thing', 'The Thing', '2026-09-04T23:00:00', '2026-09-05T01:00:00'),
+  filmEntry('predator',  'Predator',  '2026-09-05T01:00:00', '2026-09-05T03:00:00'),
+  filmEntry('robocop',   'RoboCop',   '2026-09-05T03:00:00', '2026-09-05T05:00:00')
+];
+
 // ⚠️ THE TWO WAYS AN ITEM ENDS, and TASK-574 is the difference between them.
 //
 // ON SCHEDULE — the channel has reached the end of the slot, so the next
@@ -232,19 +248,64 @@ test.describe('the gap between two items', () => {
   });
 
   // Story 2 — three things coming with clock times, then a shorter untimed list.
-  test('the card names three things with times, then what is on later', async ({ page }) => {
+  //
+  // TASK-592 — the titles now name the SHOW, with the episode stacked under it,
+  // and the later run collapses to shows. Cartoon Club's shipped lookahead is one
+  // Hey Duggee then six Bluey episodes, so the later half is the one word Bluey
+  // where it used to be four episode titles.
+  test('the card names three shows with times, then what is on later', async ({ page }) => {
     await openChannel(page, 'cartoon-club');
     await endItem(page);
     await expect(page.locator('#channel-card')).toBeVisible();
 
     await expect(page.locator('#card-rows .card-time')).toHaveText(['17:08', '17:15', '17:22']);
-    // TASK-588 gave the fixture the episode titles a manifest actually holds
-    // ("The Tidying Up Badge", not "Hey Duggee") and the show beside them. This
-    // card still draws the episode alone — it was not in that task's two
-    // surfaces — so what it names is unchanged in kind, only more honest.
-    await expect(page.locator('#card-rows .card-title')).toHaveText(['The Tidying Up Badge', 'Bob Bilby', 'Neighbours']);
-    await expect(page.locator('#card-later')).toHaveText('The Magic Xylophone · Keepy Uppy · Daddy Robot · Shadowlands');
+    await expect(page.locator('#card-rows .card-title')).toHaveText(['Hey Duggee', 'Bluey', 'Bluey']);
+    await expect(page.locator('#card-rows .card-episode')).toHaveText([
+      'The Tidying Up Badge · S1 E4', 'Bob Bilby · S1 E12', 'Neighbours · S1 E21'
+    ]);
+    await expect(page.locator('#card-later')).toHaveText('Bluey');
     await expect(page.locator('#card-label')).toHaveText('Cartoon Club');
+  });
+
+  // ⚠️ TASK-592 — THE EPISODE IS THE SECOND CHILD OF THE TITLE CELL, not a third
+  // child of the row. `#card-rows` is a two-column grid (`auto 1fr`), so a third
+  // child per row would push every clock into the title column and the card would
+  // come apart. This asserts the shape that keeps the clocks where they are:
+  // three rows, two grid children each, the episode nested inside the second.
+  test('the episode stacks inside the title cell, leaving the clocks their column', async ({ page }) => {
+    await openChannel(page, 'cartoon-club');
+    await endItem(page);
+    await expect(page.locator('#channel-card')).toBeVisible();
+
+    await expect(page.locator('#card-rows > *')).toHaveCount(6);
+    await expect(page.locator('#card-rows > .card-title-cell')).toHaveCount(3);
+    await expect(page.locator('#card-rows > .card-title-cell > .card-episode')).toHaveCount(3);
+    // Every clock still sits in the first column — one x for all three.
+    const lefts = await page.locator('#card-rows .card-time').evaluateAll(
+      nodes => nodes.map(node => node.getBoundingClientRect().left));
+    expect(new Set(lefts).size).toBe(1);
+  });
+
+  // ⭐ TASK-592 story 4 — AFTER DARK, BETWEEN TWO FILMS. A film belongs to no
+  // show, so `episodeSlot` comes back empty and `.card-episode:empty` hides the
+  // element: one title per row and NO blank line under it. This is the one part
+  // of the row that only the browser can prove — the empty div is in the DOM
+  // either way, and CSS is what stops it taking a line.
+  test('a film draws one title with no blank line under it', async ({ page }) => {
+    await withChannel(page, Object.assign({}, DETAIL, { name: 'After Dark', next: FILM_NEXT }));
+    await openChannel(page, 'cartoon-club');
+    await endItem(page);
+    await expect(page.locator('#channel-card')).toBeVisible();
+
+    await expect(page.locator('#card-rows .card-title')).toHaveText(['Alien', 'The Thing', 'Predator']);
+    await expect(page.locator('#card-rows .card-episode')).toHaveCount(3);
+    await expect(page.locator('#card-rows .card-episode').first()).toBeHidden();
+    // The row is as tall as its title alone — the hidden episode costs nothing.
+    const heights = await page.locator('#card-rows .card-title-cell').evaluateAll(
+      nodes => nodes.map(node => node.getBoundingClientRect().height));
+    const titles = await page.locator('#card-rows .card-title').evaluateAll(
+      nodes => nodes.map(node => node.getBoundingClientRect().height));
+    expect(heights).toEqual(titles);
   });
 
   // ⚠️ THE ASYMMETRY IS THE DESIGN (decision 12). Times invite waiting for

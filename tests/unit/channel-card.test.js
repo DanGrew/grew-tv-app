@@ -14,21 +14,57 @@ import {
 // asymmetry in both directions, because it is the sort of thing a later hand
 // "tidies up" by giving every line a time.
 
-function entry(id, title, startsAt) {
+// TASK-592 — an entry's item carries the SHOW it belongs to (`series`, put on the
+// wire by TASK-588), or null for anything the catalog holds no show for: a film,
+// a track, a home movie, and an episode belonging to nothing. The card reads that
+// block through channels.js, so a fixture without it is a fixture of films.
+function entry(id, title, startsAt, series) {
   return {
-    item: { item_id: id, title: title },
+    item: { item_id: id, title: title, series: series || null },
     tag: 'preschool', starts_at: startsAt, ends_at: '2026-09-04T18:00:00'
   };
 }
 
+function bluey(episode) {
+  return { id: 'series-bluey', title: 'Bluey', season: 1, episode: episode };
+}
+const DUGGEE = { id: 'series-hey-duggee', title: 'Hey Duggee', season: 1, episode: 4 };
+
+// Cartoon Club as it actually airs: one Hey Duggee, then a run of Bluey. The
+// lookahead spanning two shows is the point — it is what makes the timed half's
+// job (tell three programmes apart) and the later half's job (say what is on
+// afterwards) visibly different.
 const NEXT = [
-  entry('duggee-s1e04', 'Hey Duggee',          '2026-09-04T17:08:00'),
-  entry('bluey-s1e12',  'Bob Bilby',           '2026-09-04T17:15:00'),
-  entry('bluey-s1e21',  'Neighbours',          '2026-09-04T17:22:00'),
-  entry('bluey-s1e01',  'The Magic Xylophone', '2026-09-04T17:29:00'),
-  entry('bluey-s1e03',  'Keepy Uppy',          '2026-09-04T17:36:00'),
-  entry('bluey-s1e04',  'Daddy Robot',         '2026-09-04T17:43:00'),
-  entry('bluey-s1e05',  'Shadowlands',         '2026-09-04T17:50:00')
+  entry('duggee-s1e04', 'The Tidying Up Badge', '2026-09-04T17:08:00', DUGGEE),
+  entry('bluey-s1e12',  'Bob Bilby',           '2026-09-04T17:15:00', bluey(12)),
+  entry('bluey-s1e21',  'Neighbours',          '2026-09-04T17:22:00', bluey(21)),
+  entry('bluey-s1e01',  'The Magic Xylophone', '2026-09-04T17:29:00', bluey(1)),
+  entry('bluey-s1e03',  'Keepy Uppy',          '2026-09-04T17:36:00', bluey(3)),
+  entry('bluey-s1e04',  'Daddy Robot',         '2026-09-04T17:43:00', bluey(4)),
+  entry('bluey-s1e05',  'Shadowlands',         '2026-09-04T17:50:00', bluey(5))
+];
+
+// ⚠️ THE CASE THIS ROW EXISTS FOR (TASK-592). TASK-585 makes a show hold a slot
+// and run episode-in-order, so consecutive entries sharing a show is the NORMAL
+// line-up, not an edge — five Bluey episodes, then Hey Duggee takes over.
+const REPEAT_RUN = [
+  entry('bluey-s1e12',  'Bob Bilby',           '2026-09-04T17:08:00', bluey(12)),
+  entry('bluey-s1e21',  'Neighbours',          '2026-09-04T17:15:00', bluey(21)),
+  entry('bluey-s1e01',  'The Magic Xylophone', '2026-09-04T17:22:00', bluey(1)),
+  entry('bluey-s1e03',  'Keepy Uppy',          '2026-09-04T17:29:00', bluey(3)),
+  entry('bluey-s1e04',  'Daddy Robot',         '2026-09-04T17:36:00', bluey(4)),
+  entry('duggee-s1e04', 'The Tidying Up Badge', '2026-09-04T17:43:00', DUGGEE),
+  entry('duggee-s1e09', 'The Bug Badge',       '2026-09-04T17:50:00', { id: 'series-hey-duggee', title: 'Hey Duggee', season: 1, episode: 9 })
+];
+
+// After Dark: two films back to back, and a film belongs to no show. Nothing on
+// this card has a second line to draw, and none ever did — story 4 is that this
+// line-up is untouched by the whole row.
+const FILMS = [
+  entry('alien',    'Alien',        '2026-09-04T21:00:00'),
+  entry('the-thing', 'The Thing',   '2026-09-04T23:00:00'),
+  entry('predator', 'Predator',     '2026-09-05T01:00:00'),
+  entry('robocop',  'RoboCop',      '2026-09-05T03:00:00')
 ];
 
 function detail(over) {
@@ -128,10 +164,55 @@ describe('holdSeconds', () => {
 describe('timedLines', () => {
   it('names the next three with their clock times', () => {
     expect(timedLines(detail())).toEqual([
-      { time: '17:08', title: 'Hey Duggee' },
-      { time: '17:15', title: 'Bob Bilby' },
-      { time: '17:22', title: 'Neighbours' }
+      { time: '17:08', title: 'Hey Duggee', episode: 'The Tidying Up Badge · S1 E4' },
+      { time: '17:15', title: 'Bluey',      episode: 'Bob Bilby · S1 E12' },
+      { time: '17:22', title: 'Bluey',      episode: 'Neighbours · S1 E21' }
     ]);
+  });
+
+  // ⭐ TASK-592 story 1 — the line names the SHOW and puts the episode under it.
+  // Before this row all three read the episode alone: "The Tidying Up Badge",
+  // "Bob Bilby", "Neighbours" — three programmes on one card and not one of them
+  // saying what show it was.
+  it('leads with the show and carries the episode underneath it', () => {
+    const lines = timedLines(detail());
+    expect(lines.map(line => line.title)).toEqual(['Hey Duggee', 'Bluey', 'Bluey']);
+    expect(lines.map(line => line.episode))
+      .toEqual(['The Tidying Up Badge · S1 E4', 'Bob Bilby · S1 E12', 'Neighbours · S1 E21']);
+  });
+
+  // ⚠️ THE TIMED HALF KEEPS THE EPISODE, and that is the half of the principle
+  // most likely to be "finished" later by collapsing these the way the later
+  // list collapses. It must not be: the timed half exists to tell three
+  // programmes apart, and three rows reading "Bluey" against three clocks tell
+  // you less than the episode titles that were there before this row.
+  it('does NOT collapse a repeat run — three Bluey slots stay three lines', () => {
+    const lines = timedLines(detail({ next: REPEAT_RUN }));
+    expect(lines.map(line => line.title)).toEqual(['Bluey', 'Bluey', 'Bluey']);
+    expect(lines.map(line => line.episode))
+      .toEqual(['Bob Bilby · S1 E12', 'Neighbours · S1 E21', 'The Magic Xylophone · S1 E1']);
+    expect(lines.map(line => line.time)).toEqual(['17:08', '17:15', '17:22']);
+  });
+
+  // ⭐ TASK-592 story 4 — After Dark between two films. A film belongs to no
+  // show, so the title line is the film and there is NO second line: the episode
+  // is empty, and `.card-episode:empty` is what keeps the row one line tall.
+  it('names a film alone, with no episode line under it', () => {
+    expect(timedLines(detail({ next: FILMS }))).toEqual([
+      { time: '21:00', title: 'Alien',     episode: '' },
+      { time: '23:00', title: 'The Thing', episode: '' },
+      { time: '01:00', title: 'Predator',  episode: '' }
+    ]);
+  });
+
+  // A show the catalog numbers nothing for still reads — the show leads and the
+  // episode's own title stands alone underneath, rather than "Bob Bilby · S
+  // undefined E undefined". Both halves of the numbering are optional and
+  // independently so; channels.js owns that and this proves the card gets it.
+  it('draws an unnumbered episode without inventing a season or an episode', () => {
+    const vague = detail({ next: [entry('bluey-s1e12', 'Bob Bilby', '2026-09-04T17:08:00',
+      { id: 'series-bluey', title: 'Bluey', season: null, episode: null })] });
+    expect(timedLines(vague)).toEqual([{ time: '17:08', title: 'Bluey', episode: 'Bob Bilby' }]);
   });
 
   it('stops at three however long the lookahead is', () => {
@@ -151,16 +232,17 @@ describe('timedLines', () => {
   it('shortens the card rather than drawing a line with a blank time', () => {
     const mixed = detail({ next: [entry('a', 'A', null), NEXT[0], NEXT[1]] });
     expect(timedLines(mixed)).toEqual([
-      { time: '17:08', title: 'Hey Duggee' },
-      { time: '17:15', title: 'Bob Bilby' }
+      { time: '17:08', title: 'Hey Duggee', episode: 'The Tidying Up Badge · S1 E4' },
+      { time: '17:15', title: 'Bluey',      episode: 'Bob Bilby · S1 E12' }
     ]);
   });
 
   it('names an id the catalog has forgotten rather than blanking the line', () => {
     // A six-month programme outlives the library under it, so a removed item
-    // should read as a gap, not a blank row.
+    // should read as a gap, not a blank row. It carries no show either, so the
+    // id stands alone with nothing under it.
     const gone = detail({ next: [{ item: { item_id: 'gone-s1e01' }, starts_at: '2026-09-04T17:08:00' }] });
-    expect(timedLines(gone)).toEqual([{ time: '17:08', title: 'gone-s1e01' }]);
+    expect(timedLines(gone)).toEqual([{ time: '17:08', title: 'gone-s1e01', episode: '' }]);
   });
 
   it('survives an answer with no lookahead at all', () => {
@@ -172,11 +254,38 @@ describe('timedLines', () => {
   });
 });
 
+// TASK-592 — the later half is SHOWS, and it is the half where the two jobs of
+// one fact come apart. The timed half tells three programmes apart and needs the
+// episode; this half is one glance at what is on afterwards, so it collapses.
 describe('laterTitles', () => {
-  it('is the names AFTER the timed lines, untimed', () => {
-    expect(laterTitles(detail())).toEqual([
-      'The Magic Xylophone', 'Keepy Uppy', 'Daddy Robot', 'Shadowlands'
-    ]);
+  it('is the SHOWS after the timed lines, untimed', () => {
+    // Four Bluey episodes follow the three timed lines, and they are one show.
+    expect(laterTitles(detail())).toEqual(['Bluey']);
+  });
+
+  // ⭐ TASK-592 story 2 — a stretch of one show names it ONCE. Swapping the read
+  // to the show without this ships "Bluey · Bluey · Bluey · Bluey", which is the
+  // whole reason the row exists: TASK-585 makes the repeat the normal line-up.
+  it('names a show once however many of its episodes are coming', () => {
+    expect(laterTitles(detail({ next: REPEAT_RUN }))).toEqual(['Bluey', 'Hey Duggee']);
+  });
+
+  // ⭐ TASK-592 story 3, and the owner's 2026-09-10 call at build time. The later
+  // half is the run of shows still to come READ ON ITS OWN — it does not check
+  // what the timed lines said and does not go quiet when they said the same
+  // thing. Shown both readings side by side, the owner took this one; the
+  // alternative (drop a show the timed half already named, and lose the later
+  // half entirely when there is only one show) was put to them and not taken.
+  it('names a show the timed half ALREADY drew, rather than going quiet', () => {
+    const oneShow = detail({ next: REPEAT_RUN.slice(0, 5) });
+    expect(timedLines(oneShow).map(line => line.title)).toEqual(['Bluey', 'Bluey', 'Bluey']);
+    expect(laterTitles(oneShow)).toEqual(['Bluey']);
+  });
+
+  it('keeps its later half when every line on the card is one show', () => {
+    // The card does NOT lose its later half here. `card-rule` and
+    // `card-later-block` hide on an EMPTY list, and this list is not empty.
+    expect(laterTitles(detail({ next: REPEAT_RUN.slice(0, 5) })).length).toBe(1);
   });
 
   it('carries no times — the asymmetry IS the design', () => {
@@ -185,24 +294,63 @@ describe('laterTitles', () => {
     expect(laterTitles(detail()).join(' ')).not.toContain(':');
   });
 
-  it('caps, so the card cannot grow down the screen', () => {
-    const long = detail({ next: NEXT.concat(NEXT) });
-    expect(laterTitles(long).length).toBe(LATER_LINES);
+  // ⚠️ It carries no EPISODE either, which is the other direction the asymmetry
+  // can be tidied away in. "Bluey · Bob Bilby · S1 E12 · Bluey · Neighbours · S1
+  // E21" is a listing, and this half is a glance.
+  it('carries no episode titles — the shows alone', () => {
+    expect(laterTitles(detail()).join(' ')).not.toContain('Keepy Uppy');
+    expect(laterTitles(detail()).join(' ')).not.toContain('S1 E');
+  });
+
+  it('caps at four DISTINCT SHOWS, so the card cannot grow down the screen', () => {
+    // Six shows follow the timed lines and four is what the card has room for.
+    const many = detail({ next: NEXT.slice(0, 3).concat([
+      entry('a', 'A', '2026-09-04T17:29:00', { id: 's-a', title: 'Show A', season: 1, episode: 1 }),
+      entry('b', 'B', '2026-09-04T17:36:00', { id: 's-b', title: 'Show B', season: 1, episode: 1 }),
+      entry('c', 'C', '2026-09-04T17:43:00', { id: 's-c', title: 'Show C', season: 1, episode: 1 }),
+      entry('d', 'D', '2026-09-04T17:50:00', { id: 's-d', title: 'Show D', season: 1, episode: 1 }),
+      entry('e', 'E', '2026-09-04T17:57:00', { id: 's-e', title: 'Show E', season: 1, episode: 1 }),
+      entry('f', 'F', '2026-09-04T18:04:00', { id: 's-f', title: 'Show F', season: 1, episode: 1 })
+    ]) });
+    expect(laterTitles(many)).toEqual(['Show A', 'Show B', 'Show C', 'Show D']);
+    expect(laterTitles(many).length).toBe(LATER_LINES);
+  });
+
+  // ⚠️ THE CAP COUNTS SHOWS, WHICH MEANS THE DEDUPE RUNS FIRST. Capping the
+  // entries and collapsing afterwards would let four episodes of one show fill
+  // the list and then collapse it to a single name — the card would go quiet
+  // exactly where it has the most to say.
+  it('spends one of its four lines on a show, not one per episode', () => {
+    const buried = detail({ next: NEXT.slice(0, 3).concat([
+      NEXT[3], NEXT[4], NEXT[5], NEXT[6],
+      entry('z', 'Z', '2026-09-04T18:04:00', { id: 's-z', title: 'Show Z', season: 1, episode: 1 })
+    ]) });
+    expect(laterTitles(buried)).toEqual(['Bluey', 'Show Z']);
   });
 
   it('is everything the timed half did NOT take, skipped entries included', () => {
     // An entry the timed half passed over for want of a clock is still
     // something that is on later — and counting off the front of the list
-    // instead would both lose it AND repeat a line already drawn with a time.
+    // instead would lose it. The partition is still on ENTRIES; the collapse to
+    // shows sits on top of it.
     const mixed = detail({ next: [entry('a', 'Unclocked', null), NEXT[0], NEXT[1], NEXT[2], NEXT[3]] });
-    expect(timedLines(mixed).map(l => l.title)).toEqual(['Hey Duggee', 'Bob Bilby', 'Neighbours']);
-    expect(laterTitles(mixed)).toEqual(['Unclocked', 'The Magic Xylophone']);
+    expect(timedLines(mixed).map(l => l.title)).toEqual(['Hey Duggee', 'Bluey', 'Bluey']);
+    expect(laterTitles(mixed)).toEqual(['Unclocked', 'Bluey']);
   });
 
-  it('never repeats a line the timed half already drew', () => {
-    const view = detail();
-    const timed = timedLines(view).map(l => l.title);
-    laterTitles(view).forEach(title => expect(timed).not.toContain(title));
+  it('never repeats the same show twice in its own run', () => {
+    const titles = laterTitles(detail({ next: REPEAT_RUN }));
+    expect(titles.length).toBe(new Set(titles).size);
+  });
+
+  it('keeps the shows in the order the channel airs them', () => {
+    // The later half is a glance at what is on AFTERWARDS, so the first name is
+    // the one coming soonest. A show's place in the run is where it FIRST airs,
+    // not where it last does — grouping or sorting would lose both.
+    const duggeeFirst = detail({ next: NEXT.slice(0, 3).concat([REPEAT_RUN[5], NEXT[4], REPEAT_RUN[6]]) });
+    const blueyFirst = detail({ next: NEXT.slice(0, 3).concat([NEXT[4], REPEAT_RUN[5], NEXT[5]]) });
+    expect(laterTitles(duggeeFirst)).toEqual(['Hey Duggee', 'Bluey']);
+    expect(laterTitles(blueyFirst)).toEqual(['Bluey', 'Hey Duggee']);
   });
 
   it('is empty when the lookahead does not reach past the timed lines', () => {
@@ -211,9 +359,13 @@ describe('laterTitles', () => {
     expect(laterTitles(null)).toEqual([]);
   });
 
+  it('names films by their own titles, because a film belongs to no show', () => {
+    expect(laterTitles(detail({ next: FILMS }))).toEqual(['RoboCop']);
+  });
+
   it('drops an entry it cannot name at all rather than listing a blank', () => {
     const nameless = detail({ next: NEXT.slice(0, 3).concat([{ item: null, starts_at: '2026-09-04T17:29:00' }, NEXT[4]]) });
-    expect(laterTitles(nameless)).toEqual(['Keepy Uppy']);
+    expect(laterTitles(nameless)).toEqual(['Bluey']);
   });
 });
 
@@ -255,12 +407,27 @@ describe('cardView — between items', () => {
       headline: null,
       returnAt: null,
       timed: [
-        { time: '17:08', title: 'Hey Duggee' },
-        { time: '17:15', title: 'Bob Bilby' },
-        { time: '17:22', title: 'Neighbours' }
+        { time: '17:08', title: 'Hey Duggee', episode: 'The Tidying Up Badge · S1 E4' },
+        { time: '17:15', title: 'Bluey',      episode: 'Bob Bilby · S1 E12' },
+        { time: '17:22', title: 'Bluey',      episode: 'Neighbours · S1 E21' }
       ],
-      later: ['The Magic Xylophone', 'Keepy Uppy', 'Daddy Robot', 'Shadowlands']
+      later: ['Bluey']
     });
+  });
+
+  // ⭐ TASK-592 — ONE FACT, TWO JOBS, on one card. The timed half carries the
+  // show AND the episode because it has to tell three programmes apart; the
+  // later half carries the show alone because it is one glance at what is on
+  // afterwards. Reading the two halves of this card side by side is the clearest
+  // statement of the split there is.
+  it('carries the episode in the timed half and the show alone underneath', () => {
+    const view = cardView(detail({ next: REPEAT_RUN }));
+    expect(view.timed.map(line => line.title + ' / ' + line.episode)).toEqual([
+      'Bluey / Bob Bilby · S1 E12',
+      'Bluey / Neighbours · S1 E21',
+      'Bluey / The Magic Xylophone · S1 E1'
+    ]);
+    expect(view.later).toEqual(['Bluey', 'Hey Duggee']);
   });
 
   it('says nothing about being off air, because it is not', () => {
@@ -350,7 +517,25 @@ describe('cardStatus — what the phone is told', () => {
 
   it('reads the FIRST timed line, not a later one', () => {
     expect(cardStatus(detail()).line).toContain('Hey Duggee');
-    expect(cardStatus(detail()).line).not.toContain('Bob Bilby');
+    expect(cardStatus(detail()).line).not.toContain('Bluey');
+  });
+
+  // ⭐ TASK-592 story 6 — the phone names the SHOW ALONE. It reads "Next: Bluey
+  // at 17:08" where it read "Next: Bob Bilby at 17:08" before, and the episode
+  // the television draws underneath deliberately does not follow it here: a
+  // one-line detail belongs to what is on now, and the phone is a remote rather
+  // than a second listing.
+  it('names the show, and does not carry the episode over from the television', () => {
+    expect(cardStatus(detail({ next: REPEAT_RUN })).line).toBe('Next: Bluey at 17:08');
+    expect(cardStatus(detail()).line).toBe('Next: Hey Duggee at 17:08');
+    expect(cardStatus(detail()).line).not.toContain('The Tidying Up Badge');
+    expect(cardStatus(detail()).line).not.toContain('S1 E4');
+  });
+
+  // A film has no show, so the phone names the film — the line the card has
+  // always drawn, unchanged by any of this.
+  it('names a film by its own title', () => {
+    expect(cardStatus(detail({ next: FILMS })).line).toBe('Next: Alien at 21:00');
   });
 
   it('says off air and when it is back', () => {

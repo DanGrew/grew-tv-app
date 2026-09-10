@@ -82,7 +82,14 @@ video::cue { font-size: clamp(28px, 2.6vw, 56px); background: rgba(0,0,0,0.75); 
 #card-rows { display: grid; grid-template-columns: auto 1fr; gap: 22px 40px; align-items: baseline; }
 #card-rows:empty { display: none; }
 .card-time { font-size: var(--fs-lg); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* TASK-592 — the show and its episode are ONE grid cell, stacked. A third child
+   per row would push every clock into the wrong column, so the title column
+   holds a stack instead. `:empty` is what hides the episode for a film — the
+   same idiom `#card-rows` uses above, and the reason appendRow needs no branch. */
+.card-title-cell { display: flex; flex-direction: column; gap: 6px; }
 .card-title { font-size: var(--fs-xl); color: var(--text); }
+.card-episode { font-size: var(--fs-md); color: var(--text-muted); }
+.card-episode:empty { display: none; }
 #card-rule { height: 1px; background: var(--border); width: 880px; }
 #card-later-block { display: flex; flex-direction: column; gap: 12px; }
 #card-later { font-size: var(--fs-md); color: var(--text-muted); }
