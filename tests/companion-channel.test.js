@@ -154,6 +154,25 @@ test.describe('the phone while the TV is on a channel', () => {
     await expect(page.locator('#c-restart')).toBeVisible();
   });
 
+  // ⭐ TASK-592 story 6 — the phone names the SHOW, and only the show. The
+  // television draws "Bluey" with "Bob Bilby · S1 E12" stacked under it; the
+  // phone gets the first half alone, because a one-line detail belongs to what is
+  // on NOW and the phone is a remote rather than a second listing. This line is
+  // built once on the TV (core/channel-card.js `cardStatus`) and pushed whole, so
+  // what is proved here is the other half of the mirror: the phone draws what it
+  // is handed and never decorates it back into a listing.
+  test('names the show in the gap, without the episode the television stacks under it', async ({ page }) => {
+    await installApi(page);
+    await installChannelTv(page, { card: { label: 'Between programmes', line: 'Next: Bluey at 17:08' } });
+    await page.goto('/companion/video.html');
+    await expect(page.locator('#ctx-label')).toHaveText('Between programmes');
+    await expect(page.locator('#now-title')).toHaveText('Next: Bluey at 17:08');
+    await expect(page.locator('#now-title')).not.toContainText('Bob Bilby');
+    await expect(page.locator('#now-title')).not.toContainText('S1 E12');
+    // The crumb agrees with the header — one answer about what the TV is showing.
+    await expect(page.locator('#breadcrumb')).not.toContainText('Bob Bilby');
+  });
+
   test('says off air, and when the channel is back', async ({ page }) => {
     await installApi(page);
     await installChannelTv(page, { card: { label: 'Off air', line: 'Back at 21:00' } });

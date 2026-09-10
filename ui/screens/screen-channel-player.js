@@ -163,16 +163,30 @@ export function initChannelPage() {
   // One component, two callers (decision 8): the gap between two items, and a
   // channel with nothing on. What differs is which fields the view carries, so
   // the render hides what is absent rather than branching on which card it is.
+  // TASK-592 — TWO children per row, still. `#card-rows` is a two-column grid
+  // (`auto 1fr`), so the episode goes INSIDE the title cell as a stack: a third
+  // child appended here would shift every clock into the wrong column and the
+  // card would come apart. The episode is empty for anything with no show, and
+  // `.card-episode:empty` hides it in CSS — the `:empty` idiom `#card-rows`
+  // already uses — rather than a branch here, because cyclomatic complexity is
+  // capped at 1 across `ui/**`.
   function appendRow(line) {
     var rows = document.getElementById('card-rows');
     var time = document.createElement('div');
     time.className = 'card-time';
     time.textContent = line.time;
+    var cell = document.createElement('div');
+    cell.className = 'card-title-cell';
     var title = document.createElement('div');
     title.className = 'card-title';
     title.textContent = line.title;
+    var episode = document.createElement('div');
+    episode.className = 'card-episode';
+    episode.textContent = line.episode;
+    cell.appendChild(title);
+    cell.appendChild(episode);
     rows.appendChild(time);
-    rows.appendChild(title);
+    rows.appendChild(cell);
   }
   function renderCard(view) {
     document.getElementById('card-label').textContent = view.label;

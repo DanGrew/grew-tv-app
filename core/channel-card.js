@@ -11,7 +11,7 @@
 // Fed by the answer core/channel-player.js documents: the on-now line plus
 // `next`, each entry { item, tag, starts_at, ends_at }.
 
-import { itemTitle, clockLabel, returnTimeLabel, tickedOffset } from './channels.js';
+import { leadTitle, episodeSlot, clockLabel, returnTimeLabel, tickedOffset } from './channels.js';
 
 // The FLOOR under the hold, never the whole of it (TASK-574 — see holdSeconds
 // below). Decision 12 says five to ten seconds; eight sits in the middle, long
@@ -76,6 +76,10 @@ export var TIMED_LINES = 3;
 // The untimed list is shorter than the timed one on purpose — it is a glance,
 // not a listing, and a card that grows down the screen stops being readable in
 // eight seconds.
+//
+// TASK-592 — four distinct SHOWS, not four items. The number is unchanged and
+// what it counts is not: a channel running four episodes of one show now spends
+// one of these, not four.
 export var LATER_LINES = 4;
 
 // How many entries the player asks the endpoint for. Both lists come out of one
@@ -104,10 +108,19 @@ function entries(detail) {
 // untimed list below instead of drawing a line with a blank time column.
 //
 // Only ever called on an `entries()` result, so the entry itself is real.
+//
+// TASK-592 — the SHOW leads and the episode sits under it. The timed half exists
+// to tell three programmes apart, so it needs both halves: three rows all
+// reading "Bluey" against different clocks would be worse than the episode
+// titles that were there before it. `leadTitle`/`episodeSlot` are borrowed
+// wholesale from channels.js rather than re-derived — they are the one place the
+// app decides an episode leads with its show, and `episodeSlot` already comes
+// back empty for anything with no show, which is how a film draws one title and
+// no second line.
 function timedLine(entry) {
   var at = clockLabel(entry.starts_at);
   if (!at) return null;
-  return { time: at, title: itemTitle(entry.item) };
+  return { time: at, title: leadTitle(entry.item), episode: episodeSlot(entry.item) };
 }
 
 // The entries the timed half takes — the first three that can say WHEN.
@@ -121,19 +134,38 @@ export function timedLines(detail) {
   return timedEntries(detail).map(timedLine);
 }
 
-// The untimed "later" list — names only, no clock, capped.
+// The untimed "later" list — SHOWS only, no clock, capped.
 //
 // It is everything the timed half did NOT take, in order: an entry skipped for
 // want of a clock is still something that is on later, and an entry already
 // drawn with a time must not appear again underneath itself. Partitioning is
 // what gets both right — counting off the front of the list gets both wrong the
 // moment one entry is skipped.
+//
+// TASK-592 — THE PARTITION IS ON ENTRIES AND THE COLLAPSE SITS ON TOP OF IT, two
+// steps rather than one. The partition is unchanged; what is new is that the
+// entries it keeps come out as their SHOW, and a show already named stops being
+// repeated. Without the collapse this half reads "Bluey · Bluey · Bluey · Bluey"
+// the moment TASK-585 lets a show hold a slot and run episode-in-order — which
+// is the normal case for these channels, not an edge.
+//
+// ⚠️ A SHOW THE TIMED HALF ALREADY NAMED IS NOT DROPPED (owner, 2026-09-10). The
+// later half is the run of shows still to come, read on its own — so a card
+// whose whole lookahead is one show says "Bluey" underneath rather than going
+// quiet, and Cartoon Club's Bluey stretch followed by Hey Duggee reads "Bluey ·
+// Hey Duggee". The alternative was put to the owner beside this one and not
+// taken; the only empty later list is an empty lookahead past the timed half.
+//
+// The dedupe runs BEFORE the cap, because LATER_LINES counts distinct shows now
+// rather than items: capping first would let four episodes of one show fill a
+// list that then collapses to a single name.
 export function laterTitles(detail) {
   var shown = timedEntries(detail);
   return entries(detail)
     .filter(function(entry) { return shown.indexOf(entry) < 0; })
-    .map(function(entry) { return itemTitle(entry.item); })
+    .map(function(entry) { return leadTitle(entry.item); })
     .filter(Boolean)
+    .filter(function(title, at, titles) { return titles.indexOf(title) === at; })
     .slice(0, LATER_LINES);
 }
 
@@ -204,6 +236,13 @@ export function cardView(detail) {
 // is a remote, not a second screen for the listing, and its own crumb already
 // names the channel — so the timed list, the later list and the credit stay on
 // the television.
+//
+// TASK-592 — it reads "Next: Bluey at 17:08", the SHOW alone. That is not a
+// second rule: it falls out of the timed line's own title, which the show now
+// leads, and the episode the television draws underneath deliberately does not
+// follow it here. A one-line detail belongs to what is on NOW (the same call
+// TASK-588 made for `nextLabel`), and the phone is a remote rather than a second
+// listing.
 export var BETWEEN = 'Between programmes';
 
 export function cardStatus(detail) {
