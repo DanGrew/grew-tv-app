@@ -83,6 +83,12 @@ describe('stepped', () => {
   it('is null for a date with no time in it', () => {
     expect(stepped('2026-09-12', 1)).toBe(null);
   });
+
+  it('reads a stamp only from the START of the string, so junk in front of one '
+     + 'is refused rather than quietly stepped', () => {
+    expect(stepped('at 2026-09-12T19:00:00', 1)).toBe(null);
+    expect(stepped('NOW · 2026-09-12T19:00:00', 1)).toBe(null);
+  });
 });
 
 describe('bandState', () => {
