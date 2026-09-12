@@ -47,3 +47,18 @@ export function fetchHttpsOrigin(serverOrigin) {
     .then(function(c) { return httpsOrigin(location.hostname, c.httpsPort); })
     .catch(function() { return httpsOrigin(location.hostname); });
 }
+
+// TASK-604: whether THIS server honours a moved clock on the channel routes,
+// which is what decides if the Guide draws its ±1hr control at all. A fact about
+// the run, not about the device, so it comes from the server for the same reason
+// the two ports above do — the app cannot derive it.
+//
+// ⛔ Falls back to FALSE on an absent field, an older server, or a failed fetch.
+// The safe default is no control: the Mini answers false, and a server that
+// cannot be asked is treated as one that would refuse.
+export function fetchDevClock(serverOrigin) {
+  return fetch(serverOrigin + '/api/config')
+    .then(function(r) { return r.json(); })
+    .then(function(c) { return c.devClock === true; })
+    .catch(function() { return false; });
+}

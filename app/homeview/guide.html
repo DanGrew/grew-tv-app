@@ -42,6 +42,10 @@ button:focus { outline: none; border-color: var(--focus); box-shadow: var(--focu
 #day-tabs { display: flex; gap: 12px; }
 .guide-day { font-size: var(--fs-sm); padding: 11px 24px; border-radius: 999px; font-variant-numeric: tabular-nums; }
 .guide-day.on { background: var(--surface-hi); border-color: rgba(255,255,255,0.5); color: var(--text); }
+#guide-clock { display: none; align-items: center; gap: 12px; }
+#guide-clock.on { display: flex; }
+#clock-dev { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 2px; color: var(--live); border: 2px solid var(--live); border-radius: 999px; padding: 6px 14px; }
+.clock-step { font-size: var(--fs-sm); padding: 11px 20px; border-radius: 999px; font-variant-numeric: tabular-nums; }
 /* The grid scrolls BOTH ways, and it is the only thing on the page that
    scrolls. Down: a channel's day runs past the bottom on anything shorter than
    the living-room screen, and there is no reading it if the page cannot move.
@@ -87,6 +91,12 @@ button:focus { outline: none; border-color: var(--focus); box-shadow: var(--focu
 <div id="breadcrumb" style="padding:22px 48px 0;flex-shrink:0"></div>
 <div class="guide-head">
   <div id="guide-title">Guide</div>
+  <div id="guide-clock">
+    <span id="clock-dev">DEV CLOCK</span>
+    <button id="clock-back" class="clock-step" data-band="tabs">&minus;1hr</button>
+    <button id="clock-now" class="clock-step" data-band="tabs">Now</button>
+    <button id="clock-fwd" class="clock-step" data-band="tabs">+1hr</button>
+  </div>
   <div id="day-tabs"></div>
 </div>
 <div id="guide-grid"></div>

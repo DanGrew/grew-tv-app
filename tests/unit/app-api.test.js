@@ -49,6 +49,25 @@ describe('loadChannels', () => {
     fakeFetch({}, false);
     await expect(loadChannels('http://s', 'kids')).rejects.toBe(500);
   });
+  // TASK-604 — the Guide's moved clock rides on the strip read too, or half the
+  // page would still be answering for now.
+  it('sends at= when given a moment to read against', async () => {
+    var calls = fakeFetch({ channels: [] });
+    await loadChannels('http://s', 'adults', '2026-09-12T20:00:00');
+    expect(calls[0].url).toBe('http://s/api/channels?profile=adults&at=2026-09-12T20%3A00%3A00');
+  });
+  it('sends NO at= without one, so every other caller reads the real clock', async () => {
+    var calls = fakeFetch({ channels: [] });
+    await loadChannels('http://s', 'adults');
+    expect(calls[0].url).not.toContain('at=');
+  });
+  it('sends no at= for a null or empty moment either', async () => {
+    var calls = fakeFetch({ channels: [] });
+    await loadChannels('http://s', 'adults', null);
+    await loadChannels('http://s', 'adults', '');
+    expect(calls[0].url).not.toContain('at=');
+    expect(calls[1].url).not.toContain('at=');
+  });
 });
 
 // FEAT-560/TASK-564 — ONE channel in full, for the player. Same profile scoping
@@ -132,6 +151,20 @@ describe('loadChannelSchedule', () => {
   it('rejects a channel nobody wrote, so the Guide draws that column off the strip alone', async () => {
     fakeFetch({}, false);
     await expect(loadChannelSchedule('http://s', 'after-dark', 'kids')).rejects.toBe(500);
+  });
+  // TASK-604 — at= MOVES the window's clock rather than lifting its forward
+  // clamp, which is how the listing answers for a moment earlier today.
+  it('sends at= when given a moment, alongside the profile and still no from/to', async () => {
+    var calls = fakeFetch({});
+    await loadChannelSchedule('http://s', 'cartoon-club', 'kids', '2026-09-12T14:00:00');
+    expect(calls[0].url).toBe(
+      'http://s/api/channels/cartoon-club/schedule?profile=kids&at=2026-09-12T14%3A00%3A00');
+    expect(calls[0].url).not.toContain('from=');
+  });
+  it('sends NO at= without one', async () => {
+    var calls = fakeFetch({});
+    await loadChannelSchedule('http://s', 'cartoon-club', 'kids');
+    expect(calls[0].url).not.toContain('at=');
   });
 });
 

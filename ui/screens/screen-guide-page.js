@@ -5,6 +5,9 @@ import { loadChannels, loadChannelSchedule } from '../../core/app-api.js';
 import { channelCardView } from '../../core/channels.js';
 import { dayTabs, todayKey, guideColumn, guideHead, guideTailLine, guideMoreLine,
          nowLabel, quietLabel } from '../../core/guide.js';
+import { STEP_HOURS, stepped, bandState, movedLabel, ticking,
+         elapsedSeconds as elapsedFor } from '../../core/guide-clock.js';
+import { fetchDevClock } from '../../core/server-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
 
@@ -48,15 +51,21 @@ var PLAY_KEYS = { Enter: true, ' ': true };
 
 export function initGuidePage() {
   var profile = [getProfile()].filter(Boolean).concat(['kids'])[0];
-  var state = { lines: [], schedules: {}, stripAt: 0, tabs: [], dayKey: null, today: null };
+  // `at` is the moment the page is reading against — null while it reads the
+  // real clock, which is every run but a dev one (TASK-604).
+  var state = { lines: [], schedules: {}, stripAt: 0, tabs: [], dayKey: null,
+                today: null, at: null };
 
   function noop() {}
   function grid() { return document.getElementById('guide-grid'); }
 
   // The card ticks off the clock, exactly as the strip's does: a position baked
   // at fetch time is wrong within a minute of render, so what moves it is real
-  // seconds elapsed since the fetch, not a second request.
-  function elapsedSeconds() { return (Date.now() - state.stripAt) / 1000; }
+  // seconds elapsed since the fetch, not a second request. A MOVED clock does
+  // not elapse at all — the server answered for the moment asked about, and a
+  // bar creeping away from 20:00 on its own is a moving answer to a fixed
+  // question (core/guide-clock.js).
+  function elapsedSeconds() { return elapsedFor(state.stripAt, Date.now(), state.at); }
   function isToday() { return state.dayKey === state.today; }
 
   function el(tag, className) {
@@ -90,9 +99,14 @@ export function initGuidePage() {
     return Object.keys(state.schedules)
       .map(function(id) { return state.schedules[id].from; }).filter(Boolean)[0];
   }
+  // Three states, not two (TASK-604): a moved clock says AT · 20:00 rather than
+  // NOW, because the server answers a moved question as though the moment were
+  // the present — this line is the only place left that can say which moment is
+  // actually being looked at.
   var NOW_TAG = {
-    'true': function() { return nowLabel(fromStamp()); },
-    'false': function() { return quietLabel(state.dayKey); }
+    live:  function() { return nowLabel(fromStamp()); },
+    moved: function() { return movedLabel(state.at); },
+    quiet: function() { return quietLabel(state.dayKey); }
   };
   function nowLine() {
     var row = document.createElement('div');
@@ -100,7 +114,7 @@ export function initGuidePage() {
     row.classList.toggle('quiet', !isToday());
     var tag = document.createElement('span');
     tag.id = 'now-tag';
-    tag.textContent = NOW_TAG[isToday() + '']();
+    tag.textContent = NOW_TAG[bandState(isToday(), state.at)]();
     var rule = document.createElement('span');
     rule.id = 'now-rule';
     row.appendChild(tag);
@@ -276,7 +290,7 @@ export function initGuidePage() {
     });
   }
   var TICK = { 'true': tickCards, 'false': noop };
-  function tick() { TICK[isToday() + ''](); }
+  function tick() { TICK[ticking(isToday(), state.at) + '']();  }
 
   // --- loading -------------------------------------------------------------
   function applyStrip(lines) {
@@ -286,8 +300,11 @@ export function initGuidePage() {
   // A failed poll leaves the last good page on screen and lets the next one try:
   // a Guide going blank because one request lost the LAN is worse than one that
   // is thirty seconds stale.
+  // ⛔ Every poll carries the moved moment (TASK-604). Without it the next
+  // thirty-second re-read would drag the page back to now and the control would
+  // fight whoever pressed it.
   function pollStrip() {
-    loadChannels(SERVER, profile)
+    loadChannels(SERVER, profile, state.at)
       .then(function(res) {
         applyStrip([res.channels].filter(Boolean).concat([[]])[0]);
         render();
@@ -302,7 +319,7 @@ export function initGuidePage() {
   // than taking the page down with it.
   function loadSchedules() {
     return Promise.all(state.lines.map(function(line) {
-      return loadChannelSchedule(SERVER, line.channel_id, profile).catch(noop);
+      return loadChannelSchedule(SERVER, line.channel_id, profile, state.at).catch(noop);
     }));
   }
   function applySchedules(answers) {
@@ -321,6 +338,55 @@ export function initGuidePage() {
       .then(function(answers) { applySchedules(answers); render(); })
       .catch(noop);
   }
+
+  // --- the moved clock (TASK-604) ------------------------------------------
+  // Re-reads everything against `state.at`, exactly as the boot chain does.
+  // `dayKey` is cleared first: a step can land on another day, and the tabs are
+  // rebuilt from whatever day the server then calls today — holding the old key
+  // would leave the grid on a day the tabs no longer offer.
+  function reload() {
+    state.dayKey = null;
+    loadChannels(SERVER, profile, state.at)
+      .then(function(res) {
+        applyStrip([res.channels].filter(Boolean).concat([[]])[0]);
+        return loadSchedules();
+      })
+      .then(function(answers) { applySchedules(answers); render(); })
+      .catch(noop);
+  }
+  // A step is relative to where the page is already reading — the moved moment
+  // if there is one, else the SERVER's own `from`. Never this device's clock:
+  // the browser may be a minute off the Mini, and the first press would inherit
+  // that as a permanent offset.
+  function stepClock(hours) {
+    state.at = stepped([state.at].filter(Boolean).concat([fromStamp()])[0], hours);
+    reload();
+  }
+  function resetClock() {
+    state.at = null;
+    reload();
+  }
+  var CLOCK_KEYS = [
+    { id: 'clock-back', run: function() { stepClock(-STEP_HOURS); } },
+    { id: 'clock-now', run: resetClock },
+    { id: 'clock-fwd', run: function() { stepClock(STEP_HOURS); } }
+  ];
+  // The buttons declare `data-band="tabs"`, so ◀ ▶ walk onto them from the day
+  // tabs and no new band is needed — every control stays reachable without a
+  // remote key of its own (docs/KEYMAP.md untouched: this never renders on the
+  // TV).
+  function showClock() {
+    CLOCK_KEYS.forEach(function(button) {
+      document.getElementById(button.id).addEventListener('click', button.run);
+    });
+    document.getElementById('guide-clock').classList.add('on');
+  }
+  // ⛔ The SERVER decides whether this exists. `fetchDevClock` answers false for
+  // the Mini, for an older server and for a fetch that failed — so the control
+  // appears only where `at=` would actually be honoured, and the couch never
+  // gets a button that would be refused.
+  var MOUNT_CLOCK = { 'true': showClock, 'false': noop };
+  function mountClock(on) { MOUNT_CLOCK[on + '']();  }
 
   // --- the page ------------------------------------------------------------
   function goBack(e) {
@@ -437,6 +503,11 @@ export function initGuidePage() {
       setInterval(pollStrip, STRIP_POLL_MS);
       setInterval(pollSchedules, SCHEDULE_POLL_MS);
       setInterval(tick, TICK_MS);
+      // Asked for last and deliberately NOT part of the chain: the Guide is
+      // fully drawn and usable whether or not this answers, and nothing about a
+      // dev affordance should be able to send the page to error.html. On every
+      // run but a dev one the answer is "draw nothing".
+      fetchDevClock(SERVER).then(mountClock).catch(noop);
     })
     .catch(function() { navTo('error.html'); });
 }

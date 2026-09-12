@@ -20,8 +20,19 @@ export function loadBrowse(serverUrl, profile) {
 //
 // An empty `channels` list is a normal answer, not an error — grew-tv ran
 // without channels before this feature and a profile may have none of its own.
-export function loadChannels(serverUrl, profile) {
-  return getJson(serverUrl + '/api/channels?profile=' + encodeURIComponent(profile));
+// TASK-604 — `at` is the clock the answer is read against, so the Guide can
+// show what a channel WOULD be showing at a moment that isn't now. Absent (the
+// normal case, and every caller but the Guide) the server reads its own clock
+// exactly as before. The server refuses it outright unless it was started with
+// --dev-clock, which is why the Guide asks /api/config before offering it.
+function atParam(at) {
+  return [at].filter(Boolean).map(function(moment) {
+    return '&at=' + encodeURIComponent(moment);
+  }).concat([''])[0];
+}
+
+export function loadChannels(serverUrl, profile, at) {
+  return getJson(serverUrl + '/api/channels?profile=' + encodeURIComponent(profile) + atParam(at));
 }
 
 // ONE channel in full (FEAT-560/TASK-564) — the same on-now line plus what the
@@ -52,18 +63,25 @@ export function loadChannel(serverUrl, channelId, profile, lookahead) {
 // which parameters arrived would be two routes wearing one path.
 //
 // Neither bound is sent, and that is the whole request: `from` defaults to now
-// (and is clamped forward to it either way — the programme is popped as it airs,
-// so the past is not there to ask for) and `to` to the widest span the backend
-// serves, which is the two days the Guide shows. So the app never puts its own
-// clock in the question, and the answer carries the `from` and `to` it settled
-// on — which is where the page reads what day it is (core/guide.js todayKey).
+// (and is clamped forward to it either way — a listing answers about what is
+// coming, and looking backwards is a product call nobody has made) and `to` to
+// the widest span the backend serves, which is the two days the Guide shows. So
+// the app never puts its own clock in the question, and the answer carries the
+// `from` and `to` it settled on — which is where the page reads what day it is
+// (core/guide.js todayKey).
+//
+// TASK-604 — `at` MOVES that clock rather than lifting the clamp: the span
+// still only looks forward, from whatever moment it was handed. Which is how
+// winding back works at all — 14:00 becomes the present and the listing runs on
+// from there. (⚠️ `no-dom-in-core` greps raw text, comments included, so the
+// w-word for a stretch of clock cannot be written in here.)
 //
 // ⛔ NOT PAGED. There is no `offset`/`limit` envelope here and nothing to ask a
 // second page of: the read is bounded by the CLOCK, and a listing that runs long
 // comes back covering less time rather than fewer rows. See docs/PAGINATION.md.
-export function loadChannelSchedule(serverUrl, channelId, profile) {
+export function loadChannelSchedule(serverUrl, channelId, profile, at) {
   return getJson(serverUrl + '/api/channels/' + encodeURIComponent(channelId) +
-    '/schedule?profile=' + encodeURIComponent(profile));
+    '/schedule?profile=' + encodeURIComponent(profile) + atParam(at));
 }
 
 // Mid-watch videos for a profile, newest first (FEAT-017). Backs the Home
