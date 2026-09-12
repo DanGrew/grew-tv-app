@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { wsUrl, WS_PORT, fetchWsUrl, httpsOrigin, HTTPS_PORT, fetchHttpsOrigin } from '../../core/server-config.js';
+import { wsUrl, WS_PORT, fetchWsUrl, httpsOrigin, HTTPS_PORT, fetchHttpsOrigin,
+         fetchDevClock } from '../../core/server-config.js';
 
 describe('wsUrl', () => {
   it('builds a ws:// URL on the WS port for the given host', () => {
@@ -122,5 +123,49 @@ describe('fetchHttpsOrigin (TASK-405)', () => {
   it('falls back to HTTPS_PORT when the fetch rejects (older server / offline)', async () => {
     global.fetch = vi.fn(function() { return Promise.reject(new Error('nope')); });
     expect(await fetchHttpsOrigin('http://localhost:8765')).toBe('https://localhost:8767');
+  });
+});
+
+describe('fetchDevClock (TASK-604)', () => {
+  var origFetch;
+  beforeEach(() => {
+    origFetch = global.fetch;
+  });
+  afterEach(() => {
+    global.fetch = origFetch;
+  });
+
+  function serving(config) {
+    return vi.fn(function() {
+      return Promise.resolve({ json: function() { return Promise.resolve(config); } });
+    });
+  }
+
+  it('reads devClock from /api/config on the server origin', async () => {
+    global.fetch = vi.fn(function(url) {
+      expect(url).toBe('http://localhost:8765/api/config');
+      return Promise.resolve({ json: function() { return Promise.resolve({ devClock: true }); } });
+    });
+    expect(await fetchDevClock('http://localhost:8765')).toBe(true);
+  });
+
+  it('is false on a run that did not set the flag', async () => {
+    global.fetch = serving({ devClock: false });
+    expect(await fetchDevClock('http://localhost:8765')).toBe(false);
+  });
+
+  it('is false when the field is absent (older server)', async () => {
+    global.fetch = serving({ wsPort: 8766 });
+    expect(await fetchDevClock('http://localhost:8765')).toBe(false);
+  });
+
+  it('is false when the fetch rejects — a server that cannot be asked refuses', async () => {
+    global.fetch = vi.fn(function() { return Promise.reject(new Error('nope')); });
+    expect(await fetchDevClock('http://localhost:8765')).toBe(false);
+  });
+
+  it('demands the literal true, so a truthy string cannot switch it on', async () => {
+    global.fetch = serving({ devClock: 'yes' });
+    expect(await fetchDevClock('http://localhost:8765')).toBe(false);
   });
 });
