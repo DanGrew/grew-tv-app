@@ -363,6 +363,11 @@ function channelSeries(season, episode) {
 }
 const CHANNEL_ON_AIR = {
   channel_id: 'cartoon-club', name: 'Cartoon Club', item_type: 'episode',
+  // TASK-626 — the rails this channel opts into. Empty by default, which is
+  // what a config naming none sends and what keeps every test that predates
+  // rails drawing its one `On now` strip; a test about rails tags its own
+  // lines.
+  rails: [],
   on_air: true,
   item: { item_id: 'bluey-s1e22', title: 'Sleepytime', poster: null, itemType: 'episode', ext: 'mp4', subtitles: null, series: channelSeries(1, 22) },
   offset_seconds: 120, runtime_seconds: 480, next_on_air: null,
@@ -373,6 +378,7 @@ const CHANNEL_ON_AIR = {
 };
 const CHANNEL_OFF_AIR_TIMED = {
   channel_id: 'after-dark', name: 'After Dark', item_type: 'film',
+  rails: [],
   on_air: false, item: null, offset_seconds: null, runtime_seconds: null,
   next_on_air: '2026-09-04T21:00:00', following: null
 };
