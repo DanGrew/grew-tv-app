@@ -1,6 +1,6 @@
 import { connect } from '../../core/companion-ws.js';
 import { loadBrowse, loadContinueWatching, loadTracks, loadEpisodes, loadChannels } from '../../core/app-api.js';
-import { withChannelsTab, channelsById, channelCardView, tileVariant, browseRestore, CHANNELS_TAB, CHANNELS_RAIL } from '../../core/channels.js';
+import { withChannelsTab, channelsById, channelCardView, tileVariant, browseRestore, browseDrive, CHANNELS_TAB } from '../../core/channels.js';
 import { queueAdd, queueAddStatus, itemMediaType } from '../../core/queue-shell-config.js';
 import { allVideoItems, musicItems, rankSearch, searchResultsHtml } from '../../core/search-rank.js';
 import { CONTINUE_TYPES, continueTarget } from '../../core/browse-continue.js';
@@ -181,9 +181,10 @@ export function initPage() {
   setInterval(tickChannelTiles, CHANNEL_TICK_MS);
   setInterval(pollChannels, CHANNEL_POLL_MS);
 
-  // TASK-563 — the Channels section's one rail comes from the /api/channels
-  // strip, not from browse cards. Same shape as every other rail so the pager,
-  // the dots and the grid need no channel knowledge at all.
+  // TASK-563 — the Channels section's rails come from the /api/channels strip,
+  // not from browse cards. Same shape as every other rail so the pager, the
+  // dots and the grid need no channel knowledge at all — which is what let
+  // TASK-626 turn its one rail into several without this screen changing.
   // core resolves it, because the Channels section's rails come from the
   // /api/channels strip rather than the catalog (TASK-563).
   function railList() { return railsForBrowseSection(state.section, state.cards, state.cw, state.labels, state.recents, state.channels); }
@@ -459,17 +460,18 @@ export function initPage() {
     ({ sections: clearTrail, rails: recordRails, grid: recordGrid })[state.level]();
   }
   function recordRails() { writeTrail({ tab: state.section }, sectionTitle()); }
-  // TASK-564 — Channels records its position WITHOUT a rail, and named as the
-  // section rather than the rail. A recorded rail is what a later breadcrumb
-  // press navigates to, and for every other section that is `rail-grid.html`,
-  // which the TV has and channels do not (TASK-563's own note: there is no
-  // channels rail-grid, and sending the TV to one lands it on "Nothing here
-  // yet"). A viewer who tuned in from the phone and then pressed the crumb back
-  // got exactly that empty page, and a crumb reading "On now" rather than the
-  // channel. Recording the tab alone points that press at the TV's Channels tab,
-  // the screen the section actually has.
+  // TASK-564 — Channels records its position named as the SECTION rather than
+  // the rail, because that crumb points the TV at its Channels tab (browseDrive
+  // — the TV has no channels rail-grid, and sending it to one lands it on
+  // "Nothing here yet"), so a crumb reading "Films" would name a page nobody is
+  // about to see.
+  //
+  // TASK-626 — but it records the rail now. With several rails the tab no
+  // longer says which one the phone was in, and coming back reopened on the
+  // first one whatever the viewer had walked into. Where the TV goes is
+  // browseDrive's question, not this one's.
   var GRID_TRAIL = {
-    'true':  function() { writeTrail({ tab: state.section }, sectionTitle()); },
+    'true':  function() { writeTrail({ tab: state.section, rail: state.rail }, sectionTitle()); },
     'false': function() { writeTrail({ tab: state.section, rail: state.rail }, railTitle()); }
   };
   function recordGrid() { GRID_TRAIL[(state.section === CHANNELS_TAB.id) + ''](); }
@@ -492,11 +494,10 @@ export function initPage() {
   function browseTrailEntry() {
     return entriesTrail().filter(function(e) { return e.page === 'browse.html'; }).slice(-1)[0];
   }
-  // TASK-564 — core decides which level a recorded entry reopens at, because
-  // Channels records its position without a rail (its crumb has to point the TV
-  // at a browse tab, not a rail-grid it does not have) while the phone's own
-  // channels screen IS a grid. Reading the entry literally landed the phone on
-  // the rail level: the pager's dots over no title and no cards.
+  // TASK-564 — core decides which level a recorded entry reopens at, and
+  // TASK-626 where the TV is sent for the same entry (browseDrive above): the
+  // phone reopens on the rail it was in, while the crumb still points the TV at
+  // its Channels tab rather than a rail-grid page it does not have.
   function seedFromTrail(entry) {
     var pos = browseRestore(entry.params);
     state.section = pos.section;
@@ -516,7 +517,7 @@ export function initPage() {
   function doDriveRestore() {
     restoreDriven = true;
     [browseTrailEntry()].filter(Boolean).forEach(function(entry) {
-      api.sendIntent('navigate', ({ true: { page: 'rail-grid.html', params: { section: entry.params.tab, rail: entry.params.rail } }, false: { page: 'browse.html', params: { tab: entry.params.tab } } })[Boolean(entry.params.rail)]);
+      api.sendIntent('navigate', browseDrive(entry.params));
     });
   }
 
@@ -637,9 +638,14 @@ export function initPage() {
   // to its own grid locally — the two stay on the same content, by their own
   // routes. The mirror invariant is that both surfaces carry the feature, not
   // that they navigate identically.
+  //
+  // TASK-626 — the grid it lands on is the section's FIRST rail, the same one
+  // every other section lands on (selectBySection below), rather than a rail id
+  // written in here. With several channel rails there is no one id to name, and
+  // the phone's pager walks to the rest.
   function selectChannels() {
     api.sendIntent('navigate', { page: 'browse.html', params: { tab: CHANNELS_TAB.id } });
-    applyGrid(CHANNELS_TAB.id, CHANNELS_RAIL);
+    applyGrid(CHANNELS_TAB.id, firstRailId(railsForBrowseSection(CHANNELS_TAB.id, state.cards, state.cw, state.labels, state.recents, state.channels)));
   }
 
   // TASK-590 — the ☰ menu's Guide row. Both surfaces go, the same split
@@ -665,7 +671,17 @@ export function initPage() {
   function selectSection(id) {
     [SECTION_ROUTE[id]].filter(Boolean).concat([selectBySection])[0](id);
   }
-  function selectRail(id) { navigate('rail-grid.html', { section: state.section, rail: id }); }
+  // TASK-626 — walking to a rail is the one navigation where the two surfaces
+  // part company, for the reason selectChannels already does: Channels has no
+  // `rail-grid.html` on the TV, and sending it to one lands it on an empty
+  // grid. That could not happen while the tab had a single rail — there was
+  // nowhere to swipe to — so the split has to reach this funnel too now.
+  // `browseDrive` answers where the TV goes for a section and rail; the phone
+  // drills to the rail either way.
+  function selectRail(id) {
+    api.sendIntent('navigate', browseDrive({ tab: state.section, rail: id }));
+    applyGrid(state.section, id);
+  }
 
   // Tapping a tile. SYNCED: send `select`; the app's rail-grid routes it to the
   // item's detail/player and echoes the new context, which onContext follows to

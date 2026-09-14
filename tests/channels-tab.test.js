@@ -35,6 +35,16 @@ async function openBrowse(page) {
   await expect(page.locator('#screen-browse')).toBeVisible();
 }
 
+// TASK-626 — the same three channels, saying which rails they belong on. Two
+// name one each and the third names none, so one strip proves all three of the
+// rules at once: a rail per slug, alphabetical by title, and `On now` last
+// holding whatever opted into nothing.
+const RAILED = [
+  Object.assign({}, ON_AIR, { rails: ['cartoons'] }),
+  Object.assign({}, OFF_AIR_TIMED, { rails: ['films'] }),
+  OFF_AIR_PLAIN
+];
+
 test.describe('with channels on air', () => {
   test.beforeEach(async ({ page }) => {
     await installApi(page);
@@ -52,6 +62,28 @@ test.describe('with channels on air', () => {
     await openBrowse(page);
     await expect(page.locator('.rail-title').first()).toHaveText('On now');
     await expect(page.locator('.channel-tile')).toHaveCount(3);
+  });
+
+  // TASK-626 stories 1 and 5 — the tab groups itself from what each channel
+  // says it belongs to, and a channel naming nothing still has somewhere to be.
+  test('channels draw under the rails they name, On now last', async ({ page }) => {
+    await withChannels(page, RAILED);
+    await openBrowse(page);
+    await expect(page.locator('.rail-title')).toHaveText(['Cartoons', 'Films', 'On now']);
+    await expect(page.locator('.channel-tile')).toHaveCount(3);
+    const films = page.locator('.rail', { has: page.locator('.rail-title', { hasText: 'Films' }) });
+    await expect(films.locator('.channel-tile')).toHaveCount(1);
+    await expect(films.locator('.channel-tile[data-channel="after-dark"]')).toBeVisible();
+  });
+
+  // Story 4 — a channel naming two rails is drawn in both of them. The same
+  // fan-out a card gets from its genres, and the reason nothing anywhere holds
+  // a list of rails.
+  test('a channel naming two rails is drawn in both', async ({ page }) => {
+    await withChannels(page, [Object.assign({}, ON_AIR, { rails: ['films', 'romance'] })]);
+    await openBrowse(page);
+    await expect(page.locator('.rail-title')).toHaveText(['Films', 'Romance']);
+    await expect(page.locator('.channel-tile[data-channel="cartoon-club"]')).toHaveCount(2);
   });
 
   // Story 2 — position over runtime in minutes, and a bar on the artwork.
@@ -284,20 +316,62 @@ test.describe('the companion mirror', () => {
     expect(intents.find(i => i.intent === 'select').params.id).toBe('channel:cartoon-club');
   });
 
+  // TASK-626 — swiping to another rail on the phone must not send the TV to a
+  // `rail-grid.html` for Channels: that page does not exist for this section
+  // and the TV lands on an empty grid (TASK-564's own finding). It could not
+  // happen while the tab had one rail, because there was nowhere to swipe TO.
+  // The TV goes to its Channels tab, which draws every rail at once, while the
+  // phone walks its own — the same split the dock tap already used.
+  test('walking to another rail keeps the TV on its Channels tab', async ({ page }) => {
+    const intents = [];
+    await installApi(page);
+    await withChannels(page, RAILED);
+    await mockApp(page, intents);
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="channels"]').click();
+    await expect(page.locator('#pager-name')).toHaveText('Cartoons');
+
+    await page.locator('#pager-next').first().click();
+    await expect(page.locator('#pager-name')).toHaveText('Films');
+    const navigates = intents.filter(i => i.intent === 'navigate');
+    expect(navigates.map(i => i.params.page)).not.toContain('rail-grid.html');
+    expect(navigates[navigates.length - 1].params.page).toBe('browse.html');
+    expect(navigates[navigates.length - 1].params.params).toEqual({ tab: 'channels' });
+    // And the phone is on the rail it walked to, with that rail's cards.
+    await expect(page.locator('#grid-wrap')).toBeVisible();
+    await expect(page.locator('.ph-chan[data-channel="after-dark"]')).toBeVisible();
+  });
+
+  // Every other section still drives the TV to the rail-grid page it does have
+  // — the fix above is the Channels exception, not a new rule for all of them.
+  test('walking to another rail still drives the TV for a catalog section', async ({ page }) => {
+    const intents = [];
+    await installApi(page);
+    await withChannels(page, []);
+    await mockApp(page, intents);
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="films"]').click();
+    await page.locator('#pager-next').first().click();
+    const navigates = intents.filter(i => i.intent === 'navigate');
+    expect(navigates[navigates.length - 1].params.page).toBe('rail-grid.html');
+    expect(navigates[navigates.length - 1].params.params.section).toBe('films');
+  });
+
   // TASK-564 — pressing the player's "Channels" crumb on the phone. The crumb
   // trims the trail to the recorded channels entry and both surfaces reload
-  // onto browse; the phone rebuilds its position from that entry, which names
-  // the tab and no rail (the TV's channels screen is a browse tab, so the crumb
-  // cannot name a rail-grid). The phone's own channels screen is a grid, and it
-  // has to come back with the cards on it — it came back on the rail level,
-  // drawing the pager's dots over an empty screen with no title.
+  // onto browse; the phone rebuilds its position from that entry and has to
+  // come back with the cards on it — it came back on the rail level, drawing
+  // the pager's dots over an empty screen with no title.
+  //
+  // TASK-626 — the entry names its rail now, because the tab has several and
+  // the tab alone no longer says which one the viewer was in.
   test('coming back to Channels lands on the cards, not an empty rail', async ({ page }) => {
     await installApi(page);
     await withChannels(page, [ON_AIR, OFF_AIR_TIMED]);
     await mockApp(page);
     await page.addInitScript(() => {
       sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
-        { page: 'browse.html', params: { tab: 'channels' }, label: 'Channels' }
+        { page: 'browse.html', params: { tab: 'channels', rail: 'channels' }, label: 'Channels' }
       ]));
     });
     await page.goto('/companion/browse.html');
@@ -305,6 +379,43 @@ test.describe('the companion mirror', () => {
     await expect(page.locator('#pager-name')).toHaveText('On now');
     await expect(page.locator('#grid-wrap')).toBeVisible();
     await expect(page.locator('.dock-tab[data-section="channels"]')).toHaveClass(/active/);
+  });
+
+  // TASK-626 story 9 — the rail the viewer walked into is the rail they come
+  // back to. This is the check on `browseRestore`'s old premise: it answered
+  // the channels rail from the tab alone "because the section has exactly one",
+  // which with several rails reopened the phone on the first one every time.
+  test('coming back lands on the rail you were in, not the first one', async ({ page }) => {
+    await installApi(page);
+    await withChannels(page, RAILED);
+    await mockApp(page);
+    await page.addInitScript(() => {
+      sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
+        { page: 'browse.html', params: { tab: 'channels', rail: 'channel-rail:films' }, label: 'Channels' }
+      ]));
+    });
+    await page.goto('/companion/browse.html');
+    await expect(page.locator('#pager-name')).toHaveText('Films');
+    await expect(page.locator('.ph-chan')).toHaveCount(1);
+    await expect(page.locator('.ph-chan[data-channel="after-dark"]')).toBeVisible();
+  });
+
+  // The mirror invariant (FEAT-017/028) — the same rails, in the same order, on
+  // the phone. Both surfaces resolve them through the one railsForBrowseSection,
+  // which is what makes that true rather than two lists agreeing by luck.
+  test('the phone walks the same rails in the same order', async ({ page }) => {
+    await installApi(page);
+    await withChannels(page, RAILED);
+    await mockApp(page);
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="channels"]').click();
+    await expect(page.locator('#pager-name')).toHaveText('Cartoons');
+    await expect(page.locator('#pager-next').first()).toBeEnabled();
+    await page.locator('#pager-next').first().click();
+    await expect(page.locator('#pager-name')).toHaveText('Films');
+    await page.locator('#pager-next').first().click();
+    await expect(page.locator('#pager-name')).toHaveText('On now');
+    await expect(page.locator('.ph-chan[data-channel="matinee"]')).toBeVisible();
   });
 
   test('no channels means no Channels tab on the phone either', async ({ page }) => {

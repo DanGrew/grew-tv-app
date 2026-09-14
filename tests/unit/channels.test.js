@@ -2,9 +2,9 @@ import {
   CHANNEL_KIND, CHANNELS_TAB,
   minutesLabel, positionLabel, tickedOffset, channelPercent, returnTimeLabel, clockLabel,
   itemTitle, seriesTitle, episodeSlot, leadTitle, channelSubLine,
-  nextLabel, channelCardView, channelTile, channelTiles, channelRails,
+  nextLabel, channelCardView, channelTile, channelTiles, railsOf,
   channelsById, hasChannels, withChannelsTab, landingTab, browseRestore,
-  tileVariant, CHANNEL_TILE, LIBRARY_TILE, CHANNELS_RAIL
+  browseDrive, tileVariant, CHANNEL_TILE, LIBRARY_TILE
 } from '../../core/channels.js';
 
 // FEAT-560/TASK-563 — the Channels tab's model. The card TICKS and the strip's
@@ -415,24 +415,39 @@ describe('channelTile', () => {
   });
 });
 
-describe('channelTiles and channelRails', () => {
+describe('channelTiles', () => {
   it('keeps the order the endpoint sent — the backend owns channel order', () => {
     var tiles = channelTiles([onAir(), offAir()]);
     expect(tiles.map(function(t) { return t.channelId; })).toEqual(['cartoon-club', 'after-dark']);
   });
 
-  it('is one strip, titled On now', () => {
-    var rails = channelRails([onAir()]);
-    expect(rails.length).toBe(1);
-    expect(rails[0].id).toBe('channels');
-    expect(rails[0].title).toBe('On now');
-    expect(rails[0].items.length).toBe(1);
+  it('is no tile at all when there are no channels', () => {
+    expect(channelTiles([])).toEqual([]);
+    expect(channelTiles(null)).toEqual([]);
+  });
+});
+
+// TASK-626 — what a channel SAYS about where it belongs. The grouping that acts
+// on it lives beside the genre rails (tests/unit/home-rails.test.js).
+describe('railsOf', () => {
+  it('reads the rails a channel opts into, in the order its config names them', () => {
+    expect(railsOf(onAir({ rails: ['films', 'comedy'] }))).toEqual(['films', 'comedy']);
   });
 
-  it('is no rail at all when there are no channels', () => {
-    expect(channelRails([])).toEqual([]);
-    expect(channelRails(null)).toEqual([]);
-    expect(channelTiles(null)).toEqual([]);
+  it('reads a channel naming none as no rails', () => {
+    expect(railsOf(onAir())).toEqual([]);
+    expect(railsOf(onAir({ rails: null }))).toEqual([]);
+  });
+
+  it('reads a backend too old to send the field as no rails', () => {
+    expect(railsOf({ channel_id: 'comfort' })).toEqual([]);
+    expect(railsOf(null)).toEqual([]);
+    expect(railsOf(undefined)).toEqual([]);
+  });
+
+  it('refuses a value that is not a list rather than fanning a string out', () => {
+    expect(railsOf(onAir({ rails: 'films' }))).toEqual([]);
+    expect(railsOf(onAir({ rails: {} }))).toEqual([]);
   });
 });
 
@@ -533,20 +548,19 @@ describe('landingTab', () => {
   });
 });
 
-// TASK-564 — reopening the companion's browse drill from a recorded trail
-// entry. Channels is the section where the recorded entry and the phone's own
-// screen disagree: the entry names the tab alone, because it is also what a
-// later breadcrumb press sends the TV to, and the TV's channels screen is a
-// browse tab rather than a rail-grid. The phone's is a grid, so the tab has to
-// name the rail back — otherwise the phone reopens on the rail level and draws
-// the pager's dots over no title and no cards.
+// TASK-564/TASK-626 — reopening the companion's browse drill from a recorded
+// trail entry. One rule for every section now the Channels tab has several
+// rails: a recorded rail is the rail the phone reopens on. Where the TV is sent
+// for that same entry is browseDrive's question, below.
 describe('browseRestore', () => {
-  it('reopens Channels on its cards, from the tab alone', () => {
-    expect(browseRestore({ tab: 'channels' })).toEqual({ section: 'channels', rail: CHANNELS_RAIL, level: 'grid' });
+  it('reopens Channels on the rail the phone was in, not the first one', () => {
+    expect(browseRestore({ tab: 'channels', rail: 'channel-rail:films' }))
+      .toEqual({ section: 'channels', rail: 'channel-rail:films', level: 'grid' });
   });
 
-  it('names the channels rail even when the entry recorded one', () => {
-    expect(browseRestore({ tab: 'channels', rail: 'channels' }).level).toBe('grid');
+  it('reopens a channels entry with no rail on the tab rails', () => {
+    expect(browseRestore({ tab: 'channels' }))
+      .toEqual({ section: 'channels', rail: null, level: 'rails' });
   });
 
   it('reopens any other section on its recorded rail', () => {
@@ -561,5 +575,28 @@ describe('browseRestore', () => {
   it('reopens an empty entry at the sections root', () => {
     expect(browseRestore({})).toEqual({ section: null, rail: null, level: 'sections' });
     expect(browseRestore(null)).toEqual({ section: null, rail: null, level: 'sections' });
+  });
+});
+
+// TASK-626 — where the TV goes for a recorded entry. The Channels tab is the
+// one section with no rail-grid page behind it, so its entry names the browse
+// tab however deep the phone is; every other section keeps the rail-grid target
+// TASK-564 relied on.
+describe('browseDrive', () => {
+  it('sends the TV to the Channels tab even from inside a rail', () => {
+    expect(browseDrive({ tab: 'channels', rail: 'channel-rail:films' }))
+      .toEqual({ page: 'browse.html', params: { tab: 'channels' } });
+  });
+
+  it('sends the TV to the rail grid for any other section', () => {
+    expect(browseDrive({ tab: 'series', rail: 'genre:animation' }))
+      .toEqual({ page: 'rail-grid.html', params: { section: 'series', rail: 'genre:animation' } });
+  });
+
+  it('sends the TV to the browse tab when the entry names no rail', () => {
+    expect(browseDrive({ tab: 'films' }))
+      .toEqual({ page: 'browse.html', params: { tab: 'films' } });
+    expect(browseDrive({})).toEqual({ page: 'browse.html', params: { tab: null } });
+    expect(browseDrive(null)).toEqual({ page: 'browse.html', params: { tab: null } });
   });
 });

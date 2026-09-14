@@ -1,4 +1,4 @@
-import { buildRails, buildTabs, buildTabRails, railsForSection, railsForBrowseSection, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail, homeMoviesPlayAllRail, homeMoviesMonthRail, homeMoviesListItems, homeMoviesListTitle, homeMoviesSourceLabel, homeMoviesListPlayParams } from '../../core/home-rails.js';
+import { buildRails, buildTabs, buildTabRails, railsForSection, railsForBrowseSection, channelRails, clampIndex, cardRoute, CARD_ROUTES, albumsByArtist, artistFromId, withPlaylistsRail, withMvPlaylistsRail, homeMoviesPlayAllRail, homeMoviesMonthRail, homeMoviesListItems, homeMoviesListTitle, homeMoviesSourceLabel, homeMoviesListPlayParams } from '../../core/home-rails.js';
 
 // FEAT-560/TASK-563 — Channels is the one section whose rails don't come from
 // the catalog. Both surfaces resolve a section's rails through here, so the TV
@@ -30,6 +30,78 @@ describe('railsForBrowseSection', () => {
 
   it('gives the Channels section no rails when there are no channels', () => {
     expect(railsForBrowseSection('channels', [], [], {}, [], [])).toEqual([]);
+  });
+});
+
+// FEAT-560/TASK-626 — the tab groups itself from what each channel says it
+// belongs to. A rail exists exactly while a visible channel names it, so the
+// owner adds one by editing a channel and nothing keeps a list.
+describe('channelRails', () => {
+  function line(id, name, rails) {
+    const l = { channel_id: id, name: name, on_air: true,
+                item: { item_id: 'i', title: 'Something' },
+                offset_seconds: 60, runtime_seconds: 480 };
+    if (rails) l.rails = rails;
+    return l;
+  }
+
+  it('draws a rail per slug a channel names, title-cased for the heading', () => {
+    const rails = channelRails([line('date-night', 'Date Night', ['films']),
+                                line('comedy-club', 'Comedy Club', ['comedy'])]);
+    expect(rails.map(r => r.title)).toEqual(['Comedy', 'Films']);
+    expect(rails.map(r => r.id)).toEqual(['channel-rail:comedy', 'channel-rail:films']);
+  });
+
+  it('title-cases a multi-word slug the way the genre rails do', () => {
+    expect(channelRails([line('bedtime', 'Bedtime', ['late-night'])])[0].title)
+      .toBe('Late Night');
+  });
+
+  it('puts a channel naming two rails in both of them', () => {
+    const rails = channelRails([line('date-night', 'Date Night', ['films', 'romance'])]);
+    expect(rails.map(r => r.title)).toEqual(['Films', 'Romance']);
+    expect(rails.every(r => r.items[0].channelId === 'date-night')).toBe(true);
+  });
+
+  it('orders rails alphabetically by title', () => {
+    const rails = channelRails([line('a', 'A', ['music']), line('b', 'B', ['cartoons']),
+                                line('c', 'C', ['films'])]);
+    expect(rails.map(r => r.title)).toEqual(['Cartoons', 'Films', 'Music']);
+  });
+
+  it('keeps the endpoint order inside a rail rather than sorting by name', () => {
+    const rails = channelRails([line('z', 'Zoo', ['films']), line('a', 'Aviary', ['films'])]);
+    expect(rails[0].items.map(t => t.channelId)).toEqual(['z', 'a']);
+  });
+
+  it('lands a channel naming no rails under On now, last', () => {
+    const rails = channelRails([line('plain', 'Plain'), line('date-night', 'Date Night', ['films'])]);
+    expect(rails.map(r => r.title)).toEqual(['Films', 'On now']);
+    expect(rails[1].id).toBe('channels');
+    expect(rails[1].items.map(t => t.channelId)).toEqual(['plain']);
+  });
+
+  it('is the tab exactly as it was when no channel names a rail', () => {
+    const rails = channelRails([line('a', 'A'), line('b', 'B')]);
+    expect(rails.length).toBe(1);
+    expect(rails[0].id).toBe('channels');
+    expect(rails[0].title).toBe('On now');
+    expect(rails[0].items.map(t => t.channelId)).toEqual(['a', 'b']);
+  });
+
+  it('draws no On now rail at all when every channel named one', () => {
+    const rails = channelRails([line('date-night', 'Date Night', ['films'])]);
+    expect(rails.map(r => r.title)).toEqual(['Films']);
+  });
+
+  it('is no rail at all when there are no channels', () => {
+    expect(channelRails([])).toEqual([]);
+    expect(channelRails(null)).toEqual([]);
+  });
+
+  it('drops a rail no visible channel names any more', () => {
+    const kids = channelRails([line('cartoon-club', 'Cartoon Club', ['cartoons'])]);
+    expect(kids.map(r => r.title)).toEqual(['Cartoons']);
   });
 });
 
