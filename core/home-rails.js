@@ -234,8 +234,11 @@ function cmpDateDesc(a, b) {
 // rendered, so a second item order had no consumer left. TASK-626 brought it
 // back for the one caller that genuinely orders its items differently — the
 // Channels tab, whose order is the endpoint's and never the app's — rather
-// than letting a second grouping grow beside this one.
-function groupBySlug(cards, keyer, labeler, itemCmp) {
+// than letting a second grouping grow beside this one. It takes an ORDER (a
+// whole list in, a whole list out) rather than a comparator: a comparator that
+// keeps the order given has to return 0, and a broken one returning nothing
+// sorts identically, so the seam would have a shape no test could watch.
+function groupBySlug(cards, keyer, labeler, itemOrder) {
   var groups = {};
   cards.forEach(function(card) {
     keyer(card).forEach(function(slug) {
@@ -243,10 +246,10 @@ function groupBySlug(cards, keyer, labeler, itemCmp) {
       groups[slug].push(card);
     });
   });
-  var cmp = itemCmp || function(a, b) { return cmpStr(titleOf(a), titleOf(b)); };
+  var order = itemOrder || sortItems;
   return Object.keys(groups)
     .map(function(slug) {
-      return { slug: slug, title: labeler(slug), items: groups[slug].sort(cmp) };
+      return { slug: slug, title: labeler(slug), items: order(groups[slug]) };
     })
     .sort(function(a, b) { return cmpStr(a.title, b.title); });
 }
@@ -256,8 +259,8 @@ function groupBySlug(cards, keyer, labeler, itemCmp) {
 // Movies groups its clips by kid WITHOUT those groups becoming rails, so the
 // id is minted here rather than in groupBySlug, and no caller is left
 // fabricating an id nothing reads.
-function groupRails(cards, keyer, labeler, prefix, itemCmp) {
-  return groupBySlug(cards, keyer, labeler, itemCmp).map(function(g) {
+function groupRails(cards, keyer, labeler, prefix, itemOrder) {
+  return groupBySlug(cards, keyer, labeler, itemOrder).map(function(g) {
     return { id: prefix + g.slug, slug: g.slug, title: g.title, items: g.items };
   });
 }
@@ -674,15 +677,16 @@ export function railsForSection(sectionId, cards, cwRows, genreLabels, recents) 
 var CHANNEL_RAIL_PREFIX = 'channel-rail:';
 function railsOfTile(tile) { return railsOf(tile.line); }
 function untagged(tile) { return railsOfTile(tile).length === 0; }
-function tagged(tile) { return railsOfTile(tile).length > 0; }
-function KEEP_ORDER() { return 0; }
+function keepOrder(tiles) { return tiles; }
 
+// Every tile goes into the grouping, tagged or not: a channel naming no rails
+// fans out to no group and so lands in none of them — the same thing filtering
+// it out first would do, with one line and one branch fewer.
 export function channelRails(lines) {
   var tiles = channelTiles(lines);
-  var rails = groupRails(tiles.filter(tagged), railsOfTile, titleCase,
-                         CHANNEL_RAIL_PREFIX, KEEP_ORDER);
-  var rest = tiles.filter(untagged);
-  return rails.concat(simpleOnNowRail(rest));
+  var rails = groupRails(tiles, railsOfTile, titleCase,
+                         CHANNEL_RAIL_PREFIX, keepOrder);
+  return rails.concat(simpleOnNowRail(tiles.filter(untagged)));
 }
 
 // `On now` is omitted when every channel named a rail — an empty titled row is
