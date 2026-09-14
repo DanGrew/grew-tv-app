@@ -316,6 +316,47 @@ test.describe('the companion mirror', () => {
     expect(intents.find(i => i.intent === 'select').params.id).toBe('channel:cartoon-club');
   });
 
+  // TASK-626 — swiping to another rail on the phone must not send the TV to a
+  // `rail-grid.html` for Channels: that page does not exist for this section
+  // and the TV lands on an empty grid (TASK-564's own finding). It could not
+  // happen while the tab had one rail, because there was nowhere to swipe TO.
+  // The TV goes to its Channels tab, which draws every rail at once, while the
+  // phone walks its own — the same split the dock tap already used.
+  test('walking to another rail keeps the TV on its Channels tab', async ({ page }) => {
+    const intents = [];
+    await installApi(page);
+    await withChannels(page, RAILED);
+    await mockApp(page, intents);
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="channels"]').click();
+    await expect(page.locator('#pager-name')).toHaveText('Cartoons');
+
+    await page.locator('#pager-next').first().click();
+    await expect(page.locator('#pager-name')).toHaveText('Films');
+    const navigates = intents.filter(i => i.intent === 'navigate');
+    expect(navigates.map(i => i.params.page)).not.toContain('rail-grid.html');
+    expect(navigates[navigates.length - 1].params.page).toBe('browse.html');
+    expect(navigates[navigates.length - 1].params.params).toEqual({ tab: 'channels' });
+    // And the phone is on the rail it walked to, with that rail's cards.
+    await expect(page.locator('#grid-wrap')).toBeVisible();
+    await expect(page.locator('.ph-chan[data-channel="after-dark"]')).toBeVisible();
+  });
+
+  // Every other section still drives the TV to the rail-grid page it does have
+  // — the fix above is the Channels exception, not a new rule for all of them.
+  test('walking to another rail still drives the TV for a catalog section', async ({ page }) => {
+    const intents = [];
+    await installApi(page);
+    await withChannels(page, []);
+    await mockApp(page, intents);
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="films"]').click();
+    await page.locator('#pager-next').first().click();
+    const navigates = intents.filter(i => i.intent === 'navigate');
+    expect(navigates[navigates.length - 1].params.page).toBe('rail-grid.html');
+    expect(navigates[navigates.length - 1].params.params.section).toBe('films');
+  });
+
   // TASK-564 — pressing the player's "Channels" crumb on the phone. The crumb
   // trims the trail to the recorded channels entry and both surfaces reload
   // onto browse; the phone rebuilds its position from that entry and has to

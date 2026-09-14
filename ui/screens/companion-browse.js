@@ -671,7 +671,17 @@ export function initPage() {
   function selectSection(id) {
     [SECTION_ROUTE[id]].filter(Boolean).concat([selectBySection])[0](id);
   }
-  function selectRail(id) { navigate('rail-grid.html', { section: state.section, rail: id }); }
+  // TASK-626 — walking to a rail is the one navigation where the two surfaces
+  // part company, for the reason selectChannels already does: Channels has no
+  // `rail-grid.html` on the TV, and sending it to one lands it on an empty
+  // grid. That could not happen while the tab had a single rail — there was
+  // nowhere to swipe to — so the split has to reach this funnel too now.
+  // `browseDrive` answers where the TV goes for a section and rail; the phone
+  // drills to the rail either way.
+  function selectRail(id) {
+    api.sendIntent('navigate', browseDrive({ tab: state.section, rail: id }));
+    applyGrid(state.section, id);
+  }
 
   // Tapping a tile. SYNCED: send `select`; the app's rail-grid routes it to the
   // item's detail/player and echoes the new context, which onContext follows to
