@@ -7,7 +7,7 @@
 // progress: { id: { resumePositionSec, lastPlayed } } (from /api/continue-watching)
 
 import { continueWatching } from './progress.js';
-import { channelRails, CHANNELS_TAB } from './channels.js';
+import { channelTiles, railsOf, CHANNELS_TAB, CHANNELS_RAIL, CHANNELS_RAIL_TITLE } from './channels.js';
 
 // Normalize a browse card's `duration` (seconds, the backend's name) to the
 // `durationSec` the tile/progress model expects. Non-mutating shallow copy.
@@ -231,8 +231,11 @@ function cmpDateDesc(a, b) {
 //
 // TASK-502 dropped the itemCmp override this took: its one caller was the
 // Home Movies person rails, and with those rails gone their items are never
-// rendered, so a second item order had no consumer left.
-function groupBySlug(cards, keyer, labeler) {
+// rendered, so a second item order had no consumer left. TASK-626 brought it
+// back for the one caller that genuinely orders its items differently — the
+// Channels tab, whose order is the endpoint's and never the app's — rather
+// than letting a second grouping grow beside this one.
+function groupBySlug(cards, keyer, labeler, itemCmp) {
   var groups = {};
   cards.forEach(function(card) {
     keyer(card).forEach(function(slug) {
@@ -240,7 +243,7 @@ function groupBySlug(cards, keyer, labeler) {
       groups[slug].push(card);
     });
   });
-  var cmp = function(a, b) { return cmpStr(titleOf(a), titleOf(b)); };
+  var cmp = itemCmp || function(a, b) { return cmpStr(titleOf(a), titleOf(b)); };
   return Object.keys(groups)
     .map(function(slug) {
       return { slug: slug, title: labeler(slug), items: groups[slug].sort(cmp) };
@@ -253,8 +256,8 @@ function groupBySlug(cards, keyer, labeler) {
 // Movies groups its clips by kid WITHOUT those groups becoming rails, so the
 // id is minted here rather than in groupBySlug, and no caller is left
 // fabricating an id nothing reads.
-function groupRails(cards, keyer, labeler, prefix) {
-  return groupBySlug(cards, keyer, labeler).map(function(g) {
+function groupRails(cards, keyer, labeler, prefix, itemCmp) {
+  return groupBySlug(cards, keyer, labeler, itemCmp).map(function(g) {
     return { id: prefix + g.slug, slug: g.slug, title: g.title, items: g.items };
   });
 }
@@ -652,6 +655,44 @@ export function railsForSection(sectionId, cards, cwRows, genreLabels, recents) 
   var rails = buildTabRails(sectionId, cards, cwRows, genreLabels, recents);
   var guarantee = [RAIL_GUARANTEE[sectionId]].filter(Boolean).concat([function(r) { return r; }])[0];
   return guarantee(rails);
+}
+
+// FEAT-560/TASK-626 — the Channels tab's rails. A channel names the rails it
+// belongs on in its own config (core/channels.js railsOf) and the tab groups
+// itself from that: one rail per slug any visible channel names, title-cased
+// for its heading by the SAME titleCase the genre rails use, then `On now` last
+// holding every channel that named none.
+//
+// Nothing holds a list of rails — a rail exists exactly while a visible channel
+// names it, so adding one is an edit to a channel and removing the last channel
+// from one removes it. Alphabetical by title (groupBySlug's own group order),
+// with `On now` last because it is the fallback rather than a rail anyone chose.
+//
+// ⛔ The tiles keep the order the endpoint sent (KEEP_ORDER): the backend owns
+// channel order and the app never re-sorts it (core/channels.js), which is the
+// one thing a channel rail does differently from a genre rail.
+var CHANNEL_RAIL_PREFIX = 'channel-rail:';
+function railsOfTile(tile) { return railsOf(tile.line); }
+function untagged(tile) { return railsOfTile(tile).length === 0; }
+function tagged(tile) { return railsOfTile(tile).length > 0; }
+function KEEP_ORDER() { return 0; }
+
+export function channelRails(lines) {
+  var tiles = channelTiles(lines);
+  var rails = groupRails(tiles.filter(tagged), railsOfTile, titleCase,
+                         CHANNEL_RAIL_PREFIX, KEEP_ORDER);
+  var rest = tiles.filter(untagged);
+  return rails.concat(simpleOnNowRail(rest));
+}
+
+// `On now` is omitted when every channel named a rail — an empty titled row is
+// what simpleRail has always refused, and this one is no different. It keeps
+// its original id, so a trail entry written before this task still names a rail
+// that exists.
+function simpleOnNowRail(tiles) {
+  return tiles.length
+    ? [{ id: CHANNELS_RAIL, title: CHANNELS_RAIL_TITLE, items: tiles }]
+    : [];
 }
 
 // FEAT-560/TASK-563 — the rails for any browse section, INCLUDING Channels.

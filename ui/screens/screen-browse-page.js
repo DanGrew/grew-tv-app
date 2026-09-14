@@ -7,8 +7,8 @@ import { queueAdd, queueAddStatus, itemMediaType } from '../../core/queue-shell-
 import { parseConfig, badgePerson } from '../../core/profile-config.js';
 import { buildCrumbs } from '../../core/breadcrumb.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
-import { cardRoute, artistTiles } from '../../core/home-rails.js';
-import { channelRails, CHANNELS_TAB } from '../../core/channels.js';
+import { cardRoute, artistTiles, channelRails } from '../../core/home-rails.js';
+import { CHANNELS_TAB } from '../../core/channels.js';
 import { mountSearch } from './screen-search.js';
 import { mountContinueMenu } from './continue-menu.js';
 import { continueTarget } from '../../core/browse-continue.js';

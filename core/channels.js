@@ -5,8 +5,10 @@
 //
 // Fed by GET /api/channels?profile= (grew-tv api/channels.py), one on-now line
 // per channel this profile may see:
-//   { channel_id, name, item_type, on_air, item, offset_seconds,
+//   { channel_id, name, item_type, rails, on_air, item, offset_seconds,
 //     runtime_seconds, next_on_air, following }
+// `rails` is the slugs of the tab's rails this channel belongs on, in config
+// order, and empty for a channel naming none (TASK-626).
 // `item` is a resolved catalog entry, a minimal { item_id } for an id the
 // catalog no longer knows, or null when nothing is on. `following` is the one
 // programme after it, in the same shape, or null (TASK-570).
@@ -28,10 +30,12 @@ export var CHANNEL_KIND = 'channel';
 // which media type you want before showing you anything.
 export var CHANNELS_TAB = { id: 'channels', title: 'Channels' };
 
-// The one rail on that tab. Not a catalog rail — a small fixed strip that needs
-// no paging (decision 17), which is why FEAT-547 doesn't gate this.
+// The tab's fallback rail: every channel that names none of its own lands here
+// (TASK-626), which is the whole strip as it stood before rails existed. Not a
+// catalog rail — a small fixed strip that needs no paging (decision 17), which
+// is why FEAT-547 doesn't gate this.
 export var CHANNELS_RAIL = 'channels';
-var RAIL_TITLE = 'On now';
+export var CHANNELS_RAIL_TITLE = 'On now';
 
 var OFF_AIR = 'Off air';
 
@@ -245,10 +249,22 @@ export function channelTiles(lines) {
   return (lines || []).map(channelTile);
 }
 
-// The Channels tab's rails: one strip, or none at all.
-export function channelRails(lines) {
-  var tiles = channelTiles(lines);
-  return tiles.length ? [{ id: CHANNELS_RAIL, title: RAIL_TITLE, items: tiles }] : [];
+// TASK-626 — the rails one channel opts into, as api/channels.py sends them: a
+// list of slugs in the order its config names them, and empty for a channel
+// naming none.
+//
+// Empty for a backend too old to send the field at all, which is the same
+// answer and puts the card exactly where it has always been — so the app can
+// ship before the backend does, and the field arriving changes the tab without
+// the app changing again.
+//
+// The grouping itself lives in core/home-rails.js beside the genre rails,
+// because a channel rail is built by the same slug grouping and must not grow a
+// second idea of how a slug becomes a heading. This file stays what a channel
+// SAYS; that one stays how rails are made.
+export function railsOf(line) {
+  var rails = (line || {}).rails;
+  return Array.isArray(rails) ? rails : [];
 }
 
 // Which renderer a browse card takes. A channel card has its own on both
@@ -307,19 +323,35 @@ export function landingTab(tabIds, requestedTab, lastTab, lines) {
 // at, and the target a later breadcrumb press sends the TV to. For every other
 // section those agree, because both surfaces show a rail's items on a
 // `rail-grid` page. Channels is the one section where they don't (decision 10 —
-// it is a browse TAB on the TV, with no rail-grid behind it), so its entry
-// names the tab alone; restoring that literally left the phone on the rail
-// level, showing the pager's dots over no title and no cards.
+// it is a browse TAB on the TV, with no rail-grid behind it).
 //
-// The tab is enough to name the rail back, because the section has exactly one.
-// Every other entry restores as it always did: a rail means the grid, a tab
-// alone means that section's rails, neither means the sections root.
+// ⚠️ TASK-626 — this used to answer the channels rail from the tab alone,
+// "because the section has exactly one". It has several now, so the tab no
+// longer names which one the phone was in and a channels entry carries its rail
+// like every other section's. One rule for every entry: a rail means the grid,
+// a tab alone means that section's rails, neither means the sections root.
+// Where the TV is sent is a separate question, and `browseDrive` answers it —
+// splitting the two is what lets a channels entry name its rail without
+// pointing the TV at a rail-grid page it does not have.
 export function browseRestore(params) {
   var p = params || {};
   var tab = p.tab || null;
   var rail = p.rail || null;
-  if (tab === CHANNELS_TAB.id) return { section: tab, rail: CHANNELS_RAIL, level: 'grid' };
   if (rail) return { section: tab, rail: rail, level: 'grid' };
   if (tab) return { section: tab, rail: null, level: 'rails' };
   return { section: null, rail: null, level: 'sections' };
+}
+
+// TASK-626 — where the TV goes for the same recorded entry. Every other section
+// has a `rail-grid.html` holding a rail's items, so a recorded rail names a
+// page; Channels does not, and sending the TV there lands it on "Nothing here
+// yet" (TASK-564 fixed exactly that). So the channels tab answers its browse
+// tab whatever rail the phone is on — the TV's tab draws every rail at once, so
+// the two surfaces are still on the same content by their own routes.
+export function browseDrive(params) {
+  var p = params || {};
+  var tab = p.tab || null;
+  if (tab === CHANNELS_TAB.id) return { page: 'browse.html', params: { tab: tab } };
+  if (p.rail) return { page: 'rail-grid.html', params: { section: tab, rail: p.rail } };
+  return { page: 'browse.html', params: { tab: tab } };
 }
