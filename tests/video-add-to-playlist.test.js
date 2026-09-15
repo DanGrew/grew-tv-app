@@ -102,6 +102,23 @@ test('Escape closes the add sheet', async ({ page }) => {
   await expect(page.locator('#add-sheet')).toBeHidden();
 });
 
+// TASK-596 — ＋ Playlist was drawn, and focus was even placed on it when its
+// sheet closed (the Cancel test above), but it was missing from the player's
+// d-pad cycle: a remote could land there once, on the way out of the sheet, and
+// then never get back to it. Stepping onto it and back off is the whole of the
+// fix — the sheet itself has been walkable since TASK-378.
+test('＋ Playlist is a stop on the d-pad cycle, reachable and returnable (TASK-596)', async ({ page }) => {
+  await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
+  await expect(page.locator('#btn-add-playlist')).toBeVisible();
+  await page.evaluate(() => document.getElementById('btn-night').focus());
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#btn-add-playlist')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#btn-add-playlist')).not.toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('#btn-add-playlist')).toBeFocused();
+});
+
 test('a standalone film never offers Add to playlist (the existing engine Queue button lives there instead)', async ({ page }) => {
   await installQueuePlaybackBackend(page, 'film');
   await page.goto('/app/homeview/video.html?video=toy-story-main&from=browse');
