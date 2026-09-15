@@ -106,7 +106,14 @@ export function mountSearch(opts) {
   // stops propagation, so the browse d-pad (document listener) never fires while
   // the overlay is open. It also routes a hardware keyboard's printable keys +
   // Escape/Backspace, mirroring the create screen's onTyping.
-  function closeSearch() { panel.classList.remove('open'); }
+  // TASK-595 — closing hands focus back to the 🔍 that opened it. It used to
+  // drop the class and leave focus on a key cell that was now hidden, so browse's
+  // d-pad found no zone behind it and every arrow did nothing until a mouse
+  // rescued it — a dead end from the couch even once Search was reachable.
+  function closeSearch() {
+    panel.classList.remove('open');
+    document.getElementById('btn-search').focus();
+  }
   var PANEL_KEYS = { Escape: closeSearch, Backspace: function() { setQuery(backspace(st.query)); } };
   function onPanelKey(e) {
     e.stopPropagation();
