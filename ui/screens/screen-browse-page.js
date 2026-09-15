@@ -1,6 +1,6 @@
 import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
-import { browseArrow, renderBrowse, getActiveTab, updateChannels } from './screen-browse.js';
+import { browseArrow, renderBrowse, getActiveTab, updateChannels, menuStops } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, loadConfig, loadTracks, loadEpisodes, loadChannels } from '../../core/app-api.js';
 import { queueAdd, queueAddStatus, itemMediaType } from '../../core/queue-shell-config.js';
@@ -44,7 +44,38 @@ export function initBrowsePage() {
       navTo(t.page, t.params);
     }
   });
-  function toggleQueueMenu() { document.getElementById('queue-menu').classList.toggle('open'); }
+  // TASK-595 (FEAT-526) — the menu is opened, walked and closed like an overlay.
+  // It only ever toggled a class: no focus went into it and nothing but a second
+  // click closed it, so from the couch it was a menu you could open and then be
+  // stranded in.
+  //
+  // Opening lands on the first button that has something to play (menuStops
+  // skips the dimmed Continue buttons and the per-tab hidden Play All), and
+  // closing hands focus back to the ▶ that opened it, so the cluster walk picks
+  // up exactly where it was. A menu with no live button at all keeps focus on ▶
+  // rather than putting it somewhere a press would do nothing.
+  function queueMenuEl() { return document.getElementById('queue-menu'); }
+  function queueMenuOpen() { return queueMenuEl().classList.contains('open'); }
+  function openQueueMenu() {
+    queueMenuEl().classList.add('open');
+    [menuStops()[0]].filter(Boolean).forEach(function(b) { b.focus(); });
+  }
+  function closeQueueMenu() {
+    queueMenuEl().classList.remove('open');
+    document.getElementById('btn-queue-menu').focus();
+  }
+  var MENU_TOGGLE = { 'true': closeQueueMenu, 'false': openQueueMenu };
+  function toggleQueueMenu() { MENU_TOGGLE[queueMenuOpen() + ''](); }
+
+  // Home closes it, the way Home closes Search and the Queue overlay. Scoped to
+  // the menu's own mount and live only while the menu is open: browse still
+  // declares no back key of its own — that is TASK-594's — and swallowing Home
+  // here when the menu is shut would take that key away before it exists.
+  var CLOSE_KEYS = { Escape: true };
+  var MENU_CLOSE = { 'true': function(e) { e.stopPropagation(); closeQueueMenu(); }, 'false': noop };
+  function onQueueMenuKey(e) {
+    [CLOSE_KEYS[e.key]].filter(Boolean).forEach(function() { MENU_CLOSE[queueMenuOpen() + ''](e); });
+  }
 
   // TASK-445 — Play All: a whole-catalog "play everything of this type"
   // control, shown only on a tab that has one. Keyed by tab id, no branch.
@@ -140,6 +171,7 @@ export function initBrowsePage() {
   });
 
   document.getElementById('btn-queue-menu').addEventListener('click', toggleQueueMenu);
+  document.getElementById('queue-menu-mount').addEventListener('keydown', onQueueMenuKey);
   document.getElementById('btn-play-all').addEventListener('click', onPlayAll);
   document.getElementById('btn-guide').addEventListener('click', onGuide);
   document.addEventListener('keydown', dispatchKey);

@@ -10,7 +10,7 @@ import { withChannelsTab, channelsById, channelCardView, landingTab, tileVariant
 // rails. Pure grouping/ordering lives in core/home-rails.js; this module owns
 // the DOM and the two-zone (sidebar / rails) d-pad focus model. Module state
 // holds the last-rendered data so a tab switch can rebuild the rails.
-var STATE = { server: null, cards: [], cw: [], recents: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null, onTabChange: null, channels: [], channelsById: {}, channelsAt: 0 };
+var STATE = { server: null, cards: [], cw: [], recents: [], progress: {}, labels: {}, profile: null, onSelect: null, onQueue: null, onCreatePlaylist: null, onTabChange: null, channels: [], channelsById: {}, channelsAt: 0, railCol: 0 };
 
 // FEAT-560/TASK-563 — the Channels strip ticks (decision 14): a card baked at
 // fetch time is wrong within a minute of render. Every second the rendered
@@ -145,13 +145,26 @@ export function toggleArrow(e) {
 
 // Topbar zone: the profile control sits above both zones. Down drops into the
 // rails, Left into the sidebar; activation (Enter) is wired by the page.
+// TASK-595 — Right enters the bottom-right cluster. It is the second of the two
+// ways in, and like the first it was a press that did nothing before: this table
+// mapped Down and Left only.
 export function profileArrow(e) {
   e.preventDefault();
   var PMOVE = {
     ArrowDown: focusFirstTile,
-    ArrowLeft: focusActiveTab
+    ArrowLeft: focusActiveTab,
+    ArrowRight: function() { enterCluster(0); }
   };
   [PMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
+}
+
+// Downward from the rails: step a rail, or — off the LAST one — leave for the
+// bottom-right cluster (TASK-595). That press did nothing before: there is no
+// rail below, so focusCol was handed an absent row and returned without moving.
+// The column travels with it, so ▲ comes back to the tile it left rather than to
+// the start of the row.
+function downFromRail(rows, railIdx, col) {
+  ({ true: function() { enterCluster(col); }, false: function() { focusCol(rows[railIdx + 1], col); } })[railIdx + 1 >= rows.length]();
 }
 
 // Rails zone: left/right scroll within a rail (left at col 0 hops to the
@@ -168,11 +181,83 @@ export function railArrow(e) {
     ArrowLeft:  function() { leftFromRail(rows[railIdx], col); },
     ArrowRight: function() { focusCol(rows[railIdx], col + 1); },
     ArrowUp:    function() { upFromRail(rows, railIdx, col); },
-    ArrowDown:  function() { focusCol(rows[railIdx + 1], col); }
+    ArrowDown:  function() { downFromRail(rows, railIdx, col); }
   };
   [railIdx].filter(function() { return railIdx >= 0; }).forEach(function() {
     [MOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
   });
+}
+
+// ── TASK-595 (FEAT-526): the cluster, and the play menu inside it ────────────
+// #queue-actions floats bottom-right and holds the Guide, Search and the ▶ play
+// menu. All three were click-only, and btn-search is the only way into Search —
+// so from the couch the entire Search surface was unreachable, not merely
+// awkward. It is a fifth zone here, beside topbar / toggle / sidebar / rails.
+//
+// A stop is a control that is actually on screen and would actually do
+// something: btn-guide and btn-play-all are shown per tab by style.display, and
+// a Continue button with nothing to continue carries the real `disabled`
+// attribute. Both are skipped the way the video player skips a disabled
+// transport control, so a walk never lands somewhere a press does nothing.
+function visibleStops(sel) {
+  return Array.from(document.querySelectorAll(sel))
+    .filter(function(b) { return b.offsetParent !== null; })
+    .filter(function(b) { return !b.disabled; });
+}
+
+// The cluster's own controls — everything but the menu's contents, which are a
+// zone of their own while it is open.
+export function clusterStops() {
+  return visibleStops('#queue-actions button').filter(function(b) { return !b.closest('#queue-menu'); });
+}
+
+export function menuStops() {
+  return visibleStops('#queue-menu button');
+}
+
+// No wrap at either end: a cluster of two or three controls is read as a row
+// with edges, and wrapping a three-stop row reads as the focus jumping.
+function focusStop(stops, i) {
+  [stops[i]].filter(Boolean).forEach(function(b) { b.focus(); });
+}
+
+export function enterCluster(col) {
+  STATE.railCol = col;
+  focusStop(clusterStops(), 0);
+}
+
+function focusBottomRail() {
+  var rows = allRows();
+  focusCol(rows[rows.length - 1], STATE.railCol);
+}
+
+// Cluster zone: Left/Right walk the controls, Up returns to the bottom rail.
+// Down is the edge — the cluster is the last thing on the screen.
+export function clusterArrow(e) {
+  e.preventDefault();
+  var stops = clusterStops();
+  var i = stops.indexOf(document.activeElement);
+  var CMOVE = {
+    ArrowLeft:  function() { focusStop(stops, i - 1); },
+    ArrowRight: function() { focusStop(stops, i + 1); },
+    ArrowUp:    focusBottomRail,
+    ArrowDown:  function() {}
+  };
+  [CMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
+}
+
+// Play-menu zone: an overlay for as long as it is open, so Up/Down walk its
+// buttons and Left/Right do nothing — the cluster behind it is reached by
+// closing it, not by walking off its edge.
+export function menuArrow(e) {
+  e.preventDefault();
+  var stops = menuStops();
+  var i = stops.indexOf(document.activeElement);
+  var MMOVE = {
+    ArrowUp:   function() { focusStop(stops, i - 1); },
+    ArrowDown: function() { focusStop(stops, i + 1); }
+  };
+  [MMOVE[e.key]].filter(Boolean).forEach(function(fn) { fn(); });
 }
 
 function topbarZone() {
@@ -189,11 +274,21 @@ function sidebarZone() {
   return [document.activeElement.closest('#sidebar')].filter(Boolean).map(function() { return 'sidebar'; });
 }
 
-function zoneOf() {
-  return topbarZone().concat(toggleZone()).concat(sidebarZone()).concat(['rails'])[0];
+// Checked before clusterZone — #queue-menu lives inside #queue-actions, so the
+// more specific match must win (the same reason toggleZone precedes sidebarZone).
+function menuZone() {
+  return [document.activeElement.closest('#queue-menu')].filter(Boolean).map(function() { return 'menu'; });
 }
 
-var ZONE = { toggle: toggleArrow, sidebar: sidebarArrow, rails: railArrow, topbar: profileArrow };
+function clusterZone() {
+  return [document.activeElement.closest('#queue-actions')].filter(Boolean).map(function() { return 'cluster'; });
+}
+
+function zoneOf() {
+  return topbarZone().concat(toggleZone()).concat(sidebarZone()).concat(menuZone()).concat(clusterZone()).concat(['rails'])[0];
+}
+
+var ZONE = { toggle: toggleArrow, sidebar: sidebarArrow, rails: railArrow, topbar: profileArrow, cluster: clusterArrow, menu: menuArrow };
 
 // Single d-pad entry point — routes the arrow to the zone holding focus.
 export function browseArrow(e) {
