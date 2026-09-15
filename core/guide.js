@@ -13,7 +13,7 @@
 //   * GET /api/channels/{id}/schedule?profile=  — the clock-bounded listing
 //     (TASK-589): every programme STARTING in the span, plus the off-air
 //     stretches it crosses, in one ordered listing of
-//     `{kind:'programme', item, tag, starts_at, ends_at}` and
+//     `{kind:'programme', item, group, starts_at, ends_at}` and
 //     `{kind:'off_air', starts_at, next_on_air}` rows.
 //
 // ⛔ NOT PAGED. PAGINATION.md's `offset`/`limit` envelope is for catalog lists,

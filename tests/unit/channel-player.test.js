@@ -18,9 +18,9 @@ function detail(over) {
     on_air: true,
     item: { item_id: 'bluey-s1e22', title: 'Bluey', ext: 'mp4', subtitles: 'bluey-s1e22.vtt' },
     offset_seconds: 120, runtime_seconds: 480, next_on_air: null,
-    bed: null, tag: 'preschool',
+    bed: null, group: 'preschool',
     started_at: '2026-09-04T17:00:00', ends_at: '2026-09-04T17:08:00',
-    next: [{ item: { item_id: 'duggee-s1e04', title: 'Hey Duggee' }, tag: 'preschool',
+    next: [{ item: { item_id: 'duggee-s1e04', title: 'Hey Duggee' }, group: 'preschool',
              starts_at: '2026-09-04T17:08:00', ends_at: '2026-09-04T17:15:00' }]
   }, over || {});
 }

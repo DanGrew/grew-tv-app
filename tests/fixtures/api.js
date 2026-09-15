@@ -402,7 +402,7 @@ const CHANNEL_OFF_AIR_PLAIN = Object.assign({}, CHANNEL_OFF_AIR_TIMED, {
 function channelEntry(id, title, startsAt, endsAt, series) {
   return {
     item: { item_id: id, title: title, poster: null, itemType: 'episode', ext: 'mp4', subtitles: null, series: series },
-    tag: 'preschool', starts_at: startsAt, ends_at: endsAt
+    group: 'preschool', starts_at: startsAt, ends_at: endsAt
   };
 }
 const DUGGEE = { id: 'series-hey-duggee', title: 'Hey Duggee', season: 1, episode: 4 };
@@ -423,7 +423,7 @@ function channelDetailResponse(line) {
     // has to carry it — the stub is what the backend answers, not what the app
     // consumes, and tests/unit/stub-contract-shape.test.js binds it to that.
     bed: 'ootb',
-    tag: 'preschool',
+    group: 'preschool',
     started_at: '2026-09-04T17:00:00',
     ends_at: '2026-09-04T17:08:00',
     next: CHANNEL_NEXT
@@ -432,7 +432,7 @@ function channelDetailResponse(line) {
 const CHANNEL_DETAIL = channelDetailResponse(CHANNEL_ON_AIR);
 // Off air answers the same shape with nothing in it — one state, never three.
 const CHANNEL_DETAIL_OFF_AIR = Object.assign({}, CHANNEL_OFF_AIR_TIMED, {
-  bed: null, tag: null, started_at: null, ends_at: null, next: []
+  bed: null, group: null, started_at: null, ends_at: null, next: []
 });
 // FEAT-560/TASK-589 — GET /api/channels/{id}/schedule: one channel's listing
 // over a stretch of clock, which is what the Guide (TASK-590) draws. Two row
@@ -443,11 +443,16 @@ const CHANNEL_DETAIL_OFF_AIR = Object.assign({}, CHANNEL_OFF_AIR_TIMED, {
 // suite runs on: the page takes its idea of what day it is from the answer's own
 // `from` (core/guide.js todayKey), so a fixed listing is a deterministic page.
 //
-// ⚠️ An item here carries `series` (TASK-588) because the live route resolves
-// every item through the same projection the strip does. The FROZEN contract
-// fixture for this route predates that merge and does not, which is why the
-// shape binding excuses the key rather than dropping it from the stub — the stub
-// matches the backend, and the frozen fixture is what is behind.
+// An item here carries `series` (TASK-588) because the live route resolves every
+// item through the same projection the strip does, and the frozen contract
+// fixture carries it too — it was regenerated after that merge. BUG-630: the
+// warning that used to sit here said the fixture was behind, which stopped being
+// true and was read as licence to keep excusing the key.
+//
+// BUG-630 — an entry names the `group` that aired, NOT the `tag` it was pulled
+// by: TASK-584 renamed it (grew-tv db/channel_schedule.py) and this stub kept
+// saying `tag` on both this route and the detail one, where nothing was bound to
+// notice.
 function scheduleItem(id, title, duration, series) {
   return {
     item_id: id, title: title, artist: null, poster: null, duration: duration,
@@ -458,7 +463,7 @@ function scheduleItem(id, title, duration, series) {
 function scheduleProgramme(id, title, startsAt, endsAt, duration, series) {
   return {
     kind: 'programme', item: scheduleItem(id, title, duration, series),
-    tag: 'preschool', starts_at: startsAt, ends_at: endsAt
+    group: 'preschool', starts_at: startsAt, ends_at: endsAt
   };
 }
 function scheduleOffAir(startsAt, nextOnAir) {
