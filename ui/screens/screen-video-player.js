@@ -19,18 +19,27 @@ var UPNEXT_SECS  = 5;            // autoplay "Up next" countdown
 var BACKEND_SAVE_MS = 5000;
 var STALL_RECOVERY_MS = 6000;   // BUG-429: waiting -> canplay/playing longer than this reloads
 
-// Transport focus order; CC/mv-shuffle/mv-repeat/hm-shuffle/hm-repeat/
-// film-shuffle/film-repeat are skipped while hidden (no .vtt for this video /
-// not a multi-item music-video playthrough, TASK-407 / not home-movie mode,
-// TASK-499 / not film mode, TASK-503) — a disabled-but-visible film-shuffle/
-// film-repeat stays in the list (only .hidden gates focus here; the real
-// `disabled` attribute already makes a click/Enter on it a no-op).
+// Transport focus order. TASK-596: this list IS video.html's on-screen order —
+// #transport's three buttons, then #pill-row left to right — so ▲▼ walks the
+// controls the way they sit on the screen and nothing the page draws is
+// unreachable. Keep it in sync with the markup; `focus order matches the
+// on-screen order of every control` (tests/homeview.test.js) fails if it drifts.
+// That ordering is why Jump/live/restart/CC sit AHEAD of the shuffle pairs here
+// where they used to trail them — the screen has always drawn them first.
+// CC/mv-shuffle/mv-repeat/hm-shuffle/hm-repeat/film-shuffle/film-repeat/
+// series-shuffle/series-repeat/add-playlist are skipped while hidden (no .vtt
+// for this video / not a multi-item music-video playthrough, TASK-407 / not
+// home-movie mode, TASK-499 / not film mode, TASK-503 / not a series
+// playthrough, TASK-542 / music-video-only, `addsToPlaylist`) — a
+// disabled-but-visible shuffle/repeat stays in the list (only .hidden gates
+// focus here; the real `disabled` attribute already makes a click/Enter on it
+// a no-op).
 // TASK-564: `btn-live`/`btn-restart` are the channel-mode pills — hidden on
 // every other entry, so they drop out of the cycle exactly as an unavailable
 // Shuffle pair does. `btn-clear-progress` is what `btn-reset` was called until
 // TASK-564: "Reset" never said what it reset, which is the whole of the
 // Restart-versus-Reset confusion story 8 is about.
-var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-mv-shuffle', 'btn-mv-repeat', 'btn-hm-shuffle', 'btn-hm-repeat', 'btn-film-shuffle', 'btn-film-repeat', 'btn-jump', 'btn-live', 'btn-restart', 'btn-cc', 'btn-queue', 'btn-night', 'btn-clear-progress'];
+var FOCUS_ORDER  = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-jump', 'btn-live', 'btn-restart', 'btn-cc', 'btn-mv-shuffle', 'btn-mv-repeat', 'btn-hm-shuffle', 'btn-hm-repeat', 'btn-film-shuffle', 'btn-film-repeat', 'btn-series-shuffle', 'btn-series-repeat', 'btn-queue', 'btn-night', 'btn-add-playlist', 'btn-clear-progress'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 var CC_MODE       = { 'true': 'showing', 'false': 'hidden' };
 // App-side log (TASK-213): a fresh start logs `play`, a start from a saved

@@ -630,6 +630,67 @@ test('ArrowUp cycles transport focus play-pause -> prev', async ({ page }) => {
   await expect(page.locator('#btn-prev')).toBeFocused();
 });
 
+// TASK-596 — one pass round the ▼ cycle from wherever focus sits, as ids: every
+// stop the remote can actually reach, in the order it reaches them. Stops when
+// it comes back to where it started; the cap is a guard against a cycle that
+// never closes, not an expected length.
+async function walkFocusCycle(page) {
+  const first = await page.evaluate(() => document.activeElement.id);
+  const seen = [first];
+  for (let i = 0; i < 40; i++) {
+    await page.keyboard.press('ArrowDown');
+    const id = await page.evaluate(() => document.activeElement.id);
+    if (id === first) break;
+    seen.push(id);
+  }
+  return seen;
+}
+
+// TASK-596 — the cycle IS the screen. video.html draws nineteen controls and
+// the cycle listed sixteen, so a series' Shuffle and Repeat and ＋ Playlist were
+// drawn but unreachable from the couch. Reading the ids straight off the page
+// and walking them is what keeps that from happening again: add a control to
+// the markup without adding it here and this fails.
+//
+// Un-hiding and enabling them all first is deliberate — no single entry mode
+// shows every control at once (the channel pills, the four shuffle/repeat pairs
+// and ＋ Playlist are mutually exclusive), and this asserts the ORDER, which is
+// fixed markup, not which ones a given playthrough reveals. The skipping of
+// hidden and dimmed controls is its own behaviour, covered by TASK-517's tests.
+test('focus order matches the on-screen order of every control (TASK-596)', async ({ page }) => {
+  await goToSeriesEpisode(page);
+  const drawn = await page.evaluate(() => {
+    const btns = Array.from(document.querySelectorAll('#transport .ctrl-btn, #pill-row .ctrl-btn'));
+    btns.forEach(b => { b.classList.remove('hidden'); b.disabled = false; });
+    return btns.map(b => b.id);
+  });
+  await page.evaluate(id => document.getElementById(id).focus(), drawn[0]);
+  const walked = [drawn[0]];
+  for (let i = 1; i < drawn.length; i++) {
+    await page.keyboard.press('ArrowDown');
+    walked.push(await page.evaluate(() => document.activeElement.id));
+  }
+  expect(walked).toEqual(drawn);
+});
+
+test("a series' Shuffle and Repeat are stops on the d-pad cycle (TASK-596)", async ({ page }) => {
+  await goToSeriesEpisode(page);
+  await expect(page.locator('#btn-series-shuffle')).toBeVisible();
+  const stops = await walkFocusCycle(page);
+  expect(stops).toContain('btn-series-shuffle');
+  expect(stops).toContain('btn-series-repeat');
+});
+
+// Story 4 — OK on a newly reachable control does what a click on it does. The
+// cycle activates via activeElement.click(), so reaching it and pressing OK is
+// the same path a mouse takes; this proves the pill isn't merely focusable.
+test("OK on a series' Shuffle toggles it, as a click does (TASK-596)", async ({ page }) => {
+  await goToSeriesEpisode(page);
+  await page.evaluate(() => document.getElementById('btn-series-shuffle').focus());
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#btn-series-shuffle')).toHaveClass(/on/);
+});
+
 test('CC button shows for a video with subtitles', async ({ page }) => {
   await goToVideoScreen(page);
   await expect(page.locator('#btn-cc')).not.toHaveClass(/hidden/);
