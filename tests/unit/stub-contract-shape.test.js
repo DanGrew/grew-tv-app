@@ -92,7 +92,7 @@ const AUDIO_VIDEO = {
 };
 
 describe.skipIf(!HAS_CONTRACT)('stub ⇄ backend contract shape (SYS-017 / TASK-326)', () => {
-  let browse, cw, video, album, playlist, channels, schedule;
+  let browse, cw, video, album, playlist, channels, channelDetail, schedule;
   beforeAll(() => {
     browse = load('browse');
     cw = load('continue-watching');
@@ -100,6 +100,9 @@ describe.skipIf(!HAS_CONTRACT)('stub ⇄ backend contract shape (SYS-017 / TASK-
     album = load('album');
     playlist = load('playlist');
     channels = load('channels');
+    // BUG-630 — /api/channels/{id}. Frozen all along and never loaded here, which
+    // is how the detail route's `tag`/`group` rename went unseen.
+    channelDetail = load('channel');
     schedule = load('channel-schedule');
   });
 
@@ -298,16 +301,26 @@ describe.skipIf(!HAS_CONTRACT)('stub ⇄ backend contract shape (SYS-017 / TASK-
       });
     });
 
-    // TASK-564 — the DETAIL route's own extra keys. There is no separate
-    // contract fixture for it (the backend freezes one per route and
-    // /api/channels/{id} has none yet), so what CAN be bound is bound: the
-    // detail answer is the strip's line plus five keys (api/channels.py
-    // `_detail`), which means the shared half must still match the contract
-    // line exactly.
-    it('the detail answer still matches the contract line where they overlap', () => {
-      expectShape('channel detail (shared half)', CHANNEL_ON_AIR, channels.channels[0]);
+    // TASK-564 — the DETAIL route's own extra keys, on top of the strip's line
+    // (api/channels.py `_detail` is `_on_now` plus five).
+    //
+    // BUG-630 — this used to assert those five against the STUB and say in a
+    // comment that /api/channels/{id} had no contract fixture of its own. It has
+    // had `channel.json` since the route joined the backend's `_ENDPOINTS`, and
+    // the gap let the detail answer drift: the stub said `tag` where the backend
+    // has answered `group` since TASK-584, and nothing here could see it. Bound
+    // to the real fixture now, so the detail route fails on a rename exactly as
+    // the listing one does.
+    it('the detail answer matches the contract detail answer', () => {
+      expectShape('channel detail', CHANNEL_DETAIL, channelDetail);
       const extra = Object.keys(CHANNEL_DETAIL).filter(k => !(k in CHANNEL_ON_AIR)).sort();
-      expect(extra).toEqual(['bed', 'ends_at', 'next', 'started_at', 'tag']);
+      expect(extra).toEqual(['bed', 'ends_at', 'group', 'next', 'started_at']);
+    });
+
+    // The lookahead the card draws (TASK-565) — its own row shape, which the
+    // detail fixture carries and nothing was checking either.
+    it('a lookahead entry matches the contract lookahead entry', () => {
+      expectShape('channel lookahead entry', CHANNEL_DETAIL.next[0], channelDetail.next[0]);
     });
   });
 

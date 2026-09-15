@@ -47,7 +47,7 @@ function findItem(rails, id) {
 const VIDEO_READER_FIELDS = ['id', 'title', 'ext', 'duration', 'subtitles', 'startAt', 'endAt', 'lyrics', 'available', 'poster', 'type'];
 
 describe.skipIf(!HAS_CONTRACT)('backend contract conformance (SYS-017 / TASK-311)', () => {
-  let browse, cw, video, album, playlist, channels, schedule;
+  let browse, cw, video, album, playlist, channels, schedule, scheduleFilm;
   beforeAll(() => {
     browse = load('browse');
     cw = load('continue-watching');
@@ -56,6 +56,10 @@ describe.skipIf(!HAS_CONTRACT)('backend contract conformance (SYS-017 / TASK-311
     playlist = load('playlist');
     channels = load('channels');
     schedule = load('channel-schedule');
+    // BUG-630 — the same route over the film channel. A listing row is drawn two
+    // ways and `comfort` only freezes the episode one, which left `item.itemType`
+    // claimed by a test that never reached the branch reading it.
+    scheduleFilm = load('channel-schedule-film');
   });
 
   describe('/api/browse → core/home-rails + core/tile-model', () => {
@@ -233,17 +237,29 @@ describe.skipIf(!HAS_CONTRACT)('backend contract conformance (SYS-017 / TASK-311
       expect(todayKey([schedule])).toBe('2026-06-01');
     });
 
-    it('lists the programmes in the day, timed (proves `entries`,`kind`,`starts_at`)', () => {
+    // TASK-588 — the recognisable half leads, so an EPISODE's row is titled with
+    // its show and says which episode underneath. `series` is the field that
+    // decides it: rename it and both lines collapse onto the episode's own title,
+    // which is the drift this asserts against.
+    it('lists the programmes in the day, timed (proves `entries`,`kind`,`starts_at`,`item.series`)', () => {
       const column = guideColumn(schedule, '2026-06-01', true);
       expect(column.rows.map(r => r.time)).toEqual(['08:58']);
-      expect(column.rows[0].title).toBe("Millie's First Walk");
+      expect(column.rows[0].title).toBe('Millie');
+      expect(column.rows[0].sub).toBe("Millie's First Walk · S1 E1 · 1m");
     });
 
+    // A renamed duration reads undefined and every row loses its runtime — the
+    // listing then says what is on and never how long it is.
+    //
+    // BUG-630 — this reads the FILM channel's listing, because `rowSub` only
+    // reaches the type label when an item has no series (core/guide.js), and
+    // every row on `comfort` is an episode. Asserted against `comfort` this named
+    // `item.itemType` and proved nothing about it: the field could have been
+    // renamed and only films would have gone blank, on a page no test drew.
     it('says what a row IS and how long it runs (proves `item.itemType`,`item.duration`)', () => {
-      // A renamed duration reads undefined and every row loses its runtime —
-      // the listing then says what is on and never how long it is.
-      const column = guideColumn(schedule, '2026-06-01', true);
-      expect(column.rows[0].sub).toBe('Episode · 1m');
+      const column = guideColumn(scheduleFilm, '2026-06-01', true);
+      expect(column.rows[0].title).toBe('Toy Story');
+      expect(column.rows[0].sub).toBe('Film · 1h 20m');
     });
 
     it('names the real stop and when the channel is back (proves `ends_at`,`next_on_air`)', () => {

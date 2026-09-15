@@ -21,7 +21,7 @@ import {
 function entry(id, title, startsAt, series) {
   return {
     item: { item_id: id, title: title, series: series || null },
-    tag: 'preschool', starts_at: startsAt, ends_at: '2026-09-04T18:00:00'
+    group: 'preschool', starts_at: startsAt, ends_at: '2026-09-04T18:00:00'
   };
 }
 
