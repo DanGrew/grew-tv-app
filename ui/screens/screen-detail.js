@@ -18,8 +18,9 @@ var AVAILABLE_ROW = {
 var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, onAddToPlaylist: null, onQueue: null, onMoveItem: null, onRemoveItem: null, seasons: [], activeSeason: null, suppressResume: false, albumHeaders: false };
 
 // Up/Down move between vertical stops: clickable breadcrumb crumbs (top), then
-// the header Play-next action, the shuffle button, the active season chip, then
-// every available episode row. A focused per-row Restart control counts as its
+// the header Play-next action, the shuffle button, the playlist's Add all → Rename
+// → Delete (their on-screen order, TASK-597), the active season chip, then every
+// available episode row. A header id a screen doesn't draw simply drops out. A focused per-row Restart control counts as its
 // row; Left/Right move sideways onto it (or between season chips).
 function crumbStops() {
   return Array.from(document.querySelectorAll('#breadcrumb .crumb-link'));
@@ -30,6 +31,7 @@ function verticalStops() {
     .concat([document.getElementById('btn-play-next')].filter(Boolean))
     .concat(Array.from(document.querySelectorAll('#btn-shuffle:not(.hidden)')))
     .concat(Array.from(document.querySelectorAll('#btn-add-all')))
+    .concat(Array.from(document.querySelectorAll('#btn-rename-playlist')))
     .concat(Array.from(document.querySelectorAll('#btn-delete-playlist')))
     .concat(Array.from(document.querySelectorAll('.season-chip.active')))
     .concat(Array.from(document.querySelectorAll('.detail-row:not(.unavailable)')));

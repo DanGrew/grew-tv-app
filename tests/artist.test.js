@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS } = require('./fixtures/api.js');
-const { pickPerson } = require('./fixtures/nav.js');
+const { pickPerson, dpadPath } = require('./fixtures/nav.js');
 
 // TASK-322 (FEAT-046) — the artist page is a SONG LIST of all the artist's tracks,
 // grouped by album (newest album first, track order within), reusing the album/
@@ -51,6 +51,14 @@ test('there is no Play or Shuffle button on the artist page', async ({ page }) =
   await enterArtist(page);
   await expect(page.locator('#btn-play')).toHaveCount(0);
   await expect(page.locator('#btn-shuffle')).toHaveCount(0);
+});
+
+// TASK-597 — the stop list is shared with Playlist, which gained Rename; an artist
+// draws no Rename, so its header steps exactly as before.
+test('the d-pad steps an artist header as before, with no Rename stop (TASK-597)', async ({ page }) => {
+  await enterArtist(page);
+  expect(await dpadPath(page, '.detail-row >> nth=0', 'ArrowUp', 2))
+    .toEqual(['crumb-1', 'crumb-0']);
 });
 
 // Story 2 — tapping a song plays it and continues through the artist's songs.

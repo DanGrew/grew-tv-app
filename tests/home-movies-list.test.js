@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js');
-const { pickPerson } = require('./fixtures/nav.js');
+const { pickPerson, dpadPath } = require('./fixtures/nav.js');
 
 // TASK-486 (revision, owner 2026-08-21) — a Play All rail tile now opens a
 // plain clip LIST first, like a boxset/series (screen-detail-page.js), rather
@@ -45,6 +45,14 @@ test('a month tile opens a list scoped to that month\'s clips', async ({ page })
   await enterList(page, 'play-all:Jan 2026');
   await expect(page.locator('#detail-title')).toHaveText('Jan 2026');
   await expect(page.locator('.detail-row')).toHaveCount(2);
+});
+
+// TASK-597 — the stop list is shared with Playlist, which gained Rename; home movies
+// draw no Rename, so the header steps exactly as before.
+test('the d-pad steps the home-movies header as before, with no Rename stop (TASK-597)', async ({ page }) => {
+  await enterList(page, 'play-all:All');
+  expect(await dpadPath(page, '.detail-row >> nth=0', 'ArrowUp', 3))
+    .toEqual(['btn-play-next', 'crumb-1', 'crumb-0']);
 });
 
 test('the header Play All button starts the scoped source, unshuffled, from the top', async ({ page }) => {
