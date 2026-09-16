@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installQueuePlaybackBackend } = require('./fixtures/api.js');
-const { pickPerson } = require('./fixtures/nav.js');
+const { pickPerson, dpadPath } = require('./fixtures/nav.js');
 
 // Host-agnostic: the app derives its backend from the page origin (BUG-009).
 const BROWSE_URL = '**/api/browse**';
@@ -87,6 +87,14 @@ test('ArrowUp from first row moves focus to Play next', async ({ page }) => {
   await page.locator('.detail-row').first().focus();
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('#btn-play-next')).toBeFocused();
+});
+
+// TASK-597 — the stop list is shared with Playlist, which gained Rename; a series
+// draws no Rename, so its header steps exactly as before.
+test('the d-pad steps a series header as before, with no Rename stop (TASK-597)', async ({ page }) => {
+  await openDetail(page);
+  expect(await dpadPath(page, '.detail-row >> nth=0', 'ArrowUp', 2))
+    .toEqual(['btn-play-next', 'crumb-0']);
 });
 
 test('Escape from detail returns to browse', async ({ page }) => {

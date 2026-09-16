@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS, VIDEOS } = require('./fixtures/api.js');
-const { pickPerson } = require('./fixtures/nav.js');
+const { pickPerson, dpadPath } = require('./fixtures/nav.js');
 
 // FEAT-018/FEAT-027/FEAT-045 — music browse + album detail + <audio> player +
 // shuffle. The Music tab (titled "Music"), the Recently Played rail (TASK-318)
@@ -114,6 +114,17 @@ test('albums route to the album detail (not series detail)', async ({ page }) =>
   // TASK-321: no header Play or Shuffle button — you start by tapping a track.
   await expect(page.locator('#btn-play-next')).toHaveCount(0);
   await expect(page.locator('#btn-shuffle')).toHaveCount(0);
+});
+
+// TASK-597 — the stop list is shared with Playlist, which gained Rename; an album
+// draws no Rename, so its header steps exactly as before.
+test('the d-pad steps an album header as before, with no Rename stop (TASK-597)', async ({ page }) => {
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="ootb"]').click();
+  await expect(page.locator('.detail-row').first()).toBeVisible();
+  expect(await dpadPath(page, '.detail-row >> nth=0', 'ArrowUp', 2))
+    .toEqual(['btn-add-all', 'crumb-0']);
 });
 
 // TASK-276: music has no mid-song resume, so a track row NEVER shows the

@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installApi, installQueuePlaybackBackend, BROWSE, MUSIC_CARDS, PLAYLIST_CARDS } = require('./fixtures/api.js');
-const { pickPerson } = require('./fixtures/nav.js');
+const { pickPerson, dpadPath } = require('./fixtures/nav.js');
 
 // FEAT-036 (TASK-204) — user playlists: the Music-tab Playlists rail + the
 // playlist detail screen (reusing the album-detail layout) + play wiring to the
@@ -252,6 +252,38 @@ test('Rename with a blank name is rejected with an error and stays on the name s
   await page.locator('#btn-create').click();
   await expect(page.locator('#error-msg')).toBeVisible();
   await expect(page).toHaveURL(/playlist-create\.html\?rename=pl-roadtrip/);
+});
+
+// TASK-597 — Rename was click-only: the shared detail stop list stepped Add all →
+// Delete, so the remote could never land on it. It now sits between them, in the
+// order the three buttons are drawn.
+test('the d-pad steps Add all → Rename → Delete along the header, and back (TASK-597)', async ({ page }) => {
+  await openRoadtrip(page);
+  const firstRow = 'row:' + await page.locator('.detail-row').first().getAttribute('data-id');
+  expect(await dpadPath(page, '#btn-add-all', 'ArrowDown', 3))
+    .toEqual(['btn-rename-playlist', 'btn-delete-playlist', firstRow]);
+  expect(await dpadPath(page, '#btn-delete-playlist', 'ArrowUp', 2))
+    .toEqual(['btn-rename-playlist', 'btn-add-all']);
+});
+
+test('OK on Rename opens the name screen with the current name, as a click does (TASK-597)', async ({ page }) => {
+  await openRoadtrip(page);
+  await dpadPath(page, '#btn-add-all', 'ArrowDown', 1);
+  await expect(page.locator('#btn-rename-playlist')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/playlist-create\.html\?rename=pl-roadtrip/);
+  await expect(page.locator('#pl-name')).toHaveText('Road Trip');
+});
+
+test('Home on the rename screen returns to the playlist with nothing renamed (TASK-597)', async ({ page }) => {
+  await openRoadtrip(page);
+  await dpadPath(page, '#btn-add-all', 'ArrowDown', 1);
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/playlist-create\.html\?rename=pl-roadtrip/);
+  await expect(page.locator('#pl-name')).toHaveText('Road Trip');
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL(/playlist-detail\.html\?playlist=pl-roadtrip/);
+  await expect(page.locator('#detail-title')).toHaveText('Road Trip');
 });
 
 // FEAT-036 (TASK-211) — per-track reorder (↑ ↓) + remove (✕) on the playlist

@@ -30,4 +30,21 @@ async function enterBrowse(page, id) {
   await expect(page.locator('#screen-browse')).toBeVisible();
 }
 
-module.exports = { profileSettled, pickPerson, enterBrowse };
+// TASK-597 — the d-pad path from a starting control: focus it, press `key` `presses`
+// times, and name where focus sat after each press (its id, `row:<data-id>` for a
+// detail row, else its class). Lets a suite pin a screen's stop order in one assertion.
+async function dpadPath(page, startSelector, key, presses) {
+  await page.locator(startSelector).focus();
+  const path = [];
+  for (let i = 0; i < presses; i++) {
+    await page.keyboard.press(key);
+    path.push(await page.evaluate(function() {
+      const el = document.activeElement;
+      const row = el.classList.contains('detail-row') ? 'row:' + el.getAttribute('data-id') : el.className;
+      return el.id || row;
+    }));
+  }
+  return path;
+}
+
+module.exports = { profileSettled, pickPerson, enterBrowse, dpadPath };
