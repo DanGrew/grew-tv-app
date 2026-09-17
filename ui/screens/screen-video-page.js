@@ -1,5 +1,6 @@
 import { getParam, getProfile, getPerson, navTo, initCaptions } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { helpCard } from './help-card.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { setupQueueShell } from './screen-queue-shell.js';
 import { transportState } from '../../core/queue-shell-view.js';
@@ -512,7 +513,10 @@ export function initVideoPage() {
   function onVideoKey(e) { KEY_TARGET[queue.isOpen() + ''](e); }
   var keys = {};
   VIDEO_KEYS.forEach(function(k) { keys[k] = onVideoKey; });
-  initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote });
+  // TASK-633 — the Queue overlay has its own row on the Info card.
+  var HELP_SURFACE = { 'true': 'queue', 'false': 'video' };
+  function helpSurface() { return HELP_SURFACE[queue.isOpen() + '']; }
+  initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote, help: helpSurface, card: helpCard });
 
   // Breadcrumb crumbs on the companion send a `navigate` intent (FEAT-021);
   // everything else routes to the player's d-pad/transport remote. The two

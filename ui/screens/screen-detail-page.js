@@ -1,5 +1,6 @@
 import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { helpCard } from './help-card.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadSeries, loadContinueWatching } from '../../core/app-api.js';
@@ -116,7 +117,9 @@ export function initDetailPage() {
       ArrowLeft:  detailLeft,
       ArrowRight: detailRight
     },
-    remote: {}
+    remote: {},
+    help: 'detail',
+    card: helpCard
   });
 
   Promise.all([

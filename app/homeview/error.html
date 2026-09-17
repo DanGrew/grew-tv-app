@@ -48,6 +48,7 @@ import { navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { connectApp } from '../../core/app-ws.js';
 import { installErrorReporter } from '../../core/error-reporter.js';
+import { helpCard } from '../../ui/screens/help-card.js';
 
 installErrorReporter(window);   // app-wide JS-error capture (TASK-213); this page has no device badge
 
@@ -71,7 +72,9 @@ initPage({
   remote: {
     select: function() { document.getElementById('btn-retry').click(); },
     back:   function() { document.getElementById('btn-retry').click(); }
-  }
+  },
+  help: 'error',
+  card: helpCard
 });
 </script>
 </body>

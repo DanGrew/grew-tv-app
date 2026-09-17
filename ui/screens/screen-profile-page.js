@@ -10,6 +10,7 @@
 
 import { setProfile, setPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { helpCard } from './help-card.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadConfig, mediaUrl } from '../../core/app-api.js';
 import {
@@ -305,7 +306,9 @@ export function initProfilePage() {
       Backspace: function(e) { e.preventDefault(); dispatch('Backspace'); },
       Escape: function(e) { e.preventDefault(); dispatch('Escape'); }
     },
-    remote: {}
+    remote: {},
+    help: 'profile',
+    card: helpCard
   });
 
   // TASK-329 settle signal. applyConfig runs TWICE: once above with the

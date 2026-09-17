@@ -85,26 +85,67 @@ describe('dispatchKey', () => {
 });
 
 describe('initPage', () => {
+  // TASK-633 — every TV page hands initPage the help row it draws and the card
+  // that draws it, so a stub card stands in for the component here.
+  function stubCard() {
+    return { installed: 0, html: null, install: function(getHtml) { this.installed++; this.html = getHtml; } };
+  }
+  function args(extra) {
+    return Object.assign({ onEnter: function() {}, keys: {}, help: 'browse', card: stubCard() }, extra);
+  }
+
   it('calls onEnter on init', () => {
     var called = false;
-    initPage({ onEnter: function() { called = true; }, keys: {} });
+    initPage(args({ onEnter: function() { called = true; } }));
     expect(called).toBe(true);
   });
   it('throws its OWN initPage-prefixed error if onEnter missing (before delegating to registerScreen)', () => {
-    expect(function() { initPage({ keys: {} }); }).toThrow('initPage: missing onEnter');
+    expect(function() { initPage({ keys: {}, help: 'browse', card: stubCard() }); }).toThrow('initPage: missing onEnter');
   });
   it('throws its OWN initPage-prefixed error if keys missing', () => {
-    expect(function() { initPage({ onEnter: function() {} }); }).toThrow('initPage: missing keys');
+    expect(function() { initPage({ onEnter: function() {}, help: 'browse', card: stubCard() }); }).toThrow('initPage: missing keys');
+  });
+  it('throws if the page names no help row', () => {
+    expect(function() { initPage({ onEnter: function() {}, keys: {}, card: stubCard() }); }).toThrow('initPage: missing help');
+  });
+  it('throws if the page passes no card', () => {
+    expect(function() { initPage({ onEnter: function() {}, keys: {}, help: 'browse' }); }).toThrow('initPage: missing card');
+  });
+  it('throws if the help row does not exist — an empty card is never shown', () => {
+    expect(function() { initPage(args({ help: 'nowhere' })); }).toThrow('initPage: no help row for nowhere');
+  });
+  it('resolves a help row given as a function, for a page carrying an overlay', () => {
+    var card = stubCard();
+    var surface = 'video';
+    initPage(args({ help: function() { return surface; }, card: card }));
+    expect(card.html()).toContain('Buttons · Watching');
+    surface = 'queue';
+    expect(card.html()).toContain('Buttons · Queue');
+  });
+  it('throws if a function help row resolves to nothing known', () => {
+    expect(function() { initPage(args({ help: function() { return 'nowhere'; } })); }).toThrow('initPage: no help row for nowhere');
+  });
+  it('installs the card once, with this page\'s own row', () => {
+    var card = stubCard();
+    initPage(args({ help: 'guide', card: card }));
+    expect(card.installed).toBe(1);
+    expect(card.html()).toContain('Buttons · Guide');
+  });
+  it('installs the card AFTER registering, so an Info press cannot land on a screen that is not yet active', () => {
+    var order = [];
+    var card = { install: function() { order.push('install'); } };
+    initPage(args({ onEnter: function() { order.push('enter'); }, card: card }));
+    expect(order).toEqual(['install', 'enter']);
   });
   it('dispatches keys after initPage', () => {
     var called = false;
-    initPage({ onEnter: function() {}, keys: { Enter: function() { called = true; } } });
+    initPage(args({ keys: { Enter: function() { called = true; } } }));
     dispatchKey({ key: 'Enter' });
     expect(called).toBe(true);
   });
   it('makes remote accessible via getActiveConfig', () => {
     var remote = { back: function() {} };
-    initPage({ onEnter: function() {}, keys: {}, remote: remote });
+    initPage(args({ remote: remote }));
     expect(getActiveConfig().remote).toBe(remote);
   });
 });

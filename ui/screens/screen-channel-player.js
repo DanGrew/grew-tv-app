@@ -1,5 +1,6 @@
 import { getParam, getProfile, navTo, initCaptions } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { helpCard } from './help-card.js';
 import { setup as setupPlayer } from './screen-video-player.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadChannel, loadChannels } from '../../core/app-api.js';
@@ -395,7 +396,7 @@ export function initChannelPage() {
   VIDEO_KEYS.forEach(function(k) { keys[k] = KEY_TARGET; });
   keys[FLIP_DOWN_KEY] = function(e) { e.preventDefault(); flip(-1); };
   keys[FLIP_UP_KEY] = function(e) { e.preventDefault(); flip(1); };
-  initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote });
+  initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote, help: 'channel', card: helpCard });
 
   // The phone's own channel controls (the mirror of the two pills above) and the
   // one intent channel mode has to REFUSE.

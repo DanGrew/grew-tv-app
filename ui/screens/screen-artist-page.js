@@ -1,5 +1,6 @@
 import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { helpCard } from './help-card.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, loadAlbum, addToPlaylist } from '../../core/app-api.js';
@@ -183,7 +184,9 @@ export function initArtistPage() {
       ArrowLeft:  detailLeft,
       ArrowRight: detailRight
     },
-    remote: {}
+    remote: {},
+    help: 'artist',
+    card: helpCard
   });
 
   Promise.all([
