@@ -1,5 +1,6 @@
 import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { pressFocusedPlus } from './context-press.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusFirstDetailRow } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadSeries, loadContinueWatching } from '../../core/app-api.js';
@@ -114,7 +115,8 @@ export function initDetailPage() {
       ArrowUp:    detailArrow,
       ArrowDown:  detailArrow,
       ArrowLeft:  detailLeft,
-      ArrowRight: detailRight
+      ArrowRight: detailRight,
+      c:          pressFocusedPlus
     },
     remote: {}
   });

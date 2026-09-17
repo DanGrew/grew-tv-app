@@ -1,5 +1,6 @@
 import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { pressFocusedPlus } from './context-press.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusEntryStop } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadPlaylist, loadContinueWatching, deletePlaylist, movePlaylistTrack, removeFromPlaylist, loadBrowse, addToPlaylist, addSourceToPlaylist, mediaUrl } from '../../core/app-api.js';
@@ -304,7 +305,8 @@ export function initPlaylistDetailPage() {
       ArrowUp:    detailArrow,
       ArrowDown:  detailArrow,
       ArrowLeft:  detailLeft,
-      ArrowRight: detailRight
+      ArrowRight: detailRight,
+      c:          pressFocusedPlus
     },
     remote: {}
   });
