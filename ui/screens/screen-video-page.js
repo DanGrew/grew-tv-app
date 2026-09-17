@@ -75,7 +75,10 @@ var RESUME_BY_RESTART = {
 function resumeStart(restart, prog) { return RESUME_BY_RESTART[!!restart + ''](prog); }
 function zeroProgress() { return { position_secs: 0, duration_secs: null }; }
 function noop() {}
-var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+// TASK-600: `c` — the remote's burger button — cycles Night Mode. With the Queue
+// open it goes to the Queue, which ignores it, so a press never reaches through
+// the overlay.
+var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'c'];
 // BUG-439: an engine-fired action (play-source/-standalone/-queue) waits this long
 // for its first queue_playback snapshot before giving up and surfacing error.html,
 // instead of leaving the player sitting inert with no feedback.

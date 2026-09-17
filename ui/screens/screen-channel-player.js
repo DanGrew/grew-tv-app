@@ -69,7 +69,10 @@ var OFF_AIR_POLL_MS = 30000;
 // the rest of the handset and is not to be pre-empted from this row.
 var FLIP_DOWN_KEY = '-';
 var FLIP_UP_KEY = '=';
-var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+// TASK-600: `c` — the remote's burger button — cycles Night Mode here exactly as
+// on any film; this page registers its own key map over the shared player, so it
+// has to list it too.
+var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'c'];
 // Shown only in channel mode; `video.html` ships them hidden.
 var CHANNEL_PILLS = ['btn-restart'];
 // Hidden in channel mode: there is no queue to open, and nothing recorded to

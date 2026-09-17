@@ -313,6 +313,13 @@ export function setup(config) {
     Backspace:  function() { closeJumpPopup(); }
   };
 
+  // TASK-600: `c` is the handset's BURGER button (Kodi calls it Context) — the
+  // pill's own cycle, without a d-pad walk to it. Named for the button rather than
+  // its ☰ glyph on purpose: on screen ☰ is already the Queue (`btn-queue`, "☰ Add
+  // to Queue"), so the glyph alone would read as the wrong control here.
+  // Only this playing-state table carries it, so the Jump grid and up-next
+  // states swallow the press rather than changing the sound behind them. A page
+  // must still list `c` in its own key map for the press to arrive here at all.
   var VIDEO_NAV = {
     ArrowLeft:  function() { executeSkip(-QUICK_SKIP); },
     ArrowRight: function() { executeSkip(QUICK_SKIP); },
@@ -321,7 +328,8 @@ export function setup(config) {
     Enter:      activate,
     ' ':        activate,
     Escape:     function() { stopPlayback(); },
-    Backspace:  function() { stopPlayback(); }
+    Backspace:  function() { stopPlayback(); },
+    c:          function() { cycleNight(); }
   };
 
   // ── inline up-next line under the title (FEAT-017) ─────────────────────────
