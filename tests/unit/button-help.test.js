@@ -7,33 +7,39 @@ import { HELP_BUTTONS, HELP_NOTHING, HELP_TABLE, hasHelp, helpRows, helpCardHtml
 describe('HELP_BUTTONS', () => {
   // Pinned whole: the card is data, so every glyph and name IS behaviour — a
   // wrong glyph is a card pointing at the wrong button on the handset.
-  it('is exactly the ten buttons, with the glyph and name each is drawn with', () => {
+  it('is exactly the nine buttons, with the glyph and name each is drawn with', () => {
     expect(HELP_BUTTONS).toEqual([
       { id: 'updown',    glyph: '▲▼', name: 'Up / Down' },
       { id: 'leftright', glyph: '◀▶', name: 'Left / Right' },
       { id: 'ok',        glyph: '●',  name: 'OK' },
       { id: 'home',      glyph: '⌂',  name: 'Home' },
       { id: 'playpause', glyph: '⏯',  name: 'Play / Pause' },
-      { id: 'stop',      glyph: '⏹',  name: 'Stop' },
-      { id: 'context',   glyph: '☰',  name: 'Context' },
+      { id: 'burger',    glyph: '☰',  name: 'Burger' },
       { id: 'minus',     glyph: '−',  name: 'Volume down' },
       { id: 'plus',      glyph: '+',  name: 'Volume up' },
       { id: 'info',      glyph: 'i',  name: 'Info', words: 'Show or close this card' }
     ]);
   });
-  it('lists the ten buttons the card draws, in remote order', () => {
+  it('lists the nine buttons the card draws, in remote order', () => {
     expect(HELP_BUTTONS.map(function(b) { return b.id; })).toEqual([
-      'updown', 'leftright', 'ok', 'home', 'playpause', 'stop', 'context', 'minus', 'plus', 'info'
+      'updown', 'leftright', 'ok', 'home', 'playpause', 'burger', 'minus', 'plus', 'info'
     ]);
   });
   it('says what a button with no job here reads as', () => {
     expect(HELP_NOTHING).toBe('Does nothing here');
   });
-  it('leaves Back off entirely — it sends nothing and is dead by ruling', () => {
-    expect(HELP_BUTTONS.map(function(b) { return b.name; })).not.toContain('Back');
+  it('leaves Back and Stop off entirely — neither ever reaches the page', () => {
+    var names = HELP_BUTTONS.map(function(b) { return b.name; });
+    expect(names).not.toContain('Back');
+    expect(names).not.toContain('Stop');
+  });
+  it('calls the burger the burger — that glyph already means the Queue on screen', () => {
+    var burger = HELP_BUTTONS.filter(function(b) { return b.id === 'burger'; })[0];
+    expect(burger.name).toBe('Burger');
+    expect(burger.name).not.toBe('Context');
   });
   it('gives Info the same words everywhere rather than sixteen copies', () => {
-    expect(HELP_BUTTONS[9].words).toBe('Show or close this card');
+    expect(HELP_BUTTONS[8].words).toBe('Show or close this card');
     expect(HELP_BUTTONS.filter(function(b) { return b.words; }).length).toBe(1);
   });
 });
@@ -59,9 +65,9 @@ describe('helpRows', () => {
   });
   it('says so when a button does nothing here, rather than leaving it out', () => {
     var rows = helpRows('error');
-    var stop = rows.filter(function(r) { return r.id === 'stop'; })[0];
-    expect(stop.words).toBe(HELP_NOTHING);
-    expect(stop.none).toBe(true);
+    var burger = rows.filter(function(r) { return r.id === 'burger'; })[0];
+    expect(burger.words).toBe(HELP_NOTHING);
+    expect(burger.none).toBe(true);
   });
   it('marks a button that DOES something as not-none', () => {
     var ok = helpRows('error').filter(function(r) { return r.id === 'ok'; })[0];
@@ -69,9 +75,9 @@ describe('helpRows', () => {
     expect(ok.none).toBe(false);
   });
   it('carries the glyph and name beside the words', () => {
-    var row = helpRows('browse').filter(function(r) { return r.id === 'context'; })[0];
+    var row = helpRows('browse').filter(function(r) { return r.id === 'burger'; })[0];
     expect(row.glyph).toBe('☰');
-    expect(row.name).toBe('Context');
+    expect(row.name).toBe('Burger');
     expect(row.words).toBe('Add the focused film or music video to its Queue');
   });
   it('gives Info its standing words on every surface', () => {
@@ -101,7 +107,7 @@ describe('the table, whole', () => {
         leftright: 'Move along a rail',
         ok: 'Open or play what is focused',
         home: 'Back to the section list',
-        context: 'Add the focused film or music video to its Queue'
+        burger: 'Add the focused film or music video to its Queue'
       } },
       search: { title: 'Search', jobs: {
         updown: 'Move between the keys and the results',
@@ -114,21 +120,21 @@ describe('the table, whole', () => {
         leftright: 'Move along a row — Restart, ＋ Queue',
         ok: 'Play the episode, or press what is focused',
         home: 'Back one step',
-        context: 'Add the focused episode to the Queue'
+        burger: 'Add the focused episode to the Queue'
       } },
       album: { title: 'Album', jobs: {
         updown: 'Move between tracks',
         leftright: 'Move along a row',
         ok: 'Play the track, or press what is focused',
         home: 'Back one step',
-        context: 'Add the focused track to a playlist'
+        burger: 'Add the focused track to a playlist'
       } },
       artist: { title: 'Artist', jobs: {
         updown: 'Move between tracks',
         leftright: 'Move along a row',
         ok: 'Play the track, or press what is focused',
         home: 'Back one step',
-        context: 'Add the focused track to a playlist'
+        burger: 'Add the focused track to a playlist'
       } },
       'home-movies': { title: 'Home movies', jobs: {
         updown: 'Move between clips',
@@ -141,14 +147,14 @@ describe('the table, whole', () => {
         leftright: 'Move along a row',
         ok: 'Open or play what is focused',
         home: 'Back one step',
-        context: 'Add the focused film or music video to its Queue'
+        burger: 'Add the focused film or music video to its Queue'
       } },
       playlist: { title: 'Playlist', jobs: {
         updown: 'Move between tracks',
         leftright: 'Move along a row',
         ok: 'Play the track, or press what is focused',
         home: 'Back one step',
-        context: "Press the focused track's ＋, where it has one"
+        burger: "Press the focused track's ＋, where it has one"
       } },
       'playlist-create': { title: 'New playlist', jobs: {
         updown: 'Move between rows of keys',
@@ -169,22 +175,19 @@ describe('the table, whole', () => {
         home: 'Back one step'
       } },
       video: { title: 'Watching', jobs: Object.assign({}, PLAYING, {
-        stop: 'Stop, and go back to where it started',
         home: 'Stop, and go back to where it started',
-        context: 'Night Mode — Off, Soft, Strong',
+        burger: 'Night Mode — Off, Soft, Strong',
         minus: 'Previous',
         plus: 'Next'
       }) },
       audio: { title: 'Listening', jobs: Object.assign({}, PLAYING, {
-        stop: 'Stop, and go back to where it started',
         home: 'Stop, and go back to where it started',
         minus: 'Previous track',
         plus: 'Next track'
       }) },
       channel: { title: 'Channel', jobs: Object.assign({}, PLAYING, {
-        stop: 'Stop, and go back to where you tuned in',
         home: 'Stop, and go back to where you tuned in',
-        context: 'Night Mode — Off, Soft, Strong',
+        burger: 'Night Mode — Off, Soft, Strong',
         minus: 'Channel down',
         plus: 'Channel up'
       }) },
@@ -194,7 +197,6 @@ describe('the table, whole', () => {
         ok: 'Press what is focused',
         home: 'Close the Queue',
         playpause: 'Play or pause',
-        stop: 'Stop, and go back to where it started',
         minus: 'Previous',
         plus: 'Next'
       } },
@@ -209,8 +211,8 @@ describe('the rows themselves', () => {
   // The stories name these directly, and they are the ones the parallel FEAT-526
   // rows change — a build that repoints a button and forgets this table turns
   // the card into a liar, so each one is pinned.
-  it('tells a viewer watching a film what ☰ and the rocker do (TASK-600, TASK-602)', () => {
-    expect(HELP_TABLE.video.jobs.context).toBe('Night Mode — Off, Soft, Strong');
+  it('tells a viewer watching a film what the burger and the rocker do (TASK-600, TASK-602)', () => {
+    expect(HELP_TABLE.video.jobs.burger).toBe('Night Mode — Off, Soft, Strong');
     expect(HELP_TABLE.video.jobs.minus).toBe('Previous');
     expect(HELP_TABLE.video.jobs.plus).toBe('Next');
   });
@@ -220,8 +222,8 @@ describe('the rows themselves', () => {
     expect(HELP_TABLE.channel.jobs.leftright).toBe('Skip back / forward 10 seconds');
   });
   it('does NOT offer Night Mode on the music player (TASK-600 story 6)', () => {
-    expect(HELP_TABLE.audio.jobs.context).toBeUndefined();
-    expect(helpRows('audio').filter(function(r) { return r.id === 'context'; })[0].words).toBe(HELP_NOTHING);
+    expect(HELP_TABLE.audio.jobs.burger).toBeUndefined();
+    expect(helpRows('audio').filter(function(r) { return r.id === 'burger'; })[0].words).toBe(HELP_NOTHING);
   });
   it('keeps the rocker on channels flipping channels, not skipping (TASK-602 story 6)', () => {
     expect(HELP_TABLE.channel.jobs.minus).toBe('Channel down');
@@ -230,19 +232,15 @@ describe('the rows themselves', () => {
   it('says Home steps back to the section list on Browse (TASK-594)', () => {
     expect(HELP_TABLE.browse.jobs.home).toBe('Back to the section list');
   });
-  it('says Stop ends playback and goes back, on every player (TASK-599)', () => {
-    expect(HELP_TABLE.video.jobs.stop).toBe('Stop, and go back to where it started');
-    expect(HELP_TABLE.audio.jobs.stop).toBe('Stop, and go back to where it started');
-    expect(HELP_TABLE.channel.jobs.stop).toBe('Stop, and go back to where you tuned in');
-    expect(HELP_TABLE.queue.jobs.stop).toBe('Stop, and go back to where it started');
+  it('never mentions Stop anywhere — no press of it reaches the page (TASK-599, dropped)', () => {
+    Object.keys(HELP_TABLE).forEach(function(s) {
+      expect(HELP_TABLE[s].jobs.stop).toBeUndefined();
+    });
+    expect(helpRows('video').map(function(r) { return r.id; })).not.toContain('stop');
   });
-  it('gives Stop nothing to do on a browsing screen (TASK-599 story 6)', () => {
-    expect(HELP_TABLE.browse.jobs.stop).toBeUndefined();
-    expect(HELP_TABLE.search.jobs.stop).toBeUndefined();
-  });
-  it('offers ☰ only where something is focused that has a ＋ (TASK-601)', () => {
-    var withContext = Object.keys(HELP_TABLE).filter(function(s) { return HELP_TABLE[s].jobs.context; });
-    expect(new Set(withContext)).toEqual(new Set(['browse', 'detail', 'album', 'artist', 'rail-grid', 'playlist', 'video', 'channel']));
+  it('gives the burger a job only where it has one — a ＋ to press, or Night Mode (TASK-600/601)', () => {
+    var withBurger = Object.keys(HELP_TABLE).filter(function(s) { return HELP_TABLE[s].jobs.burger; });
+    expect(new Set(withBurger)).toEqual(new Set(['browse', 'detail', 'album', 'artist', 'rail-grid', 'playlist', 'video', 'channel']));
   });
   it('covers every TV surface the remote reaches', () => {
     expect(new Set(Object.keys(HELP_TABLE))).toEqual(new Set([
@@ -283,8 +281,7 @@ describe('helpCardHtml, to the character', () => {
       row('ok', '●', 'OK', 'Try again', false) +
       row('home', '⌂', 'Home', N, true) +
       row('playpause', '⏯', 'Play / Pause', N, true) +
-      row('stop', '⏹', 'Stop', N, true) +
-      row('context', '☰', 'Context', N, true) +
+      row('burger', '☰', 'Burger', N, true) +
       row('minus', '−', 'Volume down', N, true) +
       row('plus', '+', 'Volume up', N, true) +
       row('info', 'i', 'Info', 'Show or close this card', false) +
@@ -293,7 +290,7 @@ describe('helpCardHtml, to the character', () => {
   });
 
   it('draws a live row of a player\'s card the same way, with this surface\'s words', () => {
-    expect(helpCardHtml('video')).toContain(row('context', '☰', 'Context', 'Night Mode — Off, Soft, Strong', false));
+    expect(helpCardHtml('video')).toContain(row('burger', '☰', 'Burger', 'Night Mode — Off, Soft, Strong', false));
     expect(helpCardHtml('channel')).toContain(row('plus', '+', 'Volume up', 'Channel up', false));
   });
 
@@ -322,7 +319,7 @@ describe('helpCardHtml', () => {
   it('dims a button that does nothing here, and only that one', () => {
     var html = helpCardHtml('error');
     expect(html).toContain('help-row help-none');
-    expect(html.split('help-none').length - 1).toBe(8);
+    expect(html.split('help-none').length - 1).toBe(7);
   });
   it('leaves a live row undimmed', () => {
     expect(helpCardHtml('video')).toContain('class="help-row" data-button="updown"');

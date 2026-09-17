@@ -8,11 +8,17 @@
 // standing maintenance cost the owner accepted (one row per behaviour change).
 // `KEYMAP.md` points here rather than keeping a second copy.
 //
-// Written against the blessed specs of TASK-594 and TASK-599–602, which were
-// building alongside this one (owner, 2026-09-17): Home on Browse, Stop, ☰ and
-// the − + rocker say what those rows ship, not what main did before them.
+// Written against the blessed specs of the FEAT-526 rows building alongside this
+// one (owner, 2026-09-17). TASK-600 (the burger on the players) and TASK-602
+// (the rocker) have since merged and say here what they ship; Home on Browse
+// (TASK-594) and the burger while browsing (TASK-601) are still their specs'
+// word, so this table merges after them.
 //
-// Back is left off on purpose: it sends nothing, and is dead by ruling.
+// ⛔ **Back and Stop are left off entirely.** Neither reaches the page at all —
+// macOS routes both to its own Now Playing target, measured 2026-09-17, which is
+// what dropped TASK-599 — so a line for either would be a card describing a
+// button no press can reach. That is worse than silence: every other line on the
+// card is a button the viewer can press and watch work.
 
 export var HELP_NOTHING = 'Does nothing here';
 
@@ -24,8 +30,12 @@ export var HELP_BUTTONS = [
   { id: 'ok',        glyph: '●',  name: 'OK' },
   { id: 'home',      glyph: '⌂',  name: 'Home' },
   { id: 'playpause', glyph: '⏯',  name: 'Play / Pause' },
-  { id: 'stop',      glyph: '⏹',  name: 'Stop' },
-  { id: 'context',   glyph: '☰',  name: 'Context' },
+  // The BURGER, never "☰" in words: that glyph is the Queue on screen
+  // (`btn-queue`, and every ＋ sheet's "☰ Add to Queue"), so naming the handset's
+  // button by it points a viewer at the wrong control — the control map's ruling
+  // (TASK-600). The glyph stays in the left column, where it is a picture of the
+  // button in their hand rather than a name for it.
+  { id: 'burger',    glyph: '☰',  name: 'Burger' },
   { id: 'minus',     glyph: '−',  name: 'Volume down' },
   { id: 'plus',      glyph: '+',  name: 'Volume up' },
   { id: 'info',      glyph: 'i',  name: 'Info', words: 'Show or close this card' }
@@ -35,8 +45,7 @@ var PLAYER_MOVE = {
   updown: 'Move between the player controls',
   leftright: 'Skip back / forward 10 seconds',
   ok: 'Press the focused control',
-  playpause: 'Play or pause',
-  stop: 'Stop, and go back to where it started'
+  playpause: 'Play or pause'
 };
 
 function withMove(jobs) {
@@ -49,7 +58,7 @@ export var HELP_TABLE = {
     leftright: 'Move along a rail',
     ok: 'Open or play what is focused',
     home: 'Back to the section list',
-    context: 'Add the focused film or music video to its Queue'
+    burger: 'Add the focused film or music video to its Queue'
   } },
   search: { title: 'Search', jobs: {
     updown: 'Move between the keys and the results',
@@ -62,21 +71,21 @@ export var HELP_TABLE = {
     leftright: 'Move along a row — Restart, ＋ Queue',
     ok: 'Play the episode, or press what is focused',
     home: 'Back one step',
-    context: 'Add the focused episode to the Queue'
+    burger: 'Add the focused episode to the Queue'
   } },
   album: { title: 'Album', jobs: {
     updown: 'Move between tracks',
     leftright: 'Move along a row',
     ok: 'Play the track, or press what is focused',
     home: 'Back one step',
-    context: 'Add the focused track to a playlist'
+    burger: 'Add the focused track to a playlist'
   } },
   artist: { title: 'Artist', jobs: {
     updown: 'Move between tracks',
     leftright: 'Move along a row',
     ok: 'Play the track, or press what is focused',
     home: 'Back one step',
-    context: 'Add the focused track to a playlist'
+    burger: 'Add the focused track to a playlist'
   } },
   'home-movies': { title: 'Home movies', jobs: {
     updown: 'Move between clips',
@@ -89,14 +98,14 @@ export var HELP_TABLE = {
     leftright: 'Move along a row',
     ok: 'Open or play what is focused',
     home: 'Back one step',
-    context: 'Add the focused film or music video to its Queue'
+    burger: 'Add the focused film or music video to its Queue'
   } },
   playlist: { title: 'Playlist', jobs: {
     updown: 'Move between tracks',
     leftright: 'Move along a row',
     ok: 'Play the track, or press what is focused',
     home: 'Back one step',
-    context: "Press the focused track's ＋, where it has one"
+    burger: "Press the focused track's ＋, where it has one"
   } },
   'playlist-create': { title: 'New playlist', jobs: {
     updown: 'Move between rows of keys',
@@ -118,7 +127,7 @@ export var HELP_TABLE = {
   } },
   video: { title: 'Watching', jobs: withMove({
     home: 'Stop, and go back to where it started',
-    context: 'Night Mode — Off, Soft, Strong',
+    burger: 'Night Mode — Off, Soft, Strong',
     minus: 'Previous',
     plus: 'Next'
   }) },
@@ -129,8 +138,7 @@ export var HELP_TABLE = {
   }) },
   channel: { title: 'Channel', jobs: withMove({
     home: 'Stop, and go back to where you tuned in',
-    stop: 'Stop, and go back to where you tuned in',
-    context: 'Night Mode — Off, Soft, Strong',
+    burger: 'Night Mode — Off, Soft, Strong',
     minus: 'Channel down',
     plus: 'Channel up'
   }) },
@@ -140,7 +148,6 @@ export var HELP_TABLE = {
     ok: 'Press what is focused',
     home: 'Close the Queue',
     playpause: 'Play or pause',
-    stop: 'Stop, and go back to where it started',
     minus: 'Previous',
     plus: 'Next'
   } },

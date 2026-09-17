@@ -40,15 +40,16 @@ test('Info on Browse pops up the card, listing the buttons and what each does he
   await expect(card(page)).toBeVisible();
   await expect(panel(page)).toHaveAttribute('data-surface', 'browse');
   // Every button on the remote has a line, including the ones that do nothing.
-  await expect(page.locator('#help-card .help-row')).toHaveCount(10);
+  await expect(page.locator('#help-card .help-row')).toHaveCount(9);
   await expect(page.locator('#help-card [data-button="home"]')).toContainText('Back to the section list');
 });
 
 test('a button that does nothing here still gets a line, saying so (story 3)', async ({ page }) => {
   await enterBrowse(page, 'kids');
   await pressInfo(page);
-  await expect(page.locator('#help-card [data-button="stop"]')).toContainText('Does nothing here');
-  await expect(page.locator('#help-card [data-button="stop"]')).toHaveClass(/help-none/);
+  // The rocker does nothing while browsing — it steps a player's ⏮/⏭.
+  await expect(page.locator('#help-card [data-button="minus"]')).toContainText('Does nothing here');
+  await expect(page.locator('#help-card [data-button="minus"]')).toHaveClass(/help-none/);
 });
 
 // The rails settle after load (the Continue cluster and the channel strip both
@@ -145,7 +146,7 @@ test.describe('on a player', () => {
     await pressInfo(page);
     await expect(panel(page)).toHaveAttribute('data-surface', 'video');
     await expect(page.locator('#help-card [data-button="leftright"]')).toContainText('Skip back / forward 10 seconds');
-    await expect(page.locator('#help-card [data-button="context"]')).toContainText('Night Mode');
+    await expect(page.locator('#help-card [data-button="burger"]')).toContainText('Night Mode');
     await expect(page.locator('#help-card [data-button="minus"]')).toContainText('Previous');
     await expect(page.locator('#help-card [data-button="plus"]')).toContainText('Next');
   });

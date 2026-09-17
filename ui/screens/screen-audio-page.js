@@ -11,6 +11,7 @@ import * as qRouter from '../../core/queue-playback-router.js';
 import { parseLrc, indexAt, windowAt } from '../../core/lrc.js';
 import { buildCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
+import { claimRocker } from './rocker.js';
 
 // FEAT-031 (TASK-187) audio page — SERVER-AUTHORITATIVE playback. The album/artist
 // queue + shuffle order + next/prev are owned by the backend; this page is a
@@ -319,6 +320,10 @@ export function initAudioPage() {
   function onAudioKey(e) { KEY_TARGET[queue.isOpen() + ''](e); }
   var keys = {};
   AUDIO_KEYS.forEach(function(k) { keys[k] = onAudioKey; });
+  // TASK-602 — − and + press ⏮/⏭ (ui/screens/rocker.js). The Jump grid is the
+  // one thing drawn over this transport, and a press behind it does nothing.
+  function overlayOpen() { return !!document.querySelector('.jump-popup'); }
+  claimRocker(keys, { queue: queue, overlayOpen: overlayOpen });
   // TASK-633 — the Queue overlay has its own row on the Info card.
   var HELP_SURFACE = { 'true': 'queue', 'false': 'audio' };
   function helpSurface() { return HELP_SURFACE[queue.isOpen() + '']; }
