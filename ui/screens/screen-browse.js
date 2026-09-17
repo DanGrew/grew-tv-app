@@ -295,6 +295,21 @@ export function browseArrow(e) {
   ZONE[zoneOf()](e);
 }
 
+function noop() {}
+
+// TASK-594 (FEAT-526) — Home is one layer up. On browse the section is the layer
+// above a rail and browse is the top, so the rails and the cluster step to the lit
+// tab and every other zone is the ceiling. The profile picker is reached by
+// pressing the profile control, never by pressing Home once too often. An open
+// play menu or Search panel handles Home itself and stops it before it gets here,
+// so one press closes the overlay and nothing more.
+var HOME = { toggle: noop, sidebar: noop, rails: focusActiveTab, topbar: noop, cluster: focusActiveTab, menu: noop };
+
+export function browseHome(e) {
+  e.preventDefault();
+  HOME[zoneOf()]();
+}
+
 // FEAT-039 (TASK-235) — the Playlists rail heading carries a subtle ＋ button to
 // the right of the title ("Playlists ＋"); the rail body now holds only real
 // playlists (the old "＋ New Playlist" tile is gone). A plain clickable button —
@@ -467,7 +482,7 @@ export function renderBrowse(server, cards, cwRows, labels, profile, person, onS
 export function setup() {
   registerScreen('screen-browse', {
     onEnter: focusFirstTile,
-    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow },
+    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow, Escape: browseHome },
     remote: {}
   });
 }
