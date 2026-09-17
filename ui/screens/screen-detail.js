@@ -89,10 +89,26 @@ export function detailLeft(e) {
   chipSibling(el, -1);
 }
 
-// Default focus lands on Play-next (not the breadcrumb): the crumbs are a stop
-// you reach by pressing Up, never the entry focus.
+// Entry focus: the stop the screen would rather open on (its Play-next action, or
+// its first track row), and failing that the first stop on its own path — so a
+// screen that draws neither (an empty playlist; a list whose first rows are all
+// unavailable) still opens with something selected, instead of swallowing the
+// first d-pad press while the viewer hunts for the selection.
+// The crumbs are excluded from that fallback: they are a stop you reach by
+// pressing Up, never the one a screen opens on — opening on Home would make OK
+// leave the page you just entered.
+var ENTRY_NEVER = '.crumb-link';
+
+export function focusEntryStop(preferred) {
+  var stops = verticalStops();
+  stops.filter(function(el) { return el.matches(preferred); })
+    .concat(stops.filter(function(el) { return !el.matches(ENTRY_NEVER); }))
+    .slice(0, 1)
+    .forEach(function(el) { el.focus(); });
+}
+
 export function focusFirstDetailRow() {
-  [document.getElementById('btn-play-next')].filter(Boolean).forEach(function(s) { s.focus(); });
+  focusEntryStop('#btn-play-next');
 }
 
 function seasonHeader(list, season) {

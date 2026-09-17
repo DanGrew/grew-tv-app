@@ -310,6 +310,23 @@ test('Home on the rename screen returns to the playlist with nothing renamed (TA
   await expect(page.locator('#detail-title')).toHaveText('Road Trip');
 });
 
+// A playlist opens with something selected, so the first ▲▼ press moves the
+// selection rather than being swallowed finding one.
+test('opening a playlist lands the selection on its first track', async ({ page }) => {
+  await openRoadtrip(page);
+  await expect(page.locator('.detail-row').first()).toBeFocused();
+});
+
+// An empty playlist has no track to select, so the selection lands on the first
+// thing the header draws — without it the page opens with nothing selected and
+// the remote's first press goes nowhere.
+test('opening an empty playlist lands the selection on Add all', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="pl-empty"]').click();
+  await expect(page.locator('#detail-title')).toHaveText('Empty Mix');
+  await expect(page.locator('#btn-add-all')).toBeFocused();
+});
+
 // FEAT-036 (TASK-211) — per-track reorder (↑ ↓) + remove (✕) on the playlist
 // detail. Each POSTs BY POSITION then reloads, so the list reflects the server
 // order/membership. ↑ is gated off the first row and ↓ off the last (an edge has
