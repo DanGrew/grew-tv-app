@@ -4,6 +4,7 @@ import { getPerson } from '../../core/state.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
 import { logEvent, makeSeekCoalescer, SOURCE_TV } from '../../core/log.js';
 import { readVolume, writeVolume } from '../../core/volume-store.js';
+import { focusPath } from './focus-path.js';
 
 // FEAT-018 (TASK-130) audio player. The <audio> analogue of the FEAT-017 video
 // player: same transport (play/pause, prev/next track, graduated skip, range
@@ -22,9 +23,6 @@ var QUICK_SKIP   = 10;          // d-pad left/right one-press skip
 var BACKEND_SAVE_MS = 5000;
 var STALL_RECOVERY_MS = 6000;   // BUG-423: waiting -> canplay/playing longer than this reloads
 
-// BUG-016: d-pad up/down follows the new visual order — transport (prev/play/next)
-// then the pill row beneath the progress bar (queue, jump, lyrics, clear progress).
-var FOCUS_ORDER = ['btn-prev', 'btn-play-pause', 'btn-next', 'btn-queue', 'btn-jump', 'btn-lyrics', 'btn-clear-progress'];
 var TOGGLE_INTENT = { 'true': 'play', 'false': 'pause' };
 // App-side log (TASK-213): start from a saved position logs `resume`, else `play`.
 var PLAY_EVENT    = { 'true': 'resume', 'false': 'play' };
@@ -123,14 +121,13 @@ export function setup(config) {
   };
 
   // ── transport d-pad nav (L/R = quick ±10s; U/D cycles buttons) ─────────────
-  function crumbStops() {
-    return Array.prototype.slice.call(document.querySelectorAll('#breadcrumb .crumb-link'));
-  }
-
+  // TASK-598: U/D walks every button #controls draws, in on-screen order — the
+  // breadcrumb's crumbs, the transport (⏮ ⏯ ⏭), then the pill row beneath the
+  // progress bar (BUG-016) — so a button added to audio.html is on the path with
+  // nothing else to edit. A hidden or dimmed (`disabled`, TASK-504's lone-track
+  // ⏮/⏭) control drops out, as it does on the video player (TASK-517).
   function focusList() {
-    return crumbStops()
-      .concat(FOCUS_ORDER.map(function(id) { return document.getElementById(id); }))
-      .filter(function(el) { return !el.classList.contains('hidden'); });
+    return focusPath(document.getElementById('controls'), 'button');
   }
 
   function moveFocus(delta) {

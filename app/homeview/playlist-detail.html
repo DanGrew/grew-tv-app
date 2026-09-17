@@ -85,7 +85,7 @@ button:hover { background: var(--surface-hi); }
   <button id="btn-delete-playlist" style="font-size:var(--fs-sm);padding:12px 18px;min-width:auto">&#128465; Delete</button>
 </div>
 <div id="detail-list"></div>
-<div id="add-sheet" style="display:none" role="dialog" aria-modal="true">
+<div id="add-sheet" style="display:none" role="dialog" aria-modal="true" data-focus-skip>
   <div class="add-sheet-panel">
     <div class="add-sheet-title">Add to playlist</div>
     <div id="add-sheet-list"></div>
@@ -94,7 +94,7 @@ button:hover { background: var(--surface-hi); }
   </div>
 </div>
 <div id="add-status" style="display:none"></div>
-<div id="confirm-delete" style="display:none;position:fixed;inset:0;z-index:10;align-items:center;justify-content:center;background:rgba(0,0,0,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)">
+<div id="confirm-delete" data-focus-skip style="display:none;position:fixed;inset:0;z-index:10;align-items:center;justify-content:center;background:rgba(0,0,0,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)">
   <div style="background:var(--surface-hi);border:2.5px solid var(--border);border-radius:var(--radius);padding:36px 44px;max-width:600px;text-align:center;backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4)">
     <div style="font-size:var(--fs-lg);margin-bottom:10px">Delete this playlist?</div>
     <div id="confirm-delete-name" style="font-size:var(--fs-md);color:var(--text-muted);margin-bottom:28px"></div>

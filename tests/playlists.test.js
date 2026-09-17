@@ -266,6 +266,30 @@ test('the d-pad steps Add all → Rename → Delete along the header, and back (
     .toEqual(['btn-rename-playlist', 'btn-add-all']);
 });
 
+// TASK-598 story 2 — the whole ▼ path of a playlist, top to bottom, now read off the
+// page instead of a hand-kept list: crumbs, Add all → Rename → Delete, then one stop
+// per row (a row stands for its own ↑ ↓ ✕, which Left/Right reach).
+test('▼ walks a playlist top to bottom as before: crumbs, header, rows (TASK-598)', async ({ page }) => {
+  await openRoadtrip(page);
+  const crumbs = await page.locator('#breadcrumb .crumb-link').evaluateAll(els => els.map(e => e.id));
+  const rows = await page.locator('.detail-row:not(.unavailable)').evaluateAll(els => els.map(e => 'row:' + e.getAttribute('data-id')));
+  const path = crumbs.concat(['btn-add-all', 'btn-rename-playlist', 'btn-delete-playlist']).concat(rows);
+  expect(await dpadPath(page, '#' + path[0], 'ArrowDown', path.length - 1)).toEqual(path.slice(1));
+});
+
+// TASK-598 story 4 — a button added to the detail layout is on the remote's path
+// with nothing else to edit; one marked `data-focus-skip` stays off it. Red against
+// the old hand-kept stop list, which never heard of either.
+test('a button added to the playlist header joins ▲▼ unless marked data-focus-skip (TASK-598)', async ({ page }) => {
+  await openRoadtrip(page);
+  const firstRow = 'row:' + await page.locator('.detail-row').first().getAttribute('data-id');
+  await page.evaluate(() => {
+    document.getElementById('btn-delete-playlist').insertAdjacentHTML('afterend',
+      '<button id="btn-skipped" data-focus-skip>Skipped</button><button id="btn-added">Added</button>');
+  });
+  expect(await dpadPath(page, '#btn-delete-playlist', 'ArrowDown', 2)).toEqual(['btn-added', firstRow]);
+});
+
 test('OK on Rename opens the name screen with the current name, as a click does (TASK-597)', async ({ page }) => {
   await openRoadtrip(page);
   await dpadPath(page, '#btn-add-all', 'ArrowDown', 1);
@@ -284,6 +308,23 @@ test('Home on the rename screen returns to the playlist with nothing renamed (TA
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/playlist-detail\.html\?playlist=pl-roadtrip/);
   await expect(page.locator('#detail-title')).toHaveText('Road Trip');
+});
+
+// A playlist opens with something selected, so the first ▲▼ press moves the
+// selection rather than being swallowed finding one.
+test('opening a playlist lands the selection on its first track', async ({ page }) => {
+  await openRoadtrip(page);
+  await expect(page.locator('.detail-row').first()).toBeFocused();
+});
+
+// An empty playlist has no track to select, so the selection lands on the first
+// thing the header draws — without it the page opens with nothing selected and
+// the remote's first press goes nowhere.
+test('opening an empty playlist lands the selection on Add all', async ({ page }) => {
+  await enterMusic(page);
+  await page.locator('.film-tile[data-id="pl-empty"]').click();
+  await expect(page.locator('#detail-title')).toHaveText('Empty Mix');
+  await expect(page.locator('#btn-add-all')).toBeFocused();
 });
 
 // FEAT-036 (TASK-211) — per-track reorder (↑ ↓) + remove (✕) on the playlist
