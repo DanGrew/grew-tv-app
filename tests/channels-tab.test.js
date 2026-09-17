@@ -275,6 +275,37 @@ test.describe('the companion mirror', () => {
     await expect(card.locator('.chan-ep')).toBeHidden();
   });
 
+  // BUG-631 — a name too long for its line ends in "…" inside the card, rather
+  // than the card running off the right-hand edge of a phone. The episode is
+  // the real Open Mic title that broke it; the card's border and its position
+  // are the two things that went missing past the edge.
+  test('a long episode name stays inside the card on a phone', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await installApi(page);
+    const longEp = Object.assign({}, ON_AIR.item, {
+      title: 'Rhod Gilbert and the Cat That Looked Like Nicholas Lyndhurst'
+    });
+    await withChannels(page, [Object.assign({}, ON_AIR, { item: longEp }), OFF_AIR_TIMED]);
+    await mockApp(page);
+    await page.goto('/companion/browse.html');
+    await page.locator('.dock-tab[data-section="channels"]').click();
+    const card = page.locator('.ph-chan[data-channel="cartoon-club"]');
+    await expect(card.locator('.chan-ep')).toHaveText(/^Rhod Gilbert/);
+    const vw = page.viewportSize().width;
+    const box = await card.boundingBox();
+    expect(box.x + box.width).toBeLessThanOrEqual(vw);
+    const time = await card.locator('.chan-time').boundingBox();
+    expect(time.x + time.width).toBeLessThanOrEqual(vw);
+    // Cut, not wrapped: the line is still one line, and its text is wider than it.
+    const ep = await card.locator('.chan-ep').evaluate(function(el) {
+      return { scroll: el.scrollWidth, client: el.clientWidth };
+    });
+    expect(ep.scroll).toBeGreaterThan(ep.client);
+    // Story 6 — a short-named card beside it is the width it always was: the grid's.
+    const off = await page.locator('.ph-chan[data-channel="after-dark"]').boundingBox();
+    expect(off.width).toBe(box.width);
+  });
+
   test('an off-air channel reads the same on the phone', async ({ page }) => {
     await installApi(page);
     await withChannels(page, [ON_AIR, OFF_AIR_TIMED]);
