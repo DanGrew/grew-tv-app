@@ -113,6 +113,13 @@ export function setupQueueShell(config) {
     [NAV[e.key]].filter(Boolean).forEach(function(fn) { e.preventDefault(); fn(); });
   }
 
+  // TASK-602 — the rocker presses the hero's own ⏮/⏭ (action 'previous' or
+  // 'next'). A dimmed hero control carries no `data-action` (heroBtn), so a
+  // press with nothing to step to matches no button and does nothing.
+  function pressTransport(action) {
+    [body.querySelector('.qs-transport button[data-action="' + action + '"]')].filter(Boolean).forEach(function(b) { b.click(); });
+  }
+
   function isOpen() { return root.classList.contains('open'); }
 
   function open() {
@@ -145,5 +152,5 @@ export function setupQueueShell(config) {
     [isOpen()].filter(Boolean).forEach(function() { render(lastSnap); focusCell(); });
   }
 
-  return { open: open, close: close, isOpen: isOpen, applySnapshot: applySnapshot, handleKey: handleKey, refreshSourceTitle: refreshSourceTitle };
+  return { open: open, close: close, isOpen: isOpen, applySnapshot: applySnapshot, handleKey: handleKey, pressTransport: pressTransport, refreshSourceTitle: refreshSourceTitle };
 }

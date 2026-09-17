@@ -18,6 +18,7 @@ import { playlistCards } from '../../core/playlist-pick.js';
 import { gridIndex } from '../../core/playlist-name.js';
 import { buildCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
 import { mountBreadcrumb } from './breadcrumb.js';
+import { claimRocker } from './rocker.js';
 
 // FEAT-037 (TASK-222) — the PERSISTENT video player document. Replaces the old
 // per-episode video.html reload: the <video> element lives for the whole play
@@ -75,7 +76,10 @@ var RESUME_BY_RESTART = {
 function resumeStart(restart, prog) { return RESUME_BY_RESTART[!!restart + ''](prog); }
 function zeroProgress() { return { position_secs: 0, duration_secs: null }; }
 function noop() {}
-var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+// TASK-600: `c` — the remote's burger button — cycles Night Mode. With the Queue
+// open it goes to the Queue, which ignores it, so a press never reaches through
+// the overlay.
+var VIDEO_KEYS = ['Escape', 'Backspace', ' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'c'];
 // BUG-439: an engine-fired action (play-source/-standalone/-queue) waits this long
 // for its first queue_playback snapshot before giving up and surfacing error.html,
 // instead of leaving the player sitting inert with no feedback.
@@ -512,6 +516,18 @@ export function initVideoPage() {
   function onVideoKey(e) { KEY_TARGET[queue.isOpen() + ''](e); }
   var keys = {};
   VIDEO_KEYS.forEach(function(k) { keys[k] = onVideoKey; });
+  // TASK-602 — − and + press ⏮/⏭, claimed HERE and not in the shared player,
+  // which the channel player is also built on and flips channels with them.
+  // The Jump grid, the ＋ Playlist sheet and the Up-next countdown each cover
+  // the transport, so a press behind any of them does nothing.
+  function overlayOpen() {
+    return [
+      !!document.querySelector('.jump-popup'),
+      document.getElementById('add-sheet').style.display === 'flex',
+      !document.getElementById('upnext-overlay').classList.contains('hidden')
+    ].some(Boolean);
+  }
+  claimRocker(keys, { queue: queue, overlayOpen: overlayOpen });
   initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); }, keys: keys, remote: player.remote });
 
   // Breadcrumb crumbs on the companion send a `navigate` intent (FEAT-021);
