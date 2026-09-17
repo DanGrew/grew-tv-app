@@ -1,7 +1,7 @@
 import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { pressFocusedPlus } from './context-press.js';
-import { browseArrow, renderBrowse, getActiveTab, updateChannels, menuStops } from './screen-browse.js';
+import { browseArrow, browseHome, renderBrowse, getActiveTab, updateChannels, menuStops } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, loadConfig, loadTracks, loadEpisodes, loadChannels } from '../../core/app-api.js';
 import { queueAdd, queueAddStatus, itemMediaType } from '../../core/queue-shell-config.js';
@@ -69,9 +69,9 @@ export function initBrowsePage() {
   function toggleQueueMenu() { MENU_TOGGLE[queueMenuOpen() + ''](); }
 
   // Home closes it, the way Home closes Search and the Queue overlay. Scoped to
-  // the menu's own mount and live only while the menu is open: browse still
-  // declares no back key of its own — that is TASK-594's — and swallowing Home
-  // here when the menu is shut would take that key away before it exists.
+  // the menu's own mount and live only while the menu is open, and it stops the
+  // press there: browse's own Home (TASK-594, browseHome) steps up to the section
+  // tab, and one press must close the menu without also making that step.
   var CLOSE_KEYS = { Escape: true };
   var MENU_CLOSE = { 'true': function(e) { e.stopPropagation(); closeQueueMenu(); }, 'false': noop };
   function onQueueMenuKey(e) {
@@ -180,7 +180,7 @@ export function initBrowsePage() {
 
   initPage({
     onEnter: function() { [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); }); },
-    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow, c: pressFocusedPlus },
+    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow, Escape: browseHome, c: pressFocusedPlus },
     remote: {}
   });
 
