@@ -76,7 +76,10 @@ export function initPage() {
     tracks: [], episodes: [], searchDomain: 'videos', searchItems: [],
     // FEAT-560/TASK-563 — the Channels strip and the moment it was read, so a
     // card's position can be carried forward by the clock between polls.
-    channels: [], channelsAt: 0, channelsById: {}
+    channels: [], channelsAt: 0, channelsById: {},
+    // BUG-632 — the channel tile tapped on the current grid, recorded on its
+    // trail entry; null again as soon as the phone moves to another grid.
+    tapped: null
   };
   var api = {};
   var updateBar = null;
@@ -361,7 +364,7 @@ export function initPage() {
     el.setAttribute('data-channel', card.channelId);
     el.classList.toggle('off-air', !view.onAir);
     el.classList.toggle('desync-off', tileOffDesynced(cardRoute(card), mode.isDesynced()));
-    el.addEventListener('click', function() { openItem(card); });
+    el.addEventListener('click', function() { tuneIn(card); });
     var nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = view.name;
@@ -460,24 +463,16 @@ export function initPage() {
     ({ sections: clearTrail, rails: recordRails, grid: recordGrid })[state.level]();
   }
   function recordRails() { writeTrail({ tab: state.section }, sectionTitle()); }
-  // TASK-564 — Channels records its position named as the SECTION rather than
-  // the rail, because that crumb points the TV at its Channels tab (browseDrive
-  // — the TV has no channels rail-grid, and sending it to one lands it on
-  // "Nothing here yet"), so a crumb reading "Films" would name a page nobody is
-  // about to see.
-  //
-  // TASK-626 — but it records the rail now. With several rails the tab no
-  // longer says which one the phone was in, and coming back reopened on the
-  // first one whatever the viewer had walked into. Where the TV goes is
-  // browseDrive's question, not this one's.
-  var GRID_TRAIL = {
-    'true':  function() { writeTrail({ tab: state.section, rail: state.rail }, sectionTitle()); },
-    'false': function() { writeTrail({ tab: state.section, rail: state.rail }, railTitle()); }
-  };
-  function recordGrid() { GRID_TRAIL[(state.section === CHANNELS_TAB.id) + ''](); }
+  // BUG-632 — every section's grid entry is named for its rail, Channels
+  // included: the channel player's breadcrumb reads Home › <rail> › <channel>,
+  // the same shape a film or an album takes. Where the TV goes for a Channels
+  // entry is browseDrive's question, not this one's (TASK-626).
+  function recordGrid() { writeTrail({ tab: state.section, rail: state.rail }, railTitle()); }
+  // `focusedId` is the tile tapped on this grid — a channel records it, so the
+  // channel player names this rail only for the channel tuned in from it.
   function writeTrail(params, label) {
     clearTrail();
-    pushTrail({ page: 'browse.html', params: params, label: label });
+    pushTrail({ page: 'browse.html', params: params, label: label, focusedId: state.tapped });
   }
 
   // On load, seed the level/section/rail from the recorded trail (if any) before
@@ -603,6 +598,7 @@ export function initPage() {
   function applyDrill(tab) {
     state.section = [tab].filter(Boolean).concat([null])[0];
     state.rail = null;
+    state.tapped = null;
     state.level = SECTION_LEVEL[Boolean(tab)];
     render();
   }
@@ -610,6 +606,7 @@ export function initPage() {
   function applyGrid(section, rail) {
     state.section = section;
     state.rail = rail;
+    state.tapped = null;
     state.level = 'grid';
     render();
   }
@@ -700,6 +697,14 @@ export function initPage() {
   }
   function openItem(card) {
     ({ true: function() { openItemLocal(card); }, false: function() { api.sendIntent('select', { id: card.id }); } })[mode.isDesynced()]();
+  }
+  // BUG-632 — a channel tap records which channel this rail tuned in to before
+  // it drives the TV, so the channel player can name this rail for it (and only
+  // for it).
+  function tuneIn(card) {
+    state.tapped = card.id;
+    recordTrail();
+    openItem(card);
   }
 
   // TASK-411 — ‹ › step one rail at a time, same funnel a dot/swipe lands
