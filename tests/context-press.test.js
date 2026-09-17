@@ -214,8 +214,10 @@ test('Context on a focused episode row on a series page queues it to TV Series',
   await expect(page).toHaveURL(/detail\.html/);
 });
 
-// Story 5 — a home-movie clip: the list is not one of Context's screens.
-test('Context on a home-movie clip row does nothing', async ({ page }) => {
+// Story 5, as the owner revised it on 2026-09-17: the clip list DOES draw a ＋
+// Queue on every row (the spec had read otherwise), so Context presses it here
+// like anywhere else. Nothing on this screen is a ＋-less row.
+test('Context on a home-movie clip row queues the clip, as its ＋ Queue does', async ({ page }) => {
   await installApi(page);
   await installQueuePlaybackBackend(page, 'home-movie');
   const queued = await recordQueued(page);
@@ -225,8 +227,8 @@ test('Context on a home-movie clip row does nothing', async ({ page }) => {
   await page.locator('.sidebar-tab[data-tab="home-movies"]').click();
   await page.locator('.film-tile[data-id="play-all:All"]').click();
   await expect(page).toHaveURL(/home-movies-list\.html/);
+  await expect(page.locator('.detail-row[data-id="beach-day"] .detail-queue')).toBeVisible();
   await pressContextOn(page, page.locator('.detail-row[data-id="beach-day"]'));
-  await page.locator('.detail-row[data-id="beach-day"] .detail-queue').click();
-  await expect.poll(() => queued.length).toBe(1);
-  expect(queued).toEqual(['home-movie:beach-day']);
+  await expect.poll(() => queued).toEqual(['home-movie:beach-day']);
+  await expect(page).toHaveURL(/home-movies-list\.html/);
 });
