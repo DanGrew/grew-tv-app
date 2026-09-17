@@ -1,5 +1,6 @@
 import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { pressFocusedPlus } from './context-press.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, loadAlbum, addToPlaylist } from '../../core/app-api.js';
@@ -181,7 +182,8 @@ export function initArtistPage() {
       ArrowUp:    detailArrow,
       ArrowDown:  detailArrow,
       ArrowLeft:  detailLeft,
-      ArrowRight: detailRight
+      ArrowRight: detailRight,
+      c:          pressFocusedPlus
     },
     remote: {}
   });
