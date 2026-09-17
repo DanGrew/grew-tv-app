@@ -102,9 +102,10 @@ test('Escape closes the add sheet', async ({ page }) => {
   await expect(page.locator('#add-sheet')).toBeHidden();
 });
 
-// TASK-600 — ☰ cycles Night Mode on the player, but never from under the sheet:
-// the sheet's own keydown stops the press before the page's key map sees it.
-test('☰ does nothing behind the open ＋ Playlist sheet', async ({ page }) => {
+// TASK-600 — the remote's burger button (`c`) cycles Night Mode on the player, but
+// never from under the sheet: the sheet's own keydown stops the press before the
+// page's key map sees it.
+test('the burger button does nothing behind the open ＋ Playlist sheet', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
   await page.locator('#btn-add-playlist').click();
   await expect(page.locator('#add-sheet')).toBeVisible();
@@ -115,8 +116,8 @@ test('☰ does nothing behind the open ＋ Playlist sheet', async ({ page }) => 
 });
 
 // TASK-600 — the positive half on a music video, so the sheet test above can't
-// pass merely because ☰ does nothing on this page at all.
-test('☰ cycles Night Mode on a music video', async ({ page }) => {
+// pass merely because the burger button does nothing on this page at all.
+test('the burger button cycles Night Mode on a music video', async ({ page }) => {
   await page.goto('/app/homeview/video.html?musicVideo=mv-01&from=browse');
   await expect(page.locator('#btn-add-playlist')).toBeVisible();
   await page.keyboard.press('c');

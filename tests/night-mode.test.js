@@ -89,12 +89,16 @@ test('Off never touches the audio path — no AudioContext until the first press
   expect(await page.evaluate(() => window.__ctxCount)).toBe(1);
 });
 
-// TASK-600 — ☰ (the handset's Context button, `c`) is a shortcut to the pill: the
-// same cycle a click gives, from the couch, with no d-pad walk. It lives in the
-// player's playing-state key table, so every overlay that owns the keys — Jump,
-// the Queue, the ＋ Playlist sheet — swallows it rather than letting it reach
+// TASK-600 — the remote's BURGER button (`c`, Kodi's Context) is a shortcut to the
+// pill: the same cycle a click gives, from the couch, with no d-pad walk. It lives
+// in the player's playing-state key table, so every overlay that owns the keys —
+// Jump, the Queue, the ＋ Playlist sheet — swallows it rather than letting it reach
 // through and change the sound behind.
-test('☰ brings the controls up and cycles Off -> Soft -> Strong -> Off', async ({ page }) => {
+//
+// Called the burger button throughout, never "☰": that glyph is already the Queue
+// on screen (`btn-queue`, "☰ Add to Queue"), so naming this row's button by it
+// would point at the wrong control.
+test('the burger button brings the controls up and cycles Off -> Soft -> Strong -> Off', async ({ page }) => {
   await openFilm(page);
   await page.evaluate(() => document.getElementById('controls').classList.add('hidden'));
   const night = page.locator('#btn-night');
@@ -107,7 +111,7 @@ test('☰ brings the controls up and cycles Off -> Soft -> Strong -> Off', async
   await expect(night).toHaveText('Night: Off');
 });
 
-test('☰ leaves focus where it was rather than jumping to the pill', async ({ page }) => {
+test('the burger button leaves focus where it was rather than jumping to the pill', async ({ page }) => {
   await openFilm(page);
   await page.evaluate(() => document.getElementById('btn-play-pause').focus());
   await page.keyboard.press('c');
@@ -115,7 +119,7 @@ test('☰ leaves focus where it was rather than jumping to the pill', async ({ p
   await expect(page.locator('#btn-play-pause')).toBeFocused();
 });
 
-test('☰ does nothing behind the open Jump grid', async ({ page }) => {
+test('the burger button does nothing behind the open Jump grid', async ({ page }) => {
   await openFilm(page);
   await page.locator('#btn-jump').click();
   await expect(page.locator('.jump-popup')).toBeVisible();
@@ -124,7 +128,7 @@ test('☰ does nothing behind the open Jump grid', async ({ page }) => {
   await expect(page.locator('#btn-night')).toHaveText('Night: Off');
 });
 
-test('☰ does nothing behind the open Queue', async ({ page }) => {
+test('the burger button does nothing behind the open Queue', async ({ page }) => {
   await openFilm(page);
   await page.locator('#btn-queue').click();
   await expect(page.locator('#queue-overlay')).toHaveClass(/open/);
@@ -134,8 +138,9 @@ test('☰ does nothing behind the open Queue', async ({ page }) => {
 });
 
 // Night Mode is the video player's alone — the music player has no pill and no
-// compressor, so ☰ is not claimed there and a press changes nothing on screen.
-test('☰ on the music player does nothing', async ({ page }) => {
+// compressor, so the burger button is not claimed there and a press changes
+// nothing on screen.
+test('the burger button on the music player does nothing', async ({ page }) => {
   await page.goto('/app/homeview/audio.html?track=ootb-02&from=browse');
   await expect(page.locator('#screen-audio')).toBeVisible();
   await expect(page.locator('#btn-night')).toHaveCount(0);
@@ -146,9 +151,9 @@ test('☰ on the music player does nothing', async ({ page }) => {
 });
 
 // The phone reads its Night label off the app_state snapshot the player emits on
-// every change (TASK-568), so a ☰ press has to reach the phone the way a pill
+// every change (TASK-568), so a burger press has to reach the phone the way a pill
 // click does — captured here as what the TV actually sent.
-test('a ☰ press tells the phone the new level', async ({ page }) => {
+test('a burger-button press tells the phone the new level', async ({ page }) => {
   const sent = [];
   await page.routeWebSocket(/:8766/, (ws) => {
     ws.onMessage((raw) => { sent.push(JSON.parse(raw)); });

@@ -327,10 +327,11 @@ test.describe('tuned into a channel', () => {
     await expect(page).toHaveURL(/channel=after-dark/);
   });
 
-  // TASK-600 — ☰ cycles Night Mode on a channel exactly as on any film: the
-  // channel player registers its own key map over the shared player, so `c`
-  // has to join it here too, and nothing in channel mode hides the pill.
-  test('☰ cycles Night Mode while watching a channel', async ({ page }) => {
+  // TASK-600 — the remote's burger button (`c`) cycles Night Mode on a channel
+  // exactly as on any film: the channel player registers its own key map over the
+  // shared player, so `c` has to join it here too, and nothing in channel mode
+  // hides the pill.
+  test('the burger button cycles Night Mode while watching a channel', async ({ page }) => {
     await openChannel(page, 'cartoon-club');
     const night = page.locator('#btn-night');
     await page.keyboard.press('c');
