@@ -7,6 +7,7 @@ import { readVolume, writeVolume } from '../../core/volume-store.js';
 import { progressPct, clampTime, wrapIndex, frameDrop } from '../../core/player-math.js';
 import { nightLabel } from '../../core/night-mode.js';
 import { createNightMode } from './night-mode-audio.js';
+import { claimStop, releaseStop } from '../../core/media-session-stop.js';
 
 // Graduated relative skips (FEAT-017): ±10s / 30s / 2m / 10m / 30m. The Jump
 // popup is a 5-column grid: back row then forward row. No absolute seek / scrub.
@@ -477,6 +478,7 @@ export function setup(config) {
     [currentBlobUrl].filter(Boolean).forEach(function() { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; });
     onIntent('stop');
     releaseWakeLock();
+    releaseStop();
     var rp = returnPage;
     currentVideo = null;
     returnPage = null;
@@ -583,6 +585,9 @@ export function setup(config) {
     video.src       = mediaUrl(server, record.id + '.' + [record.ext].filter(Boolean).concat(['mp4'])[0]);
     setSubtitleTrack(record);
     onIntent('play', { title: record.title });
+    // TASK-599 — the remote's ⏹ Stop is Home-while-playing: this player's own
+    // stopPlayback, which a channel reaches too since it plays through here.
+    claimStop(stopPlayback);
     startPlayback(startSec);
   }
 

@@ -4,6 +4,7 @@ import { getPerson } from '../../core/state.js';
 import { createHeartbeat } from '../../core/ws-protocol.js';
 import { logEvent, makeSeekCoalescer, SOURCE_TV } from '../../core/log.js';
 import { readVolume, writeVolume } from '../../core/volume-store.js';
+import { claimStop, releaseStop } from '../../core/media-session-stop.js';
 
 // FEAT-018 (TASK-130) audio player. The <audio> analogue of the FEAT-017 video
 // player: same transport (play/pause, prev/next track, graduated skip, range
@@ -263,6 +264,7 @@ export function setup(config) {
     audio.pause();
     audio.src = '';
     onIntent('stop');
+    releaseStop();
     var rp = returnPage;
     currentTrack = null;
     returnPage = null;
@@ -314,6 +316,9 @@ export function setup(config) {
     document.getElementById('audio-title').textContent = record.title;
     document.getElementById('audio-artist').textContent = [record.artist].filter(Boolean).concat([''])[0];
     onIntent('play', { title: record.title });
+    // TASK-599 — the remote's ⏹ Stop is Home-while-playing: this player's own
+    // stopPlayback, never a destination worked out afresh.
+    claimStop(stopPlayback);
     startPlayback(startSec);
   }
 
