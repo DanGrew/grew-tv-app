@@ -371,7 +371,7 @@ test.describe('the companion mirror', () => {
     await mockApp(page);
     await page.addInitScript(() => {
       sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
-        { page: 'browse.html', params: { tab: 'channels', rail: 'channels' }, label: 'Channels' }
+        { page: 'browse.html', params: { tab: 'channels', rail: 'channels' }, label: 'On now' }
       ]));
     });
     await page.goto('/companion/browse.html');
@@ -391,7 +391,7 @@ test.describe('the companion mirror', () => {
     await mockApp(page);
     await page.addInitScript(() => {
       sessionStorage.setItem('grew-tv:nav-trail', JSON.stringify([
-        { page: 'browse.html', params: { tab: 'channels', rail: 'channel-rail:films' }, label: 'Channels' }
+        { page: 'browse.html', params: { tab: 'channels', rail: 'channel-rail:films' }, label: 'Films' }
       ]));
     });
     await page.goto('/companion/browse.html');

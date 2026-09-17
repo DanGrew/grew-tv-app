@@ -7,6 +7,7 @@ import { percent } from '../../core/progress.js';
 import { buildCrumbs, trailCrumbs, playerCrumbs } from '../../core/breadcrumb.js';
 import { trimOnCrumb, entries as entriesTrail } from '../../core/nav-trail.js';
 import { createCompanionMode } from '../../core/companion-mode.js';
+import { channelRailEntry, channelSourceCrumb, playerCrumbDrive } from '../../core/channels.js';
 import { nightLabel, isNightOn } from '../../core/night-mode.js';
 import { switchProfileTarget } from '../../core/switch-profile.js';
 import { playlistCards } from '../../core/playlist-pick.js';
@@ -70,7 +71,7 @@ export function initPage() {
     restart: document.getElementById('c-restart'),
     live: document.getElementById('c-live')
   };
-  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, homeMovie: false, film: false, series: false, channel: false, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '', mvSource: null, channelSource: null } };
+  var state = { snap: null, vsnap: null, person: null, loadedSeriesId: null, musicVideo: false, homeMovie: false, film: false, series: false, channel: false, channelId: null, itemId: null, profile: null, crumb: { seriesId: null, seriesTitle: null, videoTitle: '', mvSource: null, channelSource: null } };
   var api = {};
   var updateBar = null;
   var mode = createCompanionMode();
@@ -109,11 +110,15 @@ export function initPage() {
     var t = [LOCAL_PAGE[page]].filter(Boolean).map(function(fn) { return fn(params); }).concat([{ page: page, params: params }])[0];
     window.location.href = t.page + queryString(t.params);
   }
+  // BUG-632 — where the TV is sent for a crumb. A channel's crumbs can carry the
+  // rail it was tuned in from, and those go out through browseDrive so the TV
+  // lands on its Channels tab rather than a rail-grid page it does not have.
+  // Every other surface's crumb goes out exactly as built.
   function navigate(page, params) {
     // Trim the trail to the clicked ancestor (Home clears) so a later Back can't
     // retrace past this jump (FEAT-032 stale-Back fix).
     trimOnCrumb(page, params);
-    ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', { page: page, params: params }); } })[mode.isDesynced()]();
+    ({ true: function() { localGo(page, params); }, false: function() { api.sendIntent('navigate', playerCrumbDrive(state.channel, page, params)); } })[mode.isDesynced()]();
   }
   // Film branch: the recorded genre grid retrace when the nav-trail holds a browse
   // entry, else the minimal deep-link crumb. Series branch: the unchanged
@@ -130,12 +135,17 @@ export function initPage() {
   function mvCrumbs() { return playerCrumbs(null, state.crumb.mvSource, state.crumb.videoTitle); }
   var CRUMBS_BY_MODE = { true: mvCrumbs, false: nonMvCrumbs };
   function queueCrumbs() { return CRUMBS_BY_MODE[state.musicVideo](); }
-  // TASK-564 — a channel names the CHANNEL, off the target the TV pushed, and
-  // that crumb returns to the Channels tab. The recorded browse rail is not the
-  // fallback here it is for a queue: it names the rail ("On now") and its target
-  // is a rail-grid page the TV has no channels grid for, so a viewer pressing it
-  // landed on "Nothing here yet".
-  function channelCrumbs() { return playerCrumbs(null, state.crumb.channelSource, state.crumb.videoTitle); }
+  // TASK-564 — a channel names the CHANNEL, off the target the TV pushed.
+  // BUG-632 — and the rail it was tuned in from goes in front of it, the same
+  // playerCrumbs(rail, source, leaf) every other player crumb takes: Home ›
+  // <rail> › <channel> › <what's on>, with the channel's crumb re-pointed at that
+  // rail so both land back on it. The rail is only the recorded Channels entry
+  // that tapped THIS channel; reached any other way, there is none and the
+  // channel crumb returns to the Channels tab as the TV built it (story 7).
+  function channelCrumbs() {
+    var rail = channelRailEntry(entriesTrail(), state.channelId);
+    return playerCrumbs(rail, channelSourceCrumb(rail, state.crumb.channelSource), state.crumb.videoTitle);
+  }
   var CRUMBS_BY_SURFACE = { true: channelCrumbs, false: queueCrumbs };
   function mountVideoCrumbs() {
     mountCompanionBreadcrumb('breadcrumb', CRUMBS_BY_SURFACE[state.channel](), navigate);
@@ -430,6 +440,7 @@ export function initPage() {
     applyContextHead(payload);
     state.channel = !!payload.channel;
     state.crumb.channelSource = [payload.channelSource].filter(Boolean).concat([null])[0];
+    state.channelId = [payload.channelId].filter(Boolean).concat([null])[0];
     applyChannelMode(state.channel);
     state.musicVideo = !!payload.musicVideo;
     state.homeMovie = !!payload.homeMovie;

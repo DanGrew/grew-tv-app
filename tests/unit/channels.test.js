@@ -4,7 +4,8 @@ import {
   itemTitle, seriesTitle, episodeSlot, leadTitle, channelSubLine,
   nextLabel, channelCardView, channelTile, channelTiles, railsOf,
   channelsById, hasChannels, withChannelsTab, landingTab, browseRestore,
-  browseDrive, tileVariant, CHANNEL_TILE, LIBRARY_TILE
+  browseDrive, tileVariant, CHANNEL_TILE, LIBRARY_TILE,
+  channelTileId, channelRailEntry, channelSourceCrumb, channelCrumbDrive, playerCrumbDrive
 } from '../../core/channels.js';
 
 // FEAT-560/TASK-563 — the Channels tab's model. The card TICKS and the strip's
@@ -598,5 +599,92 @@ describe('browseDrive', () => {
       .toEqual({ page: 'browse.html', params: { tab: 'films' } });
     expect(browseDrive({})).toEqual({ page: 'browse.html', params: { tab: null } });
     expect(browseDrive(null)).toEqual({ page: 'browse.html', params: { tab: null } });
+  });
+});
+
+// BUG-632 — a channel's breadcrumb on the phone names the rail it was tuned in
+// from, and both crumbs go back to it.
+describe('channelTileId', () => {
+  it('is the id a channel tile carries', () => {
+    expect(channelTileId('after-dark')).toBe('channel:after-dark');
+    expect(channelTile({ channel_id: 'after-dark' }).id).toBe(channelTileId('after-dark'));
+  });
+});
+
+describe('channelRailEntry', () => {
+  var films = { page: 'browse.html', params: { tab: 'channels', rail: 'channel-rail:films' }, label: 'Films', focusedId: 'channel:after-dark' };
+
+  it('is the Channels entry that tapped this channel', () => {
+    expect(channelRailEntry([films], 'after-dark')).toBe(films);
+  });
+
+  it('is the nearest such entry when there are several', () => {
+    var later = Object.assign({}, films, { label: 'Later' });
+    expect(channelRailEntry([films, later], 'after-dark')).toBe(later);
+  });
+
+  // Story 7 — the TV changed channel, or the channel came from the Guide.
+  it('is nothing for a channel the rail did not tap', () => {
+    expect(channelRailEntry([films], 'cartoon-club')).toBe(undefined);
+    expect(channelRailEntry([Object.assign({}, films, { focusedId: undefined })], 'after-dark')).toBe(undefined);
+  });
+
+  it('is nothing for another section\'s entry, or another page', () => {
+    expect(channelRailEntry([Object.assign({}, films, { params: { tab: 'films', rail: 'genre:drama' } })], 'after-dark')).toBe(undefined);
+    expect(channelRailEntry([Object.assign({}, films, { params: undefined })], 'after-dark')).toBe(undefined);
+    expect(channelRailEntry([Object.assign({}, films, { page: 'artist.html' })], 'after-dark')).toBe(undefined);
+  });
+
+  it('is nothing with an empty trail', () => {
+    expect(channelRailEntry([], 'after-dark')).toBe(undefined);
+  });
+});
+
+describe('channelSourceCrumb', () => {
+  var rail = { page: 'browse.html', params: { tab: 'channels', rail: 'channel-rail:films' }, label: 'Films' };
+  var source = { label: 'After Dark', page: 'browse.html', params: { tab: 'channels' } };
+
+  it('keeps the channel\'s name and points it at the rail', () => {
+    expect(channelSourceCrumb(rail, source))
+      .toEqual({ label: 'After Dark', page: 'browse.html', params: { tab: 'channels', rail: 'channel-rail:films' } });
+  });
+
+  it('leaves the TV\'s target alone with no rail', () => {
+    expect(channelSourceCrumb(undefined, source)).toBe(source);
+  });
+
+  it('has nothing to point with no source', () => {
+    expect(channelSourceCrumb(rail, null)).toBe(null);
+  });
+});
+
+describe('channelCrumbDrive', () => {
+  it('sends a Channels crumb carrying a rail to the TV\'s Channels tab, never a rail grid', () => {
+    expect(channelCrumbDrive('browse.html', { tab: 'channels', rail: 'channel-rail:films' }))
+      .toEqual({ page: 'browse.html', params: { tab: 'channels' } });
+  });
+
+  it('passes Home through untouched', () => {
+    expect(channelCrumbDrive('browse.html', {})).toEqual({ page: 'browse.html', params: {} });
+    expect(channelCrumbDrive('browse.html', null)).toEqual({ page: 'browse.html', params: {} });
+  });
+
+  it('passes any other target through untouched', () => {
+    expect(channelCrumbDrive('guide.html', { tab: 'films' })).toEqual({ page: 'guide.html', params: { tab: 'films' } });
+  });
+});
+
+describe('playerCrumbDrive', () => {
+  var railed = { tab: 'channels', rail: 'channel-rail:films' };
+
+  it('drives a channel crumb through channelCrumbDrive', () => {
+    expect(playerCrumbDrive(true, 'browse.html', railed)).toEqual({ page: 'browse.html', params: { tab: 'channels' } });
+  });
+
+  // Story 9 — a film's and an album's crumbs go to the TV as they always have.
+  it('sends every other crumb exactly as built', () => {
+    expect(playerCrumbDrive(false, 'browse.html', railed)).toEqual({ page: 'browse.html', params: railed });
+    expect(playerCrumbDrive(false, 'browse.html', { tab: 'films', rail: 'genre:drama' }))
+      .toEqual({ page: 'browse.html', params: { tab: 'films', rail: 'genre:drama' } });
   });
 });

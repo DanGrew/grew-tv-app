@@ -423,7 +423,7 @@ describe('channelVideoContext', () => {
     expect(channelVideoContext(display, source)).toEqual({
       context_id: 'video',
       display: display,
-      channel: true, channelSource: source, channelCard: null,
+      channel: true, channelSource: source, channelCard: null, channelId: null,
       musicVideo: false, musicVideoShuffle: false, musicVideoRepeat: false,
       musicVideoSource: null, musicVideoTransport: DEAD,
       homeMovie: false, homeMovieShuffle: false, homeMovieRepeat: false, homeMovieTransport: DEAD,
@@ -448,6 +448,14 @@ describe('channelVideoContext', () => {
     expect(channelVideoContext(display, source, card).channelCard).toEqual(card);
     expect(channelVideoContext(display, source, null).channelCard).toBe(null);
     expect(channelVideoContext(display, source).channelCard).toBe(null);
+  });
+
+  // BUG-632 — which channel is playing, so the phone names the rail it tuned in
+  // from only for that channel.
+  it('carries the channel playing, and null when none is named', () => {
+    expect(channelVideoContext(display, source, null, 'after-dark').channelId).toBe('after-dark');
+    expect(channelVideoContext(display, source, null, '').channelId).toBe(null);
+    expect(channelVideoContext(display, source).channelId).toBe(null);
   });
 
   it('never leaves a queue rail claiming to be holding a card', () => {
