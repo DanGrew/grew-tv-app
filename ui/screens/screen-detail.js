@@ -4,6 +4,7 @@ import { percent, rowMidWatch } from '../../core/progress.js';
 import { resumeOf, episodeLabel, durationMarkup, progressBarMarkup, detailTagMarkup } from '../../core/detail-view.js';
 import { primaryAction } from '../../core/series-detail.js';
 import { seasonsOf, seasonLabel, chipClass, visibleItems, defaultSeason, seasonPosterOf, posterCandidates } from '../../core/seasons.js';
+import { focusPath } from './focus-path.js';
 
 var DETAIL_ARROW_DELTA = { ArrowUp: -1, ArrowDown: 1 };
 var PLAY_KEYS = { Enter: true, ' ': true };
@@ -17,24 +18,19 @@ var AVAILABLE_ROW = {
 // list). Reset on each buildDetailList.
 var state = { server: '', series: { items: [] }, progress: {}, onPlayItem: function() {}, onAddToPlaylist: null, onQueue: null, onMoveItem: null, onRemoveItem: null, seasons: [], activeSeason: null, suppressResume: false, albumHeaders: false };
 
-// Up/Down move between vertical stops: clickable breadcrumb crumbs (top), then
-// the header Play-next action, the shuffle button, the playlist's Add all → Rename
-// → Delete (their on-screen order, TASK-597), the active season chip, then every
-// available episode row. A header id a screen doesn't draw simply drops out. A focused per-row Restart control counts as its
-// row; Left/Right move sideways onto it (or between season chips).
-function crumbStops() {
-  return Array.from(document.querySelectorAll('#breadcrumb .crumb-link'));
-}
+// Up/Down move between vertical stops — TASK-598: every button and row the page
+// draws, in on-screen order, so a header button added to any of the five pages
+// (series, album, artist, home movies, playlist) is on the path with nothing else
+// to edit. Today that reads crumbs → the header's own buttons (Play next, or Add
+// all → Rename → Delete) → the active season chip → each available row. Two
+// composite rules stay: of the season chips only the active one is a stop (Left/
+// Right walk the rest), and a row stands for its own per-row actions (Restart, ＋,
+// ↑ ↓ ✕ — Left/Right reach them). The add sheet and delete confirmation carry
+// `data-focus-skip`: they own their navigation while open.
+var VERTICAL_STOPS = 'button:not(.season-chip):not(.detail-row-action), .season-chip.active, .detail-row';
 
 function verticalStops() {
-  return crumbStops()
-    .concat([document.getElementById('btn-play-next')].filter(Boolean))
-    .concat(Array.from(document.querySelectorAll('#btn-shuffle:not(.hidden)')))
-    .concat(Array.from(document.querySelectorAll('#btn-add-all')))
-    .concat(Array.from(document.querySelectorAll('#btn-rename-playlist')))
-    .concat(Array.from(document.querySelectorAll('#btn-delete-playlist')))
-    .concat(Array.from(document.querySelectorAll('.season-chip.active')))
-    .concat(Array.from(document.querySelectorAll('.detail-row:not(.unavailable)')));
+  return focusPath(document.body, VERTICAL_STOPS);
 }
 
 function activeStop() {
@@ -93,10 +89,26 @@ export function detailLeft(e) {
   chipSibling(el, -1);
 }
 
-// Default focus lands on Play-next (not the breadcrumb): the crumbs are a stop
-// you reach by pressing Up, never the entry focus.
+// Entry focus: the stop the screen would rather open on (its Play-next action, or
+// its first track row), and failing that the first stop on its own path — so a
+// screen that draws neither (an empty playlist; a list whose first rows are all
+// unavailable) still opens with something selected, instead of swallowing the
+// first d-pad press while the viewer hunts for the selection.
+// The crumbs are excluded from that fallback: they are a stop you reach by
+// pressing Up, never the one a screen opens on — opening on Home would make OK
+// leave the page you just entered.
+var ENTRY_NEVER = '.crumb-link';
+
+export function focusEntryStop(preferred) {
+  var stops = verticalStops();
+  stops.filter(function(el) { return el.matches(preferred); })
+    .concat(stops.filter(function(el) { return !el.matches(ENTRY_NEVER); }))
+    .slice(0, 1)
+    .forEach(function(el) { el.focus(); });
+}
+
 export function focusFirstDetailRow() {
-  [document.getElementById('btn-play-next')].filter(Boolean).forEach(function(s) { s.focus(); });
+  focusEntryStop('#btn-play-next');
 }
 
 function seasonHeader(list, season) {

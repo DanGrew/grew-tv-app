@@ -8,11 +8,10 @@
 // standing maintenance cost the owner accepted (one row per behaviour change).
 // `KEYMAP.md` points here rather than keeping a second copy.
 //
-// Written against the blessed specs of the FEAT-526 rows building alongside this
-// one (owner, 2026-09-17). TASK-600 (the burger on the players) and TASK-602
-// (the rocker) have since merged and say here what they ship; Home on Browse
-// (TASK-594) and the burger while browsing (TASK-601) are still their specs'
-// word, so this table merges after them.
+// Every row is checked against SHIPPED behaviour, not a spec: TASK-594 (Home on
+// Browse), TASK-598 (the focus paths), TASK-600 (the burger on the players),
+// TASK-601 (the burger while browsing, the clip list included) and TASK-602 (the
+// rocker) have all merged, and this row is the last of FEAT-526's build.
 //
 // ⛔ **Back and Stop are left off entirely.** Neither reaches the page at all —
 // macOS routes both to its own Now Playing target, measured 2026-09-17, which is
@@ -91,7 +90,8 @@ export var HELP_TABLE = {
     updown: 'Move between clips',
     leftright: 'Move along a row',
     ok: 'Play the clip',
-    home: 'Back one step'
+    home: 'Back one step',
+    burger: 'Add the focused clip to the Queue'
   } },
   'rail-grid': { title: 'Rail', jobs: {
     updown: 'Move between rows of the grid',
@@ -105,7 +105,7 @@ export var HELP_TABLE = {
     leftright: 'Move along a row',
     ok: 'Play the track, or press what is focused',
     home: 'Back one step',
-    burger: "Press the focused track's ＋, where it has one"
+    burger: 'Add the focused track to a playlist'
   } },
   'playlist-create': { title: 'New playlist', jobs: {
     updown: 'Move between rows of keys',

@@ -142,7 +142,9 @@ export function initChannelPage() {
   // Home › <channel> › <what's on>. The channel's own crumb returns to the
   // Channels tab, the way a music video's crumb returns to its playlist. The
   // phone is handed this SAME target on the context push (below), so both
-  // surfaces name the channel and neither falls back to a browse rail.
+  // surfaces name the channel. No TV player names a rail — TV browse records no
+  // trail — so the rail is `null` here; the phone puts the rail it tuned in from
+  // in front of this crumb and re-points it there (BUG-632).
   function crumbSource() {
     return { label: identLabel(detail), page: 'browse.html', params: { tab: 'channels' } };
   }
@@ -160,7 +162,7 @@ export function initChannelPage() {
   };
   function sendChannelContext() {
     [wsApp].filter(Boolean).forEach(function(ws) {
-      ws.sendContext(channelVideoContext(player.currentVideoDisplay(), crumbSource(), CARD_LINE[cardUp + '']()));
+      ws.sendContext(channelVideoContext(player.currentVideoDisplay(), crumbSource(), CARD_LINE[cardUp + ''](), channelId));
     });
   }
 

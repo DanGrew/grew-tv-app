@@ -320,6 +320,60 @@ test('the pills sit on their own row below the progress bar in the BUG-016 order
   await expect(page.locator('#transport .pill')).toHaveCount(0);
 });
 
+// TASK-598 story 1 — ▲▼ on the music player walks what the screen draws, in the
+// order it draws it: the crumbs, ⏮ ⏯ ⏭, then the pill row. The ids are read off
+// #controls rather than typed here, so the walk and the markup can't drift apart;
+// un-hiding and enabling them first makes this about ORDER, which is fixed markup,
+// not about which ones a given track happens to dim (story 3 has its own test).
+test('▲▼ on the music player walks every control it draws, in on-screen order (TASK-598)', async ({ page }) => {
+  await openPlayer(page);
+  const drawn = await page.evaluate(() => {
+    const btns = Array.from(document.querySelectorAll('#controls button'));
+    btns.forEach(b => { b.classList.remove('hidden'); b.disabled = false; });
+    return btns.map(b => b.id);
+  });
+  // Today's stops still come in today's order — filtered, so a button added later
+  // doesn't need adding here too.
+  const today = ['crumb-0', 'crumb-1', 'btn-prev', 'btn-play-pause', 'btn-next',
+    'btn-queue', 'btn-jump', 'btn-lyrics', 'btn-clear-progress'];
+  expect(drawn.filter(id => today.includes(id))).toEqual(today);
+  expect(await dpadPath(page, '#' + drawn[0], 'ArrowDown', drawn.length - 1)).toEqual(drawn.slice(1));
+});
+
+// TASK-598 story 3 — on an album's last track with repeat off, ⏭ has nothing to
+// step to and dims; ▲▼ skips it, as the video player already does (TASK-517).
+// Before, ▼ from ⏯ landed on a button that did nothing.
+test('▲▼ on the music player skips a dimmed ⏭ (TASK-598)', async ({ page }) => {
+  await enterKids(page);
+  await page.locator('.sidebar-tab[data-tab="music"]').click();
+  await page.locator('.film-tile[data-id="ootb"]').click();
+  await page.locator('.detail-row[data-id="ootb-03"]').click();
+  await expect(page.locator('#audio-title')).toHaveText('Sweet Talkin Woman');
+  await page.locator('#btn-queue').focus();
+  await page.keyboard.press('Enter');
+  const repeat = page.locator('.qs-tbtn[data-action="toggle-repeat"]');
+  await expect(repeat).toHaveClass(/on/);
+  await repeat.click();
+  await expect(repeat).not.toHaveClass(/on/);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#btn-next')).toBeDisabled();
+  expect(await dpadPath(page, '#btn-play-pause', 'ArrowDown', 1)).toEqual(['btn-queue']);
+  expect(await dpadPath(page, '#btn-queue', 'ArrowUp', 1)).toEqual(['btn-play-pause']);
+});
+
+// TASK-598 story 4 — a button added to the player's markup is on the remote's path
+// with nothing else to edit; one marked `data-focus-skip` stays off it. Red against
+// the old hand-kept id list, which never heard of either.
+test('a button added to the music player joins ▲▼ unless marked data-focus-skip (TASK-598)', async ({ page }) => {
+  await openPlayer(page);
+  await page.evaluate(() => {
+    const row = document.getElementById('pill-row');
+    row.insertAdjacentHTML('beforeend', '<button id="btn-skipped" class="ctrl-btn pill" data-focus-skip>Skipped</button>' +
+      '<button id="btn-added" class="ctrl-btn pill">Added</button>');
+  });
+  expect(await dpadPath(page, '#btn-clear-progress', 'ArrowDown', 2)).toEqual(['btn-added', 'crumb-0']);
+});
+
 // BUG-016 (dead clicks): the bar auto-hides after the idle window and sets
 // pointer-events:none. Before the fix only a d-pad key could summon it, so a mouse
 // could never wake it and every click was dead. Pointer activity must now wake the

@@ -235,7 +235,7 @@ export function channelSubLine(view) {
 export function channelTile(line) {
   return {
     kind: CHANNEL_KIND,
-    id: 'channel:' + line.channel_id,
+    id: channelTileId(line.channel_id),
     channelId: line.channel_id,
     title: line.name || line.channel_id,
     line: line,
@@ -340,6 +340,50 @@ export function browseRestore(params) {
   if (rail) return { section: tab, rail: rail, level: 'grid' };
   if (tab) return { section: tab, rail: null, level: 'rails' };
   return { section: null, rail: null, level: 'sections' };
+}
+
+// The id a channel's tile carries — what the TV's card-route table is handed on
+// a tap, and what the phone's trail records as the tile it tuned in from.
+export function channelTileId(channelId) {
+  return 'channel:' + channelId;
+}
+
+// BUG-632 — the rail a channel was tuned in from: the recorded Channels entry
+// whose tapped tile is the channel now playing. A channel reached any other way
+// — the Guide, the TV changing channel, a rail tapped for a different channel —
+// has none, and its crumb stays Home › <channel> › <what's on> (story 7).
+// `entries` is the trail as core/nav-trail.js entries() serves it — always an
+// array, so there is no absent case to guard (railEntry beside it takes the
+// same contract).
+export function channelRailEntry(entries, channelId) {
+  return entries.filter(function(e) {
+    return e.page === 'browse.html' && (e.params || {}).tab === CHANNELS_TAB.id && e.focusedId === channelTileId(channelId);
+  }).slice(-1)[0];
+}
+
+// BUG-632 — the channel's own crumb, re-pointed at the rail it was tuned in from
+// so that pressing it lands back on that rail. The TV's target names the tab
+// alone, which a phone's recorded { tab, rail } entry never matches — the trim
+// that followed cleared the trail and browse reopened somewhere else.
+export function channelSourceCrumb(rail, source) {
+  if (!rail || !source) return source;
+  return { label: source.label, page: rail.page, params: rail.params };
+}
+
+// BUG-632 — where the TV goes when a channel player's crumb is pressed on the
+// phone. A Channels target carrying a rail goes out through browseDrive, so it
+// never reaches the TV as a rail-grid page; Home passes through untouched.
+export function channelCrumbDrive(page, params) {
+  var p = params || {};
+  if (p.tab === CHANNELS_TAB.id) return browseDrive(p);
+  return { page: page, params: p };
+}
+
+// BUG-632 — where the TV goes for a crumb pressed on the phone's player page:
+// a channel's through channelCrumbDrive, every other rail's exactly as built.
+export function playerCrumbDrive(channel, page, params) {
+  if (!channel) return { page: page, params: params };
+  return channelCrumbDrive(page, params);
 }
 
 // TASK-626 — where the TV goes for the same recorded entry. Every other section

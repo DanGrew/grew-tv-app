@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { HELP_BUTTONS, HELP_NOTHING, HELP_TABLE, hasHelp, helpRows, helpCardHtml, helpKeyAction } from '../../core/button-help.js';
 
 // TASK-633 — the card is data, so this is where the card is actually asserted:
@@ -140,7 +141,8 @@ describe('the table, whole', () => {
         updown: 'Move between clips',
         leftright: 'Move along a row',
         ok: 'Play the clip',
-        home: 'Back one step'
+        home: 'Back one step',
+        burger: 'Add the focused clip to the Queue'
       } },
       'rail-grid': { title: 'Rail', jobs: {
         updown: 'Move between rows of the grid',
@@ -154,7 +156,7 @@ describe('the table, whole', () => {
         leftright: 'Move along a row',
         ok: 'Play the track, or press what is focused',
         home: 'Back one step',
-        burger: "Press the focused track's ＋, where it has one"
+        burger: 'Add the focused track to a playlist'
       } },
       'playlist-create': { title: 'New playlist', jobs: {
         updown: 'Move between rows of keys',
@@ -238,9 +240,12 @@ describe('the rows themselves', () => {
     });
     expect(helpRows('video').map(function(r) { return r.id; })).not.toContain('stop');
   });
-  it('gives the burger a job only where it has one — a ＋ to press, or Night Mode (TASK-600/601)', () => {
+  // The seven browsing screens that claim `c` (ui/screens/context-press.js), plus
+  // the two players where it is Night Mode. Checked against what shipped, not
+  // against TASK-601's spec, which had excluded the clip list.
+  it('gives the burger a job on exactly the screens that claim it (TASK-600/601)', () => {
     var withBurger = Object.keys(HELP_TABLE).filter(function(s) { return HELP_TABLE[s].jobs.burger; });
-    expect(new Set(withBurger)).toEqual(new Set(['browse', 'detail', 'album', 'artist', 'rail-grid', 'playlist', 'video', 'channel']));
+    expect(new Set(withBurger)).toEqual(new Set(['browse', 'detail', 'album', 'artist', 'rail-grid', 'playlist', 'home-movies', 'video', 'channel']));
   });
   it('covers every TV surface the remote reaches', () => {
     expect(new Set(Object.keys(HELP_TABLE))).toEqual(new Set([
@@ -248,6 +253,36 @@ describe('the rows themselves', () => {
       'playlist-create', 'profile', 'guide', 'video', 'audio', 'channel', 'queue', 'error'
     ]));
   });
+  // The card's whole risk is telling lies, and the cheapest lie to tell is about
+  // a key a screen quietly stopped or started claiming. This reads the screens
+  // themselves: a screen that registers the burger must have words for it here,
+  // and one that does not must not. It cannot kill a mutant (it re-reads source),
+  // and it is not there for that — it is there so the next row to touch `c` finds
+  // this table rather than shipping a card that lies.
+  const BURGER_SCREENS = {
+    'screen-browse-page.js': 'browse',
+    'screen-rail-grid-page.js': 'rail-grid',
+    'screen-detail-page.js': 'detail',
+    'screen-album-detail-page.js': 'album',
+    'screen-artist-page.js': 'artist',
+    'screen-playlist-detail-page.js': 'playlist',
+    'screen-home-movies-list-page.js': 'home-movies'
+  };
+
+  it('has words for the burger on every screen whose source claims `c`, and on no other browsing screen', () => {
+    const claims = Object.keys(BURGER_SCREENS).filter(function(f) {
+      return readFileSync(new URL('../../ui/screens/' + f, import.meta.url), 'utf8').includes('pressFocusedPlus');
+    });
+    expect(new Set(claims)).toEqual(new Set(Object.keys(BURGER_SCREENS)));
+    claims.forEach(function(f) {
+      expect(HELP_TABLE[BURGER_SCREENS[f]].jobs.burger).toBeTruthy();
+    });
+    // The screens that draw no ＋ say so rather than promising one.
+    ['search', 'playlist-create', 'profile', 'guide', 'audio', 'queue', 'error'].forEach(function(s) {
+      expect(HELP_TABLE[s].jobs.burger).toBeUndefined();
+    });
+  });
+
   it('titles each surface for the viewer, not by its module name', () => {
     expect(HELP_TABLE.video.title).toBe('Watching');
     expect(HELP_TABLE.audio.title).toBe('Listening');

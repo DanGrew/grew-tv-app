@@ -283,11 +283,14 @@ export function emptyVideoContext(display) {
 // `card` (TASK-565) is the one line the phone shows while the TV is holding a
 // card — core/channel-card.js's cardStatusLine — and null while a programme is
 // actually playing, which is what puts the item's own title back.
-export function channelVideoContext(display, source, card) {
+// `channelId` (BUG-632) is the channel playing, so the phone names the rail it
+// was tuned in from only when that rail's tapped channel is this one.
+export function channelVideoContext(display, source, card, channelId) {
   var context = emptyVideoContext(display);
   context.channel = true;
   context.channelSource = source;
   context.channelCard = [card].filter(Boolean).concat([null])[0];
+  context.channelId = [channelId].filter(Boolean).concat([null])[0];
   return context;
 }
 

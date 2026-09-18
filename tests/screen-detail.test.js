@@ -229,6 +229,16 @@ test.describe('season selector (TASK-123)', () => {
     await expect(page.locator('.season-chip[data-season="1"]')).toBeFocused();
   });
 
+  // TASK-598 story 2 — deriving the path from the page keeps the season rule: of
+  // the chips only the active one is a ▼ stop (Left/Right walk the rest), so the
+  // path runs crumbs → Play next → the active chip → its episodes.
+  test('▼ walks crumbs, Play next, the active season chip only, then its rows (TASK-598)', async ({ page }) => {
+    await openSeasons(page);
+    const crumbs = await page.locator('#breadcrumb .crumb-link').evaluateAll(els => els.map(e => e.id));
+    const path = crumbs.concat(['btn-play-next', 'season-chip active', 'row:ib-s1e1', 'row:ib-s1e2']);
+    expect(await dpadPath(page, '#' + path[0], 'ArrowDown', path.length - 1)).toEqual(path.slice(1));
+  });
+
   test('a seasons-less series shows no chips (legacy single list)', async ({ page }) => {
     await openDetail(page);
     await expect(page.locator('.season-chip')).toHaveCount(0);

@@ -1,7 +1,8 @@
 import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { helpCard } from './help-card.js';
-import { buildDetailList, detailArrow, detailLeft, detailRight } from './screen-detail.js';
+import { pressFocusedPlus } from './context-press.js';
+import { buildDetailList, detailArrow, detailLeft, detailRight, focusEntryStop } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadAlbum, loadContinueWatching, addToPlaylist, addSourceToPlaylist, loadBrowse } from '../../core/app-api.js';
 import { itemMediaType, queueAdd, queueAddStatus, QUEUE_ADD_LABEL } from '../../core/queue-shell-config.js';
@@ -37,7 +38,7 @@ export function initAlbumDetailPage() {
   // TASK-321: no header Play/Shuffle — entry focus lands on the first track row,
   // tapping it starts the album from there.
   function focusFirstRow() {
-    [document.querySelector('.detail-row')].filter(Boolean).forEach(function(r) { r.focus(); });
+    focusEntryStop('.detail-row');
   }
 
   function goBack(e) { [e].filter(Boolean).forEach(function(ev) { ev.preventDefault(); }); navTo('browse.html'); }
@@ -199,7 +200,8 @@ export function initAlbumDetailPage() {
       ArrowUp:    detailArrow,
       ArrowDown:  detailArrow,
       ArrowLeft:  detailLeft,
-      ArrowRight: detailRight
+      ArrowRight: detailRight,
+      c:          pressFocusedPlus
     },
     remote: {},
     help: 'album',

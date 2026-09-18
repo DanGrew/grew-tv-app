@@ -1,6 +1,7 @@
 import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { helpCard } from './help-card.js';
+import { pressFocusedPlus } from './context-press.js';
 import { gridArrow, renderGrid, focusFirstGridTile } from './screen-rail-grid.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching } from '../../core/app-api.js';
@@ -117,7 +118,8 @@ export function initRailGridPage() {
       ArrowUp:    gridArrow,
       ArrowDown:  gridArrow,
       Escape:     goBack,
-      Backspace:  goBack
+      Backspace:  goBack,
+      c:          pressFocusedPlus
     },
     remote: {},
     help: 'rail-grid',
