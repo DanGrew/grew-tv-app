@@ -1,5 +1,6 @@
 import { getParam, getProfile, getPerson, navTo, getLyrics, setLyrics as saveLyricsPref, initLyrics } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { helpCard } from './help-card.js';
 import { setup as setupPlayer } from './screen-audio-player.js';
 import { setupQueueShell } from './screen-queue-shell.js';
 import { MUSIC } from '../../core/queue-shell-config.js';
@@ -323,7 +324,10 @@ export function initAudioPage() {
   // one thing drawn over this transport, and a press behind it does nothing.
   function overlayOpen() { return !!document.querySelector('.jump-popup'); }
   claimRocker(keys, { queue: queue, overlayOpen: overlayOpen });
-  initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); armHide(); }, keys: keys, remote: player.remote });
+  // TASK-633 — the Queue overlay has its own row on the Info card.
+  var HELP_SURFACE = { 'true': 'queue', 'false': 'audio' };
+  function helpSurface() { return HELP_SURFACE[queue.isOpen() + '']; }
+  initPage({ onEnter: function() { document.getElementById('btn-play-pause').focus(); armHide(); }, keys: keys, remote: player.remote, help: helpSurface, card: helpCard });
 
   // Companion `play` carries a track id -> teleport via the server play-track
   // action (no id -> resume local <audio>). `playAlbum`/`playArtist` jump the TV

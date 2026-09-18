@@ -1,5 +1,6 @@
 import { getParam, getProfile, getPerson, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { helpCard } from './help-card.js';
 import { pressFocusedPlus } from './context-press.js';
 import { buildDetailList, detailArrow, detailLeft, detailRight, focusEntryStop } from './screen-detail.js';
 import { connectApp } from '../../core/app-ws.js';
@@ -308,7 +309,9 @@ export function initPlaylistDetailPage() {
       ArrowRight: detailRight,
       c:          pressFocusedPlus
     },
-    remote: {}
+    remote: {},
+    help: 'playlist',
+    card: helpCard
   });
 
   Promise.all([

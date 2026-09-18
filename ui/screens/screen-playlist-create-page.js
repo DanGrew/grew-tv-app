@@ -1,5 +1,6 @@
 import { getParam, getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { helpCard } from './help-card.js';
 import { createPlaylist, renamePlaylist, addToPlaylist, addSourceToPlaylist } from '../../core/app-api.js';
 import { CHAR_KEYS, KEY_COLS, appendChar, backspace, cleanName, isValidName, gridIndex, editorMode, typedChar } from '../../core/playlist-name.js';
 
@@ -138,6 +139,8 @@ export function initPlaylistCreatePage() {
       Escape:    function(e) { e.preventDefault(); cancel(); },
       Backspace: function(e) { e.preventDefault(); setName(backspace(st.name)); }
     },
-    remote: {}
+    remote: {},
+    help: 'playlist-create',
+    card: helpCard
   });
 }

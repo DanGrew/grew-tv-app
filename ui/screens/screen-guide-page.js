@@ -1,5 +1,6 @@
 import { getProfile, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
+import { helpCard } from './help-card.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadChannels, loadChannelSchedule } from '../../core/app-api.js';
 import { channelCardView } from '../../core/channels.js';
@@ -488,7 +489,9 @@ export function initGuidePage() {
       ArrowUp:    function(e) { e.preventDefault(); goUp(); },
       ArrowDown:  function(e) { e.preventDefault(); goDown(); }
     },
-    remote: {}
+    remote: {},
+    help: 'guide',
+    card: helpCard
   });
 
   loadChannels(SERVER, profile)

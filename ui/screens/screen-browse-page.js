@@ -14,6 +14,7 @@ import { mountSearch } from './screen-search.js';
 import { mountContinueMenu } from './continue-menu.js';
 import { continueTarget } from '../../core/browse-continue.js';
 import { mountBreadcrumb } from './breadcrumb.js';
+import { helpCard } from './help-card.js';
 
 // Backend = page origin, not a hardcoded host (BUG-009 — see screen-video-page).
 var SERVER = window.location.origin;
@@ -178,10 +179,17 @@ export function initBrowsePage() {
   document.addEventListener('keydown', dispatchKey);
   mountBreadcrumb('breadcrumb', buildCrumbs('browse'));
 
+  // TASK-633 — Search is a surface of its own over browse, so the Info card
+  // reads its row while the panel is open.
+  var HELP_SURFACE = { 'true': 'search', 'false': 'browse' };
+  function helpSurface() { return HELP_SURFACE[document.getElementById('search-panel').classList.contains('open') + '']; }
+
   initPage({
     onEnter: function() { [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); }); },
     keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow, Escape: browseHome, c: pressFocusedPlus },
-    remote: {}
+    remote: {},
+    help: helpSurface,
+    card: helpCard
   });
 
   var profile = [getProfile()].filter(Boolean).concat(['kids'])[0];
