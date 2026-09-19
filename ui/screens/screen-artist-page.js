@@ -184,7 +184,7 @@ export function initArtistPage() {
       ArrowDown:  detailArrow,
       ArrowLeft:  detailLeft,
       ArrowRight: detailRight,
-      c:          pressFocusedPlus
+      '=':        pressFocusedPlus
     },
     remote: {},
     help: 'artist',

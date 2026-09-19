@@ -11,7 +11,8 @@
 // Every row is checked against SHIPPED behaviour, not a spec: TASK-594 (Home on
 // Browse), TASK-598 (the focus paths), TASK-600 (the burger on the players),
 // TASK-601 (the burger while browsing, the clip list included) and TASK-602 (the
-// rocker) have all merged, and this row is the last of FEAT-526's build.
+// rocker) have all merged. TASK-637 moved adding the focused item from the
+// burger to + on every browsing screen, and gave Browse's burger the ▶ play menu.
 //
 // ⛔ **Back and Stop are left off entirely.** Neither reaches the page at all —
 // macOS routes both to its own Now Playing target, measured 2026-09-17, which is
@@ -57,7 +58,8 @@ export var HELP_TABLE = {
     leftright: 'Move along a rail',
     ok: 'Open or play what is focused',
     home: 'Back to the section list',
-    burger: 'Add the focused film or music video to its Queue'
+    burger: 'Open or close the ▶ play menu',
+    plus: 'Add the focused film or music video to its Queue'
   } },
   search: { title: 'Search', jobs: {
     updown: 'Move between the keys and the results',
@@ -70,42 +72,42 @@ export var HELP_TABLE = {
     leftright: 'Move along a row — Restart, ＋ Queue',
     ok: 'Play the episode, or press what is focused',
     home: 'Back one step',
-    burger: 'Add the focused episode to the Queue'
+    plus: 'Add the focused episode to the Queue'
   } },
   album: { title: 'Album', jobs: {
     updown: 'Move between tracks',
     leftright: 'Move along a row',
     ok: 'Play the track, or press what is focused',
     home: 'Back one step',
-    burger: 'Add the focused track to a playlist'
+    plus: 'Add the focused track to a playlist'
   } },
   artist: { title: 'Artist', jobs: {
     updown: 'Move between tracks',
     leftright: 'Move along a row',
     ok: 'Play the track, or press what is focused',
     home: 'Back one step',
-    burger: 'Add the focused track to a playlist'
+    plus: 'Add the focused track to a playlist'
   } },
   'home-movies': { title: 'Home movies', jobs: {
     updown: 'Move between clips',
     leftright: 'Move along a row',
     ok: 'Play the clip',
     home: 'Back one step',
-    burger: 'Add the focused clip to the Queue'
+    plus: 'Add the focused clip to the Queue'
   } },
   'rail-grid': { title: 'Rail', jobs: {
     updown: 'Move between rows of the grid',
     leftright: 'Move along a row',
     ok: 'Open or play what is focused',
     home: 'Back one step',
-    burger: 'Add the focused film or music video to its Queue'
+    plus: 'Add the focused film or music video to its Queue'
   } },
   playlist: { title: 'Playlist', jobs: {
     updown: 'Move between tracks',
     leftright: 'Move along a row',
     ok: 'Play the track, or press what is focused',
     home: 'Back one step',
-    burger: 'Add the focused track to a playlist'
+    plus: 'Add the focused track to a playlist'
   } },
   'playlist-create': { title: 'New playlist', jobs: {
     updown: 'Move between rows of keys',

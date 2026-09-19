@@ -307,7 +307,7 @@ export function initPlaylistDetailPage() {
       ArrowDown:  detailArrow,
       ArrowLeft:  detailLeft,
       ArrowRight: detailRight,
-      c:          pressFocusedPlus
+      '=':        pressFocusedPlus
     },
     remote: {},
     help: 'playlist',

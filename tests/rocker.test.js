@@ -199,14 +199,14 @@ test.describe('the music player', () => {
   });
 });
 
-// Story 8 — nothing off a player claims either key.
-test('− and + on Browse do nothing', async ({ page }) => {
+// Story 8 — nothing off a player claims −. (+ adds the focused item while
+// browsing since TASK-637 — tests/context-press.test.js.)
+test('− on Browse does nothing', async ({ page }) => {
   await installApi(page);
   await page.goto('/app/homeview/profile.html');
   await pickPerson(page, 'kids');
   await expect(page.locator('#screen-browse')).toBeVisible();
   const url = page.url();
-  await page.keyboard.press('=');
   await page.keyboard.press('-');
   await settle(page);
   expect(page.url()).toBe(url);

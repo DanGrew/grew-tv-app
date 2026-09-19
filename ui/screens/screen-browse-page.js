@@ -57,8 +57,14 @@ export function initBrowsePage() {
   // up exactly where it was. A menu with no live button at all keeps focus on ▶
   // rather than putting it somewhere a press would do nothing.
   function queueMenuEl() { return document.getElementById('queue-menu'); }
+  function queueMenuBtn() { return document.getElementById('btn-queue-menu'); }
   function queueMenuOpen() { return queueMenuEl().classList.contains('open'); }
+  // Where the burger hands focus back to when it closes the menu. Every open
+  // resets it to ▶, so a menu opened with OK and closed with the burger lands
+  // on ▶, never on a tile left over from an earlier burger press.
+  var menuOrigin = null;
   function openQueueMenu() {
+    menuOrigin = queueMenuBtn();
     queueMenuEl().classList.add('open');
     [menuStops()[0]].filter(Boolean).forEach(function(b) { b.focus(); });
   }
@@ -68,6 +74,33 @@ export function initBrowsePage() {
   }
   var MENU_TOGGLE = { 'true': closeQueueMenu, 'false': openQueueMenu };
   function toggleQueueMenu() { MENU_TOGGLE[queueMenuOpen() + ''](); }
+
+  // TASK-637 (FEAT-526) — the burger opens and closes the ▶ play menu, so
+  // carrying on from the couch is one press. It is a click on the ▶ already
+  // drawn, so the menu's own open and focus (TASK-595) stay the menu's. Focus
+  // moves to ▶ first, so a menu with nothing live to focus leaves it on ▶ —
+  // never on the tile, where + would add what sits behind the menu. Closing
+  // hands focus back to where the burger was pressed from, not to ▶.
+  //
+  // Search stops every key at its panel, so the burger never reaches here while
+  // Search is open.
+  var BURGER = {
+    'false': function() {
+      var from = document.activeElement;
+      queueMenuBtn().focus();
+      queueMenuBtn().click();
+      menuOrigin = from;
+    },
+    'true': function() {
+      var back = menuOrigin;
+      queueMenuBtn().click();
+      back.focus();
+    }
+  };
+  function burgerPlayMenu(e) {
+    e.preventDefault();
+    BURGER[queueMenuOpen() + '']();
+  }
 
   // Home closes it, the way Home closes Search and the Queue overlay. Scoped to
   // the menu's own mount and live only while the menu is open, and it stops the
@@ -186,7 +219,7 @@ export function initBrowsePage() {
 
   initPage({
     onEnter: function() { [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); }); },
-    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow, Escape: browseHome, c: pressFocusedPlus },
+    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow, Escape: browseHome, '=': pressFocusedPlus, c: burgerPlayMenu },
     remote: {},
     help: helpSurface,
     card: helpCard
