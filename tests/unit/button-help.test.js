@@ -79,7 +79,7 @@ describe('helpRows', () => {
     var row = helpRows('browse').filter(function(r) { return r.id === 'burger'; })[0];
     expect(row.glyph).toBe('☰');
     expect(row.name).toBe('Burger');
-    expect(row.words).toBe('Add the focused film or music video to its Queue');
+    expect(row.words).toBe('Open or close the ▶ play menu');
   });
   it('gives Info its standing words on every surface', () => {
     var words = Object.keys(HELP_TABLE).map(function(s) {
@@ -108,7 +108,8 @@ describe('the table, whole', () => {
         leftright: 'Move along a rail',
         ok: 'Open or play what is focused',
         home: 'Back to the section list',
-        burger: 'Add the focused film or music video to its Queue'
+        burger: 'Open or close the ▶ play menu',
+        plus: 'Add the focused film or music video to its Queue'
       } },
       search: { title: 'Search', jobs: {
         updown: 'Move between the keys and the results',
@@ -121,42 +122,42 @@ describe('the table, whole', () => {
         leftright: 'Move along a row — Restart, ＋ Queue',
         ok: 'Play the episode, or press what is focused',
         home: 'Back one step',
-        burger: 'Add the focused episode to the Queue'
+        plus: 'Add the focused episode to the Queue'
       } },
       album: { title: 'Album', jobs: {
         updown: 'Move between tracks',
         leftright: 'Move along a row',
         ok: 'Play the track, or press what is focused',
         home: 'Back one step',
-        burger: 'Add the focused track to a playlist'
+        plus: 'Add the focused track to a playlist'
       } },
       artist: { title: 'Artist', jobs: {
         updown: 'Move between tracks',
         leftright: 'Move along a row',
         ok: 'Play the track, or press what is focused',
         home: 'Back one step',
-        burger: 'Add the focused track to a playlist'
+        plus: 'Add the focused track to a playlist'
       } },
       'home-movies': { title: 'Home movies', jobs: {
         updown: 'Move between clips',
         leftright: 'Move along a row',
         ok: 'Play the clip',
         home: 'Back one step',
-        burger: 'Add the focused clip to the Queue'
+        plus: 'Add the focused clip to the Queue'
       } },
       'rail-grid': { title: 'Rail', jobs: {
         updown: 'Move between rows of the grid',
         leftright: 'Move along a row',
         ok: 'Open or play what is focused',
         home: 'Back one step',
-        burger: 'Add the focused film or music video to its Queue'
+        plus: 'Add the focused film or music video to its Queue'
       } },
       playlist: { title: 'Playlist', jobs: {
         updown: 'Move between tracks',
         leftright: 'Move along a row',
         ok: 'Play the track, or press what is focused',
         home: 'Back one step',
-        burger: 'Add the focused track to a playlist'
+        plus: 'Add the focused track to a playlist'
       } },
       'playlist-create': { title: 'New playlist', jobs: {
         updown: 'Move between rows of keys',
@@ -240,12 +241,25 @@ describe('the rows themselves', () => {
     });
     expect(helpRows('video').map(function(r) { return r.id; })).not.toContain('stop');
   });
-  // The seven browsing screens that claim `c` (ui/screens/context-press.js), plus
-  // the two players where it is Night Mode. Checked against what shipped, not
-  // against TASK-601's spec, which had excluded the clip list.
-  it('gives the burger a job on exactly the screens that claim it (TASK-600/601)', () => {
+  // TASK-637: the burger opens the play menu on Browse and is Night Mode on the
+  // two players; nowhere else. + adds on the seven browsing screens and is Next
+  // (or channel up) wherever something plays.
+  it('gives the burger a job on exactly Browse and the two players with Night Mode (TASK-600/637)', () => {
     var withBurger = Object.keys(HELP_TABLE).filter(function(s) { return HELP_TABLE[s].jobs.burger; });
-    expect(new Set(withBurger)).toEqual(new Set(['browse', 'detail', 'album', 'artist', 'rail-grid', 'playlist', 'home-movies', 'video', 'channel']));
+    expect(new Set(withBurger)).toEqual(new Set(['browse', 'video', 'channel']));
+  });
+  it('gives + a job on the seven browsing screens and wherever something plays (TASK-602/637)', () => {
+    var withPlus = Object.keys(HELP_TABLE).filter(function(s) { return HELP_TABLE[s].jobs.plus; });
+    expect(new Set(withPlus)).toEqual(new Set(['browse', 'detail', 'album', 'artist', 'rail-grid', 'playlist', 'home-movies', 'video', 'audio', 'channel', 'queue']));
+  });
+  it('says the burger opens the play menu on Browse (TASK-637 story 8)', () => {
+    expect(HELP_TABLE.browse.jobs.burger).toBe('Open or close the ▶ play menu');
+    expect(HELP_TABLE.browse.jobs.plus).toBe('Add the focused film or music video to its Queue');
+  });
+  it('leaves − with no job on every browsing screen (TASK-637)', () => {
+    ['browse', 'detail', 'album', 'artist', 'rail-grid', 'playlist', 'home-movies'].forEach(function(s) {
+      expect(HELP_TABLE[s].jobs.minus).toBeUndefined();
+    });
   });
   it('covers every TV surface the remote reaches', () => {
     expect(new Set(Object.keys(HELP_TABLE))).toEqual(new Set([
@@ -259,7 +273,7 @@ describe('the rows themselves', () => {
   // and one that does not must not. It cannot kill a mutant (it re-reads source),
   // and it is not there for that — it is there so the next row to touch `c` finds
   // this table rather than shipping a card that lies.
-  const BURGER_SCREENS = {
+  const PLUS_SCREENS = {
     'screen-browse-page.js': 'browse',
     'screen-rail-grid-page.js': 'rail-grid',
     'screen-detail-page.js': 'detail',
@@ -269,14 +283,17 @@ describe('the rows themselves', () => {
     'screen-home-movies-list-page.js': 'home-movies'
   };
 
-  it('has words for the burger on every screen whose source claims `c`, and on no other browsing screen', () => {
-    const claims = Object.keys(BURGER_SCREENS).filter(function(f) {
-      return readFileSync(new URL('../../ui/screens/' + f, import.meta.url), 'utf8').includes('pressFocusedPlus');
+  it('has words for + on every screen whose source claims it for adding, and the burger only where Browse claims it', () => {
+    const src = function(f) { return readFileSync(new URL('../../ui/screens/' + f, import.meta.url), 'utf8'); };
+    const claims = Object.keys(PLUS_SCREENS).filter(function(f) {
+      return /'=':\s*pressFocusedPlus/.test(src(f));
     });
-    expect(new Set(claims)).toEqual(new Set(Object.keys(BURGER_SCREENS)));
+    expect(new Set(claims)).toEqual(new Set(Object.keys(PLUS_SCREENS)));
     claims.forEach(function(f) {
-      expect(HELP_TABLE[BURGER_SCREENS[f]].jobs.burger).toBeTruthy();
+      expect(HELP_TABLE[PLUS_SCREENS[f]].jobs.plus).toBeTruthy();
     });
+    const burgers = Object.keys(PLUS_SCREENS).filter(function(f) { return /\bc:\s/.test(src(f)); });
+    expect(burgers).toEqual(['screen-browse-page.js']);
     // The screens that draw no ＋ say so rather than promising one.
     ['search', 'playlist-create', 'profile', 'guide', 'audio', 'queue', 'error'].forEach(function(s) {
       expect(HELP_TABLE[s].jobs.burger).toBeUndefined();

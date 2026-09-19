@@ -119,7 +119,7 @@ export function initRailGridPage() {
       ArrowDown:  gridArrow,
       Escape:     goBack,
       Backspace:  goBack,
-      c:          pressFocusedPlus
+      '=':        pressFocusedPlus
     },
     remote: {},
     help: 'rail-grid',

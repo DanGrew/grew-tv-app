@@ -1,5 +1,7 @@
-// FEAT-526/TASK-601 — ☰ Context (`c`) on a browsing screen presses the ＋ that
-// belongs to whatever is focused: a tile's ＋ badge, or a row's ＋ / ＋ Queue.
+// FEAT-526/TASK-637 — the remote's + (`=`) on a browsing screen presses the ＋
+// that belongs to whatever is focused: a tile's ＋ badge, or a row's ＋ / ＋ Queue.
+// One meaning per kind of surface: while browsing + adds, while playing it is
+// Next (ui/screens/rocker.js), and no browsing page claims `=` for anything else.
 // It is a press on the control already drawn, never a second path to its
 // action — so which Queue it fills (BUG-531, `itemMediaType()` inside each
 // onQueue) and where focus goes when a sheet closes stay the control's own.

@@ -201,7 +201,7 @@ export function initAlbumDetailPage() {
       ArrowDown:  detailArrow,
       ArrowLeft:  detailLeft,
       ArrowRight: detailRight,
-      c:          pressFocusedPlus
+      '=':        pressFocusedPlus
     },
     remote: {},
     help: 'album',
