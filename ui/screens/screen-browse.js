@@ -2,6 +2,7 @@ import { registerScreen } from '../../core/screen-registry.js';
 import { createTile, createChannelTile, applyChannelView } from '../../components/tile.js';
 import { buildTabs, railsForBrowseSection, clampIndex } from '../../core/home-rails.js';
 import { progressMapFromCW } from '../../core/progress.js';
+import { hasProgress, withoutProgress } from '../../core/minus-clear.js';
 import { personGlyph } from '../../core/profile-config.js';
 import { withChannelsTab, channelsById, channelCardView, landingTab, tileVariant } from '../../core/channels.js';
 
@@ -441,6 +442,28 @@ function renderSidebar(tabs) {
 // on the same tab (and thus can restore focus to the last-opened tile).
 export function getActiveTab() {
   return STATE.activeTab;
+}
+
+// TASK-643 — whether − can clear this tile: the active person's Continue
+// Watching rows carry its id (core/minus-clear.js).
+export function tileHasProgress(tile) {
+  return hasProgress(STATE.cw, tile.getAttribute('data-id'));
+}
+
+// TASK-643 — the backend has cleared `tile`'s progress: drop its row and redraw
+// the tab, so it leaves Continue Watching and its bar goes from every rail at
+// once. Focus stays on the rail it was pressed on, at the same place — the next
+// tile along where the cleared one left the Continue Watching rail — and falls
+// to the first tile when that rail has gone with it.
+export function dropProgress(tile) {
+  var row = tile.closest('.rail-row');
+  var railId = row.getAttribute('data-rail');
+  var col = tilesIn(row).indexOf(tile);
+  STATE.cw = withoutProgress(STATE.cw, tile.getAttribute('data-id'));
+  STATE.progress = progressMapFromCW(STATE.cw);
+  renderRailRows(railsFor());
+  focusFirstTile();
+  focusCol(document.querySelector('.rail-row[data-rail="' + railId + '"]'), col);
 }
 
 // rails come from buildTabRails per the selected tab; the page passes the raw

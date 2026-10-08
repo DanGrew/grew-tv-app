@@ -41,8 +41,14 @@ Always pass all four flags (this exact shape):
   blank. That reads like a broken build and is a missing flag value — it wasted
   a hand-off on TASK-565. The trade is that the run pulls on boot and commits +
   pushes watch-progress snapshots there every few minutes, exactly as the Mini
-  does; `/tmp/grew-state` is only for a run that must not touch real progress
+  does; `/tmp/grew-state` is only for a run that must not push snapshots
   AND has nothing to do with channels.
+- ⚠️ **No `--state-repo-dir` isolates live progress.** The server reads and writes
+  progress in its own database, `~/.grew-tv/grew-tv.db`, and only restores from
+  the state dir when that database is empty — on the dev mac it never is (log:
+  `restore skipped — live progress present`). So a scratch state dir stops the
+  snapshot pushes, but a progress save or clear in the run is still real for
+  this mac's database (found testing TASK-643).
 
 NEVER hand the user a `git pull`/`git checkout`/"run from primary on updated
 main" step. If the backend lives in a worktree, serve from that worktree — even

@@ -109,6 +109,7 @@ describe('the table, whole', () => {
         ok: 'Open or play what is focused',
         home: 'Back to the section list',
         burger: 'Open or close the ▶ play menu',
+        minus: "Clear the focused item's progress (press twice)",
         plus: 'Add the focused film or music video to its Queue'
       } },
       search: { title: 'Search', jobs: {
@@ -256,8 +257,11 @@ describe('the rows themselves', () => {
     expect(HELP_TABLE.browse.jobs.burger).toBe('Open or close the ▶ play menu');
     expect(HELP_TABLE.browse.jobs.plus).toBe('Add the focused film or music video to its Queue');
   });
-  it('leaves − with no job on every browsing screen (TASK-637)', () => {
-    ['browse', 'detail', 'album', 'artist', 'rail-grid', 'playlist', 'home-movies'].forEach(function(s) {
+  it('says − clears the focused item\'s progress on Browse, two presses (TASK-643 story 5)', () => {
+    expect(HELP_TABLE.browse.jobs.minus).toBe("Clear the focused item's progress (press twice)");
+  });
+  it('leaves − with no job on every other browsing screen (TASK-637, TASK-643)', () => {
+    ['detail', 'album', 'artist', 'rail-grid', 'playlist', 'home-movies'].forEach(function(s) {
       expect(HELP_TABLE[s].jobs.minus).toBeUndefined();
     });
   });

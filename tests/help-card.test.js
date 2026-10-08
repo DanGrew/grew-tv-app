@@ -47,9 +47,10 @@ test('Info on Browse pops up the card, listing the buttons and what each does he
 test('a button that does nothing here still gets a line, saying so (story 3)', async ({ page }) => {
   await enterBrowse(page, 'kids');
   await pressInfo(page);
-  // The rocker does nothing while browsing — it steps a player's ⏮/⏭.
-  await expect(page.locator('#help-card [data-button="minus"]')).toContainText('Does nothing here');
-  await expect(page.locator('#help-card [data-button="minus"]')).toHaveClass(/help-none/);
+  // Play / Pause does nothing while browsing — nothing is playing. (This was the
+  // rocker's − until TASK-643 gave it clearing progress on Browse.)
+  await expect(page.locator('#help-card [data-button="playpause"]')).toContainText('Does nothing here');
+  await expect(page.locator('#help-card [data-button="playpause"]')).toHaveClass(/help-none/);
 });
 
 // The rails settle after load (the Continue cluster and the channel strip both
