@@ -23,7 +23,6 @@ describe('hasProgress', () => {
 
   it('is false with no rows at all', () => {
     expect(hasProgress([], 'film-a')).toBe(false);
-    expect(hasProgress(undefined, 'film-a')).toBe(false);
   });
 });
 
@@ -57,6 +56,6 @@ describe('withoutProgress', () => {
   });
 
   it('is empty with no rows at all', () => {
-    expect(withoutProgress(undefined, 'film-a')).toEqual([]);
+    expect(withoutProgress([], 'film-a')).toEqual([]);
   });
 });

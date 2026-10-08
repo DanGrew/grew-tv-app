@@ -14,8 +14,10 @@
 
 export var CLEAR_PROMPT = 'Clear progress?';
 
+// `cwRows` is always an array: the page defaults a missing answer to [] before
+// Browse ever holds it.
 export function hasProgress(cwRows, id) {
-  return (cwRows || []).some(function(r) { return r.item_id === id; });
+  return cwRows.some(function(r) { return r.item_id === id; });
 }
 
 // What one − press does to the focused tile: 'none' with no progress to clear,
@@ -28,5 +30,5 @@ export function minusAction(armed, progress) {
 // The Continue Watching rows once `id` is cleared — the rail and every bar on
 // the page are drawn from these, so dropping the row is the whole of "gone".
 export function withoutProgress(cwRows, id) {
-  return (cwRows || []).filter(function(r) { return r.item_id !== id; });
+  return cwRows.filter(function(r) { return r.item_id !== id; });
 }
