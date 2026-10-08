@@ -46,7 +46,7 @@ export function mountMinusClear(opts) {
   return function pressMinus(e) {
     [document.activeElement.closest('.film-tile')].filter(Boolean).forEach(function(tile) {
       e.preventDefault();
-      ACTIONS[minusAction(tile.classList.contains('armed'), tileHasProgress(tile.getAttribute('data-id')))](tile);
+      ACTIONS[minusAction(tile.classList.contains('armed'), tileHasProgress(tile))](tile);
     });
   };
 }

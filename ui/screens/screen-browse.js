@@ -446,8 +446,8 @@ export function getActiveTab() {
 
 // TASK-643 — whether − can clear this tile: the active person's Continue
 // Watching rows carry its id (core/minus-clear.js).
-export function tileHasProgress(id) {
-  return hasProgress(STATE.cw, id);
+export function tileHasProgress(tile) {
+  return hasProgress(STATE.cw, tile.getAttribute('data-id'));
 }
 
 // TASK-643 — the backend has cleared `tile`'s progress: drop its row and redraw
