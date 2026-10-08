@@ -1,6 +1,7 @@
 import { getProfile, getPerson, getParam, navTo } from '../../core/state.js';
 import { initPage, dispatchKey } from '../../core/screen-registry.js';
 import { pressFocusedPlus } from './context-press.js';
+import { mountMinusClear } from './minus-clear.js';
 import { browseArrow, browseHome, renderBrowse, getActiveTab, updateChannels, menuStops } from './screen-browse.js';
 import { connectApp } from '../../core/app-ws.js';
 import { loadBrowse, loadContinueWatching, loadConfig, loadTracks, loadEpisodes, loadChannels } from '../../core/app-api.js';
@@ -217,9 +218,17 @@ export function initBrowsePage() {
   var HELP_SURFACE = { 'true': 'search', 'false': 'browse' };
   function helpSurface() { return HELP_SURFACE[document.getElementById('search-panel').classList.contains('open') + '']; }
 
+  // TASK-643 (FEAT-526) — − clears the focused tile's progress, two presses to
+  // do it. + adds, − clears: Browse is the one surface where − is not previous.
+  var pressMinus = mountMinusClear({
+    server: SERVER,
+    getPerson: getPerson,
+    onFail: function() { showStatus('Could not clear progress.'); }
+  });
+
   initPage({
     onEnter: function() { [document.querySelector('.rail-row .film-tile')].filter(Boolean).forEach(function(t) { t.focus(); }); },
-    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow, Escape: browseHome, '=': pressFocusedPlus, c: burgerPlayMenu },
+    keys: { ArrowLeft: browseArrow, ArrowRight: browseArrow, ArrowUp: browseArrow, ArrowDown: browseArrow, Escape: browseHome, '=': pressFocusedPlus, '-': pressMinus, c: burgerPlayMenu },
     remote: {},
     help: helpSurface,
     card: helpCard

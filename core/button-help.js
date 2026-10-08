@@ -13,6 +13,7 @@
 // TASK-601 (the burger while browsing, the clip list included) and TASK-602 (the
 // rocker) have all merged. TASK-637 moved adding the focused item from the
 // burger to + on every browsing screen, and gave Browse's burger the ▶ play menu.
+// TASK-643 gave Browse's − clearing the focused tile's progress.
 //
 // ⛔ **Back and Stop are left off entirely.** Neither reaches the page at all —
 // macOS routes both to its own Now Playing target, measured 2026-09-17, which is
@@ -59,6 +60,7 @@ export var HELP_TABLE = {
     ok: 'Open or play what is focused',
     home: 'Back to the section list',
     burger: 'Open or close the ▶ play menu',
+    minus: "Clear the focused item's progress (press twice)",
     plus: 'Add the focused film or music video to its Queue'
   } },
   search: { title: 'Search', jobs: {

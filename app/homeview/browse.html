@@ -79,6 +79,10 @@ button:hover { background: var(--surface-hi); }
 .tile-queue:hover, .tile-queue:focus { outline: none; border-color: var(--focus); color: var(--focus); box-shadow: var(--focus-glow); }
 .tile-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,0.45); }
 .tile-progress-fill { height: 100%; background: var(--focus); }
+/* TASK-643 — a tile armed by − reads "Clear progress?" over its poster, in the
+   player's own Clear progress amber, until a second − clears it or focus moves. */
+.film-tile.armed, .film-tile.armed:focus { border-color: #ffce6b; }
+.tile-armed { position: absolute; left: 0; right: 0; top: 0; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.72); color: #ffce6b; font-size: var(--fs-md); font-weight: 700; }
 /* FEAT-560/TASK-563 — the Channels strip. A wider tile than the library's 372px
    because it carries three lines of its own, so the row reads as a different
    mode without needing a second visual language. */
