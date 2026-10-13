@@ -179,6 +179,23 @@ test('retry button on error returns to profile select', async ({ page }) => {
   }).toPass({ timeout: 5000 });
 });
 
+// BUG-651: the error page found the phone remote at a hardcoded ws://localhost:8766,
+// so only the kiosk could be driven. It now asks the server it was loaded from, like
+// every other screen. Serve a non-default wsPort so the old literal can't pass: the
+// remote's select only lands if the page connected where /api/config sent it.
+test('error page hears the remote on the port its server names (BUG-651)', async ({ page }) => {
+  let errorWs = null;
+  await page.route('**/api/config', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ wsPort: 8771 })
+  }));
+  await page.routeWebSocket(/:8771/, function(ws) { errorWs = ws; });
+  await page.goto('/app/homeview/error.html');
+  await expect(page.locator('#screen-error')).toBeVisible();
+  await expect.poll(function() { return errorWs !== null; }).toBe(true);
+  await errorWs.send(JSON.stringify({ type: 'intent', payload: { intent: 'select' } }));
+  await expect(page.locator('#screen-profile')).toBeVisible();
+});
+
 test('select standalone video plays directly with src set', async ({ page }) => {
   await pickPerson(page, 'kids');
   await page.locator('.sidebar-tab[data-tab="films"]').click();

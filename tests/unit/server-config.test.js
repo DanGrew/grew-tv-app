@@ -64,6 +64,26 @@ describe('fetchWsUrl (TASK-297)', () => {
     global.fetch = vi.fn(function() { return Promise.reject(new Error('nope')); });
     expect(await fetchWsUrl('http://localhost:8765')).toBe('ws://localhost:8766');
   });
+
+  it('falls back to the page host on the default port when the server is down (BUG-651)', async () => {
+    global.location = { hostname: '192.168.1.212' };
+    global.fetch = vi.fn(function() { return Promise.reject(new Error('down')); });
+    expect(await fetchWsUrl('http://192.168.1.212:8765')).toBe('ws://192.168.1.212:8766');
+  });
+
+  it('falls back to localhost when the page has no host — opened from disk (BUG-651)', async () => {
+    global.location = { hostname: '' };
+    global.fetch = vi.fn(function() { return Promise.reject(new Error('file://')); });
+    expect(await fetchWsUrl('null')).toBe('ws://localhost:8766');
+  });
+
+  it('keeps localhost for a hostless page even when config answers (BUG-651)', async () => {
+    global.location = { hostname: '' };
+    global.fetch = vi.fn(function() {
+      return Promise.resolve({ json: function() { return Promise.resolve({ wsPort: 8770 }); } });
+    });
+    expect(await fetchWsUrl('null')).toBe('ws://localhost:8770');
+  });
 });
 
 describe('httpsOrigin', () => {

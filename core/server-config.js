@@ -22,11 +22,17 @@ export function wsUrl(hostname, port) {
 // hardcoding 8766. The host still comes from location.hostname (what lets a LAN
 // device reach the WS, TASK-134). Falls back to WS_PORT if the endpoint or the
 // field is absent, so an older server or a fetch failure still connects.
+// BUG-651: a page with no host (opened from disk) falls back to `localhost`, so
+// the kiosk's error page still hears the remote while the server is down.
+function pageHost() {
+  return location.hostname || 'localhost';
+}
+
 export function fetchWsUrl(serverOrigin) {
   return fetch(serverOrigin + '/api/config')
     .then(function(r) { return r.json(); })
-    .then(function(c) { return wsUrl(location.hostname, c.wsPort); })
-    .catch(function() { return wsUrl(location.hostname); });
+    .then(function(c) { return wsUrl(pageHost(), c.wsPort); })
+    .catch(function() { return wsUrl(pageHost()); });
 }
 
 // TASK-405: same shape as the WS port above, for the HTTPS door (TASK-404) — the
