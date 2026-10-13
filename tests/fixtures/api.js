@@ -701,10 +701,10 @@ async function installApi(page) {
   await page.route('**/media/config.json', function(route) {
     return json(route, 200, CONFIG);
   });
-  // TASK-297: companion pages now resolve the WS port from /api/config.wsPort
-  // (core/server-config.js fetchWsUrl) instead of hardcoding 8766. Serve 8766 here
-  // so the resolved ws url stays ws://host:8766 and the routeWebSocket(/:8766/)
-  // stub below still matches. (The TV app still hardcodes 8766 via connectApp.)
+  // TASK-297: every page — companion and TV (connectApp), the error page too since
+  // BUG-651 — resolves the WS port from /api/config.wsPort (core/server-config.js
+  // fetchWsUrl) instead of hardcoding 8766. Serve 8766 here so the resolved ws url
+  // stays ws://host:8766 and the routeWebSocket(/:8766/) stub below still matches.
   // TASK-405: same reasoning for httpsPort (core/server-config.js
   // fetchHttpsOrigin) — 8767 matches the real backend's DEFAULT_HTTPS_PORT.
   await page.route('**/api/config', function(route) {

@@ -15,7 +15,7 @@ export function initErrorPage() {
 
   document.getElementById('btn-retry').addEventListener('click', function() { navTo('profile.html'); });
 
-  var wsApp = connectApp('ws://localhost:8766', function(intent) {
+  var wsApp = connectApp(window.location.origin, function(intent) {
     var INTENTS = {
       back:   function() { navTo('profile.html'); },
       select: retry,
